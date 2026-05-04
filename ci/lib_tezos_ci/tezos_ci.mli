@@ -603,8 +603,6 @@ module Images : sig
 
     val rpm_version : string
 
-    val homebrew_version : string
-
     val rust_toolchain_version : string
 
     val debian_bookworm : Image.t
@@ -632,7 +630,7 @@ module Images : sig
 
     val fedora_42 : Image.t
 
-    val homebrew : Image.t
+    val debian_homebrew_trixie : Image.t
 
     val rust_toolchain_trixie : Image.t
 

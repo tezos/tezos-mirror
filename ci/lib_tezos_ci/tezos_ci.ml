@@ -1654,9 +1654,8 @@ module Images = struct
     (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
        May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
        https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines *)
-    let homebrew_version = "master-be43e621"
-
-    let homebrew = make_img "debian-homebrew:trixie" homebrew_version
+    let debian_homebrew_trixie =
+      make_img "debian-homebrew:trixie" "master-be43e621"
 
     (* [debian-rust-trixie] *)
     (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2481391601
