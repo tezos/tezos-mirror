@@ -44,17 +44,18 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
     announcement="https://octez.tezos.com/docs/releases/version-${gitlab_release_major_version}.html"
 
     # Add the new version using version_manager
-    # [gitlab_release_rc_version], [gitlab_release_major_version] and [gitlab_release_minor_version] defined in [./scripts/releases/octez-release.sh]
+    # [gitlab_release_rc_version], [gitlab_release_beta_version], [gitlab_release_major_version] and [gitlab_release_minor_version] defined in [./scripts/releases/octez-release.sh]
     echo "Adding version ${gitlab_release} to release page..."
     $VM \
       add \
       --major "${gitlab_release_major_version}" \
       --minor "${gitlab_release_minor_version}" \
       ${gitlab_release_rc_version:+--rc "${gitlab_release_rc_version}"} \
+      ${gitlab_release_beta_version:+--beta "${gitlab_release_beta_version}"} \
       --announcement "${announcement}"
 
-    # Set as latest only if not an RC
-    if [ -z "${gitlab_release_rc_version}" ]; then
+    # Set as latest only if not an RC or beta
+    if [ -z "${gitlab_release_rc_version}" ] && [ -z "${gitlab_release_beta_version}" ]; then
       echo "Setting version as latest..."
       $VM \
         set-latest \
@@ -62,8 +63,8 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
         --minor "${gitlab_release_minor_version}"
     fi
 
-    # Active versions logic
-    if [ -z "${gitlab_release_rc_version}" ] && [ "${gitlab_release_minor_version}" = "0" ]; then
+    # Active versions logic: only for stable major releases (not RC, not beta)
+    if [ -z "${gitlab_release_rc_version}" ] && [ -z "${gitlab_release_beta_version}" ] && [ "${gitlab_release_minor_version}" = "0" ]; then
 
       echo "Major release (${gitlab_release_major_version}.0), set all previous versions as not active..."
 
