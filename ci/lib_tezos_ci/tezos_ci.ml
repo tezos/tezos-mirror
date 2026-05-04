@@ -1608,6 +1608,8 @@ module Images = struct
     let make_img distro version =
       Image.mk_external ~image_path:(sf "%s/%s-%s" path_prefix distro version)
 
+    (* DEB packaging *)
+
     (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2491675993
        May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
        https://gitlab.com/tezos/tezos/-/commit/05e36a5c/pipelines *)
@@ -1617,14 +1619,11 @@ module Images = struct
 
     let debian_trixie = make_img "debian:trixie" debian_version
 
-    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2439598666
-       after https://gitlab.com/tezos/tezos/-/merge_requests/21554 was merged *)
-    let debian_jsonnet_trixie =
-      make_img "debian-jsonnet:trixie" "master-d70f7d37"
-
     let ubuntu_22_04 = make_img "ubuntu:22.04" debian_version
 
     let ubuntu_24_04 = make_img "ubuntu:24.04" debian_version
+
+    (* RPM packaging *)
 
     (* Version created by
        https://gitlab.com/tezos/tezos/-/pipelines/2412618967
@@ -1645,6 +1644,13 @@ module Images = struct
 
     let fedora_42 = make_img "fedora:42" rpm_version
 
+    (* [debian-jsonnet-trixie] *)
+    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2439598666
+       after https://gitlab.com/tezos/tezos/-/merge_requests/21554 was merged *)
+    let debian_jsonnet_trixie =
+      make_img "debian-jsonnet:trixie" "master-d70f7d37"
+
+    (* [debian-homebrew-trixie] *)
     (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
        May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
        https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines *)
@@ -1652,6 +1658,7 @@ module Images = struct
 
     let homebrew = make_img "debian-homebrew:trixie" homebrew_version
 
+    (* [debian-rust-trixie] *)
     (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2481391601
        which contains libclang for building rocksdb in CI.
 
@@ -1666,10 +1673,11 @@ module Images = struct
     let rust_toolchain_trixie =
       make_img "debian-rust:trixie" rust_toolchain_version
 
+    (* [ci-release] *)
     (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
        May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
        https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines *)
-    (* FIXME: currently not used. *)
+    (* FIXME: currently not used. + make name consistent *)
     let _ci_release_version = "master-be43e621"
 
     let ci_release =
