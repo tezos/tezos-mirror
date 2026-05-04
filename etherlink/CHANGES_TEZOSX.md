@@ -13,6 +13,18 @@
   removed (`gas_price = 0` and `value = 0` in the internal call mean no
   pre-flight balance is required), and storage version 55 cleans up the
   residue on TezosX networks. (L2-1296)
+- Fix EVM logs from cross-VM `%call_evm` calls being dropped from the
+  synthetic CRAC transaction receipt. Previously
+  `commit_evm_journal_from_external` ran before
+  `extract_cross_runtime_effects`; the former calls
+  `JournalInner::finalize` which clears `inner.logs`, leaving the receipt
+  builder with an empty buffer. Only the `CracIdEvent` (constructed by
+  the receipt builder itself) survived; both the precompile's
+  `CracReceived` log and any `LOG0..LOG4` from the inner EVM call were
+  lost. The order is now reversed so the receipt builder reads
+  `inner.logs` while revm's standard accumulation is still intact,
+  restoring parity between the two ways into the EVM for indexers
+  (subgraphs, on-chain analytics, ERC-1155 wallet trackers).
 
 ### Internals
 

@@ -1180,6 +1180,15 @@ where
 
             credit_da_fees.apply(host)?;
 
+            // Extract cross-runtime side effects accumulated
+            // during the Michelson execution (e.g. CRAC into EVM)
+            // BEFORE the commit: `commit_evm_journal_from_external`
+            // runs `JournalInner::finalize()` which clears
+            // `inner.logs` as part of revm's standard cleanup, so
+            // reading them after gives an empty buffer.
+            let cross_runtime_effects =
+                extract_cross_runtime_effects(journal, consumed_milligas);
+
             if let (Some(outbox_queue), Some(evm_block_constants)) =
                 (outbox_queue, evm_block_constants)
             {
@@ -1191,10 +1200,6 @@ where
                 )?;
                 push_withdrawals_to_outbox(host, outbox_queue, etherlink_withdrawals)?;
             }
-
-            // Extract cross-runtime side effects from the journal.
-            let cross_runtime_effects =
-                extract_cross_runtime_effects(journal, consumed_milligas);
 
             Ok(crate::apply::ExecutionResult::Valid(
                 RuntimeExecutionInfo::Tezos {

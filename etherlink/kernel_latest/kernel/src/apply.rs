@@ -1311,18 +1311,22 @@ where
                             },
                         ),
                     };
+                    // Extract cross-runtime side effects accumulated
+                    // during the Michelson execution (e.g. CRAC into EVM)
+                    // BEFORE the commit: `commit_evm_journal_from_external`
+                    // runs `JournalInner::finalize()` which clears
+                    // `inner.logs` as part of revm's standard cleanup, so
+                    // reading them after gives an empty buffer.
+                    let cross_runtime_effects = extract_cross_runtime_effects(
+                        &mut tezosx_journal,
+                        consumed_milligas,
+                    );
                     let etherlink_withdrawals = commit_evm_journal_from_external(
                         host,
                         registry,
                         block_constants,
                         &mut tezosx_journal,
                     )?;
-                    // Extract cross-runtime side effects accumulated
-                    // during the Michelson execution (e.g. CRAC into EVM).
-                    let cross_runtime_effects = extract_cross_runtime_effects(
-                        &mut tezosx_journal,
-                        consumed_milligas,
-                    );
                     Ok::<_, anyhow::Error>(ExecutionResult::Valid(
                         RuntimeTransactionResult::Tezos {
                             op: operation_and_receipt,

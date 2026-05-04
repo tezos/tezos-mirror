@@ -1009,6 +1009,17 @@ module EvmStoreAndReturn = struct
     unit
 end
 
+(** EVM contract that emits two indexed events ([EventA], [EventB]) on
+ *  every [emitBoth(uint256)] call.  Used to verify that LOG opcodes
+ *  emitted by an EVM contract reached through a Michelson-initiated
+ *  cross-VM CRAC ([%call_evm]) are surfaced on the synthetic CRAC
+ *  transaction receipt. *)
+module EvmEvents = struct
+  open EvmContract
+
+  let deploy = deploy_solidity_contract ~contract:Solidity_contracts.events
+end
+
 (** Michelson-to-EVM bridge with callback for CRAC test scenarios.
  *  On [%run], calls the gateway's [%call_evm] with
  *  [Some(SELF %on_result)] as callback.  [%on_result] stores the
@@ -1590,6 +1601,10 @@ module CracRunnerWrapper = struct
       val deploy : unit -> evm_runner Lwt.t
 
       val check_storage : expected_value:int -> evm_runner -> unit Lwt.t
+    end
+
+    module EvmEvents : sig
+      val deploy : unit -> evm_runner Lwt.t
     end
 
     module TezCallbackRunnerEvm : sig
@@ -2306,6 +2321,19 @@ module CracRunnerWrapper = struct
           EvmStoreAndReturn.check_storage ~sequencer ~expected_value runner
       end
 
+      module EvmEvents = struct
+        let deploy () =
+          let* addr =
+            EvmEvents.deploy
+              ~evm_version
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ()
+          in
+          return (`Evm_runner addr)
+      end
+
       module TezCallbackRunnerEvm = struct
         let originate ?(failing = false) ~method_sig ~abi_params
             (`Evm_runner address) =
@@ -2965,6 +2993,195 @@ let test_crac_tez_to_evm_fake_tx_unique_hash_across_blocks =
   let* () = TezRunner.call_run ~gas_limit:200_000 tez_runner in
   let* () = EvmMultiRunCaller.check_storage ~expected_counter:2 evm_runner in
   Log.debug ~prefix "Both CRAC fake transactions stored successfully" ;
+  unit
+
+(** Regression test: EVM logs emitted during a Michelson-initiated
+ *  cross-VM call ([%call_evm]) must surface on the synthetic CRAC
+ *  transaction receipt.
+ *
+ *  Pre-fix, the kernel built the synthetic CRAC tx receipt by reading
+ *  [journal.evm.inner.logs] AFTER [JournalInner::finalize] (called by
+ *  [commit_evm_journal_from_external]) had cleared it.  Both the
+ *  precompile's [CracReceived] log and any LOG0..LOG4 from the inner
+ *  EVM call were lost; only the [CracIdEvent] survived because it is
+ *  constructed by the receipt builder itself.
+ *
+ *  This test deploys [events.sol], invokes [emitBoth(uint256)] via the
+ *  gateway's [%call_evm], and asserts that:
+ *    - the synthetic CRAC tx receipt carries the contract's two events
+ *      ([EventA] + [EventB]) plus precompile bookkeeping events
+ *      ([CracIdEvent] + [CracReceived]);
+ *    - [eth_getLogs] filtered by the contract address returns those
+ *      events, restoring parity with a regular EVM-EOA call.
+ *)
+let test_crac_tez_to_evm_inner_logs_in_receipt =
+  register_crac_runner_test
+    ~title:"CRAC: TEZ->EVM inner LOG opcodes surface on synthetic tx receipt"
+    ~tags:["crac_tx"; "regression"; "logs"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-LOGS" in
+  (* TezosX runtime gateway precompile address. *)
+  let evm_gateway_address = "0xff00000000000000000000000000000000000007" in
+  Log.debug ~prefix "Deploy EVM events emitter" ;
+  let* evm_target = EvmEvents.deploy () in
+  let (`Evm_runner evm_target_address) = evm_target in
+  Log.debug ~prefix "Call gateway %%call_evm -> emitBoth(42)" ;
+  (* ABI-encode uint256(42). *)
+  let abi_params =
+    "000000000000000000000000000000000000000000000000000000000000002a"
+  in
+  let* () =
+    Gateway.call_evm ~evm_target ~method_sig:"emitBoth(uint256)" ~abi_params ()
+  in
+  Log.debug ~prefix "Fetch latest EVM block to get the synthetic CRAC tx hash" ;
+  let*@ block = Rpc.get_block_by_number ~block:"latest" sequencer in
+  let crac_tx_hash =
+    match block.transactions with
+    | Block.Hash (h :: _) -> h
+    | _ -> Test.fail "Expected at least one tx hash in EVM block"
+  in
+  Log.info "Synthetic CRAC tx hash: %s" crac_tx_hash ;
+  let*@ receipt_opt =
+    Rpc.get_transaction_receipt ~tx_hash:crac_tx_hash sequencer
+  in
+  let receipt =
+    match receipt_opt with
+    | Some r -> r
+    | None -> Test.fail "No receipt for synthetic CRAC tx %s" crac_tx_hash
+  in
+  let logs = receipt.Transaction.logs in
+  Log.info "Synthetic CRAC tx receipt has %d log(s)" (List.length logs) ;
+  List.iter
+    (fun (log : Transaction.tx_log) ->
+      Log.info
+        "  log[%ld] address=%s topics=%d"
+        log.logIndex
+        log.address
+        (List.length log.topics))
+    logs ;
+  let normalize = String.lowercase_ascii in
+  let target_addr_n = normalize evm_target_address in
+  let gateway_addr_n = normalize evm_gateway_address in
+  let contract_logs =
+    List.filter
+      (fun (log : Transaction.tx_log) -> normalize log.address = target_addr_n)
+      logs
+  in
+  (*Print contract logs for debugging purposes.*)
+  List.iter
+    (fun (log : Transaction.tx_log) ->
+      Log.info
+        "  contract log[%ld] address=%s topics=%d"
+        log.logIndex
+        log.address
+        (List.length log.topics))
+    contract_logs ;
+  (* Pre-fix: 0 contract logs reach the receipt because [inner.logs] is
+     wiped by [JournalInner::finalize] before [extract_cross_runtime_effects]
+     runs.  Post-fix: every successful [emitBoth] dispatch surfaces
+     [EventA] + [EventB] (= 2 contract logs). *)
+  Check.(
+    (List.length contract_logs = 2)
+      int
+      ~error_msg:
+        "Expected 2 logs from the EVM contract on the synthetic CRAC tx \
+         receipt (EventA + EventB), got %L. Without the fix, contract logs \
+         from a Michelson-initiated %%call_evm are dropped before the receipt \
+         is built.") ;
+  (* Pin the actual events so the test fails not only when logs are
+     missing but also when they are swapped, reordered, or have their
+     [data] field corrupted.  [topic[0]] is [keccak256(<canonical
+     signature>)] per the EVM log convention; [data] carries the
+     non-indexed [uint256 value] parameter. *)
+  let event_a_topic =
+    "0xf97f7329bd91140cac80baf605c292bf1a327a74b562336f6e99ae5debb32933"
+  in
+  let event_b_topic =
+    "0xfa732e7acdc0734e887d2179df9c2c4707ad2a04eeb84623f99631414377dc61"
+  in
+  let expected_value_data =
+    "0x000000000000000000000000000000000000000000000000000000000000002a"
+  in
+  let topic0 (log : Transaction.tx_log) =
+    match log.topics with t :: _ -> normalize t | [] -> ""
+  in
+  let count_with_topic0 lgs topic =
+    List.length (List.filter (fun l -> topic0 l = normalize topic) lgs)
+  in
+  Check.(
+    (count_with_topic0 contract_logs event_a_topic = 1)
+      int
+      ~error_msg:
+        "Expected exactly 1 EventA log on the CRAC receipt (topic[0] = \
+         keccak256 \"EventA(address,address,uint256)\"), got %L") ;
+  Check.(
+    (count_with_topic0 contract_logs event_b_topic = 1)
+      int
+      ~error_msg:
+        "Expected exactly 1 EventB log on the CRAC receipt (topic[0] = \
+         keccak256 \"EventB(address,address,uint256)\"), got %L") ;
+  List.iter
+    (fun (log : Transaction.tx_log) ->
+      Check.(
+        (normalize log.data = normalize expected_value_data)
+          string
+          ~error_msg:
+            "Expected contract log `data` to carry uint256(42) (%R), got %L"))
+    contract_logs ;
+  let precompile_logs =
+    List.filter
+      (fun (log : Transaction.tx_log) -> normalize log.address = gateway_addr_n)
+      logs
+  in
+  Check.(
+    (List.length precompile_logs = 2)
+      int
+      ~error_msg:
+        "Expected 2 precompile logs (CracIdEvent + CracReceived) on the \
+         synthetic CRAC tx receipt, got %L") ;
+  let crac_id_event_topic =
+    "0x7c61c77057c7568c0d0f2350fa7ab90f164008888ba00c9105b5ef6988d0255d"
+  in
+  let crac_received_topic =
+    "0x6242e34f6b48040ca8499afa39bbd1ed3fb356241249ba0be45fcb08eda0b2c9"
+  in
+  Check.(
+    (count_with_topic0 precompile_logs crac_id_event_topic = 1)
+      int
+      ~error_msg:
+        "Expected exactly 1 CracIdEvent log on the CRAC receipt, got %L") ;
+  Check.(
+    (count_with_topic0 precompile_logs crac_received_topic = 1)
+      int
+      ~error_msg:
+        "Expected exactly 1 CracReceived log on the CRAC receipt, got %L") ;
+  Log.debug
+    ~prefix
+    "Verify eth_getLogs returns the contract events when filtered by address" ;
+  let block_n = Int32.to_int block.number in
+  let*@ logs_for_contract =
+    Rpc.get_logs
+      ~from_block:(Number block_n)
+      ~to_block:(Number block_n)
+      ~address:(Single evm_target_address)
+      sequencer
+  in
+  Check.(
+    (List.length logs_for_contract = 2)
+      int
+      ~error_msg:
+        "Expected eth_getLogs(address=evm_target, blockNumber=current) to \
+         return 2 logs (EventA + EventB), got %L. Without the fix, the events \
+         are missing from the EVM block index entirely.") ;
+  Check.(
+    (count_with_topic0 logs_for_contract event_a_topic = 1)
+      int
+      ~error_msg:"Expected eth_getLogs to surface exactly 1 EventA, got %L") ;
+  Check.(
+    (count_with_topic0 logs_for_contract event_b_topic = 1)
+      int
+      ~error_msg:"Expected eth_getLogs to surface exactly 1 EventB, got %L") ;
   unit
 
 (** debug_traceTransaction on a CRAC fake transaction (TEZ→EVM).
@@ -9163,6 +9380,7 @@ let () =
   test_crac_tez_to_evm_reverts [Alpha] ;
   test_crac_tez_to_evm_fake_tx_in_block [Alpha] ;
   test_crac_tez_to_evm_fake_tx_unique_hash_across_blocks [Alpha] ;
+  test_crac_tez_to_evm_inner_logs_in_receipt [Alpha] ;
   test_crac_tez_revert_rolls_back_inner_evm_storage [Alpha] ;
   test_crac_tez_revert_propagates_to_evm [Alpha] ;
   test_crac_evm_journal_state_preserved [Alpha] ;
