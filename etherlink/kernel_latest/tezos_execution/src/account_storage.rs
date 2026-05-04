@@ -255,6 +255,7 @@ pub enum Code {
 /// Snapshot of a contract's storage-space.
 pub struct StorageSpace {
     pub used_bytes: Zarith,
+    pub allocated_bytes: Zarith,
 }
 
 pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
@@ -426,6 +427,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
         if enshrined_contracts::is_enshrined(self.kt1()) {
             return Ok(StorageSpace {
                 used_bytes: 0.into(),
+                allocated_bytes: 0.into(),
             });
         }
         let code_size = self.code_size(host)?;
@@ -440,9 +442,18 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
 
         self.set_used_bytes(host, &used_bytes)?;
 
-        // TODO: Set real values for the paid_bytes.
+        let already_paid = self.paid_bytes(host)?;
+        let allocated_bytes = if used_bytes.0 > already_paid.0 {
+            self.set_paid_bytes(host, &used_bytes)?;
+            Zarith(&used_bytes.0 - &already_paid.0)
+        } else {
+            Zarith::from(0u64)
+        };
 
-        Ok(StorageSpace { used_bytes })
+        Ok(StorageSpace {
+            used_bytes,
+            allocated_bytes,
+        })
     }
 }
 
@@ -791,9 +802,8 @@ mod test {
         );
     }
 
-    /// Verifies what happens when a contract's storage is modified to a
-    /// larger value; in this case, we expect `used_bytes` to be updated
-    /// to `code_size + new_storage_size`.
+    /// Writing a bigger value grows the watermark and the delta;
+    /// `used_bytes` is the live size.
     #[test]
     fn test_update_storage_space_after_grow() {
         let mut host = MockKernelHost::default();
@@ -805,23 +815,38 @@ mod test {
         let storage = vec![0xcd_u8; 20];
         let larger_storage = vec![0x12_u8; 50];
 
-        account.init(&mut host, &code, &storage).unwrap();
+        let StorageSpace {
+            allocated_bytes, ..
+        } = account.init(&mut host, &code, &storage).unwrap();
+        let initial_size = (code.len() + storage.len()) as u64;
+        assert_eq!(allocated_bytes, Zarith::from(initial_size));
         assert_eq!(
             account.used_bytes(&host).unwrap(),
-            Zarith::from((code.len() + storage.len()) as u64),
+            Zarith::from(initial_size)
+        );
+        assert_eq!(
+            account.paid_bytes(&host).unwrap(),
+            Zarith::from(initial_size)
         );
 
         account.set_storage(&mut host, &larger_storage).unwrap();
-        account.update_storage_space(&mut host).unwrap();
+        let StorageSpace {
+            allocated_bytes, ..
+        } = account.update_storage_space(&mut host).unwrap();
+        let larger_size = (code.len() + larger_storage.len()) as u64;
+        assert_eq!(allocated_bytes, Zarith::from(larger_size - initial_size));
         assert_eq!(
             account.used_bytes(&host).unwrap(),
-            Zarith::from((code.len() + larger_storage.len()) as u64),
+            Zarith::from(larger_size)
+        );
+        assert_eq!(
+            account.paid_bytes(&host).unwrap(),
+            Zarith::from(larger_size)
         );
     }
 
-    /// Verifies what happens when a contract's storage is modified to a
-    /// smaller value; in this case, we expect `used_bytes` to decrease
-    /// accordingly (it is the live size, not a monotonic watermark).
+    /// Writing a smaller value leaves the watermark unchanged and
+    /// returns no delta; `used_bytes` is the live size.
     #[test]
     fn test_update_storage_space_after_shrink() {
         let mut host = MockKernelHost::default();
@@ -834,24 +859,27 @@ mod test {
         let smaller_storage = vec![0x34_u8; 5];
 
         account.init(&mut host, &code, &storage).unwrap();
-        assert_eq!(
-            account.used_bytes(&host).unwrap(),
-            Zarith::from((code.len() + storage.len()) as u64),
-        );
+        let initial_size = (code.len() + storage.len()) as u64;
 
         account.set_storage(&mut host, &smaller_storage).unwrap();
-        account.update_storage_space(&mut host).unwrap();
+        let StorageSpace {
+            allocated_bytes, ..
+        } = account.update_storage_space(&mut host).unwrap();
+        assert_eq!(allocated_bytes, Zarith::from(0u64));
         assert_eq!(
             account.used_bytes(&host).unwrap(),
             Zarith::from((code.len() + smaller_storage.len()) as u64),
         );
+        assert_eq!(
+            account.paid_bytes(&host).unwrap(),
+            Zarith::from(initial_size)
+        );
     }
 
-    /// Verifies what happens when `set_storage` is called on an enshrined
-    /// contract; in this case, we expect no durable-storage write at all
-    /// (the function is a no-op).
+    /// `set_storage` early-returns `(0, 0)` on enshrined contracts and
+    /// does not write to durable storage.
     #[test]
-    fn test_set_storage_is_noop_for_enshrined() {
+    fn test_set_storage_returns_zero_for_enshrined() {
         let mut host = MockKernelHost::default();
         let context = context::TezlinkContext::init_context();
 
@@ -862,6 +890,12 @@ mod test {
         let account = context.originated_from_contract(&contract).unwrap();
 
         account.set_storage(&mut host, &[0xef_u8; 15]).unwrap();
+        let StorageSpace {
+            used_bytes,
+            allocated_bytes,
+        } = account.update_storage_space(&mut host).unwrap();
+        assert_eq!(used_bytes, Zarith::from(0u64));
+        assert_eq!(allocated_bytes, Zarith::from(0u64));
 
         let storage_path = context::code::storage_path(&account).unwrap();
         let storage_size_path = context::code::storage_size_path(&account).unwrap();

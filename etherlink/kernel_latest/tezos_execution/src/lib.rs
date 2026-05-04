@@ -686,7 +686,10 @@ where
                 code, storage, entrypoint, param, parser, &mut ctx, registry, journal,
             )?;
             let new_storage = exec_result.storage;
-            dest_account
+            // TODO: feed the returned `(used_bytes, consumed)` into the
+            // receipt's `storage_size` and `paid_storage_size_diff`
+            // (handled by the next commit on this branch).
+            let _ = dest_account
                 .set_storage(ctx.host(), &new_storage)
                 .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
 
@@ -1045,6 +1048,7 @@ where
 
     let StorageSpace {
         used_bytes: total_size,
+        ..
     } = smart_contract
         .init(ctx.host, script_code, &new_storage)
         .map_err(|_| OriginationError::CantInitContract)?;
@@ -1918,7 +1922,7 @@ mod tests {
         ContractKt1Hash, HashTrait, OperationHash, SecretKeyEd25519,
     };
     use tezos_data_encoding::enc::BinWriter;
-    use tezos_data_encoding::types::Narith;
+    use tezos_data_encoding::types::{Narith, Zarith};
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
@@ -3394,6 +3398,68 @@ mod tests {
             storage_value,
             "Storage has not been updated"
         )
+    }
+
+    /// After a transfer that grew the destination's storage,
+    /// `paid_bytes` matches `used_bytes` and both equal the post-op
+    /// `code_size + storage_size`. The watermark moved forward inside
+    /// `set_storage` during execution.
+    #[test]
+    fn apply_transfer_bumps_paid_bytes_after_storage_growth() {
+        let mut host = MockKernelHost::default();
+
+        let src = bootstrap1();
+        let dest = ContractKt1Hash::from_base58_check(CONTRACT_1)
+            .expect("ContractKt1Hash b58 conversion should have succeeded");
+
+        let initial_storage = Micheline::from("initial");
+        init_account(&mut host, &src.pkh, 50);
+        reveal_account(&mut host, &src);
+        let destination =
+            init_contract(&mut host, &dest, SCRIPT, &initial_storage, &50_u64.into());
+
+        let storage_value = Micheline::from("Hello world").encode();
+        let new_storage_size = storage_value.len() as u64;
+        let operation = make_transfer_operation(
+            15,
+            1,
+            1040,
+            5,
+            src.clone(),
+            30_u64.into(),
+            Contract::Originated(dest),
+            Parameters {
+                entrypoint: mir::ast::Entrypoint::default(),
+                value: storage_value,
+            },
+        );
+
+        let _ = validate_and_apply_operation(
+            &mut host,
+            &MockRegistry,
+            &mut TezosXJournal::default(),
+            &context::TezlinkContext::init_context(),
+            OperationHash::default(),
+            operation,
+            &block_ctx!(),
+            false,
+            None,
+            None,
+            &test_safe_roots(),
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+
+        // SCRIPT replaces storage by the parameter; post-op `used_bytes`
+        // is `code_size + |encoded("Hello world")|`. Read `code_size`
+        // from durable storage — the invariant under test is exactly
+        // `used == code_size + storage_size`.
+        let code_size = destination.code_size(&host).unwrap();
+        let expected_used = Zarith(code_size.0 + new_storage_size);
+
+        assert_eq!(destination.used_bytes(&host).unwrap(), expected_used);
+        assert_eq!(destination.paid_bytes(&host).unwrap(), expected_used);
     }
 
     #[test]
