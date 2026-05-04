@@ -1248,6 +1248,35 @@ module TezAlwaysFailsUnit = struct
       protocol
 end
 
+(** Michelson contract that emits a user [EMIT] op (tag
+    [hello_l2_1299], payload string ["hello-l2-1299"]) and then
+    self-calls a [%_revert] entrypoint that [FAILWITH]s.  The runtime
+    applies the EMIT then fails on the self-revert, so the resulting
+    internals appear as [emit BackTracked, revert Failed].  Used as
+    the deepest target in a re-entrant CRAC chain to exercise the
+    has_event check in [merge_crac_internals]: the failed inner CRAC
+    carries a user EMIT (Event variant) but no synthetic CRAC-ID
+    event, so without the fix the outer applied CRAC's synthetic event
+    is dropped from the merged receipt. *)
+module TezEmitFailer = struct
+  open TezContract
+
+  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
+      ~sequencer ~source ~counter ~protocol ?init_balance () =
+    originate_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter
+      ~script_name:["mini_scenarios"; "cross_runtime_emit_failer"]
+      ~init_storage_data:"Unit"
+      ?init_balance
+      protocol
+end
+
 (** Tezos contract that emits two internal operations:  a call to the
  *  gateway's [%collect_result] with a fixed payload, and a call to a
  *  failing contract.  Used to verify that bytes deposited by the first
@@ -1589,6 +1618,10 @@ module CracRunnerWrapper = struct
     end
 
     module TezEmitter : sig
+      val originate : ?init_balance:int -> unit -> tez_runner Lwt.t
+    end
+
+    module TezEmitFailer : sig
       val originate : ?init_balance:int -> unit -> tez_runner Lwt.t
     end
 
@@ -2208,6 +2241,24 @@ module CracRunnerWrapper = struct
         let originate ?init_balance () =
           let* runner_hex, runner =
             TezEmitter.originate
+              ~sc_rollup_address
+              ~sc_rollup_node
+              ~client
+              ~l1_contracts
+              ~sequencer
+              ~source
+              ~counter:(tez_counter ())
+              ~protocol
+              ?init_balance
+              ()
+          in
+          return (`Tez_runner (runner_hex, runner))
+      end
+
+      module TezEmitFailer = struct
+        let originate ?init_balance () =
+          let* runner_hex, runner =
+            TezEmitFailer.originate
               ~sc_rollup_address
               ~sc_rollup_node
               ~client
@@ -5786,6 +5837,147 @@ let test_crac_user_emit_in_reentrant_inner_crac =
          test scenario is broken — investigate before reading too much into \
          the EMIT assertion.") ;
   ignore evm_inner_addr ;
+  unit
+
+(** Regression test: when the synthetic Michelson manager-op merges a
+    failed inner CRAC (whose Michelson contract emitted a user [EMIT]
+    before [FAILWITH]) with a later applied outer CRAC carrying the
+    synthetic CRAC-ID event, the synthetic event must survive the
+    merge.
+  
+    Pre-fix, [merge_crac_internals] in
+    [etherlink/kernel_latest/kernel/src/apply.rs] computed
+    [has_event] over the merge target's internals as
+    [matches!(iop, InternalOperationSum::Event(_))] — i.e. ANY event
+    set the flag.  When the failed inner is sorted first by seq and its
+    internals contain the user EMIT (Backtracked) but no synthetic
+    CRAC-ID event, that flag flipped true and the prepend branch was
+    skipped, dropping the outer applied CRAC's synthetic event from
+    the merged receipt.
+  
+    Call tree:
+      EOA → EVM_main(MultiRunCaller, callees=[(EVM_bridge_to_C1, false)])
+              → EVM_bridge_to_C1(CrossRuntimeRunTez, dest=C1)
+                 ~CRAC #1~> Mich C1(MultiRunCaller, callees=[Tez_bridge])
+                              → Tez_bridge(CrossRuntimeRunEvm, dest=EVM_inner)
+                                  ~Mich→EVM~> EVM_inner(MultiRunCaller,
+                                                callees=[(EVM_bridge_to_EmitFailer, doCatch=true)])
+                                                → try { EVM_bridge_to_EmitFailer.run() }
+                                                  ~CRAC #2~> Mich EmitFailer
+                                                    emits %hello_l2_1299, then FAILWITH
+                                                  catches → continues
+  
+    Asserts that the synthetic Michelson manager-op's
+    [internal_operation_results] contains the synthetic CRAC-ID event
+    (kind=event, tag="crac"), and as a sanity check that the user
+    EMIT is still present (Backtracked).
+  
+    L2-1299. *)
+let test_crac_synthetic_event_survives_failed_inner_with_emit =
+  register_crac_runner_test
+    ~title:
+      "CRAC: synthetic crac event survives merge with failed inner that EMITted"
+    ~tags:["crac_receipt"; "regression"; "emit"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "RCPT-CRAC-EVT" in
+  let* emit_failer = TezEmitFailer.originate () in
+  let* evm_bridge_to_emit_failer =
+    EvmCrossRuntimeRunnerTez.deploy_and_init emit_failer
+  in
+  (* EVM_inner catches CRAC #2's failure so the OUTER CRAC #1 still
+     succeeds — that's how we end up with a merge of (failed inner,
+     applied outer). *)
+  let* evm_inner =
+    EvmMultiRunCaller.deploy_and_init
+      ~callees:[(evm_bridge_to_emit_failer, true)]
+      ()
+  in
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_inner in
+  let* c1 = TezMultiRunCaller.originate ~callees:[tez_bridge] () in
+  let* evm_bridge_to_c1 = EvmCrossRuntimeRunnerTez.deploy_and_init c1 in
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge_to_c1, false)] ()
+  in
+  let* _ = EvmRunner.call_run evm_main in
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  let op_list = JSON.(ops |> as_list) in
+  Log.info "%s: %d manager operation(s)" prefix (List.length op_list) ;
+  Check.(
+    (List.length op_list = 1)
+      int
+      ~error_msg:"Expected 1 manager operation, got %L") ;
+  let top = JSON.(ops |=> 0 |-> "contents" |=> 0) in
+  let metadata = JSON.(top |-> "metadata") in
+  let internals = JSON.(metadata |-> "internal_operation_results" |> as_list) in
+  Log.info
+    "%s: %d internal op(s) on the synthetic CRAC tx receipt"
+    prefix
+    (List.length internals) ;
+  List.iteri
+    (fun i iop ->
+      Log.info
+        "%s:   [%d] kind=%s tag=%s status=%s"
+        prefix
+        i
+        JSON.(iop |-> "kind" |> as_string)
+        JSON.(iop |-> "tag" |> as_opt |> Option.fold ~none:"-" ~some:as_string)
+        JSON.(
+          iop |-> "result" |-> "status" |> as_opt
+          |> Option.fold ~none:"-" ~some:as_string))
+    internals ;
+  (* Primary assertion: the synthetic CRAC-ID event must be present. *)
+  let crac_events =
+    List.filter
+      (fun iop ->
+        JSON.(iop |-> "kind" |> as_string) = "event"
+        &&
+        match JSON.(iop |-> "tag" |> as_opt) with
+        | Some t -> JSON.as_string t = "crac"
+        | None -> false)
+      internals
+  in
+  Check.(
+    (List.length crac_events = 1)
+      int
+      ~error_msg:
+        "Expected exactly 1 synthetic CRAC-ID event (tag = \"crac\") on the \
+         merged synthetic Michelson receipt, got %L. Without the fix, \
+         merge_crac_internals' has_event check is satisfied by the failed \
+         inner's user EMIT (a non-synthetic Event), so the outer applied \
+         CRAC's synthetic event is silently dropped from the merged receipt — \
+         RFC principle 6 is broken and indexers lose the CRAC-ID for the \
+         entire transaction.") ;
+  (* Sanity assertion: the user EMIT is still in the receipt as
+     Backtracked, proving the failed inner CRAC's body reached the
+     EMIT op before the FAILWITH. *)
+  let user_emits =
+    List.filter
+      (fun iop ->
+        JSON.(iop |-> "kind" |> as_string) = "event"
+        &&
+        match JSON.(iop |-> "tag" |> as_opt) with
+        | Some t -> JSON.as_string t = "hello_l2_1299"
+        | None -> false)
+      internals
+  in
+  Check.(
+    (List.length user_emits = 1)
+      int
+      ~error_msg:
+        "Sanity check: expected exactly 1 user EMIT (tag = \"hello_l2_1299\") \
+         in the merged receipt — proves the failed inner CRAC's body reached \
+         the EMIT op before the FAILWITH. If this fails, the test scenario \
+         didn't fire as designed.") ;
+  let user_emit_status =
+    JSON.(List.hd user_emits |-> "result" |-> "status" |> as_string)
+  in
+  Check.(
+    (user_emit_status = "backtracked")
+      string
+      ~error_msg:
+        "Expected the user EMIT in the failed inner CRAC to have status %R \
+         (the FAILWITH backtracks it), got %L") ;
   unit
 
 (* Two EVM→TEZ CRACs from the SAME EVM transaction (RFC Example 5).
@@ -9668,6 +9860,7 @@ let () =
   test_crac_gas_model_alias_caching [Alpha] ;
   test_crac_evm_to_tez_receipt [Alpha] ;
   test_crac_user_emit_in_reentrant_inner_crac [Alpha] ;
+  test_crac_synthetic_event_survives_failed_inner_with_emit [Alpha] ;
   test_crac_receipt_two_independent [Alpha] ;
   test_crac_receipt_separate_tx_two_cracs [Alpha] ;
   test_crac_receipt_evm_tez_evm [Alpha] ;
