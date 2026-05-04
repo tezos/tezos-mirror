@@ -2,7 +2,7 @@ Test transferring big map from "sender_fresh" to "receiver_drop"
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 289.150 units (will add 100 for safety)
+Estimated gas: 289.183 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -48,7 +48,7 @@ Test transferring big map from "sender_fresh" to "receiver_store"
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 289.810 units (will add 100 for safety)
+Estimated gas: 289.843 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -97,7 +97,7 @@ Test transferring big map from "sender_fresh" to "receiver_store_updated"
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 294.180 units (will add 100 for safety)
+Estimated gas: 294.213 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -148,7 +148,7 @@ Test transferring big map from "sender_stored" to "receiver_drop"
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 287.213 units (will add 100 for safety)
+Estimated gas: 287.246 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -193,7 +193,7 @@ Test transferring big map from "sender_stored" to "receiver_store"
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 287.873 units (will add 100 for safety)
+Estimated gas: 287.906 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -241,7 +241,7 @@ Test transferring big map from "sender_stored" to "receiver_store_updated"
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 292.243 units (will add 100 for safety)
+Estimated gas: 292.276 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -291,7 +291,7 @@ Test transferring big map from "sender_stored_updated" to "receiver_drop"
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 291.583 units (will add 100 for safety)
+Estimated gas: 291.616 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -338,7 +338,7 @@ Test transferring big map from "sender_stored_updated" to "receiver_store"
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 292.243 units (will add 100 for safety)
+Estimated gas: 292.276 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -388,7 +388,7 @@ Test transferring big map from "sender_stored_updated" to "receiver_store_update
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 296.613 units (will add 100 for safety)
+Estimated gas: 296.646 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'

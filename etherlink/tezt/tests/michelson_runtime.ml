@@ -2711,8 +2711,8 @@ let test_prevalidation =
       client_tezlink
   in
 
-  let hard_gas_limit_per_operation = 1_040_000 in
-  let hard_gas_limit_per_block = 1_040_000 in
+  let hard_gas_limit_per_operation = 3_000_000 in
+  let hard_gas_limit_per_block = 3_000_000 in
 
   (* case wrong gas limit *)
   let gas_limit_too_high_rex =
@@ -2976,7 +2976,7 @@ let test_validation_gas_limit =
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
   @@ fun {sequencer; _} _protocol ->
   let* client_tezlink = tezlink_client_from_evm_node sequencer () in
-  let hard_gas_limit_per_block = 1_040_000 in
+  let hard_gas_limit_per_block = 3_000_000 in
 
   (* make sure there are no transactions in the queue *)
   let* () = produce_block_and_wait_for ~sequencer 3 in
@@ -2985,10 +2985,10 @@ let test_validation_gas_limit =
   let almost_half_block = (hard_gas_limit_per_block / 2) - 1 in
 
   (* Sanity check: can fit two op in a blueprint *)
-  (* fee = 10_000 mutez covers execution gas fee (gas_limit * 10 * base_fee / 10^12
-     ≤ 693_332 * 10 * 10^9 / 10^12 = 6_933 mutez) so operations are not
+  (* fee = 20_000 mutez covers execution gas fee (gas_limit * 10 * base_fee / 10^12
+     ≤ 1_499_999 * 10 * 10^9 / 10^12 ≈ 15_000 mutez) so operations are not
      rejected for insufficient fees before the gas limit check. *)
-  let fee = 10_000 in
+  let fee = 20_000 in
   let* (`OpHash op1) =
     Operation.inject_transfer
       ~counter:1

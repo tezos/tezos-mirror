@@ -25,6 +25,16 @@
   `inner.logs` while revm's standard accumulation is still intact,
   restoring parity between the two ways into the EVM for indexers
   (subgraphs, on-chain analytics, ERC-1155 wallet trackers).
+- Raise the Michelson runtime `hard_gas_limit_per_operation` and
+  `hard_gas_limit_per_block` from 1,040,000 to 3,000,000 gas units (i.e.
+  3,000,000,000 milligas) to match the EVM 30M-gas per-transaction cap.
+  These two parametric constants now diverge from the L1 mainnet defaults
+  (which both stay at 1,040,000), so a Michelson operation accepted by
+  Tezos X may exceed the gas budget the same operation would be allowed
+  on L1. Without this change, an EVM transaction reaching the cross-
+  runtime precompile with more than ~10.4M gas remaining would forward
+  an oversized `X-Tezos-Gas-Limit` and be rejected by the Michelson
+  runtime, surfacing as a misleading EVM out-of-gas. (!21791)
 
 ### Internals
 

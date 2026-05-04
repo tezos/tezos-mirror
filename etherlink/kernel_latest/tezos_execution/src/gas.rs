@@ -66,9 +66,16 @@ impl Cost {
 }
 
 impl TezlinkOperationGas {
-    /// This corresponds to the default value of the `hard_gas_limit_per_operation` parametric constant.
-    /// Currently can be found in Tezos source code at: src/proto_023_PtSeouLo/lib_parameters/default_parameter.ml
-    pub const MAX_LIMIT: u32 = 1_040_000_000;
+    /// Maximum gas (in milligas) for a single Tezos operation in Tezos X.
+    ///
+    /// Raised above the L1 mainnet default (1_040_000 gas = 1_040_000_000
+    /// milligas) so that a cross-runtime call originating on the EVM side,
+    /// which can carry up to 30_000_000 EVM gas of remaining budget, can
+    /// propagate its full gas limit through `X-Tezos-Gas-Limit` (1 EVM gas
+    /// = 100 milligas, so 30_000_000 * 100 = 3_000_000_000 milligas).
+    /// This value is overridden in the Tezlink parametric constants
+    /// (`etherlink/bin_node/lib_dev/tezlink/tezlink_constants.ml`).
+    pub const MAX_LIMIT: u32 = 3_000_000_000;
 
     /// Initializes operation gas from the provided limit (in gas units) and
     /// validates it against the per-operation hard limit.

@@ -9364,6 +9364,66 @@ let test_crac_tezosx_caller_balance_stays_zero =
          RPC consumers)") ;
   unit
 
+(** Regression test for L2-1295: [eth_estimateGas] on an EVM->TEZ bridge
+    call must succeed (the RPC the bug originally surfaced on), and an
+    end-to-end transaction injected with that estimate must reach the
+    Michelson side.
+
+    Before this fix, the runtime_gateway precompile forwarded
+    [remaining_evm_gas * 100] as [X-Tezos-Gas-Limit], and the Michelson
+    runtime rejected the request via [TezlinkOperationGas::start_milligas]
+    as soon as the value exceeded [hard_gas_limit_per_operation]
+    (1_040_000_000 milligas). The EVM node's [eth_estimateGas] binary-
+    searches down from the per-transaction gas cap (30M) towards the
+    minimum gas a successful call needs; once every probe with gas >=
+    ~10.4M reverted with TransferFailed, the estimator could not converge
+    and the RPC failed outright. Raising the Michelson runtime hard cap
+    to 3_000_000_000 milligas (matching the EVM 30M-gas per-tx cap, with
+    1 EVM gas = 100 milligas) lets the high probes succeed and the
+    estimator narrow in on the real cost.
+
+    Using [eth_estimateGas] in the test rather than a hard-coded gas
+    value means the test stays correct if the per-transaction cap ever
+    changes, and catches any future regression that introduces a new
+    ceiling anywhere between the previous bug threshold (~10.4M) and the
+    per-tx cap — since any such regression would once again break the
+    high-end probes of the binary search and surface as an
+    [eth_estimateGas] failure. *)
+let test_crac_evm_to_tez_high_gas =
+  register_crac_runner_test
+    ~title:"CRAC: eth_estimateGas works on EVM->TEZ bridge call (L2-1295)"
+    ~tags:["gas"; "estimate_gas"; "l2_1295"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Originate TEZ runner" ;
+  let* tez_runner = TezMultiRunCaller.originate () in
+  Log.debug ~prefix "Deploy EVM bridge to TEZ runner" ;
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_runner in
+  let (`Evm_runner bridge_addr) = evm_bridge in
+  Log.debug ~prefix "Call eth_estimateGas on the bridge run() entrypoint" ;
+  let* run_calldata = Cast.calldata "run()" in
+  let estimate_call =
+    [
+      ("from", `String sender.Eth_account.address);
+      ("to", `String bridge_addr);
+      ("data", `String run_calldata);
+    ]
+  in
+  (* Pre-fix this RPC errored out: the binary search starts at the per-tx
+     cap and the high probes all reverted with TransferFailed. *)
+  let*@ estimated_gas = Rpc.estimate_gas estimate_call sequencer in
+  Log.info "eth_estimateGas returned %Ld" estimated_gas ;
+  (* Send the transaction with the estimated gas (mirrors what tools like
+     foundry / metamask do) and verify the CRAC reached the Michelson
+     side. *)
+  Log.debug ~prefix "Send EVM tx with gas = eth_estimateGas's value" ;
+  let* _ = EvmRunner.call_run ~gas:(Int64.to_int estimated_gas) evm_bridge in
+  Log.debug ~prefix "Verify TEZ runner counter (CRAC reached Michelson side)" ;
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_runner in
+  Log.debug ~prefix "Verify EVM bridge counter (incremented before+after CRAC)" ;
+  EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_bridge
+
 let () =
   test_crac_evm_to_tez [Alpha] ;
   test_crac_evm_multiple_independent_crossings [Alpha] ;
@@ -9468,4 +9528,5 @@ let () =
   test_crac_collect_result_once_per_frame [Alpha] ;
   test_crac_collect_result_nested_independent_slots [Alpha] ;
   test_crac_collect_result_large_payload_oog [Alpha] ;
-  test_crac_tezosx_caller_balance_stays_zero [Alpha]
+  test_crac_tezosx_caller_balance_stays_zero [Alpha] ;
+  test_crac_evm_to_tez_high_gas [Alpha]

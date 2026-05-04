@@ -87,8 +87,10 @@ pub struct ProcessedOperation {
 impl ProcessedOperation {
     /// Total milligas consumed across a batch of processed operations.
     /// In practice, individual operation gas is bounded by
-    /// `hard_gas_limit_per_operation` (1_040_000 gas = 1_040_000_000 milligas),
-    /// so neither per-operation values nor batch totals will overflow `u64`.
+    /// `hard_gas_limit_per_operation` (3_000_000 gas = 3_000_000_000 milligas
+    /// in Tezos X, raised from the L1 default of 1_040_000 gas to match the
+    /// EVM per-transaction cap of 30M gas), so neither per-operation values
+    /// nor batch totals will overflow `u64`.
     pub fn total_consumed_milligas(ops: &[ProcessedOperation]) -> u64 {
         ops.iter()
             .map(|p| u64::from(p.operation_consumed_milligas))
