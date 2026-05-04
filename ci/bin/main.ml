@@ -517,14 +517,14 @@ let () =
             })
       ~description:
         "Scheduled pipeline for scanning vulnerabilities in the Docker image \
-         for the latest release candidate of Octez" ;
-    register
-      "schedule_security_scans"
-      schedule_security_scans
-      ~jobs:Security_scans.jobs
-      ~description:
-        "Scheduled pipeline for various security scans. Currently scanning for \
-         vulnerabilities in Docker images") ;
+         for the latest release candidate of Octez") ;
+  register
+    "schedule_security_scans"
+    schedule_security_scans
+    ~jobs:Security_scans.jobs
+    ~description:
+      "Scheduled pipeline for various security scans. Currently scanning for \
+       vulnerabilities in Docker images" ;
   register
     "schedule_docker_master_snapshot"
     schedule_docker_master_snapshot

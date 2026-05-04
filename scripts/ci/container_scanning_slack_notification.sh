@@ -9,7 +9,7 @@ set -eu
 
 # parse the report for key info
 
-REPORT_FILE="gl-container-scanning-report.json"
+REPORT_FILE="${REPORT:-gl-container-scanning-report.json}"
 
 # Check that the file exists and is valid JSON
 jq empty "$REPORT_FILE" || {

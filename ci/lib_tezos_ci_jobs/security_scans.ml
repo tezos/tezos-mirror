@@ -84,8 +84,9 @@ let jobs : tezos_job list =
   in
   (* Scans [docker_image:docker_tag] image. A scanning report artifact
      is produced.
-     We adapt the template provided by Trivy:
-     https://trivy.dev/v0.63/tutorials/integrations/gitlab-ci/#gitlab-ci-using-trivy-container *)
+     The source image is pulled, pushed to GCP Artifact Registry at
+     [us-central1-docker.pkg.dev/nl-gitlab-runner/image-scanning], and
+     scanned via the GCP AR On-Demand Scanning API. *)
   let job_container_scanning image : tezos_job =
     let full_image_name = Container_scanning.(image_ref image) in
     let report = "gl-container-scanning-report-" ^ image.job_name ^ ".json" in
@@ -94,18 +95,17 @@ let jobs : tezos_job list =
       ~name:("container_scanning_" ^ image.job_name)
       ~description:("Container scanning of [" ^ full_image_name ^ "]")
       ~stage:Stages.test
-      ~image:Images.trivy
+      ~image:Images_external.docker
       ~dependencies:(Dependent [])
+      ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
       ~artifacts:(artifacts [report])
-      ~cache:[cache ~key:"trivy" [".trivycache/"]]
       ~variables:
         [
-          ("TRIVY_NO_PROGRESS", "true");
-          ("TRIVY_CACHE_DIR", ".trivycache/");
+          ("DOCKER_VERSION", "24.0.7");
           ("FULL_IMAGE_NAME", full_image_name);
           ("REPORT", report);
         ]
-      [". ./scripts/ci/container_scanning_generate_reports.sh"]
+      [". ./scripts/ci/container_scanning_generate_reports_with_gcp.sh"]
   in
 
   let job_list_container_scanning =
@@ -134,12 +134,13 @@ let jobs : tezos_job list =
              (reports
                 ~container_scanning:"gl-container-scanning-report.json"
                 ())
-           [])
+           ["gl-container-scanning-report.json"])
       ((* Merge of all container scanning reports: the vulnerability
           arrays are merged into a single one. *)
        let jq_slurp_filter =
          "'{ version: .[0].version, scan: .[0].scan, vulnerabilities: \
-          map(.vulnerabilities[]), remediations: map(.remediations[])}'"
+          map((.vulnerabilities // [])[]), remediations: map((.remediations // \
+          [])[])}'"
        in
        (* String of all individual image scan reports *)
        [
@@ -148,8 +149,63 @@ let jobs : tezos_job list =
        ])
   in
 
+  (* For each image listed here, emit a dedicated Slack notification job
+     that reports the per-image scan result. *)
+  let job_container_scanning_slack_notification full_image_name : tezos_job =
+    let image =
+      match
+        List.find_opt
+          (fun img -> Container_scanning.image_ref img = full_image_name)
+          build_images
+      with
+      | Some img -> img
+      | None ->
+          failwith
+            (Printf.sprintf
+               "[security_scans.ml] No build image matches %S. Slack \
+                notification jobs can only be emitted for images declared in \
+                [build_images]."
+               full_image_name)
+    in
+    let expected_job_name = "container_scanning_" ^ image.job_name in
+    let scanning_job =
+      match
+        List.find_opt
+          (fun j -> Tezos_ci.name_of_tezos_job j = expected_job_name)
+          job_list_container_scanning
+      with
+      | Some j -> j
+      | None ->
+          failwith
+            (Printf.sprintf
+               "[security_scans.ml] No scanning job named %S found in \
+                [job_list_container_scanning]."
+               expected_job_name)
+    in
+    let report = "gl-container-scanning-report-" ^ image.job_name ^ ".json" in
+    job
+      ~__POS__
+      ~name:("container_scanning_slack_notification_" ^ image.job_name)
+      ~description:
+        ("Report on Slack the results of the scan for [" ^ full_image_name ^ "]")
+      ~stage:Stages.test
+      ~image:Images.CI.monitoring
+      ~dependencies:(Dependent [Artifacts scanning_job])
+      ~variables:[("REPORT", report)]
+      [
+        ". ./scripts/ci/container_scanning_slack_notification.sh "
+        ^ full_image_name;
+      ]
+  in
   (Tezos_ci.job_datadog_pipeline_trace :: job_list_container_scanning)
-  @ [job_container_scanning_merge_reports]
+  @ job_container_scanning_merge_reports
+    :: List.map
+         job_container_scanning_slack_notification
+         [
+           "tezos/tezos:octez-evm-node-latest";
+           "tezos/tezos:master";
+           "tezos/tezos:latest";
+         ]
 
 let child_pipeline =
   Pipeline.register_child

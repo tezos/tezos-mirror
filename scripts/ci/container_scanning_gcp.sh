@@ -37,8 +37,9 @@ scripts_dir="${CI_PROJECT_DIR}/scripts/ci"
 
 # Build the GCP Artifact Registry image reference.  We always scan the
 # GCP copy even when CI_DOCKER_HUB=true (Docker Hub images are not
-# scanned here).
-GCP_IMAGE="${GCP_RELEASE_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}:${DOCKER_IMAGE_TAG}"
+# scanned here). Callers can override [GCP_IMAGE] in the environment
+# (e.g. when scanning images that live in a different AR repository).
+GCP_IMAGE="${GCP_IMAGE:-${GCP_RELEASE_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}:${DOCKER_IMAGE_TAG}}"
 
 echo "==> Scanning image: ${GCP_IMAGE}"
 
@@ -107,13 +108,33 @@ echo "    TOTAL    : ${TOTAL}"
 # GitLab Container Scanning report.
 # https://gitlab.com/gitlab-org/security-products/security-report-schemas
 # ---------------------------------------------------------------------------
-printf '%s' "${VULNS_JSON}" | jq --arg image "${GCP_IMAGE}" '
+SCAN_TIME=$(date -u +"%Y-%m-%dT%H:%M:%S")
+
+printf '%s' "${VULNS_JSON}" | jq \
+  --arg image "${GCP_IMAGE}" \
+  --arg scan_time "${SCAN_TIME}" '
+(
+  {
+    id: "gcp-artifact-registry",
+    name: "GCP Artifact Registry Vulnerability Scanning",
+    version: "latest",
+    vendor: { name: "Google Cloud Platform" }
+  }
+) as $scanner |
 {
-  version: "15.0.0",
+  version: "15.0.6",
+  scan: {
+    start_time: $scan_time,
+    end_time:   $scan_time,
+    status:     "success",
+    type:       "container_scanning",
+    scanner:    $scanner,
+    analyzer:   $scanner
+  },
   vulnerabilities: [
     .[]
     | .vulnerability as $v
-    | ($v.packageIssue // [])[0] as $pkg
+    | ($v.packageIssue // [{}] | .[0] // {}) as $pkg
     | {
         id:       ([$v.shortDescription // "unknown", $pkg.affectedPackage // ""]
                     | join("_")),
@@ -121,7 +142,7 @@ printf '%s' "${VULNS_JSON}" | jq --arg image "${GCP_IMAGE}" '
         severity: (
           { "CRITICAL": "Critical", "HIGH": "High",
             "MEDIUM": "Medium", "LOW": "Low" }
-          [$v.effectiveSeverity] // "Unknown"
+          [$v.effectiveSeverity // ""] // "Unknown"
         ),
         name:        ($v.shortDescription // "Unknown vulnerability"),
         description: ($v.longDescription  // $v.shortDescription // ""),
@@ -134,16 +155,23 @@ printf '%s' "${VULNS_JSON}" | jq --arg image "${GCP_IMAGE}" '
           ),
           dependency: {
             package: { name: ($pkg.affectedPackage // "unknown") },
-            version: ($pkg.affectedVersion.fullName // "unknown")
+            version: (($pkg.affectedVersion // {}).fullName // "unknown")
           }
         },
-        identifiers: [{
-          type:  "cve",
-          name:  ($v.shortDescription // ""),
-          value: ($v.shortDescription // ""),
-          url:   (($v.relatedUrl // [])[0].url // "")
-        }],
-        links: [($v.relatedUrl // [])[] | {url}]
+        identifiers: [
+          (
+            {
+              type:  "cve",
+              name:  ($v.shortDescription // ""),
+              value: ($v.shortDescription // "")
+            }
+            + (
+              ((($v.relatedUrl // [])[0] // {}).url // "")
+              | if test("^(https?|ftp)://") then {url: .} else {} end
+            )
+          )
+        ],
+        links: [($v.relatedUrl // [])[] | select(. != null) | {url}]
       }
   ]
 }' > "${CI_PROJECT_DIR}/${REPORT}"
@@ -175,14 +203,14 @@ if [ -n "${VULN_PREDICATE:-}" ]; then
         vulnerabilities: [
           .[]
           | .vulnerability as $v
-          | ($v.packageIssue // [])[0] as $pkg
+          | ($v.packageIssue // [{}] | .[0] // {}) as $pkg
           | {
-              severity:         $v.effectiveSeverity,
+              severity:         ($v.effectiveSeverity // "UNKNOWN"),
               id:               ($v.shortDescription // ""),
               package:          ($pkg.affectedPackage // "unknown"),
-              installedVersion: ($pkg.affectedVersion.fullName // ""),
-              fixedVersion:     ($pkg.fixedVersion.fullName    // ""),
-              url:              (($v.relatedUrl // [])[0].url  // "")
+              installedVersion: (($pkg.affectedVersion // {}).fullName // ""),
+              fixedVersion:     (($pkg.fixedVersion    // {}).fullName // ""),
+              url:              ((($v.relatedUrl // [])[0] // {}).url  // "")
             }
         ]
       }
@@ -197,8 +225,17 @@ if [ -n "${VULN_PREDICATE:-}" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Security gate — fail on CRITICAL or HIGH.
+# Security gate — fail on CRITICAL or HIGH (optional).
+#
+# Set [SECURITY_GATE_DISABLED=true] to report findings without failing the
+# job (e.g. for the scheduled security scans pipeline that should always
+# publish results to the vulnerability dashboard).
 # ---------------------------------------------------------------------------
+if [ "${SECURITY_GATE_DISABLED:-false}" = "true" ]; then
+  echo "==> Security gate disabled (SECURITY_GATE_DISABLED=true)"
+  exit 0
+fi
+
 GATE_COUNT=$((CRITICAL + HIGH))
 if [ "${GATE_COUNT}" -gt 0 ]; then
   echo ""
