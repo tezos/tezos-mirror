@@ -510,14 +510,20 @@ let () =
             })
       ~description:
         "Scheduled pipeline for scanning vulnerabilities in the Docker image \
-         for the latest release candidate of Octez" ;
-    register
-      "schedule_security_scans"
-      schedule_security_scans
-      ~jobs:Security_scans.jobs
-      ~description:
-        "Scheduled pipeline for various security scans. Currently scanning for \
-         vulnerabilities in Docker images") ;
+         for the latest release candidate of Octez") ;
+  (* Unlike the legacy [schedule_container_scanning_*] pipelines above,
+     which are gated by [Tezos_ci.container_scanning_flag], this pipeline
+     is registered unconditionally: it is the GCP-based replacement and is
+     meant to always run. The removal of the legacy jobs and of the
+     [container_scanning_flag] is tracked in
+     https://gitlab.com/tezos/tezos/-/work_items/8327. *)
+  register
+    "schedule_security_scans"
+    schedule_security_scans
+    ~jobs:Security_scans.jobs
+    ~description:
+      "Scheduled pipeline for various security scans. Currently scanning for \
+       vulnerabilities in Docker images" ;
   register
     "schedule_docker_master_snapshot"
     schedule_docker_master_snapshot

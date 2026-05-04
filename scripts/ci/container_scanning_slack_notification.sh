@@ -9,7 +9,7 @@ set -eu
 
 # parse the report for key info
 
-REPORT_FILE="gl-container-scanning-report.json"
+REPORT_FILE="${REPORT:-gl-container-scanning-report.json}"
 
 # Check that the file exists and is valid JSON
 jq empty "$REPORT_FILE" || {
@@ -78,5 +78,5 @@ curl -X POST "https://hooks.slack.com/triggers/$CONTAINER_SCANNING_SLACK_HOOK" \
     "image": "'"$image"'",
     "pipeline_url": "'"$CI_PIPELINE_URL"'/security?state=ALL",
     "summary": "'"$summary"'",
-    "details": "'"$details"'",
+    "details": "'"$details"'"
   }'
