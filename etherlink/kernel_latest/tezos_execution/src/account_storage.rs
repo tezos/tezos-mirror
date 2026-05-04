@@ -334,6 +334,37 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
         Ok(n.into())
     }
 
+    fn storage_size(
+        &self,
+        host: &mut impl StorageV1,
+    ) -> Result<Narith, tezos_storage::error::Error> {
+        let path = context::code::storage_size_path(self)?;
+        let len: Option<Narith> = read_optional_nom_value(host, &path)?;
+        Ok(len.unwrap_or(Narith::from(0u64)))
+    }
+
+    /// Returns the contract's `used_bytes` watermark, or `0` if the
+    /// path has never been written.
+    fn used_bytes(
+        &self,
+        host: &impl StorageV1,
+    ) -> Result<Zarith, tezos_storage::error::Error> {
+        let path = context::code::used_bytes_path(self)?;
+        let value: Option<Zarith> = read_optional_nom_value(host, &path)?;
+        Ok(value.unwrap_or(Zarith::from(0u64)))
+    }
+
+    /// Returns the contract's `paid_bytes` watermark, or `0` if the
+    /// path has never been written.
+    fn paid_bytes(
+        &self,
+        host: &impl StorageV1,
+    ) -> Result<Zarith, tezos_storage::error::Error> {
+        let path = context::code::paid_bytes_path(self)?;
+        let value: Option<Zarith> = read_optional_nom_value(host, &path)?;
+        Ok(value.unwrap_or(Zarith::from(0u64)))
+    }
+
     /// Persists `data` as the contract's main storage and refreshes the
     /// `storage_size` and `used_bytes` counters in durable storage. For
     /// enshrined contracts, returns `Ok(0)` without writing anything.
@@ -750,21 +781,6 @@ mod test {
         );
     }
 
-    /// Test helper: read a contract's `used_bytes` from durable storage as
-    /// `Zarith`. The first non-test consumer of `used_bytes` is the
-    /// end-of-op `storage_limit` quota check (L2-1273), which will likely
-    /// introduce a real getter on `TezosOriginatedAccount` and let this
-    /// helper go.
-    fn read_used_bytes<A: TezosOriginatedAccount>(
-        host: &impl StorageV1,
-        account: &A,
-    ) -> Zarith {
-        let path = context::code::used_bytes_path(account).unwrap();
-        let raw = host.store_read_all(&path).unwrap();
-        let (_, value) = Zarith::nom_read(&raw).unwrap();
-        value
-    }
-
     /// Verifies what happens when a contract's storage is modified to a
     /// larger value; in this case, we expect `used_bytes` to be updated
     /// to `code_size + new_storage_size`.
@@ -784,13 +800,13 @@ mod test {
         // (TODO(L2-1280): drop once init writes the real initial value).
         account.set_storage(&mut host, &storage).unwrap();
         assert_eq!(
-            read_used_bytes(&host, &account),
+            account.used_bytes(&host).unwrap(),
             Zarith::from((code.len() + storage.len()) as u64),
         );
 
         account.set_storage(&mut host, &larger_storage).unwrap();
         assert_eq!(
-            read_used_bytes(&host, &account),
+            account.used_bytes(&host).unwrap(),
             Zarith::from((code.len() + larger_storage.len()) as u64),
         );
     }
@@ -814,13 +830,13 @@ mod test {
         // (TODO(L2-1280): drop once init writes the real initial value).
         account.set_storage(&mut host, &storage).unwrap();
         assert_eq!(
-            read_used_bytes(&host, &account),
+            account.used_bytes(&host).unwrap(),
             Zarith::from((code.len() + storage.len()) as u64),
         );
 
         account.set_storage(&mut host, &smaller_storage).unwrap();
         assert_eq!(
-            read_used_bytes(&host, &account),
+            account.used_bytes(&host).unwrap(),
             Zarith::from((code.len() + smaller_storage.len()) as u64),
         );
     }
@@ -893,5 +909,21 @@ mod test {
         assert!(!account.exists(&host).unwrap());
         account.set_code(&mut host, &[0xab_u8; 4]).unwrap();
         assert!(account.exists(&host).unwrap());
+    }
+
+    /// `used_bytes` and `paid_bytes` default to zero on a contract that
+    /// was never written. The default holds for both freshly-created
+    /// accounts (no prior `init`) and for the `paid_bytes` slot of a
+    /// contract that has been initialised but whose watermark has not
+    /// yet been bumped by the storage-payment pass.
+    #[test]
+    fn test_getters_default_to_zero_on_absent_path() {
+        let host = MockKernelHost::default();
+        let context = context::TezlinkContext::init_context();
+        let contract = Contract::from_b58check(KT1).unwrap();
+        let account = context.originated_from_contract(&contract).unwrap();
+
+        assert_eq!(account.used_bytes(&host).unwrap(), Zarith::from(0u64));
+        assert_eq!(account.paid_bytes(&host).unwrap(), Zarith::from(0u64));
     }
 }
