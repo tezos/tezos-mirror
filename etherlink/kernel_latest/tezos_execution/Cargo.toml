@@ -34,6 +34,7 @@ mir.workspace = true
 tezos-protocol.workspace = true
 sha3.workspace = true
 
+tezosx-constants.workspace = true
 tezosx-interfaces.workspace = true
 http.workspace = true
 tezosx-journal.workspace = true

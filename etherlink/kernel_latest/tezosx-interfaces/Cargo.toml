@@ -19,6 +19,7 @@ nom.workspace = true
 primitive-types.workspace = true
 thiserror.workspace = true
 http.workspace = true
+tezosx-constants.workspace = true
 tezosx-journal.workspace = true
 evm-types.workspace = true
 

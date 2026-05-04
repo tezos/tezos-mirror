@@ -880,7 +880,7 @@ mod test {
         sol!(FABridge, "contracts/predeployed/abi/fa_bridge.abi");
     }
 
-    const GAS_LIMIT: u64 = 30_000_000;
+    const GAS_LIMIT: u64 = tezosx_constants::EVM_MAX_GAS_PER_TRANSACTION;
 
     #[test]
     fn test_simple_transfer() {
