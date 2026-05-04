@@ -932,6 +932,54 @@ where
 
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V55 => {
+            // L2-1296: clear the persisted balance of TEZOSX_CALLER_ADDRESS
+            // (0x7e20580000000000000000000000000000000001) on networks that
+            // run the Michelson runtime.
+            //
+            // Earlier kernels funded the internal TezosX caller used by
+            // `generate_alias` by writing `U256::MAX` to durable storage,
+            // because they assumed REVM's pre-flight balance check would
+            // require a positive balance. The surrounding `run_transaction`
+            // is `TransactionOrigin::CrossRuntime` so its EVM journal is
+            // never committed: only the manual storage write persisted, and
+            // the address ended up showing balance ≈ 2^256 - 1 on
+            // Blockscout. The funding has been removed (gas_price = 0 and
+            // value = 0 mean no balance is required); this migration
+            // discards the residue from networks that already imprinted it.
+            //
+            // We restrict the cleanup to TezosX networks because
+            // TEZOSX_CALLER_ADDRESS is only ever written to by
+            // `init_tezosx_alias`, which is unreachable when
+            // `enable_tezos_runtime` is unset.
+            if crate::storage::enable_tezos_runtime(host) {
+                use revm_etherlink::precompiles::constants::TEZOSX_CALLER_ADDRESS;
+                use revm_etherlink::storage::world_state_handler::StorageAccount;
+
+                // The internal caller has no nonce / code / storage to
+                // preserve — only the manually-written `info` (and a
+                // possible legacy `/balance` path). Drop the whole subtree
+                // so subsequent reads fall back to `AccountInfo::default()`
+                // (balance = 0, nonce = 0, empty code).
+                let mut account = StorageAccount::from_address(&TEZOSX_CALLER_ADDRESS)
+                    .map_err(|e| {
+                        anyhow::anyhow!(
+                            "TEZOSX_CALLER_ADDRESS account_path failed: {e:?}"
+                        )
+                    })?;
+                account.delete_info(host).map_err(|e| {
+                    anyhow::anyhow!("delete_info on TEZOSX_CALLER_ADDRESS failed: {e:?}")
+                })?;
+                // Legacy per-field layout used by very old kernels.
+                let legacy_balance_path = OwnedPath::try_from(format!(
+                    "/evm/world_state/eth_accounts/{TEZOSX_CALLER_ADDRESS:x}/balance"
+                ))?;
+                allow_path_not_found(host.store_delete(&legacy_balance_path))?;
+                Ok(MigrationStatus::Done)
+            } else {
+                Ok(MigrationStatus::None)
+            }
+        }
         StorageVersion::V54 => {
             // Phase 3 of the durable storage reorganization: consolidate
             // all feature flags under /base/feature_flags/.
@@ -1014,4 +1062,102 @@ where
 {
     let migration_result = migration(host);
     migration_result.map_err(|_| Error::UpgradeError(UpgradeProcessError::Fallback))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use revm::primitives::U256 as AlloyU256;
+    use revm::state::AccountInfo;
+    use revm_etherlink::precompiles::constants::TEZOSX_CALLER_ADDRESS;
+    use revm_etherlink::storage::world_state_handler::StorageAccount;
+    use tezos_evm_runtime::runtime::MockKernelHost;
+
+    /// L2-1296: the V55 migration must drop the persisted balance of
+    /// [`TEZOSX_CALLER_ADDRESS`] on networks where the Michelson runtime
+    /// has been enabled.
+    #[test]
+    fn v55_migration_clears_tezosx_caller_balance_on_tezosx_networks() {
+        let mut host = MockKernelHost::default();
+
+        // Mark this host as a TezosX network — the migration is gated on
+        // [`enable_tezos_runtime`] reading [`ValueType::Value`] at this
+        // path.
+        host.store_write_all(&crate::storage::ENABLE_TEZOS_RUNTIME, &[1u8])
+            .unwrap();
+
+        // Reproduce the bug state: write a `U256::MAX` balance to the
+        // internal caller's `info` path the way pre-fix kernels did via
+        // `set_info_without_code`.
+        let mut account = StorageAccount::from_address(&TEZOSX_CALLER_ADDRESS).unwrap();
+        account
+            .set_info_without_code(
+                &mut host,
+                AccountInfo {
+                    balance: AlloyU256::MAX,
+                    nonce: 0,
+                    code_hash: revm::primitives::B256::ZERO,
+                    account_id: None,
+                    code: None,
+                },
+            )
+            .unwrap();
+        // Sanity: the bug state is observable before the migration.
+        let info_before = account.info(&mut host).unwrap();
+        assert_eq!(info_before.balance, AlloyU256::MAX);
+
+        // Run the V55 step directly. We dispatch via `migrate_to` rather
+        // than the full `migration` pipeline so the assertion is scoped
+        // to V55's behaviour and is not affected by other version steps.
+        let status = migrate_to(&mut host, StorageVersion::V55).unwrap();
+        assert!(matches!(status, MigrationStatus::Done));
+
+        // After migration the `info` path is gone: reading it must fall
+        // back to `AccountInfo::default()` (balance 0, nonce 0, empty
+        // code), which is what RPC consumers see as a "non-existent"
+        // account.
+        let info_after = account.info(&mut host).unwrap();
+        assert_eq!(info_after.balance, AlloyU256::ZERO);
+        assert_eq!(info_after.nonce, 0);
+    }
+
+    /// L2-1296: the V55 migration must be a no-op on non-TezosX networks
+    /// (TEZOSX_CALLER_ADDRESS is only ever written by code that runs
+    /// under `enable_tezos_runtime`, so there is nothing to clean up
+    /// elsewhere — and we don't want to touch unrelated state).
+    #[test]
+    fn v55_migration_is_a_no_op_on_non_tezosx_networks() {
+        let mut host = MockKernelHost::default();
+        // Do NOT set ENABLE_TEZOS_RUNTIME.
+
+        let status = migrate_to(&mut host, StorageVersion::V55).unwrap();
+        assert!(matches!(status, MigrationStatus::None));
+
+        // The caller account info path must remain absent (the migration
+        // must not have created one as a side effect of the no-op).
+        let account = StorageAccount::from_address(&TEZOSX_CALLER_ADDRESS).unwrap();
+        assert!(account.info_without_migration(&host).unwrap().is_none());
+    }
+
+    /// Sanity: the cleanup is safe even if the bug state was never
+    /// imprinted (fresh TezosX network that activated post-fix).
+    #[test]
+    fn v55_migration_is_safe_when_no_bug_state_exists() {
+        let mut host = MockKernelHost::default();
+        host.store_write_all(&crate::storage::ENABLE_TEZOS_RUNTIME, &[1u8])
+            .unwrap();
+
+        // No prior `set_info_without_code` write here — the account info
+        // path doesn't exist before the migration runs.
+        let account = StorageAccount::from_address(&TEZOSX_CALLER_ADDRESS).unwrap();
+        assert!(account.info_without_migration(&host).unwrap().is_none());
+
+        let status = migrate_to(&mut host, StorageVersion::V55).unwrap();
+        assert!(matches!(status, MigrationStatus::Done));
+
+        // Still no info path — `delete_info`'s PathNotFound is swallowed
+        // by `StorageAccount::delete_info`, and the legacy `/balance`
+        // delete is wrapped in `allow_path_not_found`.
+        assert!(account.info_without_migration(&host).unwrap().is_none());
+    }
 }

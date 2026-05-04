@@ -9106,6 +9106,47 @@ let test_crac_collect_result_large_payload_oog =
   Log.debug ~prefix "Verify no bytes leaked into the result slot" ;
   EvmCollectResult.check_result ~expected_hex:"" evm_reader
 
+(** Regression test for L2-1296: the internal [TEZOSX_CALLER_ADDRESS]
+    (0x7e20580000000000000000000000000000000001) used by [generate_alias] to
+    initialise EVM aliases must not accumulate a visible balance.
+
+    Earlier kernels funded this caller by writing [U256::MAX] to durable
+    storage as a "safety" buffer, but the surrounding [run_transaction] is
+    [TransactionOrigin::CrossRuntime] so its EVM journal is never committed:
+    only the manual storage write persisted, and the address ended up
+    showing balance ≈ 2^256 - 1 on Blockscout for any TezosX network.
+
+    The funding has been removed (gas_price=0 and value=0 mean REVM's
+    pre-flight balance check requires nothing); this test exercises a TEZ →
+    EVM CRAC (which forces alias generation through the EVM runtime) and
+    asserts [eth_getBalance] returns 0 for [TEZOSX_CALLER_ADDRESS]. *)
+let test_crac_tezosx_caller_balance_stays_zero =
+  register_crac_runner_test
+    ~title:"CRAC: TEZOSX_CALLER_ADDRESS balance stays zero (L2-1296)"
+    ~tags:["caller_balance"; "l2_1296"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  let tezosx_caller_address = "0x7e20580000000000000000000000000000000001" in
+  Log.debug ~prefix "Deploy EVM runner" ;
+  let* evm_runner = EvmMultiRunCaller.deploy_and_init () in
+  Log.debug ~prefix "Originate TEZ bridge to EVM runner" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_runner in
+  Log.debug ~prefix "Originate TEZ runner calling the bridge" ;
+  let* tez_runner = TezMultiRunCaller.originate ~callees:[tez_bridge] () in
+  Log.debug ~prefix "Trigger TEZ -> EVM crossing (forces alias generation)" ;
+  let* () = TezRunner.call_run tez_runner in
+  Log.debug ~prefix "Read TEZOSX_CALLER_ADDRESS balance via eth_getBalance" ;
+  let*@ balance = Rpc.get_balance ~address:tezosx_caller_address sequencer in
+  Check.(
+    (balance = Wei.zero)
+      Wei.typ
+      ~error_msg:
+        "Expected TEZOSX_CALLER_ADDRESS balance 0 but got %L (regression of \
+         L2-1296: the internal caller is leaking a persistent balance to EVM \
+         RPC consumers)") ;
+  unit
+
 let () =
   test_crac_evm_to_tez [Alpha] ;
   test_crac_evm_multiple_independent_crossings [Alpha] ;
@@ -9208,4 +9249,5 @@ let () =
   test_crac_collect_result_fire_and_forget_empty_body [Alpha] ;
   test_crac_collect_result_once_per_frame [Alpha] ;
   test_crac_collect_result_nested_independent_slots [Alpha] ;
-  test_crac_collect_result_large_payload_oog [Alpha]
+  test_crac_collect_result_large_payload_oog [Alpha] ;
+  test_crac_tezosx_caller_balance_stays_zero [Alpha]

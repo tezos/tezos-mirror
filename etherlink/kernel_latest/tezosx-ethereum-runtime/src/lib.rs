@@ -336,16 +336,15 @@ impl RuntimeInterface for EthereumRuntime {
         let evm_version = read_evm_version(host);
         let block_constants = self.create_block_constants(host, &context);
 
-        // Use the caller's remaining gas so it controls the budget.
+        // Use the caller's remaining gas so it controls the budget. The
+        // `effective_gas_price` is 0, so REVM's pre-flight balance check on the
+        // caller (`gas_limit * gas_price + value`) reduces to 0 and no funding
+        // is needed for `TEZOSX_CALLER_ADDRESS`. Earlier kernels wrote
+        // `U256::MAX` to durable storage here as a "safety" buffer, which
+        // leaked as a visible huge balance on Blockscout — kept in
+        // `TransactionOrigin::CrossRuntime { credit: ... }` for any non-zero
+        // future credit, but here we don't credit anything.
         let gas_data = GasData::new(gas_remaining, 0, gas_remaining);
-
-        // Ensure the TezosX caller account has balance for gas
-        let mut caller_account = StorageAccount::from_address(&TEZOSX_CALLER_ADDRESS)?;
-        let mut caller_info = caller_account.info(host)?;
-        if caller_info.balance < AlloyU256::MAX.div_ceil(AlloyU256::from(2)) {
-            caller_info.balance = AlloyU256::MAX;
-            caller_account.set_info_without_code(host, caller_info)?;
-        }
 
         // Run the EVM transaction to call init_tezosx_alias
         let outcome = run_transaction(
@@ -974,22 +973,11 @@ mod tests {
             .unwrap();
         CodeStorage::add(&mut host, &bytecode_raw, Some(code_hash)).unwrap();
 
-        // Fund the TEZOSX_CALLER_ADDRESS so run_transaction doesn't fail
+        // The cross-runtime call path uses gas_price = 0 and amount = 0,
+        // so REVM's pre-flight balance requirement on the caller is 0 — no
+        // need to fund TEZOSX_CALLER_ADDRESS (the production code in
+        // `generate_alias` doesn't either).
         let caller_addr = revm_etherlink::precompiles::constants::TEZOSX_CALLER_ADDRESS;
-        let mut caller_account = StorageAccount::from_address(&caller_addr).unwrap();
-        caller_account
-            .set_info(
-                &mut host,
-                AccountInfo {
-                    balance: revm::primitives::U256::MAX,
-                    nonce: 0,
-                    code_hash: revm::primitives::B256::ZERO,
-                    account_id: None,
-                    code: None,
-                },
-            )
-            .unwrap();
-
         let url = format!(
             "http://ethereum/{}",
             alloy_primitives::hex::encode(contract.0 .0)
