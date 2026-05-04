@@ -8,44 +8,45 @@
 open Base
 open Base.Version
 
-type rc = Rc of int | Stable
+(* Used for both parsing of [--rc] and predicate filtering.
+   [Stable] selects only non-prerelease versions; [Prerelease p] selects
+   versions with that specific prerelease. [None] (absent) means no filter. *)
+type prerelease = Stable | Prerelease of Version.prerelease
 
-let parse_rc_opt = function
+let parse_prerelease_opt = function
   | "stable" -> Some Stable
-  | rc -> (
-      match int_of_string_opt rc with Some rc -> Some (Rc rc) | None -> None)
+  | n -> Option.map (fun n -> Prerelease (RC n)) (int_of_string_opt n)
 
-let show_rc = function Stable -> "stable" | Rc rc -> sf "%i" rc
+let show_prerelease = function
+  | Stable -> "stable"
+  | Prerelease (RC n) -> sf "%i" n
+  | Prerelease (Beta b) -> sf "beta%d" b
 
-let create_version_from_args ?major ?minor ?(active = false) ?announcement ?rc
-    ?(publication_date = 0.) () =
+let create_version_from_args ?major ?minor ?(active = false) ?announcement
+    ?prerelease ?(publication_date = 0.) () =
   match (major, minor) with
   | None, _ -> failwith "Missing argument for [--major]"
   | _, None -> failwith "Missing argument for [--minor]"
   | Some major, Some minor ->
-      let rc =
-        match rc with None | Some Stable -> None | Some (Rc rc) -> Some rc
-      in
       make
         ?announcement
         ~major
         ~minor
-        ?rc
+        ?prerelease
         ~latest:false
         ~active
         ~publication_date
         ()
 
-let predicate_from_args ?major ?minor ?rc () =
+let predicate_from_args ?major ?minor ?prerelease_filter () =
  fun version ->
   let check x = function None -> true | Some y -> x = y in
   check version.major major && check version.minor minor
   &&
-  match rc with
+  match prerelease_filter with
   | None -> true
-  | Some Stable -> Option.is_none version.rc
-  | Some (Rc rc) -> (
-      match version.rc with None -> false | Some version_rc -> version_rc = rc)
+  | Some Stable -> Option.is_none version.prerelease
+  | Some (Prerelease p) -> version.prerelease = Some p
 
 (* [version_to_rss_items ~component version] converts a [version] of [component]
    to a list of RSS items. The base release item is always included. An
@@ -56,7 +57,10 @@ let version_to_rss_items ~component version =
   (* TODO: Deduce from command line arguments. *)
   let link = Uri.of_string "https://octez.tezos.com/releases" in
   let rc_suffix =
-    match version.rc with Some rc -> sf "-rc%d" rc | None -> ""
+    match version.prerelease with
+    | Some (RC n) -> sf "-rc%d" n
+    | Some (Beta n) -> sf "-beta%d" n
+    | None -> ""
   in
   let base_item =
     let title =
@@ -132,7 +136,11 @@ let () =
       ()
   in
   let rc_typ =
-    Clap.typ ~name:"rc" ~dummy:Stable ~parse:parse_rc_opt ~show:show_rc
+    Clap.typ
+      ~name:"rc"
+      ~dummy:Stable
+      ~parse:parse_prerelease_opt
+      ~show:show_prerelease
   in
   let rc =
     Clap.optional
@@ -242,6 +250,10 @@ let () =
       "feed.xml"
   in
   Clap.close () ;
+  let prerelease =
+    match rc with None | Some Stable -> None | Some (Prerelease p) -> Some p
+  in
+  let prerelease_filter = rc in
   let require_path () =
     match remote_path with
     | Some path -> path
@@ -273,7 +285,7 @@ let () =
       let new_version =
         create_version_from_args
           ?announcement
-          ?rc
+          ?prerelease
           ?major
           ?minor
           ~publication_date
@@ -284,7 +296,7 @@ let () =
       Format.printf "Added %s@." (to_string new_version)
   | `set_latest -> (
       let target_version =
-        create_version_from_args ?announcement ?rc ?major ?minor ()
+        create_version_from_args ?announcement ?prerelease ?major ?minor ()
       in
       let updated =
         Base.Version.set_latest target_version (load_from_file file)
@@ -294,7 +306,7 @@ let () =
       | Some latest -> Format.printf "Set %s as latest@." (to_string latest)
       | None -> Format.printf "Warning: No version marked as latest@.")
   | `set_active ->
-      let predicate = predicate_from_args ?major ?minor ?rc () in
+      let predicate = predicate_from_args ?major ?minor ?prerelease_filter () in
       let updated = Base.Version.set_active predicate (load_from_file file) in
       save_to_file updated file ;
       let active_versions = find_active updated in
@@ -306,7 +318,7 @@ let () =
           (fun v -> Format.printf "  - %s@." (to_string v))
           active_versions)
   | `set_inactive ->
-      let predicate = predicate_from_args ?major ?minor ?rc () in
+      let predicate = predicate_from_args ?major ?minor ?prerelease_filter () in
       let updated = Base.Version.set_inactive predicate (load_from_file file) in
       save_to_file updated file ;
       let still_active = find_active updated in
@@ -338,15 +350,12 @@ let () =
         | Some bn -> bn
         | None -> failwith "--build-number is required"
       in
-      let rc =
-        match rc with None | Some Stable -> None | Some (Rc rc) -> Some rc
-      in
       let revision_date = Unix.time () in
       let updated =
         Base.Version.add_build_number
           ~major
           ~minor
-          ?rc
+          ?prerelease
           ~build_number:bn
           ~revision_date
         @@ load_from_file file
