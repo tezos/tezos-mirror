@@ -3553,11 +3553,13 @@ version = "0.1.0"
 dependencies = [
  "evm-types",
  "http",
+ "nom",
  "primitive-types",
  "tezos-evm-logging-latest",
  "tezos-evm-runtime-latest",
  "tezos-smart-rollup-host",
  "tezos-storage-latest",
+ "tezos_data_encoding",
  "tezosx-journal",
  "thiserror 1.0.69",
 ]
