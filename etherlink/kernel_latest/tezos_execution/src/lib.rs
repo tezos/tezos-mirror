@@ -686,10 +686,7 @@ where
                 code, storage, entrypoint, param, parser, &mut ctx, registry, journal,
             )?;
             let new_storage = exec_result.storage;
-            // TODO: feed the returned `(used_bytes, consumed)` into the
-            // receipt's `storage_size` and `paid_storage_size_diff`
-            // (handled by the next commit on this branch).
-            let _ = dest_account
+            dest_account
                 .set_storage(ctx.host(), &new_storage)
                 .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
 
@@ -704,7 +701,10 @@ where
             let lazy_storage_diff =
                 convert_big_map_diff(std::mem::take(&mut ctx.tc_ctx.big_map_diff));
 
-            let _: StorageSpace = dest_account
+            let StorageSpace {
+                used_bytes,
+                allocated_bytes: paid_storage_size_diff,
+            } = dest_account
                 .update_storage_space(ctx.host())
                 .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
 
@@ -743,6 +743,8 @@ where
                 },
                 lazy_storage_diff,
                 consumed_milligas,
+                storage_size: used_bytes,
+                paid_storage_size_diff,
                 ..receipt
             })
         }
@@ -1048,7 +1050,7 @@ where
 
     let StorageSpace {
         used_bytes: total_size,
-        ..
+        allocated_bytes: paid_storage_size_diff,
     } = smart_contract
         .init(ctx.host, script_code, &new_storage)
         .map_err(|_| OriginationError::CantInitContract)?;
@@ -1100,22 +1102,21 @@ where
         .record_native_origin(ctx.host, &contract)
         .map_err(|_| OriginationError::CantInitContract)?;
 
-    let dummy_origination_sucess = OriginationSuccess {
+    let origination_success = OriginationSuccess {
         balance_updates,
         originated_contracts: vec![Originated { contract }],
         consumed_milligas: ctx
             .operation_gas
             .get_and_reset_milligas_consumed()
             .map_err(|_| OriginationError::OutOfGas)?,
-        // TODO https://linear.app/tezos/issue/L2-325/fix-storage-size-and-paid-diff-at-origination
-        // These are probably not the right values for storage_size and
-        // paid_storage_size_diff, but having something different than 0
-        // participates in having the TzKT front-end not crash when originating.
-        storage_size: total_size.clone(),
-        paid_storage_size_diff: total_size,
+        // TODO(L2-1281): `lazy_storage_size` stays at zero — the receipt
+        // undercharges originations with big-maps in their initial
+        // storage (remaining half of L2-325).
+        storage_size: total_size,
+        paid_storage_size_diff,
         lazy_storage_diff,
     };
-    Ok(dummy_origination_sucess)
+    Ok(origination_success)
 }
 
 /// Prepares balance updates in the format expected by the Tezos operation.
@@ -3122,8 +3123,8 @@ mod tests {
                             ticket_receipt: vec![],
                             originated_contracts: vec![],
                             consumed_milligas: 176061_u64.into(),
-                            storage_size: 0_u64.into(),
-                            paid_storage_size_diff: 0_u64.into(),
+                            storage_size: 69_u64.into(), // code (67) + unit (2)
+                            paid_storage_size_diff: 0_u64.into(), // unit unchanged
                             allocated_destination_contract: false,
                             address_registry_diff: vec![],
                         }
@@ -3370,8 +3371,8 @@ mod tests {
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
                         consumed_milligas: 171923_u64.into(),
-                        storage_size: 0_u64.into(),
-                        paid_storage_size_diff: 0_u64.into(),
+                        storage_size: 44_u64.into(), // code (33) + "Hello world" (11)
+                        paid_storage_size_diff: 4_u64.into(), // "Hello world" (11) − "initial" (7)
                         allocated_destination_contract: false,
                         address_registry_diff: vec![],
                     },
