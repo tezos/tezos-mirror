@@ -579,7 +579,7 @@ pub enum ContentResult<M: OperationKind> {
 
 #[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
 pub struct BacktrackedResult<M: OperationKind> {
-    pub errors: Option<()>,
+    pub errors: Option<ApplyOperationErrors>,
     pub result: M::Success,
 }
 
@@ -991,6 +991,65 @@ mod tests {
             )
     }
 
+    /// A backtracked transaction whose preserved success body is a
+    /// successful tez transfer, plus a single-error trace. Mirrors the
+    /// L1 receipt shape produced when the storage-fees burn fails
+    /// after a successful execution: the success result is preserved,
+    /// `errors: Some(...)` carries the burn error.
+    fn dummy_backtracked_with_errors_operation() -> OperationDataAndMetadata {
+        OperationDataAndMetadata::OperationWithMetadata(
+            OperationBatchWithMetadata {
+                operations: vec![OperationWithMetadata {
+                    content: ManagerOperationContent::Transaction(ManagerOperation {
+                        source: PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(),
+                        fee: 468.into(),
+                        counter: 1.into(),
+                        gas_limit: 2169.into(),
+                        storage_limit: 0.into(),
+                        operation: TransferContent {
+                            amount: 42000000.into(),
+                            destination: Contract::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap(),
+                            parameters: Parameters::default(),
+                        }
+                    }),
+                    receipt: OperationResultSum::Transfer(OperationResult {
+                        balance_updates: vec![],
+                        result: ContentResult::BackTracked(BacktrackedResult {
+                            errors: Some(ApplyOperationErrors::from(
+                                ApplyOperationError::Transfer(
+                                    TransferError::BalanceTooLow(BalanceTooLow {
+                                        contract: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(),
+                                        balance: 10_u64.into(),
+                                        amount: 21_u64.into(),
+                                    })
+                                )
+                            )),
+                            result: TransferTarget::ToContrat(TransferSuccess {
+                                storage: None,
+                                lazy_storage_diff: None,
+                                balance_updates: vec![
+                                    BalanceUpdate { balance: Balance::Account(Contract::Implicit(PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap())), changes: -42000000, update_origin: UpdateOrigin::BlockApplication },
+                                    BalanceUpdate { balance: Balance::Account(Contract::Implicit(PublicKeyHash::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap())), changes: 42000000, update_origin: UpdateOrigin::BlockApplication },
+                                ],
+                                ticket_receipt: vec![],
+                                originated_contracts: vec![],
+                                consumed_milligas: 2169000.into(),
+                                storage_size: 0.into(),
+                                paid_storage_size_diff: 0.into(),
+                                allocated_destination_contract: false,
+                                address_registry_diff: vec![],
+                            }),
+                        }),
+                        internal_operation_results: vec![],
+                    }),
+                }],
+                signature: UnknownSignature::from_base58_check(
+                    "sigPc9gwEse2o5nsicnNeWLjLgoMbEGumXw7PErAkMMa1asXVKRq43RPd7TnUKYwuHmejxEu15XTyV1iKGiaa8akFHK7CCEF"
+                ).unwrap(),
+            }
+        )
+    }
+
     fn dummy_test_result_operation() -> OperationDataAndMetadata {
         OperationDataAndMetadata::OperationWithMetadata (
                  OperationBatchWithMetadata {
@@ -1133,6 +1192,50 @@ mod tests {
         );
 
         assert_eq!(output, operation_and_receipt_bytes);
+    }
+
+    #[test]
+    fn tezos_compatibility_for_backtracked_with_errors_operation_with_metadata() {
+        let operation = dummy_backtracked_with_errors_operation();
+        let output = operation
+            .to_bytes()
+            .expect("Operation with metadata should be encodable");
+        let operation_and_receipt_bytes = fetch_generated_data(
+            TARGET_TEZOS_PROTOCOL,
+            "operation.data_and_metadata",
+            "backtracked_with_errors",
+        );
+
+        assert_eq!(output, operation_and_receipt_bytes);
+    }
+
+    #[test]
+    fn test_backtracked_with_errors_roundtrip() {
+        let operation = dummy_backtracked_with_errors_operation();
+        let mut output = vec![];
+        operation
+            .bin_write(&mut output)
+            .expect("Operation with metadata should be encodable");
+        let outputcpy = output.clone();
+        let (remaining, read_result) = OperationDataAndMetadata::nom_read(&outputcpy)
+            .expect("Operation with metadata should be decodable");
+
+        assert!(
+            remaining.is_empty(),
+            "There should be no remaining bytes after decoding"
+        );
+
+        // The errors inside the trace decode to `PastError(bytes)`
+        // (cf. `ApplyOperationError::nom_read`), so the decoded
+        // structure is not bit-identical to the input. Re-encode the
+        // decoded value and assert byte equality with the original
+        // encoding — this exercises the full encode/decode/encode
+        // chain for the new `Some(ApplyOperationErrors)` shape.
+        let mut roundtrip_output = vec![];
+        read_result
+            .bin_write(&mut roundtrip_output)
+            .expect("Decoded operation should re-encode");
+        assert_eq!(output, roundtrip_output);
     }
 
     #[test]
