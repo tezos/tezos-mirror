@@ -388,7 +388,7 @@ let job_test_sdk_rust =
     "test_sdk_rust"
     ~__POS__
     ~description:"Run the tests for sdk/rust/."
-    ~image:Tezos_ci.Images.Base_images.rust_toolchain_trixie
+    ~image:Tezos_ci.Images.Base_images.debian_rust_trixie
     ~stage:Test
     ~only_if_changed:
       (Tezos_ci.Changeset.encode Changesets.changeset_images_rust_toolchain

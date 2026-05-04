@@ -1667,10 +1667,7 @@ module Images = struct
     (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
        May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
        https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines *)
-    let rust_toolchain_version = "master-8afd610a"
-
-    let rust_toolchain_trixie =
-      make_img "debian-rust:trixie" rust_toolchain_version
+    let debian_rust_trixie = make_img "debian-rust:trixie" "master-8afd610a"
 
     (* [ci-release] *)
     (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
@@ -1707,10 +1704,7 @@ module Images = struct
           ^ Runner.Arch.show_uniform arch)
         ~ci_docker_hub:false
         ~variables:
-          [
-            ( "IMAGE",
-              Base_images.(Format.asprintf "%a" pp rust_toolchain_trixie) );
-          ]
+          [("IMAGE", Base_images.(Format.asprintf "%a" pp debian_rust_trixie))]
         ~artifacts:
           (artifacts
              ~reports:(reports ~dotenv:"rust_toolchain_image_tag.env" ())

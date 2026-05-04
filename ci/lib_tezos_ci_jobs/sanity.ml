@@ -156,7 +156,7 @@ let job_check_rust_fmt =
     "check_rust_fmt"
     ~__POS__
     ~description:"Check formatting on Rust source files."
-    ~image:Tezos_ci.Images.Base_images.rust_toolchain_trixie
+    ~image:Tezos_ci.Images.Base_images.debian_rust_trixie
     ~stage:Test
     ~only_if_changed:["**/*.rs"]
     ["scripts/check-format-rust.sh"]
