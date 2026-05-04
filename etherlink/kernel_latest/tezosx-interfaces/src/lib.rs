@@ -5,6 +5,7 @@
 pub mod headers;
 
 use primitive_types::U256;
+use tezos_data_encoding::{enc::BinWriter, encoding::HasEncoding, nom::NomReader};
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_journal::TezosXJournal;
@@ -176,10 +177,44 @@ pub trait RuntimeInterface {
     ) -> Result<U256, TezosXRuntimeError>;
 }
 
-#[derive(Eq, PartialEq, Hash, Debug, Clone, Copy)]
+#[derive(Eq, PartialEq, Hash, Debug, Clone, Copy, BinWriter, NomReader, HasEncoding)]
+#[encoding(tags = "u8")]
 pub enum RuntimeId {
+    #[encoding(tag = 0)]
     Tezos = 0,
+    #[encoding(tag = 1)]
     Ethereum = 1,
+}
+
+/// Payload carried by the alias variant of Origin/
+///
+/// The address bytes hold the UTF-8 form of the address string (hex
+/// for EVM, b58check for Tezos). That is the same byte sequence the
+/// alias derivation hashes, so the read path can reconstruct the
+/// original string with a UTF-8 decode instead of going through the
+/// source runtime address decoder.
+#[derive(Clone, Debug, Eq, PartialEq, BinWriter, NomReader, HasEncoding)]
+pub struct AliasInfo {
+    pub runtime: RuntimeId,
+    #[encoding(dynamic, bytes)]
+    pub native_address: Vec<u8>,
+}
+
+/// Classification record stored at an account classification path.
+///
+/// Three states are possible: native, alias (with the runtime where
+/// the underlying account lives and the bytes of its address), and
+/// unrecorded (the absence of any Origin value at the path). The alias
+/// variant carries both the runtime and the address so that the kernel
+/// can short-circuit a translation back to the originating runtime
+/// without rerunning the derivation step.
+#[derive(Clone, Debug, Eq, PartialEq, BinWriter, NomReader, HasEncoding)]
+#[encoding(tags = "u8")]
+pub enum Origin {
+    #[encoding(tag = 0)]
+    Native,
+    #[encoding(tag = 1)]
+    Alias(AliasInfo),
 }
 
 impl From<RuntimeId> for u8 {
@@ -238,6 +273,68 @@ mod from_host_tests {
     fn case_sensitive() {
         assert_eq!(RuntimeId::from_host("Tezos"), None);
         assert_eq!(RuntimeId::from_host("Ethereum"), None);
+    }
+}
+
+#[cfg(test)]
+mod origin_tests {
+    use super::*;
+    use tezos_data_encoding::{enc::BinWriter, nom::NomReader};
+
+    fn encode(o: &Origin) -> Vec<u8> {
+        let mut buf = Vec::new();
+        o.bin_write(&mut buf).expect("encoding succeeds");
+        buf
+    }
+
+    fn decode(bytes: &[u8]) -> Origin {
+        let (rest, o) = Origin::nom_read(bytes).expect("decoding succeeds");
+        assert!(rest.is_empty(), "decoder must consume all bytes");
+        o
+    }
+
+    #[test]
+    fn native_roundtrip() {
+        let bytes = encode(&Origin::Native);
+        assert_eq!(bytes, vec![0u8]);
+        assert_eq!(decode(&bytes), Origin::Native);
+    }
+
+    #[test]
+    fn alias_ethereum_roundtrip() {
+        let origin = Origin::Alias(AliasInfo {
+            runtime: RuntimeId::Ethereum,
+            native_address: vec![0xde, 0xad, 0xbe, 0xef],
+        });
+        let bytes = encode(&origin);
+        // Outer enum tag (1 byte) + RuntimeId tag (1 byte) +
+        // dynamic length prefix (4 bytes) + 4 payload bytes = 10 bytes.
+        assert_eq!(bytes.len(), 10);
+        assert_eq!(bytes[0], 1u8);
+        assert_eq!(bytes[1], 1u8);
+        assert_eq!(decode(&bytes), origin);
+    }
+
+    #[test]
+    fn alias_tezos_roundtrip() {
+        let origin = Origin::Alias(AliasInfo {
+            runtime: RuntimeId::Tezos,
+            native_address: b"tz1...".to_vec(),
+        });
+        let bytes = encode(&origin);
+        assert_eq!(bytes[0], 1u8);
+        assert_eq!(bytes[1], 0u8);
+        assert_eq!(decode(&bytes), origin);
+    }
+
+    #[test]
+    fn invalid_tag_rejected() {
+        assert!(Origin::nom_read(&[0xff]).is_err());
+    }
+
+    #[test]
+    fn truncated_alias_rejected() {
+        assert!(Origin::nom_read(&[0x01]).is_err());
     }
 }
 
