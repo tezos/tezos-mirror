@@ -1616,7 +1616,10 @@ module Images = struct
        each image specifically to be certain. *)
     let common_version = "master-be43e621"
 
-    let debian_version = common_version
+    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2491675993
+       May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
+       https://gitlab.com/tezos/tezos/-/commit/05e36a5c/pipelines *)
+    let debian_version = "master-05e36a5c"
 
     let debian_bookworm = make_img "debian:bookworm" debian_version
 

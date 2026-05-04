@@ -29,7 +29,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.build-data_packages:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-05e36a5c
   stage: build
   tags:
   - $TAGS
@@ -56,7 +56,7 @@ oc.build-data_packages:
     - packages/$DISTRIBUTION/$RELEASE
 
 oc.build-debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-05e36a5c
   stage: build
   tags:
   - $TAGS
@@ -98,7 +98,7 @@ oc.build-debian:
       - gcp_arm64
 
 apt_repo_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-05e36a5c
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -155,7 +155,7 @@ oc.upgrade_bin_debian_bookworm-systemd:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-be43e621
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-05e36a5c
     PREFIX: ""
     DISTRIBUTION: debian
     RELEASE: bookworm
@@ -185,13 +185,13 @@ oc.install_bin_debian_bookworm_systemd:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-be43e621
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-05e36a5c
     PREFIX: ""
     DISTRIBUTION: debian
     RELEASE: bookworm
 
 oc.install_bin_debian_bookworm:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-05e36a5c
   stage: publishing_tests
   tags:
   - gcp
@@ -213,7 +213,7 @@ oc.install_bin_debian_bookworm:
     PREFIX: ""
 
 oc.build-ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-05e36a5c
   stage: build
   tags:
   - $TAGS
@@ -255,7 +255,7 @@ oc.build-ubuntu:
       - gcp_arm64
 
 apt_repo_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-05e36a5c
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -312,7 +312,7 @@ oc.upgrade_bin_ubuntu_24_04_systemd:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:24.04-master-be43e621
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:24.04-master-05e36a5c
     PREFIX: ""
     DISTRIBUTION: ubuntu
     RELEASE: "24.04"
@@ -342,7 +342,7 @@ oc.upgrade_bin_ubuntu_22_04_systemd:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:22.04-master-be43e621
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:22.04-master-05e36a5c
     PREFIX: ""
     DISTRIBUTION: ubuntu
     RELEASE: "22.04"
@@ -372,13 +372,13 @@ oc.install_bin_ubuntu_24_04_systemd:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:24.04-master-be43e621
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:24.04-master-05e36a5c
     PREFIX: ""
     DISTRIBUTION: ubuntu
     RELEASE: "24.04"
 
 oc.install_bin_ubuntu_24_04:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-05e36a5c
   stage: publishing_tests
   tags:
   - gcp
@@ -400,7 +400,7 @@ oc.install_bin_ubuntu_24_04:
     PREFIX: ""
 
 oc.install_bin_ubuntu_22_04:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:22.04-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:22.04-master-05e36a5c
   stage: publishing_tests
   tags:
   - gcp
@@ -422,7 +422,7 @@ oc.install_bin_ubuntu_22_04:
     PREFIX: ""
 
 oc.lintian_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-05e36a5c
   stage: publishing_tests
   tags:
   - gcp
@@ -447,7 +447,7 @@ oc.lintian_debian:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.lintian_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-05e36a5c
   stage: publishing_tests
   tags:
   - gcp
