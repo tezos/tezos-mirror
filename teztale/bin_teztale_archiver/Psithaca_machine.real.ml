@@ -246,6 +246,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                   };
                 delegate = public_key_hash_of_v0 delegate;
                 power = preendorsement_power;
+                is_aggregated = false;
               }
             :: acc
         | Receipt
@@ -266,6 +267,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                   };
                 delegate = public_key_hash_of_v0 delegate;
                 power = endorsement_power;
+                is_aggregated = false;
               }
             :: acc
         | _ -> acc)

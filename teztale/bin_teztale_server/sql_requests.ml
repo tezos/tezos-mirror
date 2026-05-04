@@ -67,7 +67,21 @@ let create_operations =
   \  endorser $(SMALL_PRIMARY_INCREMENTING_INT_REF) NOT NULL,\n\
   \  level INTEGER NOT NULL,\n\
   \  round INTEGER,\n\
+  \  is_aggregated BOOLEAN NOT NULL DEFAULT FALSE,\n\
   \  FOREIGN KEY (endorser) REFERENCES delegates(id))"
+
+(* For aggregated operations (is_aggregated = TRUE in the operations table),
+   the endorser column stores an arbitrary delegate from the aggregate.
+   This table stores the full committee breakdown: one row per delegate
+   that participated in the aggregated attestation. *)
+let create_aggregated_operations =
+  "CREATE TABLE IF NOT EXISTS aggregated_operations(\n\
+  \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
+  \  operation $(PRIMARY_INCREMENTING_INT_REF) NOT NULL,\n\
+  \  delegate $(SMALL_PRIMARY_INCREMENTING_INT_REF) NOT NULL,\n\
+  \  FOREIGN KEY (operation) REFERENCES operations(id),\n\
+  \  FOREIGN KEY (delegate) REFERENCES delegates(id),\n\
+  \  UNIQUE (operation, delegate))"
 
 let create_operations_reception =
   "CREATE TABLE IF NOT EXISTS operations_reception(\n\
@@ -136,6 +150,8 @@ module Mutex = struct
 
   let operations = Lwt_mutex.create ()
 
+  let aggregated_operations = Lwt_mutex.create ()
+
   let operations_reception = Lwt_mutex.create ()
 
   let operations_inclusion = Lwt_mutex.create ()
@@ -148,6 +164,10 @@ module Mutex = struct
 
   let dal_shard_assignments = Lwt_mutex.create ()
 end
+
+let create_aggregated_operations_operation_idx =
+  "CREATE INDEX IF NOT EXISTS aggregated_operations_operation_idx ON \
+   aggregated_operations(operation)"
 
 let create_endorsing_rights_level_idx =
   "CREATE INDEX IF NOT EXISTS endorsing_rights_level_idx ON \
@@ -188,12 +208,14 @@ let create_tables =
     create_blocks;
     create_blocks_reception;
     create_operations;
+    create_aggregated_operations;
     create_operations_reception;
     create_operations_inclusion;
     create_endorsing_rights;
     create_cycles;
     create_missing_blocks;
     create_dal_shard_assignments;
+    create_aggregated_operations_operation_idx;
     create_endorsing_rights_level_idx;
     create_blocks_level_idx;
     create_operations_level_idx;
@@ -222,6 +244,10 @@ let alter_blocks_reception_add_validation_timestamp =
 
 let alter_nodes = "ALTER TABLE nodes ADD COLUMN password $(BYTES)"
 
+let alter_operations_add_is_aggregated =
+  "ALTER TABLE operations ADD COLUMN is_aggregated BOOLEAN NOT NULL DEFAULT \
+   FALSE"
+
 let alter_tables =
   [
     [alter_blocks];
@@ -232,6 +258,7 @@ let alter_tables =
       alter_blocks_reception_add_validation_timestamp;
     ];
     [alter_nodes];
+    [alter_operations_add_is_aggregated];
   ]
 
 module Type = struct
@@ -322,6 +349,26 @@ let maybe_insert_operation =
     "INSERT INTO operations (level, hash, endorsement, endorser, round) SELECT \
      $1, $2, $3, delegates.id, $4 FROM delegates WHERE delegates.address = $5 \
      ON CONFLICT DO NOTHING"
+
+(* The [endorser] column stores an arbitrary representative delegate from the
+   aggregate (first one encountered); the full committee lives in
+   [aggregated_operations]. Consumers must ignore [endorser] when
+   [is_aggregated = TRUE]. *)
+let maybe_insert_aggregated_operation =
+  Caqti_request.Infix.(
+    Caqti_type.(
+      t2 (t4 int32 Type.operation_hash bool (option int32)) Type.public_key_hash
+      ->. unit))
+    "INSERT INTO operations (level, hash, endorsement, endorser, round, \
+     is_aggregated) SELECT $1, $2, $3, delegates.id, $4, TRUE FROM delegates \
+     WHERE delegates.address = $5 ON CONFLICT DO NOTHING"
+
+let insert_aggregated_operation_delegate =
+  Caqti_request.Infix.(
+    Caqti_type.(t2 Type.operation_hash Type.public_key_hash ->. unit))
+    "INSERT INTO aggregated_operations (operation, delegate) SELECT \
+     operations.id, delegates.id FROM operations, delegates WHERE \
+     operations.hash = $1 AND delegates.address = $2 ON CONFLICT DO NOTHING"
 
 let maybe_insert_block =
   Caqti_request.Infix.(

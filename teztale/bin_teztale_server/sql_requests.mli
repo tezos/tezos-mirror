@@ -32,6 +32,8 @@ module Mutex : sig
 
   val operations : Lwt_mutex.t
 
+  val aggregated_operations : Lwt_mutex.t
+
   val operations_reception : Lwt_mutex.t
 
   val operations_inclusion : Lwt_mutex.t
@@ -63,6 +65,19 @@ val maybe_insert_attesting_right :
 val maybe_insert_operation :
   ( (int32 * Tezos_crypto.Hashed.Operation_hash.t * bool * int32 option)
     * Tezos_crypto.Signature.public_key_hash,
+    unit,
+    [`Zero] )
+  Caqti_request.t
+
+val maybe_insert_aggregated_operation :
+  ( (int32 * Tezos_crypto.Hashed.Operation_hash.t * bool * int32 option)
+    * Tezos_crypto.Signature.public_key_hash,
+    unit,
+    [`Zero] )
+  Caqti_request.t
+
+val insert_aggregated_operation_delegate :
+  ( Tezos_crypto.Hashed.Operation_hash.t * Tezos_crypto.Signature.public_key_hash,
     unit,
     [`Zero] )
   Caqti_request.t

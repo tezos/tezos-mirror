@@ -261,6 +261,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
             delegate = Tezos_crypto.Signature.Of_V2.public_key_hash ck.delegate;
             power =
               Protocol.Alpha_context.Attesting_power.get_slots_from_result power;
+            is_aggregated = true;
           }
         :: acc)
       acc
@@ -300,6 +301,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                      Protocol.Alpha_context.Attesting_power
                      .get_slots_from_result
                        consensus_power;
+                   is_aggregated = false;
                  }
                :: acc
         | Receipt
@@ -325,6 +327,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                      Protocol.Alpha_context.Attesting_power
                      .get_slots_from_result
                        consensus_power;
+                   is_aggregated = false;
                  }
                :: acc
         | Receipt

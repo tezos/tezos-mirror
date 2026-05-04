@@ -28,6 +28,7 @@ module Delegate_operations = struct
     round : Int32.t option;
     mempool_inclusion : reception list;
     block_inclusion : Block_hash.t list;
+    is_aggregated : bool;
   }
 
   let legacy_operation_encoding =
@@ -47,6 +48,7 @@ module Delegate_operations = struct
           round;
           mempool_inclusion;
           block_inclusion;
+          is_aggregated = false;
         })
       (obj5
          (dft
@@ -61,11 +63,20 @@ module Delegate_operations = struct
   let operation_encoding =
     let open Data_encoding in
     conv
-      (fun {hash; kind; round; mempool_inclusion; block_inclusion} ->
-        (hash, kind, round, mempool_inclusion, block_inclusion))
-      (fun (hash, kind, round, mempool_inclusion, block_inclusion) ->
-        {hash; kind; round; mempool_inclusion; block_inclusion})
-      (obj5
+      (fun {
+             hash;
+             kind;
+             round;
+             mempool_inclusion;
+             block_inclusion;
+             is_aggregated;
+           }
+         ->
+        (hash, kind, round, mempool_inclusion, block_inclusion, is_aggregated))
+      (fun (hash, kind, round, mempool_inclusion, block_inclusion, is_aggregated)
+         ->
+        {hash; kind; round; mempool_inclusion; block_inclusion; is_aggregated})
+      (obj6
          (dft "hash" Operation_hash.encoding Operation_hash.zero)
          (dft
             "kind"
@@ -73,7 +84,8 @@ module Delegate_operations = struct
             Consensus_ops.Attestation)
          (opt "round" int32)
          (dft "received_in_mempools" (list reception_encoding) [])
-         (dft "included_in_blocks" (list Block_hash.encoding) []))
+         (dft "included_in_blocks" (list Block_hash.encoding) [])
+         (dft "is_aggregated" bool false))
 
   let operation_encoding =
     let open Data_encoding in
@@ -137,6 +149,7 @@ module Delegate_operations = struct
                     mempool_inclusion;
                     round = None;
                     block_inclusion;
+                    is_aggregated = false;
                   };
                 ];
               assigned_shard_indices = [];

@@ -260,6 +260,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
               };
             delegate = Tezos_crypto.Signature.Of_V2.public_key_hash ck.delegate;
             power;
+            is_aggregated = true;
           }
         :: acc)
       acc
@@ -296,6 +297,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                    delegate =
                      Tezos_crypto.Signature.Of_V2.public_key_hash delegate;
                    power = consensus_power;
+                   is_aggregated = false;
                  }
                :: acc
         | Receipt
@@ -318,6 +320,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                    delegate =
                      Tezos_crypto.Signature.Of_V2.public_key_hash delegate;
                    power = consensus_power;
+                   is_aggregated = false;
                  }
                :: acc
         | Receipt
