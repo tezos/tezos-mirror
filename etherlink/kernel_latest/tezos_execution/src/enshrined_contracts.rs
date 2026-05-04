@@ -55,7 +55,46 @@ impl std::fmt::Display for CracError {
 
 impl From<TransferError> for CracError {
     fn from(e: TransferError) -> Self {
-        CracError::Operation(e)
+        match e {
+            // Kernel-internal failures (storage corruption / host I/O /
+            // encoding bugs in the storage layer) bypass the
+            // CracError::Operation channel and signal a block revert
+            // directly, matching the Boundary-2 (gateway HTTP) classifier.
+            //
+            // The same construction sites are reached from both the
+            // regular Tezos pipeline and the cross-runtime gateway path;
+            // master's blanket Operation wrap silently downgraded the
+            // regular-pipeline outcome to op-level. Routing them here as
+            // BlockAbort makes both paths agree, and matches how the EVM
+            // execution path lifts the same class of failures into its
+            // own outer EVMError channel (revm/src/lib.rs:362+,
+            // apply.rs:716-721).
+            //
+            // The cause discarded by .map_err(|_| TransferError::FailedTo*)?
+            // at each construction site is a tezos_storage::error::Error
+            // (Path / Runtime / Storage / RlpDecoderError / NomReadError /
+            // BinWriteError / InvalidLoadValue / ImplicitToOriginated /
+            // OriginatedToImplicit / TcError / TryFromBigIntError) — none
+            // of these are recoverable user input. A non-existent
+            // originated destination is caught upstream by the
+            // `dest_account.exists(host)` guard in `transfer` and
+            // surfaces as the user-level TransferError::ContractDoesNotExist
+            // instead, so FailedToFetchContractCode here can only fire
+            // from genuine kernel-internal causes.
+            TransferError::FailedToApplyBalanceChanges
+            | TransferError::FailedToAllocateDestination
+            | TransferError::FailedToFetchDestinationAccount
+            | TransferError::FailedToFetchContractCode
+            | TransferError::FailedToFetchContractStorage
+            | TransferError::FailedToFetchDestinationBalance
+            | TransferError::FailedToFetchSenderBalance
+            | TransferError::FailedToUpdateContractStorage
+            | TransferError::FailedToUpdateDestinationBalance
+            | TransferError::FailedToComputeBalanceUpdate => {
+                CracError::BlockAbort(format!("internal error during transfer: {e}"))
+            }
+            _ => CracError::Operation(e),
+        }
     }
 }
 
@@ -2850,6 +2889,67 @@ mod tests {
                 );
             }
             other => panic!("expected Micheline::String, got {other:?}"),
+        }
+    }
+
+    // --- From<TransferError> for CracError routing ---
+    //
+    // These tests pin the routing decision that unifies the regular Tezos
+    // pipeline and the gateway HTTP path: kernel-internal failures must
+    // route to BlockAbort (block discarded on both paths), and user-facing
+    // failures must route to Operation (op-level revert, block continues).
+
+    /// Every infra-class TransferError variant must route to BlockAbort.
+    /// If a new infra variant is added, add it here too.
+    #[test]
+    fn test_infra_variants_route_to_block_abort() {
+        let infra: Vec<TransferError> = vec![
+            TransferError::FailedToApplyBalanceChanges,
+            TransferError::FailedToAllocateDestination,
+            TransferError::FailedToFetchDestinationAccount,
+            TransferError::FailedToFetchContractCode,
+            TransferError::FailedToFetchContractStorage,
+            TransferError::FailedToFetchDestinationBalance,
+            TransferError::FailedToFetchSenderBalance,
+            TransferError::FailedToUpdateContractStorage,
+            TransferError::FailedToUpdateDestinationBalance,
+            TransferError::FailedToComputeBalanceUpdate,
+        ];
+        for variant in infra {
+            let label = format!("{variant:?}");
+            match CracError::from(variant) {
+                CracError::BlockAbort(_) => {}
+                CracError::Operation(_) => {
+                    panic!("{label} must route to BlockAbort, not Operation")
+                }
+            }
+        }
+    }
+
+    /// User-facing TransferError variants must route to Operation so the
+    /// regular pipeline produces an op-level Failed receipt and the
+    /// gateway path returns 4xx (catchable revert).
+    #[test]
+    fn test_user_facing_variants_route_to_operation() {
+        use tezos_protocol::contract::Contract;
+        let kt1 =
+            ContractKt1Hash::from_base58_check("KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton")
+                .unwrap();
+        let user_facing: Vec<TransferError> = vec![
+            TransferError::OutOfGas,
+            TransferError::EmptyImplicitTransfer,
+            TransferError::NonSmartContractExecutionCall,
+            TransferError::MirAddressUnsupportedError,
+            TransferError::ContractDoesNotExist(Contract::Originated(kt1)),
+        ];
+        for variant in user_facing {
+            let label = format!("{variant:?}");
+            match CracError::from(variant) {
+                CracError::Operation(_) => {}
+                CracError::BlockAbort(_) => {
+                    panic!("{label} must route to Operation, not BlockAbort")
+                }
+            }
         }
     }
 }

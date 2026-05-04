@@ -6,6 +6,20 @@
 
 ### Internals
 
+- Unify the revert scope of infrastructure-class `TransferError`
+  variants across the regular Tezos pipeline and the cross-runtime
+  gateway HTTP path. Storage/encoding/host-I/O failures
+  (`FailedToFetch*` / `FailedToUpdate*` /
+  `FailedToApplyBalanceChanges` / `FailedToComputeBalanceUpdate` /
+  `FailedToAllocateDestination`) now route to `CracError::BlockAbort`
+  in `From<TransferError>`, so both paths discard the block instead of
+  the regular pipeline silently downgrading to an op-level revert.
+  Reject transfers to a never-originated KT1 with a typed user-level
+  `TransferError::ContractDoesNotExist` before any state write, so
+  `FailedToFetchContractCode` can be safely promoted to `BlockAbort`
+  alongside the other infrastructure variants without giving any
+  user a block-abort handle. (!21781)
+
 ## Version 0.2 (017753c894e5bdaae7838c9501814c1ccc7290d6)
 
 ### Native atomic composability

@@ -562,45 +562,20 @@ where
             // prevent try/catch from working).
             *consumed_milligas = gas.total_milligas_consumed().into();
 
-            // Map CracError to the TezosXRuntimeError HTTP status bearing equivalent.
-            // User-facing errors become 400/429 (catchable revert).
-            // Infrastructure errors and BlockAbort become 500 (abort the block).
+            // Map CracError to its TezosXRuntimeError HTTP-status equivalent.
+            // OutOfGas → 429 (catchable revert); user-facing TransferError
+            // variants → 400 (catchable revert); BlockAbort → 500 (abort
+            // the EVM caller's frame, then the block).
+            //
+            // The infra-class TransferError variants (FailedTo*) are routed
+            // to BlockAbort upstream by `From<TransferError> for CracError`
+            // — see `enshrined_contracts.rs:56-`. They never appear here as
+            // CracError::Operation, so this match doesn't enumerate them.
             let rt_err = match &error {
-                CracError::Operation(e) => match e {
-                    // OOG: 429 (catchable revert)
-                    TransferError::OutOfGas => TezosXRuntimeError::OutOfGas,
-                    // User-facing errors: 400 (catchable revert)
-                    TransferError::BalanceTooLow(_)
-                    | TransferError::UnspendableContract(_)
-                    | TransferError::NonSmartContractExecutionCall
-                    | TransferError::EmptyImplicitTransfer
-                    | TransferError::MichelineDecodeError(_)
-                    | TransferError::MichelsonContractInterpretError(_)
-                    | TransferError::MirTypecheckingError(_)
-                    | TransferError::MirAddressUnsupportedError
-                    | TransferError::MirAmountToNarithError(_)
-                    | TransferError::MirNarithToAmountError(_)
-                    | TransferError::FailedToExecuteInternalOperation(_)
-                    | TransferError::DepositError(_)
-                    | TransferError::GatewayError(_) => {
-                        TezosXRuntimeError::BadRequest(e.to_string())
-                    }
-                    // Infrastructure errors: 500 (block abort)
-                    TransferError::FailedToApplyBalanceChanges
-                    | TransferError::FailedToAllocateDestination
-                    | TransferError::FailedToFetchDestinationAccount
-                    | TransferError::FailedToFetchContractCode
-                    | TransferError::FailedToFetchContractStorage
-                    | TransferError::FailedToFetchDestinationBalance
-                    | TransferError::FailedToFetchSenderBalance
-                    | TransferError::FailedToUpdateContractStorage
-                    | TransferError::FailedToUpdateDestinationBalance
-                    | TransferError::FailedToComputeBalanceUpdate => {
-                        TezosXRuntimeError::Custom(format!(
-                            "internal error during cross-runtime transfer: {e}"
-                        ))
-                    }
-                },
+                CracError::Operation(TransferError::OutOfGas) => {
+                    TezosXRuntimeError::OutOfGas
+                }
+                CracError::Operation(e) => TezosXRuntimeError::BadRequest(e.to_string()),
                 CracError::BlockAbort(msg) => {
                     TezosXRuntimeError::Custom(format!("block abort: {msg}"))
                 }

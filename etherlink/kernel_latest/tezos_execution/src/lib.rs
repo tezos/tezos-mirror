@@ -616,6 +616,22 @@ where
                 .context
                 .originated_from_kt1(kt1)
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
+            // Reject transfers to a never-originated KT1 before any state
+            // write. Without this check, `transfer_tez` would create a
+            // balance entry under the bogus contract path and the failure
+            // would only surface at `code()` as RuntimeError::PathNotFound,
+            // wrapped as FailedToFetchContractCode → CracError::BlockAbort
+            // — a user-controllable block-abort handle. Mirrors Tezos's
+            // `Contract.Non_existing_contract`.
+            if !dest_account
+                .exists(tc_ctx.host)
+                .map_err(|_| TransferError::FailedToFetchDestinationAccount)?
+            {
+                return Err(TransferError::ContractDoesNotExist(Contract::Originated(
+                    kt1.clone(),
+                ))
+                .into());
+            }
             let receipt = if skip_sender_debit {
                 credit_destination_without_debiting_sender(
                     tc_ctx.host,
@@ -3102,6 +3118,98 @@ mod tests {
             (requester_balance + requested_amount - fees).into()
         ); // The faucet should have transferred 100 mutez to the source
 
+        assert_eq!(
+            requester.counter(&host).unwrap(),
+            1.into(),
+            "Counter should have been incremented"
+        );
+    }
+
+    /// Pin the existence-check guard introduced before `transfer_tez` in
+    /// the `Contract::Originated` branch of `transfer`. A Transaction to a
+    /// never-originated KT1 must produce a typed user-level
+    /// `ContractDoesNotExist` failure, not surface as
+    /// `FailedToFetchContractCode` (which is now routed to BlockAbort and
+    /// would discard the whole block).
+    ///
+    /// Regression for L2-1290: without this guard, a single transfer to
+    /// any unknown KT1 would be a user-controllable block-abort handle.
+    #[test]
+    fn apply_transfer_to_nonexistent_originated_contract() {
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+        // Never-originated KT1: no `init_contract` call, no code blob, no
+        // balance entry exists at this path.
+        let desthash =
+            ContractKt1Hash::from_base58_check("KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton")
+                .expect("ContractKt1Hash b58 conversion should have succeeded");
+
+        let requester = init_account(&mut host, &src.pkh, 50);
+        reveal_account(&mut host, &src);
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            21040,
+            5,
+            src.clone(),
+            30_u64.into(),
+            Contract::Originated(desthash.clone()),
+            Parameters::default(),
+        );
+
+        let processed = validate_and_apply_operation(
+            &mut host,
+            &MockRegistry,
+            &mut TezosXJournal::default(),
+            &context::TezlinkContext::init_context(),
+            OperationHash::default(),
+            operation.clone(),
+            &block_ctx!(),
+            false,
+            None,
+            None,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+        let receipts = ProcessedOperation::into_receipts(processed);
+
+        assert_eq!(receipts.len(), 1, "There should be one receipt");
+        assert!(
+            matches!(
+                &receipts[0].receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Failed(ApplyOperationErrors { errors }),
+                    ..
+                }) if errors.len() == 1 && matches!(
+                    &errors[0],
+                    ApplyOperationError::Transfer(
+                        TransferError::ContractDoesNotExist(Contract::Originated(kt1))
+                    ) if kt1 == &desthash
+                )
+            ),
+            "Expected Failed Transfer with ContractDoesNotExist({desthash}), got {:?}",
+            receipts[0].receipt
+        );
+
+        // No balance entry should have been written under the bogus
+        // contract path. The guard runs before `transfer_tez`, so the
+        // never-originated KT1 must remain absent from durable storage.
+        let context = context::TezlinkContext::init_context();
+        let dest_account = context
+            .originated_from_kt1(&desthash)
+            .expect("originated_from_kt1 should have succeeded");
+        let balance_path = context::account::balance_path(&dest_account)
+            .expect("balance_path should have succeeded");
+        assert_eq!(
+            host.store_has(&balance_path).unwrap(),
+            None,
+            "no balance entry should exist for a never-originated KT1"
+        );
+
+        // Source paid the manager fee but not the transfer amount.
+        assert_eq!(requester.balance(&host).unwrap(), (50_u64 - 15).into());
         assert_eq!(
             requester.counter(&host).unwrap(),
             1.into(),
