@@ -50,15 +50,16 @@ let job_docker_container_scanning =
          [vuln_predicate])
     ~variables:
       [("CI_DOCKER_HUB", match mode with `test -> "false" | `real -> "true")]
-    [
-      "./scripts/ci/docker_image_names.sh";
-      ". ./scripts/ci/docker.env";
-      ". ./scripts/ci/docker.sh";
-      sf
-        "./scripts/ci/container_scanning_gcp.sh %s %s"
-        scanning_report
-        vuln_predicate;
-    ]
+    ~script:
+      [
+        "./scripts/ci/docker_image_names.sh";
+        ". ./scripts/ci/docker.env";
+        ". ./scripts/ci/docker.sh";
+        sf
+          "./scripts/ci/container_scanning_gcp.sh %s %s"
+          scanning_report
+          vuln_predicate;
+      ]
 
 (* This job normally runs in the {!Octez_latest_release} pipeline
    that is triggered manually after a release is made.
@@ -105,10 +106,11 @@ let job_docker_promote_to_latest =
              container_scanning job is added to production release
              pipelines (Major, Minor, Beta/RC; octez_latest_release.ml). *)
           [])
-    [
-      "./scripts/ci/docker_initialize.sh";
-      "./scripts/ci/docker_promote_to_latest.sh";
-    ]
+    ~script:
+      [
+        "./scripts/ci/docker_initialize.sh";
+        "./scripts/ci/docker_promote_to_latest.sh";
+      ]
 
 let job_build_homebrew_release =
   add_artifacts
@@ -136,10 +138,11 @@ let job_gitlab_release =
       ]
     ~needs_legacy:[(Artifacts, job_build_homebrew_release)]
     ~id_tokens:Tezos_ci.id_tokens
-    [
-      "./scripts/ci/restrict_export_to_octez_source.sh";
-      "./scripts/releases/gitlab-release.sh";
-    ]
+    ~script:
+      [
+        "./scripts/ci/restrict_export_to_octez_source.sh";
+        "./scripts/releases/gitlab-release.sh";
+      ]
 
 let job_gitlab_publish =
   Cacio.parameterize @@ fun mode ->
@@ -162,16 +165,17 @@ let job_gitlab_publish =
       | `scheduled_test -> Some [("CI_COMMIT_TAG", "octez-v0.0")]
       | `non_release_tag -> None)
     ~id_tokens:Tezos_ci.id_tokens
-    ((match mode with
-     | `scheduled_test -> ["git tag octez-v0.0"]
-     | `non_release_tag -> [])
-    @ [
-        ("${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh"
-        ^
-        match mode with
-        | `scheduled_test -> " --dry-run"
-        | `non_release_tag -> "");
-      ])
+    ~script:
+      ((match mode with
+       | `scheduled_test -> ["git tag octez-v0.0"]
+       | `non_release_tag -> [])
+      @ [
+          ("${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh"
+          ^
+          match mode with
+          | `scheduled_test -> " --dry-run"
+          | `non_release_tag -> "");
+        ])
 
 let release_page_variables ~mode =
   match mode with
@@ -221,7 +225,7 @@ let job_release_page =
                 Build.job_build_static_linux_released_binaries Arm64 `release );
             ])
     ~variables:(release_page_variables ~mode)
-    ["eval $(opam env)"; "./scripts/releases/publish-release-page.sh"]
+    ~script:["eval $(opam env)"; "./scripts/releases/publish-release-page.sh"]
 
 let job_opam_release =
   Cacio.parameterize @@ fun mode ->
@@ -237,10 +241,11 @@ let job_opam_release =
        (.opam files) to https://github.com/tezos/opam-repository. It _does \
        not_ automatically create a corresponding pull request on the official \
        opam repository."
-    [
-      ("./scripts/ci/opam-release.sh"
-      ^ match mode with `test -> " --dry-run" | `real -> "");
-    ]
+    ~script:
+      [
+        ("./scripts/ci/opam-release.sh"
+        ^ match mode with `test -> " --dry-run" | `real -> "");
+      ]
 
 let job_dispatch_call =
   CI.job
@@ -258,7 +263,7 @@ let job_dispatch_call =
         (Job, job_gitlab_release `real);
         (Job, job_release_page `real `wait_for_build);
       ]
-    ["./scripts/releases/dispatch-call.sh"]
+    ~script:["./scripts/releases/dispatch-call.sh"]
 
 let () =
   (* Major *)
@@ -409,10 +414,11 @@ let job_docker_promote_to_version =
         ("DOCKER_VERSION", Docker.version);
         ("CI_DOCKER_HUB", match mode with `test -> "false" | `real -> "true");
       ]
-    [
-      "./scripts/ci/docker_initialize.sh";
-      "./scripts/ci/docker_promote_to_version.sh";
-    ]
+    ~script:
+      [
+        "./scripts/ci/docker_initialize.sh";
+        "./scripts/ci/docker_promote_to_version.sh";
+      ]
 
 let job_create_gitlab_package =
   CI.job
@@ -431,7 +437,7 @@ let job_create_gitlab_package =
       ]
     ~id_tokens:Tezos_ci.id_tokens
     ~allow_failure:No
-    ["./scripts/ci/create_gitlab_package.sh"]
+    ~script:["./scripts/ci/create_gitlab_package.sh"]
     ~retry:no_retry
     ~tag:Gcp_not_interruptible
 
@@ -446,7 +452,7 @@ let job_update_gitlab_release =
        packaging revision"
     ~needs:[(Job, job_create_gitlab_package)]
     ~id_tokens:Tezos_ci.id_tokens
-    ["./scripts/releases/update_gitlab_release.sh"]
+    ~script:["./scripts/releases/update_gitlab_release.sh"]
     ~retry:no_retry
     ~tag:Gcp_not_interruptible
 
@@ -474,10 +480,11 @@ let job_release_page_packaging_revision =
              Build.job_build_static_linux_released_binaries Arm64 `release );
          ])
     ~variables:(release_page_variables ~mode)
-    [
-      "eval $(opam env)";
-      "./scripts/releases/publish-release-page-packaging-revision.sh";
-    ]
+    ~script:
+      [
+        "eval $(opam env)";
+        "./scripts/releases/publish-release-page-packaging-revision.sh";
+      ]
 
 let () =
   Cacio.register_jobs

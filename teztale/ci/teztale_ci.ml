@@ -36,14 +36,15 @@ let job_build =
     ~variables:[("PROFILE", "static")]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    [
-      "./scripts/ci/take_ownership.sh";
-      ". ./scripts/version.sh";
-      "eval $(opam env)";
-      "make teztale";
-      "mkdir -p ./teztale-binaries/" ^ arch_string;
-      "mv octez-teztale-* ./teztale-binaries/" ^ arch_string ^ "/";
-    ]
+    ~script:
+      [
+        "./scripts/ci/take_ownership.sh";
+        ". ./scripts/version.sh";
+        "eval $(opam env)";
+        "make teztale";
+        "mkdir -p ./teztale-binaries/" ^ arch_string;
+        "mv octez-teztale-* ./teztale-binaries/" ^ arch_string ^ "/";
+      ]
 
 let job_gitlab_release =
   CI.job
@@ -57,7 +58,7 @@ let job_gitlab_release =
         (Artifacts, job_build `release Amd64);
         (Artifacts, job_build `release Arm64);
       ]
-    ["./teztale/scripts/releases/create_gitlab_release.sh"]
+    ~script:["./teztale/scripts/releases/create_gitlab_release.sh"]
 
 let job_release_page =
   Cacio.parameterize @@ fun pipeline_type ->
@@ -100,7 +101,8 @@ let job_release_page =
             ("BUCKET_PATH", "/releases");
             ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
           ])
-    ["eval $(opam env)"; "./teztale/scripts/releases/publish_release_page.sh"]
+    ~script:
+      ["eval $(opam env)"; "./teztale/scripts/releases/publish_release_page.sh"]
 
 let register () =
   Cacio.register_merge_request_jobs

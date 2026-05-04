@@ -36,12 +36,13 @@ let job_build_released =
          executables)
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ~policy:Pull_push ())
-    [
-      "./scripts/ci/take_ownership.sh";
-      ". ./scripts/version.sh";
-      "eval $(opam env)";
-      "./scripts/ci/build_full_unreleased.sh";
-    ]
+    ~script:
+      [
+        "./scripts/ci/take_ownership.sh";
+        ". ./scripts/version.sh";
+        "eval $(opam env)";
+        "./scripts/ci/build_full_unreleased.sh";
+      ]
 
 let register () =
   CI.register_scheduled_pipeline

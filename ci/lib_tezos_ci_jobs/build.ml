@@ -27,19 +27,20 @@ let build_octez_source =
     ~variables:[("DUNE_BUILD_JOBS", "-j 12")]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    [
-      "./scripts/ci/take_ownership.sh";
-      ". ./scripts/version.sh";
-      "eval $(opam env)";
-      "./scripts/ci/restrict_export_to_octez_source.sh";
-      "./scripts/ci/create_octez_tarball.sh octez";
-      "mv octez.tar.bz2 ../";
-      "cd ../";
-      "tar xf octez.tar.bz2";
-      "cd octez/";
-      "eval $(opam env)";
-      "make octez";
-    ]
+    ~script:
+      [
+        "./scripts/ci/take_ownership.sh";
+        ". ./scripts/version.sh";
+        "eval $(opam env)";
+        "./scripts/ci/restrict_export_to_octez_source.sh";
+        "./scripts/ci/create_octez_tarball.sh octez";
+        "mv octez.tar.bz2 ../";
+        "cd ../";
+        "tar xf octez.tar.bz2";
+        "cd octez/";
+        "eval $(opam env)";
+        "make octez";
+      ]
 
 (* Common features of build jobs that use [build_full_unreleased.sh]. *)
 let build_job ~__POS__ ~arch ?storage ~executable_files ?(extra = [])
@@ -73,12 +74,13 @@ let build_job ~__POS__ ~arch ?storage ~executable_files ?(extra = [])
     ?dune_cache
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ~policy:Pull_push ())
-    [
-      "./scripts/ci/take_ownership.sh";
-      ". ./scripts/version.sh";
-      "eval $(opam env)";
-      "./scripts/ci/build_full_unreleased.sh";
-    ]
+    ~script:
+      [
+        "./scripts/ci/take_ownership.sh";
+        ". ./scripts/version.sh";
+        "eval $(opam env)";
+        "./scripts/ci/build_full_unreleased.sh";
+      ]
 
 let job_build_released =
   Cacio.parameterize @@ fun arch ->
@@ -167,22 +169,23 @@ let job_build_layer1_profiling =
     ~variables:[("PROFILE", "static")]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    [
-      "./scripts/ci/take_ownership.sh";
-      ". ./scripts/version.sh";
-      "eval $(opam env)";
-      "scripts/slim-mode.sh on";
-      (* turn on -opaque for all subsequent builds *)
-      "scripts/custom-flags.sh set -opaque";
-      (* 1) compile with PPX profiling *)
-      "TEZOS_PPX_PROFILER=profiling make build " ^ octez_executables;
-      "mkdir -p octez-binaries/x86_64/profiler";
-      "mv " ^ profiled_binaries_string ^ " octez-binaries/x86_64/profiler";
-      (* 2) compile with OpenTelemetry PPX (overwrites binaries) *)
-      "TEZOS_PPX_PROFILER=opentelemetry make build " ^ octez_executables;
-      "mkdir -p octez-binaries/x86_64/telemetry";
-      "mv " ^ profiled_binaries_string ^ " octez-binaries/x86_64/telemetry";
-    ]
+    ~script:
+      [
+        "./scripts/ci/take_ownership.sh";
+        ". ./scripts/version.sh";
+        "eval $(opam env)";
+        "scripts/slim-mode.sh on";
+        (* turn on -opaque for all subsequent builds *)
+        "scripts/custom-flags.sh set -opaque";
+        (* 1) compile with PPX profiling *)
+        "TEZOS_PPX_PROFILER=profiling make build " ^ octez_executables;
+        "mkdir -p octez-binaries/x86_64/profiler";
+        "mv " ^ profiled_binaries_string ^ " octez-binaries/x86_64/profiler";
+        (* 2) compile with OpenTelemetry PPX (overwrites binaries) *)
+        "TEZOS_PPX_PROFILER=opentelemetry make build " ^ octez_executables;
+        "mkdir -p octez-binaries/x86_64/telemetry";
+        "mv " ^ profiled_binaries_string ^ " octez-binaries/x86_64/telemetry";
+      ]
 
 let job_build_static_linux_released_binaries =
   Cacio.parameterize @@ fun arch ->
@@ -215,11 +218,12 @@ let job_build_static_linux_released_binaries =
          ["octez-binaries/$ARCH/*"])
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    [
-      "./scripts/ci/take_ownership.sh";
-      "eval $(opam env)";
-      "./scripts/ci/build_static_binaries.sh";
-    ]
+    ~script:
+      [
+        "./scripts/ci/take_ownership.sh";
+        "eval $(opam env)";
+        "./scripts/ci/build_static_binaries.sh";
+      ]
 
 let job_build_static_linux_experimental_binaries =
   Cacio.parameterize @@ fun arch ->
@@ -245,11 +249,12 @@ let job_build_static_linux_experimental_binaries =
     ~artifacts:(Gitlab_ci.Util.artifacts ["octez-binaries/$ARCH/*"])
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    [
-      "./scripts/ci/take_ownership.sh";
-      "eval $(opam env)";
-      "./scripts/ci/build_static_binaries.sh";
-    ]
+    ~script:
+      [
+        "./scripts/ci/take_ownership.sh";
+        "eval $(opam env)";
+        "./scripts/ci/build_static_binaries.sh";
+      ]
 
 let register () =
   (* We do not add manual jobs to [merge_train] pipelines,

@@ -42,7 +42,8 @@ let job_docker_build =
     ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
     ~description:
       (sf "Build Octez Smart Rollup docker image for %s." arch_string)
-    ["./scripts/ci/docker_initialize.sh"; "./scripts/ci/docker_release.sh"]
+    ~script:
+      ["./scripts/ci/docker_initialize.sh"; "./scripts/ci/docker_release.sh"]
 
 let job_build_static_binaries =
   Cacio.parameterize @@ fun arch ->
@@ -72,11 +73,12 @@ let job_build_static_binaries =
        artifacts
          ~expire_in:(Duration (Days 90))
          ["octez-binaries/$ARCH/*"])
-    [
-      "./scripts/ci/take_ownership.sh";
-      "eval $(opam env)";
-      "./scripts/ci/build_static_binaries.sh";
-    ]
+    ~script:
+      [
+        "./scripts/ci/take_ownership.sh";
+        "eval $(opam env)";
+        "./scripts/ci/build_static_binaries.sh";
+      ]
 
 let job_docker_merge_manifests =
   Cacio.parameterize @@ fun test ->
@@ -98,10 +100,11 @@ let job_docker_merge_manifests =
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
     ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
     ~description:"Merge manifest for arm64 and arm64 docker images."
-    [
-      "./scripts/ci/docker_initialize.sh";
-      "./scripts/ci/docker_merge_manifests.sh";
-    ]
+    ~script:
+      [
+        "./scripts/ci/docker_initialize.sh";
+        "./scripts/ci/docker_merge_manifests.sh";
+      ]
 
 let job_release_page =
   Cacio.parameterize @@ fun pipeline_type ->
@@ -147,12 +150,13 @@ let job_release_page =
             ("BUCKET_PATH", "/releases");
             ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
           ])
-    [
-      "eval $(opam env)";
-      "./scripts/rollup_node/releases/publish_release_page.sh";
-      (* Prepare artifacts. *)
-      "cp /tmp/release_page*/index.md ./index.md";
-    ]
+    ~script:
+      [
+        "eval $(opam env)";
+        "./scripts/rollup_node/releases/publish_release_page.sh";
+        (* Prepare artifacts. *)
+        "cp /tmp/release_page*/index.md ./index.md";
+      ]
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
 
 let job_gitlab_release =
@@ -168,7 +172,7 @@ let job_gitlab_release =
       ]
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
     ~description:"Create the gitlab release for the Octez Smart Rollup."
-    ["./scripts/rollup_node/releases/create_gitlab_release.sh"]
+    ~script:["./scripts/rollup_node/releases/create_gitlab_release.sh"]
 
 let register () =
   CI.register_dedicated_test_release_pipeline

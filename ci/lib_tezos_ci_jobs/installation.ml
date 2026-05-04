@@ -31,7 +31,12 @@ let job_install_opam_ubuntu =
     ~timeout:(Hours 2)
     ~variables:[("CARGO_NET_OFFLINE", "false")]
     ~force:true
-    ["apt update"; "apt install -y sudo"; "./docs/introduction/install-opam.sh"]
+    ~script:
+      [
+        "apt update";
+        "apt install -y sudo";
+        "./docs/introduction/install-opam.sh";
+      ]
 
 let compile_sources_doc_deps_job ~name_suffix ~image =
   CI.job
@@ -45,7 +50,7 @@ let compile_sources_doc_deps_job ~name_suffix ~image =
     ~image
     ~variables:[("CARGO_NET_OFFLINE", "false")]
     ~only_if_changed:["docs/introduction/compile-sources-setup.sh"]
-    [sf "./docs/introduction/compile-sources-setup.sh"]
+    ~script:[sf "./docs/introduction/compile-sources-setup.sh"]
 
 let job_compile_sources_doc_deps_debian =
   compile_sources_doc_deps_job
@@ -77,7 +82,7 @@ let compile_sources_doc_job ~name_suffix ~project ~branch ~image_name =
          ~image_path:(Tezos_ci.Images.Base_images.path_prefix ^ "/" ^ image_name))
     ~variables:[("DUNE_BUILD_JOBS", "-j 12"); ("CARGO_NET_OFFLINE", "false")]
     ~sccache:(Cacio.sccache ())
-    [sf "./docs/introduction/compile-sources.sh %s %s" project branch]
+    ~script:[sf "./docs/introduction/compile-sources.sh %s %s" project branch]
 
 let job_compile_sources_doc_latest_debian =
   compile_sources_doc_job

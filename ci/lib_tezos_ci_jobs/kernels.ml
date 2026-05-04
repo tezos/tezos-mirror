@@ -41,12 +41,13 @@ let job_check_riscv_kernels =
     ~description:"Run 'make check' in 'src/riscv' and 'src/lib_riscv/kernels'."
     ~only_if_changed:Files.kernels
     ~image:Tezos_ci.Images.Base_images.debian_rust_trixie
-    [
-      (* EXTRA_FLAGS ensure we don't need Ocaml installed in the check and test jobs. *)
-      "make -C src/riscv CHECK_FLAGS= EXTRA_FLAGS='--no-default-features \
-       --features ci' check";
-      "make -C src/lib_riscv/kernels check";
-    ]
+    ~script:
+      [
+        (* EXTRA_FLAGS ensure we don't need Ocaml installed in the check and test jobs. *)
+        "make -C src/riscv CHECK_FLAGS= EXTRA_FLAGS='--no-default-features \
+         --features ci' check";
+        "make -C src/lib_riscv/kernels check";
+      ]
 
 let job_audit_riscv_deps =
   job_kernel
@@ -56,7 +57,7 @@ let job_audit_riscv_deps =
     ~description:"Run 'make audit' in 'src/riscv' and 'src/lib_riscv/kernels'."
     ~only_if_changed:Files.kernels
     ~image:Tezos_ci.Images.Base_images.debian_rust_trixie
-    ["make -C src/riscv audit"; "make -C src/lib_riscv/kernels audit"]
+    ~script:["make -C src/riscv audit"; "make -C src/lib_riscv/kernels audit"]
 
 let job_test_kernels =
   job_kernel
@@ -66,7 +67,7 @@ let job_test_kernels =
     ~description:"Run 'make check' and 'make test' for kernels."
     ~only_if_changed:Files.test_kernels
     ~image:Tezos_ci.Images.Base_images.debian_rust_trixie
-    ["make -f kernels.mk check"; "make -f kernels.mk test"]
+    ~script:["make -f kernels.mk check"; "make -f kernels.mk test"]
 
 let job_build_kernels =
   job_kernel
@@ -103,7 +104,7 @@ let job_build_kernels =
            "riscv-echo.checksum";
          ])
     ~sccache:(Cacio.sccache ~policy:Pull_push ())
-    ["make -f kernels.mk build"; "make -f etherlink.mk evm_kernel.wasm"]
+    ~script:["make -f kernels.mk build"; "make -f etherlink.mk evm_kernel.wasm"]
 
 let register () =
   Cacio.register_merge_request_jobs

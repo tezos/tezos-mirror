@@ -33,12 +33,13 @@ let job_sanity_ci =
         ".gitlab-ci.yml";
         ".gitlab/ci/pipelines/*.yml";
       ]
-    [
-      "./scripts/ci/take_ownership.sh";
-      "eval $(opam env)";
-      "make --silent -C manifest check";
-      "make --silent -C ci check";
-    ]
+    ~script:
+      [
+        "./scripts/ci/take_ownership.sh";
+        "eval $(opam env)";
+        "make --silent -C manifest check";
+        "make --silent -C ci check";
+      ]
 
 let job_docker_hadolint =
   let files_to_lint = ["build.Dockerfile"; "Dockerfile"] in
@@ -49,7 +50,7 @@ let job_docker_hadolint =
     ~image:Tezos_ci.Images.hadolint
     ~stage:Test
     ~only_if_changed:files_to_lint
-    (List.map (( ^ ) "hadolint ") files_to_lint)
+    ~script:(List.map (( ^ ) "hadolint ") files_to_lint)
 
 let job_oc_ocaml_fmt =
   CI.job
@@ -62,15 +63,16 @@ let job_oc_ocaml_fmt =
     ~stage:Test
     ~only_if_changed:["**/.ocamlformat"; "**/*.ml"; "**/*.mli"]
     ~dune_cache:true
-    [
-      "./scripts/ci/take_ownership.sh";
-      ". ./scripts/version.sh";
-      "eval $(opam env)";
-      (* Check .ocamlformat files. *)
-      "scripts/lint.sh --check-ocamlformat";
-      (* Check actual formatting. *)
-      "scripts/ci/dune.sh build --profile=dev @fmt";
-    ]
+    ~script:
+      [
+        "./scripts/ci/take_ownership.sh";
+        ". ./scripts/version.sh";
+        "eval $(opam env)";
+        (* Check .ocamlformat files. *)
+        "scripts/lint.sh --check-ocamlformat";
+        (* Check actual formatting. *)
+        "scripts/ci/dune.sh build --profile=dev @fmt";
+      ]
 
 let job_semgrep =
   CI.job
@@ -81,11 +83,12 @@ let job_semgrep =
     ~stage:Test
     ~only_if_changed:
       ["src/**/*"; "tezt/**/*"; "devtools/**/*"; "scripts/semgrep/**/*"]
-    [
-      "echo \"OCaml code linting. For information on how to reproduce locally, \
-       check out scripts/semgrep/README.md\"";
-      "sh ./scripts/semgrep/lint-all-ocaml-sources.sh";
-    ]
+    ~script:
+      [
+        "echo \"OCaml code linting. For information on how to reproduce \
+         locally, check out scripts/semgrep/README.md\"";
+        "sh ./scripts/semgrep/lint-all-ocaml-sources.sh";
+      ]
 
 let job_oc_misc_checks =
   Cacio.parameterize @@ fun mode ->
@@ -108,29 +111,30 @@ let job_oc_misc_checks =
         "contrib/**/*";
         "etherlink/**/*";
       ]
-    (List.flatten
-       [
-         (* Setup the environment. *)
+    ~script:
+      (List.flatten
          [
-           "./scripts/ci/take_ownership.sh";
-           ". ./scripts/version.sh";
-           "eval $(opam env)";
-           ". $HOME/.venv/bin/activate";
-         ];
-         (* Perform the checks. *)
-         [
-           "./scripts/ci/lint_misc_check.sh";
-           "scripts/check_wasm_pvm_regressions.sh check";
-           "etherlink/scripts/check_evm_store_migrations.sh check";
-           "./scripts/check_rollup_node_sql_migrations.sh check";
-           "./src/lib_dal_node/scripts/check_dal_store_migrations.sh check";
-         ];
-         (* The license check only applies to new files (in the sense of [git add]),
+           (* Setup the environment. *)
+           [
+             "./scripts/ci/take_ownership.sh";
+             ". ./scripts/version.sh";
+             "eval $(opam env)";
+             ". $HOME/.venv/bin/activate";
+           ];
+           (* Perform the checks. *)
+           [
+             "./scripts/ci/lint_misc_check.sh";
+             "scripts/check_wasm_pvm_regressions.sh check";
+             "etherlink/scripts/check_evm_store_migrations.sh check";
+             "./scripts/check_rollup_node_sql_migrations.sh check";
+             "./src/lib_dal_node/scripts/check_dal_store_migrations.sh check";
+           ];
+           (* The license check only applies to new files (in the sense of [git add]),
             so can only run in merge request pipelines. *)
-         (match mode with
-         | `full -> ["./scripts/ci/lint_check_licenses.sh"]
-         | `no_license_check -> []);
-       ])
+           (match mode with
+           | `full -> ["./scripts/ci/lint_check_licenses.sh"]
+           | `no_license_check -> []);
+         ])
 
 (* Note: this job's script includes a copy-paste of the script of [grafazos.build]. *)
 let job_check_jsonnet =
@@ -141,15 +145,16 @@ let job_check_jsonnet =
     ~description:"Check jsonnet format and lint."
     ~stage:Test
     ~only_if_changed:["**/*.jsonnet"]
-    [
-      "cd grafazos/";
-      (* For security, we explicitly install v11.1.0
-           which corresponds to commit [1ce5aec]. *)
-      "jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec";
-      "cd ../";
-      "scripts/lint.sh --check-jsonnet-format";
-      "scripts/lint.sh --check-jsonnet-lint";
-    ]
+    ~script:
+      [
+        "cd grafazos/";
+        (* For security, we explicitly install v11.1.0
+             which corresponds to commit [1ce5aec]. *)
+        "jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec";
+        "cd ../";
+        "scripts/lint.sh --check-jsonnet-format";
+        "scripts/lint.sh --check-jsonnet-lint";
+      ]
 
 let job_check_rust_fmt =
   CI.job
@@ -159,7 +164,7 @@ let job_check_rust_fmt =
     ~image:Tezos_ci.Images.Base_images.debian_rust_trixie
     ~stage:Test
     ~only_if_changed:["**/*.rs"]
-    ["scripts/check-format-rust.sh"]
+    ~script:["scripts/check-format-rust.sh"]
 
 (* Necromantic nix-related rites. *)
 let job_nix =
@@ -172,12 +177,13 @@ let job_nix =
     ~artifacts:(Gitlab_ci.Util.artifacts ~when_:On_failure ["flake.lock"])
     ~only_if_changed:["**/*.nix"; "flake.lock"; "scripts/version.sh"]
     ~cache:[Gitlab_ci.Util.cache ~key:"nix-store" ["/nix/store"]]
-    [
-      "mkdir -p ~/.config/nix";
-      "echo 'extra-experimental-features = flakes nix-command' > \
-       ~/.config/nix/nix.conf";
-      "nix run .#ci-check-version-sh-lock";
-    ]
+    ~script:
+      [
+        "mkdir -p ~/.config/nix";
+        "echo 'extra-experimental-features = flakes nix-command' > \
+         ~/.config/nix/nix.conf";
+        "nix run .#ci-check-version-sh-lock";
+      ]
 
 (* Note: checking commit titles only makes sense in merge request pipelines.
    In scheduled pipelines, it is too late to change commit titles. *)
@@ -198,18 +204,19 @@ let job_commit_titles =
              when a git history contains invalid commits titles
              in situations where that is allowed. *)
           With_exit_codes [65])
-    [
-      (* "|| exit $?" might seem like a noop but is in fact necessary
-         to please his majesty GitLab.
-         For more info, see:
-         - https://gitlab.com/tezos/tezos/-/merge_requests/9923#note_1538894754;
-         - https://gitlab.com/tezos/tezos/-/merge_requests/12141; and
-         - https://gitlab.com/groups/gitlab-org/-/epics/6074
-         TODO: replace this with [FF_USE_NEW_BASH_EVAL_STRATEGY=true], see
-         {{:https://docs.gitlab.com/runner/configuration/feature-flags.html}GitLab
-         Runner feature flags}. *)
-      "./scripts/ci/check_commit_messages.sh || exit $?";
-    ]
+    ~script:
+      [
+        (* "|| exit $?" might seem like a noop but is in fact necessary
+           to please his majesty GitLab.
+           For more info, see:
+           - https://gitlab.com/tezos/tezos/-/merge_requests/9923#note_1538894754;
+           - https://gitlab.com/tezos/tezos/-/merge_requests/12141; and
+           - https://gitlab.com/groups/gitlab-org/-/epics/6074
+           TODO: replace this with [FF_USE_NEW_BASH_EVAL_STRATEGY=true], see
+           {{:https://docs.gitlab.com/runner/configuration/feature-flags.html}GitLab
+           Runner feature flags}. *)
+        "./scripts/ci/check_commit_messages.sh || exit $?";
+      ]
 
 let register () =
   Cacio.register_merge_request_jobs

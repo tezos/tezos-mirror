@@ -56,7 +56,7 @@ let job_rst_check =
     ~stage:Test
     ~description:"Check ReStructured Text files."
     ~only_if_changed:Files.rst
-    [". $HOME/.venv/bin/activate"; "make --silent -C docs sphinx-check"]
+    ~script:[". $HOME/.venv/bin/activate"; "make --silent -C docs sphinx-check"]
 
 let job_install_python =
   Cacio.parameterize @@ fun os_distribution ->
@@ -85,7 +85,13 @@ let job_install_python =
        actually work."
     ~only_if_changed:Files.python_install_script
     ~force_if_label:["ci--docs"]
-    [sf "./docs/developer/install-python-debian-ubuntu.sh %s %s" project branch]
+    ~script:
+      [
+        sf
+          "./docs/developer/install-python-debian-ubuntu.sh %s %s"
+          project
+          branch;
+      ]
 
 let job_odoc =
   Cacio.parameterize @@ fun mode ->
@@ -109,7 +115,7 @@ let job_odoc =
          ["docs/_build/api/odoc/"; "docs/odoc.log"])
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    ["eval $(opam env)"; "make -C docs " ^ target]
+    ~script:["eval $(opam env)"; "make -C docs " ^ target]
 
 let job_manuals =
   CI.job
@@ -137,7 +143,7 @@ let job_manuals =
            "docs/developer/rollup_metrics.csv";
            "docs/user/node-config.json";
          ])
-    ["eval $(opam env)"; "make -C docs -j octez-gen"]
+    ~script:["eval $(opam env)"; "make -C docs -j octez-gen"]
 
 let job_docgen =
   CI.job
@@ -163,7 +169,7 @@ let job_docgen =
          ])
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    ["eval $(opam env)"; "make -C docs -j docexes-gen"]
+    ~script:["eval $(opam env)"; "make -C docs -j docexes-gen"]
 
 let job_build_all =
   Cacio.parameterize @@ fun mode ->
@@ -187,12 +193,13 @@ let job_build_all =
          ~expire_in:(Duration (Weeks 1))
          (* Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706) *)
          ["docs/_build/"])
-    [
-      "eval $(opam env)";
-      ". $HOME/.venv/bin/activate";
-      "make -C docs -j sphinx";
-      "make -C docs -j _build/octezdoc.txt";
-    ]
+    ~script:
+      [
+        "eval $(opam env)";
+        ". $HOME/.venv/bin/activate";
+        "make -C docs -j sphinx";
+        "make -C docs -j _build/octezdoc.txt";
+      ]
 
 let job_linkcheck =
   Cacio.parameterize @@ fun mode ->
@@ -211,13 +218,14 @@ let job_linkcheck =
         (Artifacts, job_build_all mode);
       ]
     ~allow_failure:Yes
-    [
-      ". ./scripts/version.sh";
-      "eval $(opam env)";
-      ". $HOME/.venv/bin/activate";
-      "make -C docs redirectcheck";
-      "make -C docs linkcheck";
-    ]
+    ~script:
+      [
+        ". ./scripts/version.sh";
+        "eval $(opam env)";
+        ". $HOME/.venv/bin/activate";
+        "make -C docs redirectcheck";
+        "make -C docs linkcheck";
+      ]
 
 let job_publish =
   CI.job
@@ -229,14 +237,15 @@ let job_publish =
     ~needs:[(Artifacts, job_build_all `full)]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    [
-      "eval $(opam env)";
-      ". $HOME/.venv/bin/activate";
-      {|echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519|};
-      {|echo "${CI_KH}" > ~/.ssh/known_hosts|};
-      "chmod 400 ~/.ssh/id_ed25519";
-      "./scripts/ci/doc_publish.sh";
-    ]
+    ~script:
+      [
+        "eval $(opam env)";
+        ". $HOME/.venv/bin/activate";
+        {|echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519|};
+        {|echo "${CI_KH}" > ~/.ssh/known_hosts|};
+        "chmod 400 ~/.ssh/id_ed25519";
+        "./scripts/ci/doc_publish.sh";
+      ]
 
 let register () =
   Cacio.register_merge_request_jobs
