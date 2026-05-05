@@ -426,17 +426,25 @@ pub fn renumber_nonces(operations: &mut [AppliedOperation]) {
 }
 
 /// Merge `other`'s internal operations into `target`.
-/// The CRAC event stays as the first internal operation in `target`.
-/// Non-event operations from `other` are appended after `target`'s
-/// existing operations.  If `target` has no CRAC event but `other` does,
-/// the event is prepended.  Duplicate events are dropped.
+/// The synthetic CRAC-ID event stays as the first internal operation
+/// in `target`.  Non-synthetic-event operations from `other` (regular
+/// transfers, originations, AND user `EMIT` events) are appended
+/// after `target`'s existing operations.  If `target` has no synthetic
+/// CRAC-ID event but `other` does, the event is prepended.  Duplicate
+/// synthetic CRAC-ID events from `other` are dropped — but user EMITs
+/// always pass through.
 /// Nonces are left as-is; renumber_nonces() fixes them at block finalization.
 fn merge_crac_internals(target: &mut AppliedOperation, other: AppliedOperation) {
-    use tezos_tezlink::operation_result::{
-        InternalOperationSum, OperationDataAndMetadata, OperationResultSum,
-    };
-    // Partition `other`'s internals into non-events and events.
-    let (other_transfers, other_events): (Vec<_>, Vec<_>) = match other.op_and_receipt {
+    use tezos_execution::enshrined_contracts::is_synthetic_crac_event;
+    use tezos_tezlink::operation_result::{OperationDataAndMetadata, OperationResultSum};
+    // Partition `other`'s internals into non-synthetic-event and
+    // synthetic-event entries.  User EMITs (Event variants with a
+    // non-`crac` tag) join the non-synthetic bucket so they are
+    // appended after `target`'s existing operations rather than being
+    // mistakenly treated as duplicates of the synthetic CRAC-ID event.
+    let (other_non_synthetic, other_synthetic_events): (Vec<_>, Vec<_>) = match other
+        .op_and_receipt
+    {
         OperationDataAndMetadata::OperationWithMetadata(batch) => batch
             .operations
             .into_iter()
@@ -444,7 +452,7 @@ fn merge_crac_internals(target: &mut AppliedOperation, other: AppliedOperation) 
                 OperationResultSum::Transfer(result) => result.internal_operation_results,
                 _ => vec![],
             })
-            .partition(|iop| !matches!(iop, InternalOperationSum::Event(_))),
+            .partition(|iop| !is_synthetic_crac_event(iop)),
     };
     // Append to `target`'s internal operations, before the CRAC event.
     // CRAC receipts are built by build_crac_receipt which guarantees exactly
@@ -462,23 +470,27 @@ fn merge_crac_internals(target: &mut AppliedOperation, other: AppliedOperation) 
                 "CRAC receipt operation must be a Transfer"
             );
             if let OperationResultSum::Transfer(ref mut result) = op.receipt {
-                let has_event = result
+                let has_synthetic_event = result
                     .internal_operation_results
                     .iter()
-                    .any(|iop| matches!(iop, InternalOperationSum::Event(_)));
-                if !has_event && !other_events.is_empty() {
-                    // Target has no event — prepend other's event,
-                    // then re-append existing operations.
+                    .any(is_synthetic_crac_event);
+                if !has_synthetic_event && !other_synthetic_events.is_empty() {
+                    // Target has no synthetic CRAC-ID event — prepend
+                    // other's first one, then re-append existing
+                    // operations.  Duplicate synthetic events past the
+                    // first one are dropped.
                     let existing = std::mem::take(&mut result.internal_operation_results);
                     result
                         .internal_operation_results
-                        .extend(other_events.into_iter().take(1));
+                        .extend(other_synthetic_events.into_iter().take(1));
                     result.internal_operation_results.extend(existing);
                 }
-                // Append other's transfers after existing operations,
-                // preserving execution order.  Duplicate events from
-                // `other` are dropped.
-                result.internal_operation_results.extend(other_transfers);
+                // Append other's non-synthetic-event entries after
+                // existing operations, preserving execution order.
+                // User EMITs flow through here unchanged.
+                result
+                    .internal_operation_results
+                    .extend(other_non_synthetic);
             }
         }
     }
@@ -1802,20 +1814,21 @@ mod tests {
         nonce: u16,
     ) -> tezos_tezlink::operation_result::InternalOperationSum {
         use tezos_data_encoding::types::Narith;
+        use tezos_execution::NULL_PKH;
         use tezos_tezlink::operation_result::{
             ContentResult, EventContent, EventSuccess, InternalContentWithMetadata,
             InternalOperationSum, MichelineExpr,
         };
         InternalOperationSum::Event(InternalContentWithMetadata {
-            sender: tezos_protocol::contract::Contract::Originated(
-                tezos_crypto_rs::hash::ContractKt1Hash::from_base58_check(
-                    "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",
-                )
-                .unwrap(),
+            sender: tezos_protocol::contract::Contract::Implicit(
+                tezos_smart_rollup::types::PublicKeyHash::from_b58check(NULL_PKH)
+                    .unwrap(),
             ),
             nonce,
             content: EventContent {
-                tag: Some(mir::ast::Entrypoint::from_string_unchecked("crac".into())),
+                tag: Some(mir::ast::Entrypoint::from_string_unchecked(
+                    tezos_execution::enshrined_contracts::SYNTHETIC_CRAC_EVENT_TAG.into(),
+                )),
                 payload: Some(MichelineExpr(vec![
                     0x01, 0x00, 0x00, 0x00, 0x03, 0x31, 0x2d, 0x30,
                 ])),
