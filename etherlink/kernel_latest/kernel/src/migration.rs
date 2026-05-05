@@ -938,7 +938,7 @@ where
             // run the Michelson runtime.
             //
             // Earlier kernels funded the internal TezosX caller used by
-            // `generate_alias` by writing `U256::MAX` to durable storage,
+            // `ensure_alias` by writing `U256::MAX` to durable storage,
             // because they assumed REVM's pre-flight balance check would
             // require a positive balance. The surrounding `run_transaction`
             // is `TransactionOrigin::CrossRuntime` so its EVM journal is

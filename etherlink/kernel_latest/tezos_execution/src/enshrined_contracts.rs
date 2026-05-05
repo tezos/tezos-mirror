@@ -23,8 +23,8 @@ use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::block::AppliedOperation;
 use tezos_tezlink::operation_result::{InternalOperationSum, TransferError};
 use tezosx_interfaces::{
-    gas::convert as convert_gas, headers::format_tez_from_mutez, CrossRuntimeContext,
-    Registry, RuntimeId, ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT,
+    gas::convert as convert_gas, headers::format_tez_from_mutez, AliasInfo,
+    CrossRuntimeContext, Registry, RuntimeId, ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT,
     X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT,
     X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
 };
@@ -795,7 +795,7 @@ where
     //
     // Phase 2 (generation): if the alias does not exist, get_or_create_alias
     //   forwards the remaining gas (converted to target runtime units) to the
-    //   target runtime's generate_alias, which consumes gas internally. The
+    //   target runtime's ensure_alias, which consumes gas internally. The
     //   consumed gas is returned, converted back to milligas, and charged.
     //   On cache hit, phase 2 costs nothing (consumed = 0).
 
@@ -993,11 +993,15 @@ where
         return Ok((alias, 0));
     }
     let address_b58 = address.to_base58_check();
+    let alias_info = AliasInfo {
+        runtime: RuntimeId::Tezos,
+        native_address: address_b58.into_bytes(),
+    };
     let (alias_str, gas_remaining_after) = registry
-        .generate_alias(
+        .ensure_alias(
             host,
             journal,
-            &address_b58,
+            alias_info,
             native_public_key,
             target_runtime,
             context,
@@ -1403,8 +1407,8 @@ mod tests {
         );
         assert!(result.is_ok());
 
-        // Verify generate_alias was called for both sender and source
-        let alias_calls = registry.generate_alias_calls.borrow();
+        // Verify ensure_alias was called for both sender and source
+        let alias_calls = registry.ensure_alias_calls.borrow();
         assert_eq!(alias_calls.len(), 2);
         assert_eq!(alias_calls[0].1, RuntimeId::Ethereum);
         assert_eq!(alias_calls[1].1, RuntimeId::Ethereum);
@@ -1453,8 +1457,8 @@ mod tests {
         );
         assert!(result2.is_ok());
 
-        // generate_alias should have been called twice (sender + source on first call)
-        let alias_calls = registry.generate_alias_calls.borrow();
+        // ensure_alias should have been called twice (sender + source on first call)
+        let alias_calls = registry.ensure_alias_calls.borrow();
         assert_eq!(alias_calls.len(), 2);
 
         // serve should have been called twice

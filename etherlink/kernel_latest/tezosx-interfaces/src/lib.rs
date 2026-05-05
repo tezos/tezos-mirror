@@ -78,22 +78,34 @@ pub enum TezosXRuntimeError {
     OutOfGas,
 }
 pub trait Registry {
-    /// Generate an alias in the target runtime.
+    /// Idempotently ensure that the alias of `alias_info` exists in
+    /// `target_runtime`, materializing the forwarder and recording the
+    /// classification record if needed.
     ///
-    /// `gas_remaining` is the caller's remaining gas budget in the **target
-    /// runtime's gas units** (milligas for Tezos, EVM gas for Ethereum).
-    /// The function consumes gas incrementally and fails early if the
-    /// budget is exceeded.
+    /// `alias_info` carries the source runtime where the native account
+    /// lives and the UTF-8 bytes of its address. `target_runtime`
+    /// selects the runtime that will host the alias.
     ///
-    /// Returns `(alias, gas_remaining_after)`.
+    /// `gas_remaining` is the caller's remaining gas budget in the
+    /// target runtime gas units (milligas for Tezos, EVM gas for
+    /// Ethereum). The function consumes gas incrementally and fails
+    /// early if the budget is exceeded.
+    ///
+    /// Returns `(alias, gas_remaining_after)`. On a fresh deploy the
+    /// behavior matches the legacy alias generation. When the alias is
+    /// already classified, the call is a no-op and the gas budget is
+    /// returned unchanged. When a forwarder exists but the
+    /// classification path is empty (a legacy account from before this
+    /// work), the call writes the classification only and skips the
+    /// redeploy.
     #[allow(clippy::too_many_arguments)]
-    fn generate_alias<Host>(
+    fn ensure_alias<Host>(
         &self,
         host: &mut Host,
         journal: &mut TezosXJournal,
-        native_address: &str,
+        alias_info: AliasInfo,
         native_public_key: Option<&[u8]>,
-        runtime_id: RuntimeId,
+        target_runtime: RuntimeId,
         context: CrossRuntimeContext,
         gas_remaining: u64,
     ) -> Result<(String, u64), TezosXRuntimeError>
@@ -118,18 +130,32 @@ pub trait Registry {
 }
 
 pub trait RuntimeInterface {
-    /// Generate an alias address for a native address in this runtime.
+    /// Idempotently ensure that the alias of `alias_info` exists in
+    /// this runtime. `alias_info.runtime` is the source runtime where
+    /// the underlying native account lives, and `alias_info.native_address`
+    /// holds the UTF-8 bytes of its canonical address string.
     ///
-    /// `gas_remaining` is the caller's remaining budget in this runtime's
-    /// native gas units. Returns `(alias, gas_remaining_after)`. Fails if
-    /// the budget is exceeded.
+    /// `gas_remaining` is the caller's remaining budget in this runtime
+    /// gas units. Returns `(alias, gas_remaining_after)`. Fails if the
+    /// budget is exceeded.
+    ///
+    /// Three branches:
+    /// - if the alias account already has an alias classification
+    ///   recorded, the call is a no-op and returns the address with
+    ///   `gas_remaining` unchanged;
+    /// - if the alias account exists with forwarder bytecode but the
+    ///   classification path is empty (a legacy account from before
+    ///   this work), the call writes the classification only and
+    ///   skips the redeploy;
+    /// - otherwise the call deploys the forwarder and records the
+    ///   classification.
     #[allow(clippy::too_many_arguments)]
-    fn generate_alias<Host>(
+    fn ensure_alias<Host>(
         &self,
         registry: &impl Registry,
         host: &mut Host,
         journal: &mut TezosXJournal,
-        native_address: &str,
+        alias_info: AliasInfo,
         native_public_key: Option<&[u8]>,
         context: CrossRuntimeContext,
         gas_remaining: u64,
