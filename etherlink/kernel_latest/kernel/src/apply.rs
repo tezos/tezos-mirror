@@ -50,8 +50,8 @@ use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::block::AppliedOperation;
 use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezos_tezlink::operation_result::{
-    ContentResult, OperationBatchWithMetadata, OperationDataAndMetadata, OperationError,
-    OperationResultSum,
+    ApplyOperationErrors, ContentResult, OperationBatchWithMetadata,
+    OperationDataAndMetadata, OperationError, OperationResultSum,
 };
 use tezos_tracing::trace_kernel;
 use tezosx_interfaces::{Registry, RuntimeId};
@@ -339,11 +339,19 @@ pub fn extract_cross_runtime_effects(
 /// `renumber_nonces` would then assign nonces to internals out of
 /// order as well.
 pub fn drain_pending_crac_receipts(journal: &mut TezosXJournal) -> Vec<AppliedOperation> {
-    // Whether any successful CRAC participated in this merge.  Captured
-    // before `take` so the top-level status can be reconciled below.
+    // Tri-state captured before draining so the merged top-level
+    // status can be reconciled below.  `has_applied` reflects CRACs
+    // currently still Applied (pending list); `has_failed` reflects
+    // CRACs that hit a Michelson-side failure; receipts in the
+    // backtracked list contribute neither flag — they record what
+    // was attempted but rolled back via an EVM revert.
     let has_applied = !journal.michelson.pending_crac_receipts.is_empty();
+    let has_failed = !journal.michelson.failed_crac_receipts.is_empty();
 
     let mut all = std::mem::take(&mut journal.michelson.failed_crac_receipts);
+    all.extend(std::mem::take(
+        &mut journal.michelson.backtracked_crac_receipts,
+    ));
     all.extend(std::mem::take(&mut journal.michelson.pending_crac_receipts));
     all.sort_by_key(|(seq, _)| *seq);
 
@@ -356,16 +364,22 @@ pub fn drain_pending_crac_receipts(journal: &mut TezosXJournal) -> Vec<AppliedOp
     }
     // `merge_crac_internals` only touches internals — the top-level
     // `ContentResult` is inherited from the first-executed receipt.
-    // When that receipt is a failed CRAC but later CRACs in the same
-    // EVM tx succeeded, we would end up with `Applied` internals sitting
-    // under a `Failed` top-level, which L1 semantics forbid
-    // (internals under Failed must be Backtracked/Failed/Skipped).
+    // Reconcile so the merged top-level reflects the EVM tx's overall
+    // CRAC outcome and respects the L1 invariant that internals under
+    // a Failed top-level must be Backtracked/Failed/Skipped:
     //
-    // Reconcile by forcing the top-level to `Applied` whenever any
-    // successful CRAC contributed to the merge.  The all-failed case
-    // keeps its `Failed` top-level (RFC Example 4).
+    //   has_applied                       → Applied (force).
+    //   else has_failed                   → Failed  (force, even if
+    //                                       first-by-seq was a
+    //                                       Backtracked-on-revert
+    //                                       receipt).
+    //   else (all entries Backtracked)    → keep the inherited
+    //                                       Backtracked top-level
+    //                                       (no-op).
     if has_applied {
         force_top_level_applied(&mut merged);
+    } else if has_failed {
+        force_top_level_failed(&mut merged);
     }
     vec![merged]
 }
@@ -390,6 +404,32 @@ fn force_top_level_applied(receipt: &mut AppliedOperation) {
         if let OperationResultSum::Transfer(ref mut result) = op.receipt {
             if !matches!(result.result, ContentResult::Applied(_)) {
                 result.result = tezosx_tezos_runtime::crac_top_level_applied_result();
+            }
+        }
+    }
+}
+
+/// Overwrite the top-level `ContentResult` of a merged CRAC receipt
+/// with `Failed`.  Mirror of `force_top_level_applied` for the case
+/// where no currently-Applied CRAC contributed to the merge but at
+/// least one Michelson-side failure did and the seq-first receipt
+/// happens to be a Backtracked-on-revert one — without this, the
+/// inherited Backtracked top-level would understate the EVM tx's
+/// actual outcome (a CRAC failure surfaced).
+///
+/// The synthesized error vector is intentionally empty: indexers
+/// already see the original Failed sibling's errors on its body
+/// internals (which are merged in unchanged), so the top-level
+/// merely needs to advertise `status: failed`.
+fn force_top_level_failed(receipt: &mut AppliedOperation) {
+    let OperationDataAndMetadata::OperationWithMetadata(ref mut batch) =
+        receipt.op_and_receipt;
+    debug_assert_eq!(batch.operations.len(), 1);
+    if let Some(op) = batch.operations.first_mut() {
+        if let OperationResultSum::Transfer(ref mut result) = op.receipt {
+            if !matches!(result.result, ContentResult::Failed(_)) {
+                result.result =
+                    ContentResult::Failed(ApplyOperationErrors { errors: vec![] });
             }
         }
     }
