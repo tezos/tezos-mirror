@@ -192,6 +192,14 @@ module type COMPONENT_API = sig
       it will be removed once the image feature is implemented in Cacio.
       See the Future work section for more details.
 
+      [?script] and the unnamed [string list] can both be used
+      to specify the job's script. If [?script] is specified and non-empty,
+      the unnamed list must be empty.
+      Using [?script] is convenient for partial applications.
+      In the future, we should probably remove the unlabeled [script] argument,
+      and we could also turn the [name] argument into a labeled argument
+      for the same reason (facilitating partial applications).
+
       See {!Tezos_ci.job} for information about other arguments.
 
       The default number of retries is 0 for [Publish] jobs.
@@ -226,6 +234,7 @@ module type COMPONENT_API = sig
     ?image_dependencies:Tezos_ci.Image.t list ->
     ?services:Gitlab_ci.Types.service list ->
     ?id_tokens:Gitlab_ci.Types.id_tokens ->
+    ?script:string list ->
     string ->
     string list ->
     job
