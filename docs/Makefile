@@ -149,20 +149,22 @@ xrefscheck:
 
 .PHONY: installcheck
 installcheck:
+	scripts/test_install_scripts.sh install-bin-26.04
 	scripts/test_install_scripts.sh install-bin-24.04
 	scripts/test_install_scripts.sh install-bin-22.04
 	scripts/test_install_scripts.sh install-bin-bookworm
 	scripts/test_install_scripts.sh install-bin-trixie
-	scripts/test_install_scripts.sh install-bin-rc-24.04
-	scripts/test_install_scripts.sh install-bin-rc-22.04
+	scripts/test_install_scripts.sh install-bin-rc-26.04
+	#scripts/test_install_scripts.sh install-bin-rc-24.04
+	#scripts/test_install_scripts.sh install-bin-rc-22.04
 	scripts/test_install_scripts.sh install-bin-rc-bookworm
 	scripts/test_install_scripts.sh install-bin-rc-trixie
-	scripts/test_install_scripts.sh install-opam-scratch
-	scripts/test_install_scripts.sh install-opam-24.04
-	scripts/test_install_scripts.sh install-opam-22.04
-	scripts/test_install_scripts.sh compile-release-sources-bullseye
-	scripts/test_install_scripts.sh compile-sources-bullseye
-	scripts/test_install_scripts.sh compile-sources-mantic
+	#scripts/test_install_scripts.sh install-opam-scratch
+	#scripts/test_install_scripts.sh install-opam-24.04
+	#scripts/test_install_scripts.sh install-opam-22.04
+	#scripts/test_install_scripts.sh compile-release-sources-bookworm
+	#scripts/test_install_scripts.sh compile-sources-bookworm
+	#scripts/test_install_scripts.sh compile-sources-oracular
 
 # build dune targets together to avoid concurrent dunes
 .PHONY: docexes

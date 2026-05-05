@@ -1623,6 +1623,8 @@ module Images = struct
 
     let ubuntu_24_04 = make_img "ubuntu:24.04" debian_version
 
+    let ubuntu_26_04 = make_img "ubuntu:26.04" debian_version
+
     (* RPM packaging *)
 
     (* Version created by

@@ -467,6 +467,7 @@ oc.build-ubuntu:
     - RELEASE:
       - "22.04"
       - "24.04"
+      - "26.04"
       TAGS:
       - gcp_very_high_cpu_ramfs
       - gcp_arm64
@@ -491,7 +492,7 @@ apt_repo_ubuntu:
   script:
   - . ./scripts/version.sh
   - apt-get install -y --update apt-utils debsigs
-  - ./scripts/ci/create_debian_repo.sh ubuntu 22.04 24.04
+  - ./scripts/ci/create_debian_repo.sh ubuntu 22.04 24.04 26.04
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'

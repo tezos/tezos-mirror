@@ -613,6 +613,8 @@ module Images : sig
 
     val ubuntu_24_04 : Image.t
 
+    val ubuntu_26_04 : Image.t
+
     val rockylinux_9 : Image.t
 
     (* FIXME: Images.rockylinux_10 is currently not used in the CI

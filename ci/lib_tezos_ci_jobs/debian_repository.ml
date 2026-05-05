@@ -78,7 +78,7 @@ let ubuntu_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
   | Full | Release ->
       [
         [
-          ("RELEASE", ["22.04"; "24.04"]);
+          ("RELEASE", ["22.04"; "24.04"; "26.04"]);
           ("TAGS", tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else []));
         ];
       ]
@@ -189,7 +189,7 @@ let job_apt_repo_ubuntu =
     ~build_job:job_build_ubuntu
     ~image:Images.Base_images.ubuntu_24_04
     ~distribution:"ubuntu"
-    ~releases:["22.04"; "24.04"]
+    ~releases:["22.04"; "24.04"; "26.04"]
     []
 
 let make_lintian_job ~distribution ~releases =
@@ -214,7 +214,7 @@ let job_lintian_ubuntu =
     ~needs:[(Artifacts, job_build_ubuntu pipeline_type)]
     ~image:Images.Base_images.ubuntu_24_04
     ~distribution:"ubuntu"
-    ~releases:["22.04"; "24.04"]
+    ~releases:["22.04"; "24.04"; "26.04"]
     []
 
 let job_lintian_debian =
@@ -256,6 +256,17 @@ let job_install_bin_ubuntu_24_04 =
     ~image:Images.Base_images.ubuntu_24_04
     ~distribution:"ubuntu"
     ~release:"24.04"
+    []
+
+let job_install_bin_ubuntu_26_04 =
+  Cacio.parameterize @@ fun pipeline_type ->
+  make_install_bin_job
+    "oc.install_bin_ubuntu_26_04"
+    ~__POS__
+    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
+    ~image:Images.Base_images.ubuntu_26_04
+    ~distribution:"ubuntu"
+    ~release:"26.04"
     []
 
 let job_install_bin_debian_bookworm =
@@ -306,6 +317,16 @@ let job_install_bin_ubuntu_24_04_systemd =
     ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
     ~distribution:"ubuntu"
     ~release:"24.04"
+    []
+
+let job_install_bin_ubuntu_26_04_systemd =
+  Cacio.parameterize @@ fun pipeline_type ->
+  make_systemd_install_job
+    "oc.install_bin_ubuntu_26_04_systemd"
+    ~__POS__
+    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
+    ~distribution:"ubuntu"
+    ~release:"26.04"
     []
 
 let job_upgrade_bin_ubuntu_22_04_systemd =
@@ -373,7 +394,9 @@ let () =
       (Auto, job_lintian_debian Full);
       (Auto, job_install_bin_ubuntu_22_04 Full);
       (Auto, job_install_bin_ubuntu_24_04 Full);
+      (Auto, job_install_bin_ubuntu_26_04 Full);
       (Auto, job_install_bin_ubuntu_24_04_systemd Full);
+      (Auto, job_install_bin_ubuntu_26_04_systemd Full);
       (Auto, job_upgrade_bin_ubuntu_22_04_systemd Full);
       (Auto, job_upgrade_bin_ubuntu_24_04_systemd Full);
       (Auto, job_install_bin_debian_bookworm Full);
