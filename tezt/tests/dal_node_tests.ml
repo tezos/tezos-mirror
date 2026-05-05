@@ -1372,6 +1372,130 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
       ~error_msg:"Expected value written in /output/slot-0 to be %L, got %R") ;
   unit
 
+(* Compact snapshot of a rollup that uses [reveal_dal_page] can be imported
+   into a fresh rollup node when [--dal-node] is provided. The reconstruction
+   phase replays PVM evaluation between the snapshot's first available level
+   and head, which fetches the revealed DAL pages from the DAL node. *)
+let test_compact_snapshot_with_dal_node protocol parameters dal_node
+    sc_rollup_node _sc_rollup_address node client pvm_name =
+  let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
+  let attestation_lag = parameters.attestation_lag in
+  Check.(
+    (slot_size = 32768)
+      int
+      ~error_msg:"The kernel used in the test assumes slot_size of %R, got %L") ;
+  Check.(
+    (parameters.cryptobox.page_size = 128)
+      int
+      ~error_msg:"The kernel used in the test assumes page_size of %R, got %L") ;
+  Log.info "Originate rollup with dal_echo_kernel." ;
+  let* {boot_sector; _} =
+    Sc_rollup_helpers.prepare_installer_kernel
+      ~preimages_dir:
+        (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0")
+      Constant.WASM.dal_echo_kernel
+  in
+  let* sc_rollup_address =
+    Client.Sc_rollup.originate
+      ~burn_cap:Tez.(of_int 9999999)
+      ~alias:"dal_echo_kernel"
+      ~src:Constant.bootstrap1.alias
+      ~kind:"wasm_2_0_0"
+      ~boot_sector
+      ~parameters_ty:"unit"
+      client
+  in
+  let* () = bake_for client in
+  let* () =
+    Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
+  in
+  Log.info "Publish a slot." ;
+  let slot_content = generate_dummy_slot slot_size in
+  let* level = Node.get_level node in
+  let* () =
+    publish_store_and_attest_slot
+      ~protocol
+      client
+      node
+      dal_node
+      Constant.bootstrap1
+      ~index:0
+      ~content:(Helpers.make_slot ~slot_size slot_content)
+      parameters
+  in
+  let published_level = level + 1 in
+  Log.info "Wait for the kernel to reveal the page." ;
+  let* () = bake_for ~count:(attestation_lag + 3) client in
+  let* _ = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
+  let* _ =
+    Sc_rollup_node.wait_for_level
+      ~timeout:30.
+      sc_rollup_node
+      (published_level + attestation_lag + 1)
+  in
+  let key = "/output/slot-0" in
+  let encoded_slot_content =
+    match Hex.of_string slot_content with `Hex s -> s
+  in
+  let* value_written =
+    Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:pvm_name
+         ~operation:Sc_rollup_rpc.Value
+         ~key
+         ()
+  in
+  Check.(
+    (Some encoded_slot_content = value_written)
+      (option string)
+      ~error_msg:
+        "Expected the kernel to have revealed the slot to /output/slot-0 (%L) \
+         but got %R") ;
+  Log.info "Export compact snapshot." ;
+  let dir = Tezt.Temp.dir "snapshots" in
+  let* snapshot_file =
+    Sc_rollup_node.export_snapshot
+      ~compact:true
+      ~no_check:true
+      sc_rollup_node
+      dir
+    |> Runnable.run
+  in
+  Log.info "Import compact snapshot in a fresh rollup node with --dal-node." ;
+  let new_rollup_node =
+    Sc_rollup_node.create
+      Observer
+      node
+      ~base_dir:(Client.base_dir client)
+      ~kind:pvm_name
+      ~dal_node
+  in
+  let*! () =
+    Sc_rollup_node.import_snapshot
+      ~no_check:true
+      ~dal_node
+      new_rollup_node
+      ~snapshot_file
+  in
+  Log.info "Run new rollup node and check that it has the revealed slot." ;
+  let* () = Sc_rollup_node.run new_rollup_node sc_rollup_address [] in
+  let* (_ : int) = Sc_rollup_node.wait_sync ~timeout:30. new_rollup_node in
+  let* value_after_import =
+    Sc_rollup_node.RPC.call new_rollup_node ~rpc_hooks
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:pvm_name
+         ~operation:Sc_rollup_rpc.Value
+         ~key
+         ()
+  in
+  Check.(
+    (Some encoded_slot_content = value_after_import)
+      (option string)
+      ~error_msg:
+        "Expected the imported rollup node to also have /output/slot-0 = %L \
+         but got %R") ;
+  unit
+
 let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
     _client dal_node =
   let check_bad_attester_pkh_encoding profile =
@@ -3093,6 +3217,21 @@ let register ~__FILE__ ~protocols =
     ~redundancy_factor:8
     ~page_size:128
     test_reveal_dal_page_in_fast_exec_wasm_pvm
+    protocols ;
+  scenario_with_all_nodes
+    ~__FILE__
+    ~regression:false
+    ~operator_profiles:[0]
+    "compact snapshot import with --dal-node"
+    ~uses:(fun _protocol ->
+      [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
+    ~tags:["snapshot"; "compact"; "import"; Tag.memory_hungry]
+    ~pvm_name:"wasm_2_0_0"
+    ~number_of_shards:256
+    ~slot_size:(1 lsl 15)
+    ~redundancy_factor:8
+    ~page_size:128
+    test_compact_snapshot_with_dal_node
     protocols ;
   (* Scenarios for disabling shard validation *)
   scenario_with_layer1_and_dal_nodes

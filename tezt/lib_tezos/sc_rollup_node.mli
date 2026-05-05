@@ -383,23 +383,27 @@ val change_operators : t -> (purpose * string) list -> unit
 val dump_durable_storage :
   sc_rollup_node:t -> dump:string -> ?block:string -> unit -> unit Lwt.t
 
-(** [export_snapshot ?compress_on_the_fly ?compact rollup_node dir] creates a
-    snapshot of the rollup node in directory [dir]. *)
+(** [export_snapshot ?compress_on_the_fly ?compact ?no_check rollup_node dir]
+    creates a snapshot of the rollup node in directory [dir]. *)
 val export_snapshot :
   ?compress_on_the_fly:bool ->
   ?compact:bool ->
+  ?no_check:bool ->
   ?level:string ->
   t ->
   string ->
   string Runnable.process
 
-(** [import_snapshot ?apply_unsafe_patches ?force rollup_node
-    ~snapshot_file] imports the snapshot [snapshot_file] in the rollup
-    node [rollup_node].  *)
+(** [import_snapshot ?apply_unsafe_patches ?force ?no_check ?dal_node ?level
+    rollup_node ~snapshot_file] imports the snapshot [snapshot_file] in the
+    rollup node [rollup_node]. If [dal_node] is provided, its RPC endpoint is
+    passed via [--dal-node] so that context reconstruction can fetch DAL
+    pages. *)
 val import_snapshot :
   ?apply_unsafe_patches:bool ->
   ?force:bool ->
   ?no_check:bool ->
+  ?dal_node:Dal_node.t ->
   ?level:string ->
   t ->
   snapshot_file:string ->
