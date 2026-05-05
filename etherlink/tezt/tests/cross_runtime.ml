@@ -5838,21 +5838,36 @@ let test_crac_user_emit_in_reentrant_inner_crac =
   ignore evm_inner_addr ;
   unit
 
-(** Regression test: when the synthetic Michelson manager-op merges a
-    failed inner CRAC (whose Michelson contract emitted a user [EMIT]
-    before [FAILWITH]) with a later applied outer CRAC carrying the
-    synthetic CRAC-ID event, the synthetic event must survive the
-    merge.
+(** Regression test covering L2-1299 (synthetic event survival on
+    merge) and L2-1300 (DFS ordering of failed re-entrant inner
+    CRACs).  Both bugs manifest in the same call tree: a successful
+    outer CRAC #1 nesting a failed inner re-entrant CRAC #2 caught
+    by an EVM frame in between.
 
-    Pre-fix, [merge_crac_internals] in
-    [etherlink/kernel_latest/kernel/src/apply.rs] computed
-    [has_event] over the merge target's internals as
-    [matches!(iop, InternalOperationSum::Event(_))] — i.e. ANY event
-    set the flag.  When the failed inner is sorted first by seq and its
-    internals contain the user EMIT (Backtracked) but no synthetic
-    CRAC-ID event, that flag flipped true and the prepend branch was
-    skipped, dropping the outer applied CRAC's synthetic event from
-    the merged receipt.
+    L2-1299 (pre-fix in !21808):
+      [merge_crac_internals] in [etherlink/kernel_latest/kernel/src/apply.rs]
+      computed [has_event] over the merge target's internals as
+      [matches!(iop, InternalOperationSum::Event(_))] — i.e. ANY event
+      set the flag.  When the failed inner is sorted first by seq and
+      its internals contain the user EMIT (Backtracked) but no
+      synthetic CRAC-ID event, that flag flipped true and the prepend
+      branch was skipped, dropping the outer applied CRAC's synthetic
+      event from the merged receipt.
+
+    L2-1300 (pre-fix in this MR):
+      [drain_reentrant_crac_ops] in
+      [etherlink/kernel_latest/tezos_execution/src/enshrined_contracts.rs]
+      only drained [pending_crac_receipts], so a failed re-entrant
+      inner CRAC accumulated to the journal-level
+      [failed_crac_receipts] and survived to the top-level merge.
+      Because seq is claimed at push time, the inner pushed before
+      the outer (nested execution completes inside-out) and ended up
+      at the head of the merged receipt — placing CRAC #2's failed
+      transfers BEFORE CRAC #1's own transfer, contradicting DFS
+      execution order.  The fix drains all three lists (pending,
+      failed, backtracked) at the per-list watermarks captured around
+      each internal op so re-entrant inner CRACs are spliced into
+      their parent's body regardless of outcome.
 
     Call tree:
       EOA → EVM_main(MultiRunCaller, callees=[(EVM_bridge_to_C1, false)])
@@ -5867,20 +5882,25 @@ let test_crac_user_emit_in_reentrant_inner_crac =
                                                   catches → continues
 
     Asserts that the synthetic Michelson manager-op's
-    [internal_operation_results] contains the synthetic CRAC-ID event
-    (kind=event, tag="crac"), and as a sanity check that the user
-    EMIT is still present (Backtracked).
-
-    L2-1299. *)
+    [internal_operation_results]:
+      - contains exactly one synthetic CRAC-ID event (L2-1299 fix);
+      - the user EMIT from the failed inner is present and
+        [Backtracked] (sanity that CRAC #2 reached the EMIT op
+        before the FAILWITH);
+      - the failed transfer to EmitFailer (CRAC #2's body) appears
+        AFTER the alias→C1 transfer (CRAC #1's body begins) — the
+        L2-1300 DFS-order assertion. *)
 let test_crac_synthetic_event_survives_failed_inner_with_emit =
   register_crac_runner_test
     ~title:
-      "CRAC: synthetic crac event survives merge with failed inner that EMITted"
+      "CRAC: synthetic crac event survives merge with failed inner that \
+       EMITted, and failed inner nests inside outer (DFS)"
     ~tags:["crac_receipt"; "regression"; "emit"]
   @@ fun (module Wrapper) ->
   let open Wrapper in
   let prefix = "RCPT-CRAC-EVT" in
   let* emit_failer = TezEmitFailer.originate () in
+  let (`Tez_runner (_, emit_failer_kt1)) = emit_failer in
   let* evm_bridge_to_emit_failer =
     EvmCrossRuntimeRunnerTez.deploy_and_init emit_failer
   in
@@ -5894,6 +5914,7 @@ let test_crac_synthetic_event_survives_failed_inner_with_emit =
   in
   let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_inner in
   let* c1 = TezMultiRunCaller.originate ~callees:[tez_bridge] () in
+  let (`Tez_runner (_, c1_kt1)) = c1 in
   let* evm_bridge_to_c1 = EvmCrossRuntimeRunnerTez.deploy_and_init c1 in
   let* evm_main =
     EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge_to_c1, false)] ()
@@ -5916,16 +5937,20 @@ let test_crac_synthetic_event_survives_failed_inner_with_emit =
   List.iteri
     (fun i iop ->
       Log.info
-        "%s:   [%d] kind=%s tag=%s status=%s"
+        "%s:   [%d] kind=%s dst=%s tag=%s status=%s"
         prefix
         i
         JSON.(iop |-> "kind" |> as_string)
+        JSON.(
+          iop |-> "destination" |> as_opt
+          |> Option.fold ~none:"-" ~some:as_string)
         JSON.(iop |-> "tag" |> as_opt |> Option.fold ~none:"-" ~some:as_string)
         JSON.(
           iop |-> "result" |-> "status" |> as_opt
           |> Option.fold ~none:"-" ~some:as_string))
     internals ;
-  (* Primary assertion: the synthetic CRAC-ID event must be present. *)
+  (* Primary L2-1299 assertion: the synthetic CRAC-ID event must be
+     present. *)
   let crac_events =
     List.filter
       (fun iop ->
@@ -5941,7 +5966,7 @@ let test_crac_synthetic_event_survives_failed_inner_with_emit =
       int
       ~error_msg:
         "Expected exactly 1 synthetic CRAC-ID event (tag = \"crac\") on the \
-         merged synthetic Michelson receipt, got %L. Without the fix, \
+         merged synthetic Michelson receipt, got %L. Without the L2-1299 fix, \
          merge_crac_internals' has_event check is satisfied by the failed \
          inner's user EMIT (a non-synthetic Event), so the outer applied \
          CRAC's synthetic event is silently dropped from the merged receipt — \
@@ -5977,6 +6002,86 @@ let test_crac_synthetic_event_survives_failed_inner_with_emit =
       ~error_msg:
         "Expected the user EMIT in the failed inner CRAC to have status %R \
          (the FAILWITH backtracks it), got %L") ;
+  (* L2-1300 DFS-ordering assertion.  The first transaction destined
+     for C1 (the outer CRAC #1's alias→C1 entry) must appear BEFORE
+     the first failed transaction destined for the inner EmitFailer
+     (CRAC #2's body).  Pre-L2-1300, drain_reentrant_crac_ops only
+     drained pending_crac_receipts, so the failed inner re-entrant
+     CRAC reached the top-level merge with a smaller seq than the
+     outer (claim at push time + nested execution = inner pushed
+     first), inverting DFS order and placing the failed C2 entries
+     ahead of CRAC #1's own transfer.
+
+     Implementation note: an entry's [destination] field is the
+     inner-most transfer target — we use the first occurrence of
+     each KT1 because both CRACs may produce multiple entries with
+     the same destination (self-calls etc.). *)
+  let first_index_with_destination kt1 =
+    let rec aux i = function
+      | [] -> None
+      | iop :: rest ->
+          if
+            JSON.(iop |-> "kind" |> as_string) = "transaction"
+            && JSON.(iop |-> "destination" |> as_string) = kt1
+          then Some i
+          else aux (i + 1) rest
+    in
+    aux 0 internals
+  in
+  let first_failed_index_with_destination kt1 =
+    let rec aux i = function
+      | [] -> None
+      | iop :: rest ->
+          let kind = JSON.(iop |-> "kind" |> as_string) in
+          let dst =
+            JSON.(
+              iop |-> "destination" |> as_opt
+              |> Option.fold ~none:"" ~some:as_string)
+          in
+          let status =
+            JSON.(
+              iop |-> "result" |-> "status" |> as_opt
+              |> Option.fold ~none:"" ~some:as_string)
+          in
+          if kind = "transaction" && dst = kt1 && status = "failed" then Some i
+          else aux (i + 1) rest
+    in
+    aux 0 internals
+  in
+  let c1_first_idx =
+    match first_index_with_destination c1_kt1 with
+    | Some i -> i
+    | None ->
+        Test.fail
+          "L2-1300 setup check: expected at least one transaction targeting C1 \
+           (KT1=%s) in the merged receipt"
+          c1_kt1
+  in
+  let emit_failer_failed_idx =
+    match first_failed_index_with_destination emit_failer_kt1 with
+    | Some i -> i
+    | None ->
+        Test.fail
+          "L2-1300 setup check: expected at least one failed transaction \
+           targeting EmitFailer (KT1=%s) in the merged receipt"
+          emit_failer_kt1
+  in
+  Log.info
+    "%s: c1 first_index=%d, emit_failer first_failed_index=%d"
+    prefix
+    c1_first_idx
+    emit_failer_failed_idx ;
+  Check.(
+    (c1_first_idx < emit_failer_failed_idx)
+      int
+      ~error_msg:
+        "L2-1300 DFS order: expected outer CRAC #1's alias→C1 transfer (index \
+         %L) to appear BEFORE the first failed transfer to inner EmitFailer \
+         (index %R), got C1=%L and EmitFailer-failed=%R. The inverted order \
+         means drain_reentrant_crac_ops did not pick up the failed re-entrant \
+         inner CRAC at the parent op site — it survived to the top-level merge \
+         with a smaller seq than CRAC #1 and ended up at the head of the \
+         merged receipt, contradicting DFS execution order.") ;
   unit
 
 (** Regression test: when an EVM transaction performs more than one

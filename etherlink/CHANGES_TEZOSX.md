@@ -57,6 +57,12 @@
   top-level status reconciles to `failed` when at least one Failed
   sibling participated, `applied` when any currently-applied CRAC
   remains, and `backtracked` otherwise. (!21812)
+- Fix the synthetic Michelson manager-op listing failed re-entrant
+  inner CRACs before their outer parent's own transfer when an EVM
+  transaction nests CRACs (EVM → Mich → EVM) and an intermediate EVM
+  frame catches an inner CRAC failure. Indexers walking the receipt
+  would otherwise see entries in a non-execution order and
+  mis-attribute the call tree. (!21814)
 - Raise the Michelson runtime `hard_gas_limit_per_operation` and
   `hard_gas_limit_per_block` from 1,040,000 to 3,000,000 gas units (i.e.
   3,000,000,000 milligas) to match the EVM 30M-gas per-transaction cap.
