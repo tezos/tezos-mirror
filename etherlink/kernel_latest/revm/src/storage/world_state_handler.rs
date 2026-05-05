@@ -9,11 +9,13 @@ use revm::{
     state::{AccountInfo, Bytecode},
 };
 use rlp::{Decodable, Encodable, Rlp};
+use tezos_data_encoding::{enc::BinWriter, nom::NomReader};
 use tezos_smart_rollup_host::{
     path::{concat, OwnedPath, PathError, RefPath},
     runtime::RuntimeError,
     storage::StorageV1,
 };
+use tezosx_interfaces::Origin;
 
 use evm_types::{Error, FaDepositWithProxy, PrecompileStateError};
 
@@ -72,6 +74,13 @@ const CODE_PATH: RefPath = RefPath::assert_from(b"/code");
 /// This path must contains balance, nonce and code hash. This is the new
 /// format for saving the accounts infos that overrides the previous one.
 const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
+
+/// Path that holds the classification record for an account. Stored
+/// at a sibling of the info path so the info RLP stays at 77 bytes and
+/// the read inside the basic call on Database keeps its fast path. The
+/// path is touched only by code that handles classification, which
+/// runs on cross-runtime translation and on alias materialization.
+const ORIGIN_PATH: RefPath = RefPath::assert_from(b"/origin");
 
 /// The contracts of "internal" accounts have their own storage area. The account
 /// location prefixed to this path gives the root path (prefix) to where such storage
@@ -327,6 +336,41 @@ impl StorageAccount {
         Ok(())
     }
 
+    /// Read the classification record for this account.
+    /// Returns None when the path is absent.
+    pub fn get_origin(&self, host: &impl StorageV1) -> Result<Option<Origin>, Error> {
+        let path = concat(&self.path, &ORIGIN_PATH)?;
+        match host.store_read_all(&path) {
+            Ok(bytes) => {
+                let (rest, origin) = Origin::nom_read(&bytes)
+                    .map_err(|e| Error::Custom(format!("decoding Origin failed: {e}")))?;
+                if !rest.is_empty() {
+                    return Err(Error::Custom(
+                        "remaining bytes after decoding Origin".to_string(),
+                    ));
+                }
+                Ok(Some(origin))
+            }
+            Err(RuntimeError::PathNotFound) => Ok(None),
+            Err(err) => Err(Error::Runtime(err)),
+        }
+    }
+
+    /// Write the classification record for this account.
+    pub fn set_origin(
+        &mut self,
+        host: &mut impl StorageV1,
+        origin: &Origin,
+    ) -> Result<(), Error> {
+        let path = concat(&self.path, &ORIGIN_PATH)?;
+        let mut buf = Vec::new();
+        origin
+            .bin_write(&mut buf)
+            .map_err(|e| Error::Custom(format!("encoding Origin failed: {e}")))?;
+        host.store_write(&path, &buf, 0)?;
+        Ok(())
+    }
+
     // In the future we might want to optimize reading to not use `info`.
     pub fn add_balance(
         &mut self,
@@ -567,5 +611,49 @@ mod test {
         let rlp_size = AccountInfoInternal::default().rlp_bytes().len();
         assert_eq!(rlp_size, AccountInfoInternal::RLP_SIZE);
         assert_eq!(rlp_size, 77);
+    }
+
+    #[test]
+    fn origin_storage_unrecorded_returns_none() {
+        use crate::storage::world_state_handler::StorageAccount;
+        use revm::primitives::Address;
+
+        let host = MockKernelHost::default();
+        let addr = Address::from_slice(&[0x42; 20]);
+        let account = StorageAccount::from_address(&addr).unwrap();
+        assert!(account.get_origin(&host).unwrap().is_none());
+        // A read of the info path must not affect the origin path.
+        let _ = account.info_without_migration(&host);
+        assert!(account.get_origin(&host).unwrap().is_none());
+    }
+
+    #[test]
+    fn origin_storage_native_roundtrip() {
+        use crate::storage::world_state_handler::StorageAccount;
+        use revm::primitives::Address;
+        use tezosx_interfaces::Origin;
+
+        let mut host = MockKernelHost::default();
+        let addr = Address::from_slice(&[0x42; 20]);
+        let mut account = StorageAccount::from_address(&addr).unwrap();
+        account.set_origin(&mut host, &Origin::Native).unwrap();
+        assert_eq!(account.get_origin(&host).unwrap(), Some(Origin::Native));
+    }
+
+    #[test]
+    fn origin_storage_alias_roundtrip() {
+        use crate::storage::world_state_handler::StorageAccount;
+        use revm::primitives::Address;
+        use tezosx_interfaces::{AliasInfo, Origin, RuntimeId};
+
+        let mut host = MockKernelHost::default();
+        let addr = Address::from_slice(&[0x42; 20]);
+        let mut account = StorageAccount::from_address(&addr).unwrap();
+        let origin = Origin::Alias(AliasInfo {
+            runtime: RuntimeId::Tezos,
+            native_address: b"tz1abcdef".to_vec(),
+        });
+        account.set_origin(&mut host, &origin).unwrap();
+        assert_eq!(account.get_origin(&host).unwrap(), Some(origin));
     }
 }

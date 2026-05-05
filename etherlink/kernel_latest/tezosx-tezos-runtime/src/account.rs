@@ -5,7 +5,7 @@
 use primitive_types::U256;
 use rlp::{Decodable, Encodable, Rlp};
 use tezos_crypto_rs::{public_key::PublicKey, public_key_hash::PublicKeyHash};
-use tezos_data_encoding::types::Narith;
+use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith};
 use tezos_ethereum::rlp_helpers::{
     append_u256_le, append_u64_le, decode_field_u256_le, decode_field_u64_le,
 };
@@ -18,7 +18,7 @@ use tezos_smart_rollup_host::{
     path::{concat, OwnedPath, RefPath},
     runtime::RuntimeError,
 };
-use tezosx_interfaces::TezosXRuntimeError;
+use tezosx_interfaces::{Origin, TezosXRuntimeError};
 
 // Path where Tezos accounts are stored.
 pub(crate) const TEZOS_ACCOUNTS_PATH: RefPath =
@@ -27,6 +27,12 @@ pub(crate) const TEZOS_ACCOUNTS_PATH: RefPath =
 // Path where all the infos of a Tezos contract are stored under the same key.
 // This path must contains balance, nonce and optionally a revealed public key.
 const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
+
+/// Sibling path that holds the classification record. Used by both
+/// implicit and originated KT1 accounts: the segment is appended to
+/// whichever account prefix the caller already has, and the resulting
+/// path lives next to the rest of the account state.
+const ORIGIN_PATH: RefPath = RefPath::assert_from(b"/origin");
 
 pub fn narith_to_u256(
     narith: &Narith,
@@ -102,13 +108,22 @@ impl Decodable for TezosAccountInfo {
     }
 }
 
-pub fn path_to_tezos_account(
+/// Path of the durable storage subtree for an implicit account. The
+/// info RLP record sits under this prefix at the info segment; the
+/// classification record sits at the origin segment.
+pub fn path_to_implicit_account_prefix(
     pub_key_hash: &PublicKeyHash,
 ) -> Result<OwnedPath, TezosXRuntimeError> {
     let address_path: Vec<u8> = format!("/{pub_key_hash}").into();
     let address_path = OwnedPath::try_from(address_path)
         .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
-    let prefix = concat(&TEZOS_ACCOUNTS_PATH, &address_path)?;
+    Ok(concat(&TEZOS_ACCOUNTS_PATH, &address_path)?)
+}
+
+pub fn path_to_tezos_account(
+    pub_key_hash: &PublicKeyHash,
+) -> Result<OwnedPath, TezosXRuntimeError> {
+    let prefix = path_to_implicit_account_prefix(pub_key_hash)?;
     Ok(concat(&prefix, &INFO_PATH)?)
 }
 
@@ -148,6 +163,68 @@ pub fn set_tezos_account_info(
         path_to_tezos_account(pub_key_hash).map_err(|_| RuntimeError::PathNotFound)?;
     let value = &info.rlp_bytes();
     Ok(host.store_write(&path, value, 0)?)
+}
+
+/// Read the classification record stored at the origin path under the
+/// given account path. The same shape applies to implicit and to
+/// originated KT1 accounts: the classification sits next to whatever
+/// state belongs to that account kind. A convenience wrapper for
+/// implicit accounts is `get_origin_for_implicit`.
+pub fn get_origin_at(
+    host: &impl StorageV1,
+    account_path: &OwnedPath,
+) -> Result<Option<Origin>, TezosXRuntimeError> {
+    let path = concat(account_path, &ORIGIN_PATH)?;
+    match host.store_read_all(&path) {
+        Ok(bytes) => {
+            let (rest, origin) = Origin::nom_read(&bytes).map_err(|_| {
+                TezosXRuntimeError::ConversionError("Invalid origin encoding".to_string())
+            })?;
+            if !rest.is_empty() {
+                return Err(TezosXRuntimeError::ConversionError(
+                    "Trailing bytes after origin encoding".to_string(),
+                ));
+            }
+            Ok(Some(origin))
+        }
+        Err(RuntimeError::PathNotFound) => Ok(None),
+        Err(err) => Err(TezosXRuntimeError::Runtime(err)),
+    }
+}
+
+/// Write the classification record at the origin path under the given account path.
+pub fn set_origin_at(
+    host: &mut impl StorageV1,
+    account_path: &OwnedPath,
+    origin: &Origin,
+) -> Result<(), TezosXRuntimeError> {
+    let path = concat(account_path, &ORIGIN_PATH)?;
+    let mut buf = Vec::new();
+    origin.bin_write(&mut buf).map_err(|e| {
+        TezosXRuntimeError::ConversionError(format!("encoding Origin failed: {e}"))
+    })?;
+    Ok(host.store_write(&path, &buf, 0)?)
+}
+
+/// Read the classification record for an implicit account. Returns
+/// None when the path is absent, which is the unrecorded state from
+/// the RFC.
+pub fn get_origin_for_implicit(
+    host: &impl StorageV1,
+    pub_key_hash: &PublicKeyHash,
+) -> Result<Option<Origin>, TezosXRuntimeError> {
+    let prefix = path_to_implicit_account_prefix(pub_key_hash)?;
+    get_origin_at(host, &prefix)
+}
+
+/// Write the classification record for an implicit account.
+pub fn set_origin_for_implicit(
+    host: &mut impl StorageV1,
+    pub_key_hash: &PublicKeyHash,
+    origin: &Origin,
+) -> Result<(), TezosXRuntimeError> {
+    let prefix = path_to_implicit_account_prefix(pub_key_hash)?;
+    set_origin_at(host, &prefix, origin)
 }
 
 pub struct TezosImplicitAccount {
@@ -301,5 +378,71 @@ mod tests {
         let narith_value = super::u256_to_narith(&u256_value);
         let narith_value = Narith(narith_value.0 + num_bigint::BigUint::from(1u64));
         let _ = narith_to_u256(&narith_value).expect_err("Should error on overflow");
+    }
+
+    #[test]
+    fn origin_at_path_roundtrip() {
+        use crate::account::{get_origin_at, set_origin_at};
+        use tezos_evm_runtime::runtime::MockKernelHost;
+        use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
+        use tezosx_interfaces::{AliasInfo, Origin, RuntimeId};
+
+        let mut host = MockKernelHost::default();
+        let path: OwnedPath =
+            RefPath::assert_from(b"/test/some/originated/account").into();
+
+        // An absent path returns no value.
+        assert!(get_origin_at(&host, &path).unwrap().is_none());
+
+        // The native variant round-trips.
+        set_origin_at(&mut host, &path, &Origin::Native).unwrap();
+        assert_eq!(get_origin_at(&host, &path).unwrap(), Some(Origin::Native));
+
+        // The alias variant round-trips.
+        let alias = Origin::Alias(AliasInfo {
+            runtime: RuntimeId::Tezos,
+            native_address: b"tz1...".to_vec(),
+        });
+        set_origin_at(&mut host, &path, &alias).unwrap();
+        assert_eq!(get_origin_at(&host, &path).unwrap(), Some(alias));
+    }
+
+    #[test]
+    fn origin_for_implicit_roundtrip() {
+        use crate::account::{
+            get_origin_for_implicit, get_tezos_account_info, set_origin_for_implicit,
+            set_tezos_account_info, TezosAccountInfo,
+        };
+        use tezos_crypto_rs::public_key_hash::PublicKeyHash;
+        use tezos_evm_runtime::runtime::MockKernelHost;
+        use tezosx_interfaces::Origin;
+
+        let mut host = MockKernelHost::default();
+        let pkh =
+            PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
+
+        // An account that has not been touched has no origin and no info.
+        assert!(get_origin_for_implicit(&host, &pkh).unwrap().is_none());
+
+        // A write to the origin path must leave the info path empty.
+        set_origin_for_implicit(&mut host, &pkh, &Origin::Native).unwrap();
+        assert_eq!(
+            get_origin_for_implicit(&host, &pkh).unwrap(),
+            Some(Origin::Native)
+        );
+        assert!(get_tezos_account_info(&host, &pkh).unwrap().is_none());
+
+        // A write to the info path must leave the origin path untouched.
+        let info = TezosAccountInfo {
+            balance: U256::from(1),
+            nonce: 2,
+            pub_key: None,
+        };
+        set_tezos_account_info(&mut host, &pkh, info.clone()).unwrap();
+        assert_eq!(get_tezos_account_info(&host, &pkh).unwrap(), Some(info));
+        assert_eq!(
+            get_origin_for_implicit(&host, &pkh).unwrap(),
+            Some(Origin::Native)
+        );
     }
 }
