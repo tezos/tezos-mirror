@@ -57,13 +57,6 @@ pub struct Journal<'a, Host: StorageV1, R: Registry> {
     /// The `JournalTr` trait methods `checkpoint_commit` and `checkpoint_revert`
     /// cannot return errors, so we store them here for later retrieval.
     deferred_error: Option<RuntimeError>,
-
-    /// The original top-level EVM source address (E_0 / tx.origin).
-    /// Set on the first outgoing EVM→Michelson gateway call and reused
-    /// for subsequent re-entrant gateway calls so that
-    /// `X-Tezos-Source` always carries alias(E_0) regardless of how
-    /// many runtime crossings have occurred.
-    original_evm_source: Option<Address>,
 }
 
 impl<'a, Host: StorageV1, R: Registry> Journal<'a, Host, R> {
@@ -75,7 +68,6 @@ impl<'a, Host: StorageV1, R: Registry> Journal<'a, Host, R> {
             database,
             journal,
             deferred_error: None,
-            original_evm_source: None,
         }
     }
 
@@ -757,13 +749,11 @@ where
     }
 
     fn set_original_evm_source(&mut self, source: Address) {
-        if self.original_evm_source.is_none() {
-            self.original_evm_source = Some(source);
-        }
+        self.journal.evm.set_original_evm_source(source);
     }
 
     fn original_evm_source(&self) -> Option<Address> {
-        self.original_evm_source
+        self.journal.evm.original_evm_source()
     }
 }
 
