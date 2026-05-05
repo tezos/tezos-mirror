@@ -34,6 +34,18 @@ pub struct EvmJournal {
     access_list: Option<AccessList>,
     /// Header info from the first incoming CRAC.
     crac_tx_info: Option<CracTransactionInfo>,
+    /// Original EVM source (E_0 / `tx.origin`) of the current
+    /// top-level EVM transaction.  Set on the first outgoing
+    /// EVM→Michelson gateway call and re-read on every subsequent
+    /// gateway call — including ones issued by re-entrant EVM frames
+    /// spawned by Michelson `call_evm`.  Lives on `EvmJournal`
+    /// (which persists for the whole transaction across runtime
+    /// crossings) rather than on the per-revm-execution `Journal`
+    /// wrapper, so re-entry preserves it instead of falling back to
+    /// the inner frame's `tx().caller()` (which would be the alias
+    /// of the Michelson contract that called `call_evm`, not the
+    /// EOA).
+    original_evm_source: Option<Address>,
 }
 
 impl EvmJournal {
@@ -43,6 +55,7 @@ impl EvmJournal {
             inner: JournalInner::new(),
             access_list: None,
             crac_tx_info: None,
+            original_evm_source: None,
         }
     }
 }
@@ -54,6 +67,22 @@ impl EvmJournal {
         let _ = self.layered_state.finalize();
         self.crac_tx_info = None;
         self.access_list = None;
+        self.original_evm_source = None;
+    }
+
+    /// Retrieve the original EVM source captured on the first
+    /// outgoing gateway call of this transaction, if any.
+    pub fn original_evm_source(&self) -> Option<Address> {
+        self.original_evm_source
+    }
+
+    /// Capture the original EVM source on the first outgoing gateway
+    /// call.  Subsequent calls are no-ops so re-entrant frames cannot
+    /// overwrite the EOA with an intermediate alias.
+    pub fn set_original_evm_source(&mut self, source: Address) {
+        if self.original_evm_source.is_none() {
+            self.original_evm_source = Some(source);
+        }
     }
 
     pub fn set_access_list(
@@ -176,5 +205,50 @@ mod tests {
         // Second call returns None (consumed)
         assert!(journal.take_crac_data().is_none());
         assert!(!journal.has_crac_data());
+    }
+
+    // `original_evm_source` starts unset on a fresh journal.
+    #[test]
+    fn test_original_evm_source_starts_unset() {
+        let journal = EvmJournal::new();
+        assert_eq!(journal.original_evm_source(), None);
+    }
+
+    // The first call to `set_original_evm_source` captures the EOA;
+    // subsequent calls are no-ops so a re-entrant EVM frame's
+    // `tx().caller()` (which would be the alias of the Michelson
+    // contract that called `call_evm`, not the EOA) cannot overwrite
+    // the originally-captured value.
+    #[test]
+    fn test_original_evm_source_first_set_wins() {
+        let mut journal = EvmJournal::new();
+        let eoa = Address::from([0xEE; 20]);
+        let intermediate_alias = Address::from([0xCC; 20]);
+
+        journal.set_original_evm_source(eoa);
+        assert_eq!(journal.original_evm_source(), Some(eoa));
+
+        // Simulate the re-entrant frame's first gateway call trying
+        // to set its own (incorrect) source — must be ignored.
+        journal.set_original_evm_source(intermediate_alias);
+        assert_eq!(journal.original_evm_source(), Some(eoa));
+    }
+
+    // `clear()` resets `original_evm_source` so the next operation in
+    // the same kernel iteration starts with a fresh capture window.
+    #[test]
+    fn test_clear_resets_original_evm_source() {
+        let mut journal = EvmJournal::new();
+        let eoa = Address::from([0xEE; 20]);
+        journal.set_original_evm_source(eoa);
+        assert_eq!(journal.original_evm_source(), Some(eoa));
+
+        journal.clear();
+        assert_eq!(journal.original_evm_source(), None);
+
+        // After clear, a new capture should land normally.
+        let next_eoa = Address::from([0xAA; 20]);
+        journal.set_original_evm_source(next_eoa);
+        assert_eq!(journal.original_evm_source(), Some(next_eoa));
     }
 }

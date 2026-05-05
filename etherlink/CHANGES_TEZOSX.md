@@ -63,6 +63,14 @@
   frame catches an inner CRAC failure. Indexers walking the receipt
   would otherwise see entries in a non-execution order and
   mis-attribute the call tree. (!21814)
+- Fix the originating EOA being lost on every CRAC issued from a
+  re-entrant EVM frame (Michelson `call_evm` back into the EVM
+  runtime). Each fresh EVM execution started without remembering the
+  outer transaction's `tx.origin`, causing the inner CRAC's source
+  attribution to fall back to the alias of the Michelson contract
+  that triggered the re-entry instead of the EOA. Indexers and any
+  downstream code resolving per-CRAC source identity could no longer
+  recover which EOA originated the transaction. (!21817)
 - Raise the Michelson runtime `hard_gas_limit_per_operation` and
   `hard_gas_limit_per_block` from 1,040,000 to 3,000,000 gas units (i.e.
   3,000,000,000 milligas) to match the EVM 30M-gas per-transaction cap.
