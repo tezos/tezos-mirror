@@ -42,7 +42,7 @@ impl core::fmt::Display for SetFrameResultError {
 
 impl std::error::Error for SetFrameResultError {}
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct MichelsonJournal {
     snapshots: Vec<OwnedPath>,
     external_checkpoints: Vec<ExternalCheckpoint>,
@@ -60,39 +60,11 @@ pub struct MichelsonJournal {
     /// shared across pending and failed lists so that merging them
     /// recovers execution order.
     next_receipt_seq: u64,
-    /// Whether the next incoming CRAC should emit a CRAC-ID event.
-    /// Set to `false` when Michelson originates a CRAC or emits a
-    /// CRAC-ID event.  Stays `false` for the lifetime of the journal
-    /// (one transaction); a fresh journal is created per transaction.
-    should_emit_crac_id: bool,
-}
-
-impl Default for MichelsonJournal {
-    fn default() -> Self {
-        Self {
-            snapshots: Vec::new(),
-            external_checkpoints: Vec::new(),
-            pending_crac_receipts: Vec::new(),
-            failed_crac_receipts: Vec::new(),
-            next_receipt_seq: 0,
-            should_emit_crac_id: true,
-        }
-    }
 }
 
 impl MichelsonJournal {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn should_emit_crac_id(&self) -> bool {
-        self.should_emit_crac_id
-    }
-
-    /// Suppress CRAC-ID event emission (Michelson is originating a
-    /// CRAC or has already emitted the event for this chain).
-    pub fn suppress_crac_id(&mut self) {
-        self.should_emit_crac_id = false;
     }
 
     /// Claim the next execution-order sequence number.  `u64` overflow

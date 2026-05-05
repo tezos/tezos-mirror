@@ -44,7 +44,7 @@ use tezos_tezlink::{
     },
 };
 use tezosx_interfaces::{
-    CrossRuntimeContext, Registry, RuntimeInterface, TezosXRuntimeError,
+    CrossRuntimeContext, Registry, RuntimeId, RuntimeInterface, TezosXRuntimeError,
     X_TEZOS_GAS_CONSUMED,
 };
 use tezosx_journal::TezosXJournal;
@@ -483,17 +483,34 @@ where
     // SOURCE to be tz1/tz2/tz3; the null PKH fills that role for both
     // CRAC and non-CRAC requests.
     let is_crac = hdrs.crac_origin_contract.is_some();
-    // Check and suppress BEFORE execution so that this (outermost)
-    // execute_request claims the event, not a recursive re-entrant call.
-    let crac_id_for_event = if is_crac
-        && journal.crac_id().origin_runtime != 0
-        && journal.michelson.should_emit_crac_id()
-    {
-        journal.michelson.suppress_crac_id();
-        Some(journal.crac_id().to_string())
-    } else {
-        None
-    };
+    // Every CRAC receipt carries the synthetic CRAC-ID event.  The
+    // merge stage (`merge_crac_internals` for top-level CRACs and
+    // `drain_reentrant_crac_ops` for re-entrant inner CRACs) dedupes
+    // events tagged `"crac"` with the null implicit sender so the
+    // final synthetic Michelson manager-op carries exactly one.
+    // Always-emitting keeps each receipt self-contained: when an EVM
+    // revert wipes pending receipts but failed ones survive (see
+    // `MichelsonJournal::revert_frame`), the surviving failed
+    // receipt brings its own CRAC-ID event with it.
+    //
+    // The synthetic event is only useful when the originating
+    // runtime is *not* Tezos: Tezos-originated CRACs already surface
+    // naturally on the Michelson side and don't need the
+    // cross-runtime correlation key.  Phrasing the predicate as
+    // "not Tezos" rather than "is Ethereum" keeps the semantics
+    // forward-compatible with hypothetical additional non-Tezos
+    // runtimes.
+    //
+    // `CracId::origin_runtime` is a raw `u8` (the journal crate
+    // cannot import `RuntimeId` because of the inverse dep), but
+    // `u8::from(RuntimeId::Tezos)` resolves to the same canonical
+    // discriminant so the comparison stays typed-by-construction.
+    let crac_id_for_event =
+        if is_crac && journal.crac_id().origin_runtime != u8::from(RuntimeId::Tezos) {
+            Some(journal.crac_id().to_string())
+        } else {
+            None
+        };
     let source_pkh = PublicKeyHash::from_b58check(NULL_PKH).map_err(|e| {
         TezosXRuntimeError::ConversionError(format!("Failed to parse null address: {e}"))
     })?;

@@ -37,6 +37,12 @@
   Previously, the user EMIT could shadow the kernel's CRAC-ID event
   during receipt merging, leaving indexers without the correlation key
   for the whole transaction. (!21808)
+- Fix the synthetic CRAC-ID event being absent from the synthetic
+  Michelson manager-op when an EVM transaction performs more than
+  one CRAC and the applied one is rolled back by an EVM revert,
+  leaving only failed siblings on the receipt. Indexers correlating
+  Michelson activity to the originating EVM transaction by CRAC-ID
+  would otherwise lose entire transactions. (!21811)
 - Raise the Michelson runtime `hard_gas_limit_per_operation` and
   `hard_gas_limit_per_block` from 1,040,000 to 3,000,000 gas units (i.e.
   3,000,000,000 milligas) to match the EVM 30M-gas per-transaction cap.

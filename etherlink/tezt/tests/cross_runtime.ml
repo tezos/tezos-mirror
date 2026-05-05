@@ -5707,11 +5707,10 @@ let test_crac_evm_to_tez_receipt =
     filtered every [InternalOperationSum::Event] from a re-entrant
     CRAC's [internal_operation_results] before splicing them into the
     parent op's flat list.  The intent was to drop the duplicate
-    synthetic CRAC-ID event, but re-entrant inner CRACs carry no
-    synthetic event in the first place ([should_emit_crac_id] is
-    already false), so the only [Event] entries there are user
-    [EMIT] ops produced by [execute_internal_operations] — and those
-    were unconditionally discarded.
+    synthetic CRAC-ID event from the inner CRAC; the filter now uses
+    [is_synthetic_crac_event] (tag [crac] AND null implicit sender) so
+    user [EMIT] ops produced by [execute_internal_operations] — which
+    carry the executing contract's KT1 sender — are preserved.
 
     Call tree:
       EOA → EVM_main(MultiRunCaller, callees=[(EVM_bridge_to_C1, false)])
@@ -5844,7 +5843,7 @@ let test_crac_user_emit_in_reentrant_inner_crac =
     before [FAILWITH]) with a later applied outer CRAC carrying the
     synthetic CRAC-ID event, the synthetic event must survive the
     merge.
-  
+
     Pre-fix, [merge_crac_internals] in
     [etherlink/kernel_latest/kernel/src/apply.rs] computed
     [has_event] over the merge target's internals as
@@ -5854,7 +5853,7 @@ let test_crac_user_emit_in_reentrant_inner_crac =
     CRAC-ID event, that flag flipped true and the prepend branch was
     skipped, dropping the outer applied CRAC's synthetic event from
     the merged receipt.
-  
+
     Call tree:
       EOA → EVM_main(MultiRunCaller, callees=[(EVM_bridge_to_C1, false)])
               → EVM_bridge_to_C1(CrossRuntimeRunTez, dest=C1)
@@ -5866,12 +5865,12 @@ let test_crac_user_emit_in_reentrant_inner_crac =
                                                   ~CRAC #2~> Mich EmitFailer
                                                     emits %hello_l2_1299, then FAILWITH
                                                   catches → continues
-  
+
     Asserts that the synthetic Michelson manager-op's
     [internal_operation_results] contains the synthetic CRAC-ID event
     (kind=event, tag="crac"), and as a sanity check that the user
     EMIT is still present (Backtracked).
-  
+
     L2-1299. *)
 let test_crac_synthetic_event_survives_failed_inner_with_emit =
   register_crac_runner_test
@@ -5978,6 +5977,177 @@ let test_crac_synthetic_event_survives_failed_inner_with_emit =
       ~error_msg:
         "Expected the user EMIT in the failed inner CRAC to have status %R \
          (the FAILWITH backtracks it), got %L") ;
+  unit
+
+(** Regression test: when an EVM transaction performs more than one
+    top-level CRAC, the synthetic Michelson manager-op must always
+    carry exactly one [crac] event — even when the applied CRAC that
+    "owned" the event is wiped by an EVM revert and only a failed
+    CRAC survives in [failed_crac_receipts].
+
+    Pre-fix, [build_crac_receipt] in
+    [etherlink/kernel_latest/tezosx-tezos-runtime/src/lib.rs] gated
+    synthetic-event emission on the journal flag
+    [should_emit_crac_id], suppressing it after the first CRAC of a
+    transaction.  When the first CRAC was applied (consumes the flag,
+    receipt with event pushed to [pending_crac_receipts]) and a later
+    CRAC failed (flag already false → receipt without event pushed
+    to [failed_crac_receipts]), an EVM revert that wiped pending
+    receipts left only the event-less failed receipt.  The merged
+    synthetic Michelson manager-op then carried zero [crac] events.
+
+    Fix: every CRAC receipt always carries the synthetic event;
+    [merge_crac_internals] / [drain_reentrant_crac_ops] already
+    deduplicate so the final merged receipt carries exactly one.
+
+    Call tree (mirrors L2-1302 reproducer):
+      EOA → EVM_main(MultiRunCaller, willRevert=false,
+                     callees=[(EVM_caller_ok, doCatch=false),
+                              (EVM_caller_fail, doCatch=false)]).run()
+              → EVM_caller_ok ~CRAC #1~> Mich C_ok    (Applied)
+              → EVM_caller_fail ~CRAC #2~> Mich C_fail (FAILWITH)
+                                           reverts up to EVM_main;
+                                           no catch → tx-level revert
+
+    Asserts the merged synthetic Mich manager-op carries the
+    synthetic CRAC-ID event (kind=event, tag=[crac]).  Sanity:
+    top-level status is [failed] (only the failed CRAC survives
+    the EVM revert) and at least one transaction targets C_fail.
+
+    L2-1302. *)
+let test_crac_synthetic_event_present_when_applied_crac_reverted_out =
+  register_crac_runner_test
+    ~title:
+      "CRAC: synthetic crac event survives when applied CRAC is reverted out \
+       by EVM tx revert"
+    ~tags:["crac_receipt"; "regression"; "emit"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "RCPT-CRAC-EVT-3" in
+  (* Mich C_ok: TezMultiRunCaller defaults (revert=false, callees=[])
+     — body is just an internal counter increment, no callees. *)
+  let* c_ok = TezMultiRunCaller.originate () in
+  let (`Tez_runner (_, c_ok_kt1)) = c_ok in
+  (* Mich C_fail: TezMultiRunCaller with revert=true, no callees —
+     FAILWITHs after running zero callees.  The CRAC into it fails. *)
+  let* c_fail = TezMultiRunCaller.originate ~revert:true () in
+  let (`Tez_runner (_, c_fail_kt1)) = c_fail in
+  let* evm_caller_ok = EvmCrossRuntimeRunnerTez.deploy_and_init c_ok in
+  let* evm_caller_fail = EvmCrossRuntimeRunnerTez.deploy_and_init c_fail in
+  (* doCatch=false on both callees → CRAC #2's failure propagates up
+     through EVM_caller_fail and EVM_main, reverting the entire EVM
+     tx.  CRAC #1's pending receipt is then truncated by revert_frame;
+     only CRAC #2's failed receipt survives the merge. *)
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init
+      ~callees:[(evm_caller_ok, false); (evm_caller_fail, false)]
+      ()
+  in
+  let* _ = EvmRunner.call_run ~expected_status:false evm_main in
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  let op_list = JSON.(ops |> as_list) in
+  Log.info "%s: %d manager operation(s)" prefix (List.length op_list) ;
+  Check.(
+    (List.length op_list = 1)
+      int
+      ~error_msg:"Expected 1 manager operation, got %L") ;
+  let top = JSON.(ops |=> 0 |-> "contents" |=> 0) in
+  let top_status =
+    JSON.(top |-> "metadata" |-> "operation_result" |-> "status" |> as_string)
+  in
+  Log.info "%s: top-level status=%s" prefix top_status ;
+  (* Sanity: only the failed CRAC #2 survives the merge, so the
+     merged top-level status is `failed` (no applied receipt to
+     trigger force_top_level_applied). *)
+  Check.(
+    (top_status = "failed")
+      string
+      ~error_msg:
+        "Expected merged synthetic Mich manager-op top-level status %R (only \
+         the failed CRAC survives the EVM revert), got %L") ;
+  let internals =
+    JSON.(top |-> "metadata" |-> "internal_operation_results" |> as_list)
+  in
+  Log.info
+    "%s: %d internal op(s) on the synthetic CRAC tx receipt"
+    prefix
+    (List.length internals) ;
+  List.iteri
+    (fun i iop ->
+      Log.info
+        "%s:   [%d] kind=%s src=%s dst=%s tag=%s status=%s"
+        prefix
+        i
+        JSON.(iop |-> "kind" |> as_string)
+        JSON.(
+          iop |-> "source" |> as_opt |> Option.fold ~none:"-" ~some:as_string)
+        JSON.(
+          iop |-> "destination" |> as_opt
+          |> Option.fold ~none:"-" ~some:as_string)
+        JSON.(iop |-> "tag" |> as_opt |> Option.fold ~none:"-" ~some:as_string)
+        JSON.(
+          iop |-> "result" |-> "status" |> as_opt
+          |> Option.fold ~none:"-" ~some:as_string))
+    internals ;
+  (* Primary assertion: the synthetic CRAC-ID event must be present
+     even though the applied CRAC #1 (which historically owned the
+     event) was reverted out of the merge by the EVM tx revert. *)
+  let crac_events =
+    List.filter
+      (fun iop ->
+        JSON.(iop |-> "kind" |> as_string) = "event"
+        &&
+        match JSON.(iop |-> "tag" |> as_opt) with
+        | Some t -> JSON.as_string t = "crac"
+        | None -> false)
+      internals
+  in
+  Check.(
+    (List.length crac_events = 1)
+      int
+      ~error_msg:
+        "Expected exactly 1 synthetic CRAC-ID event (tag = \"crac\") on the \
+         merged synthetic Michelson receipt, got %L. Without the fix, \
+         build_(failed_)crac_receipt gates synthetic-event emission on the \
+         journal flag should_emit_crac_id which is consumed by CRAC #1 and not \
+         restored on revert; the surviving failed CRAC #2's receipt has no \
+         event, breaking RFC principle 6 (CRAC-ID per top-level transaction) — \
+         indexers correlating Mich activity by CRAC-ID lose entire \
+         transactions.") ;
+  (* Sanity: a transaction targeting C_fail must be present in the
+     merged receipt — proves the failed CRAC reached its target. *)
+  let to_c_fail =
+    List.filter
+      (fun iop ->
+        JSON.(iop |-> "kind" |> as_string) = "transaction"
+        && JSON.(iop |-> "destination" |> as_string) = c_fail_kt1)
+      internals
+  in
+  Check.(
+    (List.length to_c_fail >= 1)
+      int
+      ~error_msg:
+        "Sanity check: expected at least one transaction targeting C_fail in \
+         the merged receipt — proves CRAC #2 reached its destination before \
+         the FAILWITH. If this fails, the test scenario didn't fire as \
+         designed.") ;
+  (* Sanity: NO transaction targeting C_ok survives — its applied
+     CRAC was rolled back by the EVM revert (revert_frame truncates
+     pending_crac_receipts). *)
+  let to_c_ok =
+    List.filter
+      (fun iop ->
+        JSON.(iop |-> "kind" |> as_string) = "transaction"
+        && JSON.(iop |-> "destination" |> as_string) = c_ok_kt1)
+      internals
+  in
+  Check.(
+    (List.length to_c_ok = 0)
+      int
+      ~error_msg:
+        "Sanity check: expected no transaction targeting C_ok (its applied \
+         CRAC was rolled back by the EVM tx revert), got %L. If this fails, \
+         the test scenario didn't fire as designed.") ;
   unit
 
 (* Two EVM→TEZ CRACs from the SAME EVM transaction (RFC Example 5).
@@ -9861,6 +10031,7 @@ let () =
   test_crac_evm_to_tez_receipt [Alpha] ;
   test_crac_user_emit_in_reentrant_inner_crac [Alpha] ;
   test_crac_synthetic_event_survives_failed_inner_with_emit [Alpha] ;
+  test_crac_synthetic_event_present_when_applied_crac_reverted_out [Alpha] ;
   test_crac_receipt_two_independent [Alpha] ;
   test_crac_receipt_separate_tx_two_cracs [Alpha] ;
   test_crac_receipt_evm_tez_evm [Alpha] ;
