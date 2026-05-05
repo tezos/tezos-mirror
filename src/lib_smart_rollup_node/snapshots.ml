@@ -645,10 +645,28 @@ let reconstruct_context_from_first_available_level
   reconstruct_chain_from first_block first_ctxt
 
 let maybe_reconstruct_context cctxt ~data_dir ~apply_unsafe_patches =
+  let skip_condition (store : _ Store.t) (context : _ Context.index) ~head:_ =
+    let is_in_context (block : Sc_rollup_block.t option) =
+      let open Lwt_syntax in
+      match block with
+      | None -> return_false
+      | Some block -> (
+          match block.header.context_hash with
+          | None -> return_false
+          | Some hash ->
+              let+ context = Context.checkout context hash in
+              Option.is_some context)
+    in
+    let open Lwt_result_syntax in
+    let* last_committed = Store.L2_blocks.find_last_committed store in
+    let*! last_committed_in_context = is_in_context last_committed in
+    return last_committed_in_context
+  in
   with_modify_data_dir
     cctxt
     ~data_dir
     ~apply_unsafe_patches
+    ~skip_condition
     reconstruct_context_from_first_available_level
 
 let post_checks ?(apply_unsafe_patches = false)
