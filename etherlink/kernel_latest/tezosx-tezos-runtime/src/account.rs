@@ -332,7 +332,12 @@ impl TezosImplicitAccountTrait for TezosImplicitAccount {
             .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))?;
         info.pub_key = Some(public_key.clone());
         set_tezos_account_info(host, &self.pkh, info)
-            .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))
+            .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))?;
+        // Reveal is the sole writer here, and the protocol rejects a
+        // second reveal on the same account. Write unconditionally.
+        set_origin_for_implicit(host, &self.pkh, &Origin::Native)
+            .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))?;
+        Ok(())
     }
 
     fn allocated(
@@ -440,6 +445,41 @@ mod tests {
         };
         set_tezos_account_info(&mut host, &pkh, info.clone()).unwrap();
         assert_eq!(get_tezos_account_info(&host, &pkh).unwrap(), Some(info));
+        assert_eq!(
+            get_origin_for_implicit(&host, &pkh).unwrap(),
+            Some(Origin::Native)
+        );
+    }
+
+    #[test]
+    fn set_manager_public_key_marks_native_on_first_reveal() {
+        use crate::account::{get_origin_for_implicit, TezosImplicitAccount};
+        use tezos_crypto_rs::{public_key::PublicKey, public_key_hash::PublicKeyHash};
+        use tezos_evm_runtime::runtime::MockKernelHost;
+        use tezos_execution::account_storage::TezosImplicitAccount as TezosImplicitAccountTrait;
+        use tezosx_interfaces::Origin;
+
+        let mut host = MockKernelHost::default();
+        let pkh =
+            PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
+        let public_key = PublicKey::from_b58check(
+            "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
+        )
+        .unwrap();
+        let path = crate::account::path_to_tezos_account(&pkh).unwrap();
+        let account = TezosImplicitAccount {
+            pkh: pkh.clone(),
+            path,
+        };
+
+        // Before reveal, no classification.
+        assert!(get_origin_for_implicit(&host, &pkh).unwrap().is_none());
+
+        account
+            .set_manager_public_key(&mut host, &public_key)
+            .unwrap();
+
+        // After reveal the classification is Native.
         assert_eq!(
             get_origin_for_implicit(&host, &pkh).unwrap(),
             Some(Origin::Native)
