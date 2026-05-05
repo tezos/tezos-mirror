@@ -188,11 +188,13 @@ let encoding_with_optional_extended_block_param encoding =
     Ethereum_types.Block_parameter.(Block_parameter Latest)
 
 module Kernel_version = struct
-  type input = unit
+  open Ethereum_types
+
+  type input = Block_parameter.extended
 
   type output = string
 
-  let input_encoding = Data_encoding.unit
+  let input_encoding = Data_encoding.tup1 Block_parameter.extended_encoding
 
   let output_encoding = Data_encoding.string
 
@@ -202,11 +204,13 @@ module Kernel_version = struct
 end
 
 module Kernel_root_hash = struct
-  type input = unit
+  open Ethereum_types
+
+  type input = Block_parameter.extended
 
   type output = Ethereum_types.hex option
 
-  let input_encoding = Data_encoding.unit
+  let input_encoding = Data_encoding.tup1 Block_parameter.extended_encoding
 
   let output_encoding = Data_encoding.(option Ethereum_types.hex_encoding_no0x)
 

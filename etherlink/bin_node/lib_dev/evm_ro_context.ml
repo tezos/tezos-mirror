@@ -62,12 +62,6 @@ let current_block_number_durable ctxt ~chain_family =
 let storage_version ctxt =
   with_latest_state ctxt Durable_storage.storage_version
 
-let kernel_version ctxt =
-  with_latest_state ctxt (Durable_storage.read Kernel_version)
-
-let kernel_root_hash ctxt =
-  with_latest_state ctxt (Durable_storage.read_opt Kernel_root_hash)
-
 let list_runtimes ctxt = with_latest_state ctxt Durable_storage.list_runtimes
 
 let list_l1_l2_levels ctxt ~from_l1_level =

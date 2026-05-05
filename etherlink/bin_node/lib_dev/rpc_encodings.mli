@@ -138,10 +138,15 @@ module Sequencer :
     with type input = Ethereum_types.Block_parameter.extended
      and type output = Signature.Public_key.t
 
-module Kernel_version : METHOD with type input = unit and type output = string
+module Kernel_version :
+  METHOD
+    with type input = Ethereum_types.Block_parameter.extended
+     and type output = string
 
 module Kernel_root_hash :
-  METHOD with type input = unit and type output = Ethereum_types.hex option
+  METHOD
+    with type input = Ethereum_types.Block_parameter.extended
+     and type output = Ethereum_types.hex option
 
 module Michelson_activation_level :
   METHOD with type input = unit and type output = int64 option

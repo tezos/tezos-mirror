@@ -1699,14 +1699,30 @@ let dispatch_request (type f) ~websocket
             build_with_input ~f module_ parameters
         (* Internal RPC methods *)
         | Kernel_version.Method ->
-            let f (_ : unit option) =
-              let* kernel_version = Evm_ro_context.kernel_version ro_ctxt in
+            let f block_param =
+              let block =
+                Option.value
+                  ~default:(Block_parameter.Block_parameter Latest)
+                  block_param
+              in
+              let* state = Evm_ro_context.get_state ro_ctxt ~block () in
+              let* kernel_version =
+                Durable_storage.(read Kernel_version state)
+              in
               rpc_ok kernel_version
             in
             build ~f module_ parameters
         | Kernel_root_hash.Method ->
-            let f (_ : unit option) =
-              let* kernel_root_hash = Evm_ro_context.kernel_root_hash ro_ctxt in
+            let f block_param =
+              let block =
+                Option.value
+                  ~default:(Block_parameter.Block_parameter Latest)
+                  block_param
+              in
+              let* state = Evm_ro_context.get_state ro_ctxt ~block () in
+              let* kernel_root_hash =
+                Durable_storage.(read_opt Kernel_root_hash state)
+              in
               rpc_ok kernel_root_hash
             in
             build ~f module_ parameters

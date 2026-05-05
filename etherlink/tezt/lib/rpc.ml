@@ -179,9 +179,21 @@ module Request = struct
 
   let net_version = {method_ = "net_version"; parameters = `A []}
 
-  let tez_kernelVersion = {method_ = "tez_kernelVersion"; parameters = `Null}
+  let tez_kernelVersion ?block () =
+    let parameters =
+      match block with
+      | None -> `Null
+      | Some block -> `A [block_param_to_json block]
+    in
+    {method_ = "tez_kernelVersion"; parameters}
 
-  let tez_kernelRootHash = {method_ = "tez_kernelRootHash"; parameters = `Null}
+  let tez_kernelRootHash ?block () =
+    let parameters =
+      match block with
+      | None -> `Null
+      | Some block -> `A [block_param_to_json block]
+    in
+    {method_ = "tez_kernelRootHash"; parameters}
 
   let tez_getMichelsonActivationLevel =
     {method_ = "tez_getMichelsonActivationLevel"; parameters = `Null}
@@ -777,18 +789,18 @@ let get_transaction_count ?websocket ?(block = "latest") ~address evm_node =
        (fun response -> Evm_node.extract_result response |> JSON.as_int64)
        response
 
-let tez_kernelVersion ?websocket evm_node =
+let tez_kernelVersion ?websocket ?block evm_node =
   let* response =
-    Evm_node.jsonrpc ?websocket evm_node Request.tez_kernelVersion
+    Evm_node.jsonrpc ?websocket evm_node (Request.tez_kernelVersion ?block ())
   in
   return
   @@ decode_or_error
        (fun response -> Evm_node.extract_result response |> JSON.as_string)
        response
 
-let tez_kernelRootHash ?websocket evm_node =
+let tez_kernelRootHash ?websocket ?block evm_node =
   let* response =
-    Evm_node.jsonrpc ?websocket evm_node Request.tez_kernelRootHash
+    Evm_node.jsonrpc ?websocket evm_node (Request.tez_kernelRootHash ?block ())
   in
   return
   @@ decode_or_error

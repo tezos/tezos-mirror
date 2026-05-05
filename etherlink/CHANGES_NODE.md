@@ -10,6 +10,9 @@
 
 - Include `injectTezlinkOperation` in the list of supported EVM
   methods used by the RPC node. (!21785)
+- Add an optional block parameter to `tez_kernelVersion` and
+  `tez_kernelRootHash`. Omitting it preserves the previous behavior
+  (returns the value at the latest block). (!21786)
 
 ### Monitoring changes
 

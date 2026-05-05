@@ -310,15 +310,21 @@ val get_transaction_count :
   Evm_node.t ->
   (int64, error) result Lwt.t
 
-(** [tez_kernelVersion evm_node] calls [tez_kernelVersion]. Returns the
-    kernel commit hash. *)
+(** [tez_kernelVersion ?block evm_node] calls [tez_kernelVersion]. Returns
+    the kernel commit hash at [block] (defaults to [Latest] if omitted). *)
 val tez_kernelVersion :
-  ?websocket:Websocket.t -> Evm_node.t -> (string, error) result Lwt.t
+  ?websocket:Websocket.t ->
+  ?block:block_param ->
+  Evm_node.t ->
+  (string, error) result Lwt.t
 
-(** [tez_kernelRootHash evm_node] calls [tez_kernelRootHash]. Returns the
-    kernel root hash. *)
+(** [tez_kernelRootHash ?block evm_node] calls [tez_kernelRootHash]. Returns
+    the kernel root hash at [block] (defaults to [Latest] if omitted). *)
 val tez_kernelRootHash :
-  ?websocket:Websocket.t -> Evm_node.t -> (string option, error) result Lwt.t
+  ?websocket:Websocket.t ->
+  ?block:block_param ->
+  Evm_node.t ->
+  (string option, error) result Lwt.t
 
 (** [tez_getMichelsonActivationLevel evm_node] calls
     [tez_getMichelsonActivationLevel]. Returns the EVM block level at which the

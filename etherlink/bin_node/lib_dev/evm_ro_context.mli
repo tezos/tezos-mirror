@@ -74,12 +74,6 @@ val current_block_number_durable :
     current kernel. *)
 val storage_version : t -> int tzresult Lwt.t
 
-(** [kernel_version ctxt] returns the internal kernel version. *)
-val kernel_version : t -> string tzresult Lwt.t
-
-(** [kernel_root_hash ctxt] returns the internal kernel root hash. *)
-val kernel_root_hash : t -> Ethereum_types.hex option tzresult Lwt.t
-
 (** [list_runtimes ctxt] returns the list of runtimes activated in the kernel. *)
 val list_runtimes : t -> Tezosx.runtime list tzresult Lwt.t
 
