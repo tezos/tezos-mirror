@@ -334,6 +334,15 @@ let job_upgrade_bin_ubuntu_24_04_systemd =
     ~distribution:"ubuntu"
     ~release:"24.04"
 
+let job_upgrade_bin_ubuntu_26_04_systemd =
+  Cacio.parameterize @@ fun pipeline_type ->
+  make_systemd_upgrade_job
+    "oc.upgrade_bin_ubuntu_26_04_systemd"
+    ~__POS__
+    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
+    ~distribution:"ubuntu"
+    ~release:"26.04"
+
 let job_install_bin_debian_bookworm_systemd =
   Cacio.parameterize @@ fun pipeline_type ->
   make_systemd_install_job
@@ -382,6 +391,7 @@ let () =
       (Auto, job_install_bin_ubuntu_26_04_systemd Full);
       (Auto, job_upgrade_bin_ubuntu_22_04_systemd Full);
       (Auto, job_upgrade_bin_ubuntu_24_04_systemd Full);
+      (Auto, job_upgrade_bin_ubuntu_26_04_systemd Full);
       (Auto, job_install_bin_debian_bookworm Full);
       (Auto, job_install_bin_debian_bookworm_systemd Full);
       (Auto, job_upgrade_bin_debian_bookworm_systemd Full);
