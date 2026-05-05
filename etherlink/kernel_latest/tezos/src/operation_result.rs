@@ -235,6 +235,8 @@ pub enum ApplyOperationError {
     UnSupportedSetDelegate(String),
     #[error("Internal operation nonce overflow due to {0}")]
     InternalOperationNonceOverflow(String),
+    #[error("Cannot pay storage fee: {0}")]
+    CannotPayStorageFee(BalanceTooLow),
     // This error variant is used to encapsulate errors that were generated in the past and encoded as bson.
     // It should not be used for new errors, which should be added as new variants to this enum.
     // This is a temporary solution while waiting for better error support.
@@ -1017,15 +1019,17 @@ mod tests {
                     receipt: OperationResultSum::Transfer(OperationResult {
                         balance_updates: vec![],
                         result: ContentResult::BackTracked(BacktrackedResult {
-                            errors: Some(ApplyOperationErrors::from(
-                                ApplyOperationError::Transfer(
-                                    TransferError::BalanceTooLow(BalanceTooLow {
-                                        contract: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(),
-                                        balance: 10_u64.into(),
-                                        amount: 21_u64.into(),
-                                    })
-                                )
-                            )),
+                            errors: Some(ApplyOperationErrors {
+                                errors: vec![
+                                    ApplyOperationError::CannotPayStorageFee(
+                                        BalanceTooLow {
+                                            contract: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(),
+                                            balance: 10_u64.into(),
+                                            amount: 21_u64.into(),
+                                        }
+                                    ),
+                                ],
+                            }),
                             result: TransferTarget::ToContrat(TransferSuccess {
                                 storage: None,
                                 lazy_storage_diff: None,

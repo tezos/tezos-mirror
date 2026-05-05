@@ -16,7 +16,7 @@
             {
               "kind": "permanent",
               "id": "tezlink_error",
-              "error_message": "Transfer(BalanceTooLow(BalanceTooLow { contract: Implicit(Ed25519(ContractTz1Hash(\"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\"))), balance: Narith(10), amount: Narith(21) }))"
+              "error_message": "CannotPayStorageFee(BalanceTooLow { contract: Implicit(Ed25519(ContractTz1Hash(\"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\"))), balance: Narith(10), amount: Narith(21) })"
             }
           ],
           "balance_updates": [
