@@ -20,6 +20,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_tezlink::block::AppliedOperation;
 use tezos_tezlink::operation_result::{InternalOperationSum, TransferError};
 use tezosx_interfaces::{
     gas::convert as convert_gas, headers::format_tez_from_mutez, CrossRuntimeContext,
@@ -483,29 +484,65 @@ pub fn is_synthetic_crac_event(iop: &InternalOperationSum) -> bool {
     }
 }
 
-/// Drain re-entrant CRAC receipts that accumulated since `watermark`.
+/// Drain re-entrant CRAC receipts that accumulated since the per-list
+/// watermarks.
 ///
 /// After each internal operation that may have triggered a cross-runtime
 /// call (e.g. a gateway call that re-entered Michelson), this function
-/// drains the CRAC receipts that were pushed since the watermark and
-/// splices their internal operation results into the parent op's flat
-/// list, preserving execution order (RFC Example 8).
+/// drains the CRAC receipts that were pushed since the watermarks —
+/// across all three lists (pending, failed, backtracked) — and splices
+/// their internal operation results into the parent op's flat list,
+/// preserving DFS execution order (RFC Example 8).
 ///
-/// Synthetic CRAC-ID events are dropped (only the outermost CRAC carries
-/// one per RFC principle 6); user-issued `EMIT` ops are preserved.
+/// Draining all three lists matters because a re-entrant inner CRAC
+/// can land in any of them depending on its outcome and the EVM frame
+/// catch behavior:
+///   - Applied inner: pushed to `pending_crac_receipts`.
+///   - Failed inner caught by an upstream EVM frame: pushed to
+///     `failed_crac_receipts`, must still nest under its outer parent
+///     in the receipt rather than reach the top-level merge with a
+///     smaller seq than the outer (would invert DFS order — L2-1300).
+///   - Applied inner whose enclosing EVM frame later reverted but was
+///     caught above: migrated to `backtracked_crac_receipts` by
+///     `revert_frame` (L2-1304); same nesting requirement.
+///
+/// Receipts are sorted by their shared sequence number before splicing
+/// so cross-list interleavings of inner CRACs at the same depth come
+/// out in execution order.
+///
+/// Synthetic CRAC-ID events are dropped from each spliced receipt
+/// (only the outermost CRAC carries one per RFC principle 6); user-
+/// issued `EMIT` ops are preserved.
 pub(crate) fn drain_reentrant_crac_ops(
     journal: &mut TezosXJournal,
-    watermark: usize,
+    pending_watermark: usize,
+    failed_watermark: usize,
+    backtracked_watermark: usize,
 ) -> Vec<InternalOperationSum> {
     use tezos_tezlink::operation_result::{OperationDataAndMetadata, OperationResultSum};
-    let receipts: Vec<_> = journal
-        .michelson
-        .pending_crac_receipts
-        .drain(watermark..)
-        .map(|(_, receipt)| receipt)
-        .collect();
+    let mut receipts: Vec<(u64, AppliedOperation)> = Vec::new();
+    receipts.extend(
+        journal
+            .michelson
+            .pending_crac_receipts
+            .drain(pending_watermark..),
+    );
+    receipts.extend(
+        journal
+            .michelson
+            .failed_crac_receipts
+            .drain(failed_watermark..),
+    );
+    receipts.extend(
+        journal
+            .michelson
+            .backtracked_crac_receipts
+            .drain(backtracked_watermark..),
+    );
+    receipts.sort_by_key(|(seq, _)| *seq);
+
     let mut ops = Vec::new();
-    for receipt in receipts {
+    for (_, receipt) in receipts {
         let OperationDataAndMetadata::OperationWithMetadata(batch) =
             receipt.op_and_receipt;
         for op in batch.operations {

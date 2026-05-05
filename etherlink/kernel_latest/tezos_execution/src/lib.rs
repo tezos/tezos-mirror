@@ -352,7 +352,16 @@ where
         let nonce = *nonce_counter;
         *nonce_counter = nonce_counter.saturating_add(1);
         let receipts_before = all_internal_receipts.len();
-        let crac_receipts_before = journal.michelson.pending_crac_receipts.len();
+        // Watermarks for `drain_reentrant_crac_ops`: any CRAC receipt
+        // pushed during this internal operation's execution — to any
+        // of the three lists — is a re-entrant inner CRAC and must
+        // be spliced into the parent op's flat list at this point
+        // rather than reach the top-level merge with a smaller seq
+        // than its outer parent (would invert DFS order — L2-1300).
+        let pending_crac_receipts_before = journal.michelson.pending_crac_receipts.len();
+        let failed_crac_receipts_before = journal.michelson.failed_crac_receipts.len();
+        let backtracked_crac_receipts_before =
+            journal.michelson.backtracked_crac_receipts.len();
         let internal_receipt = match operation {
             mir::ast::Operation::TransferTokens(TransferTokens {
                 param,
@@ -551,7 +560,9 @@ where
         // receipt — preserves execution order (RFC Example 8).
         let reentrant_ops = crate::enshrined_contracts::drain_reentrant_crac_ops(
             journal,
-            crac_receipts_before,
+            pending_crac_receipts_before,
+            failed_crac_receipts_before,
+            backtracked_crac_receipts_before,
         );
         all_internal_receipts.extend(reentrant_ops);
     }
