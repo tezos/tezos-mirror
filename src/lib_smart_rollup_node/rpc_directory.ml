@@ -277,6 +277,15 @@ let () =
       in
       Option.map (fun c -> (c, commitment_hash)) commitment
 
+let () =
+  Global_directory.register0
+    Rollup_node_services.Global.last_cemented_commitment
+  @@ fun node_ctxt () () ->
+  let open Lwt_result_syntax in
+  let lcc = Reference.get node_ctxt.lcc in
+  let+ commitment = Node_context.find_commitment node_ctxt lcc.commitment in
+  Option.map (fun c -> (c, lcc.commitment)) commitment
+
 (* Sets up a block watching service. It creates a stream to
    observe block events and asynchronously fetches the next
    block when available *)
