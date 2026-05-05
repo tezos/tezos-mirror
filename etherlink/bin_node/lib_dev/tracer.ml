@@ -9,8 +9,8 @@
 let is_tracing_root_indexed_by_hash hash state =
   let open Lwt_result_syntax in
   let* exists =
-    Durable_storage.exists
-      (Raw_path
+    Durable_storage.exists_dir
+      (Raw_dir
          (Durable_storage_path.Trace.root_indexed_by_hash
             ~transaction_hash:(Some hash)))
       state

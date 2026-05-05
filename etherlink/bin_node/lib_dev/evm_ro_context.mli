@@ -169,8 +169,7 @@ val read_state :
 
 (** [subkeys state path] returns the list of subkeys under [path] in the
     durable storage of [state]. *)
-val subkeys :
-  Evm_state.t -> Durable_storage_path.path -> string list tzresult Lwt.t
+val subkeys : Evm_state.t -> Durable_storage.dir -> string list tzresult Lwt.t
 
 (** [execute_entrypoint ctxt state ~input_path ~input ~output_path ~entrypoint]
     writes [input] to [input_path] in durable storage, calls the kernel

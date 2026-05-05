@@ -65,7 +65,7 @@ let inspect state path =
 let subkeys state path =
   Lwt.map
     (function Ok v -> v | Error _ -> [])
-    (Durable_storage.subkeys (Raw_path path) state)
+    (Durable_storage.subkeys (Raw_dir path) state)
 
 let ls = Commands.ls ~subkeys ~inspect
 

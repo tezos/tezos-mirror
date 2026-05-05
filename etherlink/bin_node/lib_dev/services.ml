@@ -2139,7 +2139,7 @@ let dispatch_private_request (type f) ~websocket
         let f (path, block) =
           let open Lwt_result_syntax in
           let* state = Evm_ro_context.get_state ro_ctxt ~block () in
-          let* value = Evm_ro_context.subkeys state path in
+          let* value = Evm_ro_context.subkeys state (Raw_dir path) in
           rpc_ok value
         in
         build_with_input ~f module_ parameters
