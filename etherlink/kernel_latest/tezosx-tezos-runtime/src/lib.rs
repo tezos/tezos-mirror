@@ -51,11 +51,12 @@ use tezosx_journal::TezosXJournal;
 
 use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 
-/// PKH used for the `SOURCE` field in all cross-runtime requests — both
-/// entrypoint calls and view calls. Michelson requires SOURCE to be an
-/// implicit account (tz1/tz2/tz3), and cross-runtime calls have no
-/// natural implicit SOURCE of their own.
-pub(crate) const NULL_PKH: &str = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU";
+/// Re-export the canonical null PKH from `tezos_execution` so the rest
+/// of this crate can keep its short name.  Both the synthetic
+/// CRAC-ID event built here and the `is_synthetic_crac_event`
+/// predicate in `tezos_execution::enshrined_contracts` match against
+/// the same constant.
+pub(crate) use tezos_execution::NULL_PKH;
 
 use crate::{
     account::{get_tezos_account_info_or_init, narith_to_u256, set_tezos_account_info},
@@ -181,7 +182,9 @@ fn build_crac_receipt(
         next_nonce = next_nonce.saturating_add(1);
         all_internal.push(InternalOperationSum::Event(InternalContentWithMetadata {
             content: EventContent {
-                tag: Some(Entrypoint::from_string_unchecked("crac".into())),
+                tag: Some(Entrypoint::from_string_unchecked(
+                    tezos_execution::enshrined_contracts::SYNTHETIC_CRAC_EVENT_TAG.into(),
+                )),
                 payload: Some(payload.into()),
                 ty: ty.into(),
             },
@@ -295,7 +298,9 @@ fn build_failed_crac_receipt(
         next_nonce = next_nonce.saturating_add(1);
         all_internal.push(InternalOperationSum::Event(InternalContentWithMetadata {
             content: EventContent {
-                tag: Some(Entrypoint::from_string_unchecked("crac".into())),
+                tag: Some(Entrypoint::from_string_unchecked(
+                    tezos_execution::enshrined_contracts::SYNTHETIC_CRAC_EVENT_TAG.into(),
+                )),
                 payload: Some(payload.into()),
                 ty: ty.into(),
             },

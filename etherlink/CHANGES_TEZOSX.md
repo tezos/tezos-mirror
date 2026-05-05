@@ -25,6 +25,12 @@
   `inner.logs` while revm's standard accumulation is still intact,
   restoring parity between the two ways into the EVM for indexers
   (subgraphs, on-chain analytics, ERC-1155 wallet trackers).
+- Surface user Michelson `EMIT` events from re-entrant inner CRACs on
+  the synthetic CRAC transaction receipt. Previously, events emitted by
+  a Michelson contract reached through a nested cross-runtime call (EVM
+  → Mich → EVM → Mich within one EVM transaction) were silently
+  discarded, breaking parity for Michelson-side event indexers.
+  (!21807)
 - Raise the Michelson runtime `hard_gas_limit_per_operation` and
   `hard_gas_limit_per_block` from 1,040,000 to 3,000,000 gas units (i.e.
   3,000,000,000 milligas) to match the EVM 30M-gas per-transaction cap.

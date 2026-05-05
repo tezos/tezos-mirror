@@ -1300,6 +1300,31 @@ module TezAlwaysSucceedsUnit = struct
       protocol
 end
 
+(** Michelson contract that emits a single user [EMIT] op on [%run]
+    with tag [hello_l2_1301] and payload string ["hello-l2-1301"], then
+    succeeds.  Used as the deepest target in a re-entrant CRAC chain to
+    exercise [drain_reentrant_crac_ops]: the user EMIT must survive the
+    splice into the parent op's flat list instead of being stripped as
+    if it were a duplicate synthetic CRAC-ID event. *)
+module TezEmitter = struct
+  open TezContract
+
+  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
+      ~sequencer ~source ~counter ~protocol ?init_balance () =
+    originate_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter
+      ~script_name:["mini_scenarios"; "cross_runtime_emitter"]
+      ~init_storage_data:"Unit"
+      ?init_balance
+      protocol
+end
+
 (** Tezos contract that calls [%collect_result] twice in the same
  *  frame.  The second call violates the once-per-frame invariant
  *  and reverts the whole operation group.  Used to verify the
@@ -1560,6 +1585,10 @@ module CracRunnerWrapper = struct
     end
 
     module TezAlwaysSucceedsUnit : sig
+      val originate : ?init_balance:int -> unit -> tez_runner Lwt.t
+    end
+
+    module TezEmitter : sig
       val originate : ?init_balance:int -> unit -> tez_runner Lwt.t
     end
 
@@ -2161,6 +2190,24 @@ module CracRunnerWrapper = struct
         let originate ?init_balance () =
           let* runner_hex, runner =
             TezAlwaysSucceedsUnit.originate
+              ~sc_rollup_address
+              ~sc_rollup_node
+              ~client
+              ~l1_contracts
+              ~sequencer
+              ~source
+              ~counter:(tez_counter ())
+              ~protocol
+              ?init_balance
+              ()
+          in
+          return (`Tez_runner (runner_hex, runner))
+      end
+
+      module TezEmitter = struct
+        let originate ?init_balance () =
+          let* runner_hex, runner =
+            TezEmitter.originate
               ~sc_rollup_address
               ~sc_rollup_node
               ~client
@@ -5597,6 +5644,148 @@ let test_crac_evm_to_tez_receipt =
     ~expected_entrypoint:"_incrementWitness"
     ~expected_status:"applied"
     (List.nth internals 2) ;
+  unit
+
+(** Regression test: a user [EMIT] op executed by a Michelson contract
+    reached via a re-entrant inner CRAC (i.e. EVM → Mich → EVM → Mich
+    within one EVM transaction) must surface on the synthetic Michelson
+    manager-op receipt.
+
+    Pre-fix, [drain_reentrant_crac_ops] in
+    [etherlink/kernel_latest/tezos_execution/src/enshrined_contracts.rs]
+    filtered every [InternalOperationSum::Event] from a re-entrant
+    CRAC's [internal_operation_results] before splicing them into the
+    parent op's flat list.  The intent was to drop the duplicate
+    synthetic CRAC-ID event, but re-entrant inner CRACs carry no
+    synthetic event in the first place ([should_emit_crac_id] is
+    already false), so the only [Event] entries there are user
+    [EMIT] ops produced by [execute_internal_operations] — and those
+    were unconditionally discarded.
+
+    Call tree:
+      EOA → EVM_main(MultiRunCaller, callees=[(EVM_bridge_to_C1, false)])
+              → EVM_bridge_to_C1(CrossRuntimeRunTez, dest=C1)
+                 ~CRAC #1~> Mich C1(MultiRunCaller, callees=[Tez_bridge])
+                              → Tez_bridge(CrossRuntimeRunEvm, dest=EVM_inner)
+                                  ~Mich→EVM~> EVM_inner(MultiRunCaller,
+                                                callees=[(EVM_bridge_to_Emitter, false)])
+                                                → EVM_bridge_to_Emitter
+                                                  ~CRAC #2~> Mich Emitter
+                                                    emits %hello_l2_1301 string
+                                                    "hello-l2-1301", succeeds
+
+    Asserts that the synthetic Michelson manager-op's
+    [internal_operation_results] contains an [event] with tag
+    [hello_l2_1301] and payload string ["hello-l2-1301"].
+
+    L2-1301. *)
+let test_crac_user_emit_in_reentrant_inner_crac =
+  register_crac_runner_test
+    ~title:
+      "CRAC: user EMIT from re-entrant inner CRAC surfaces on synthetic receipt"
+    ~tags:["crac_receipt"; "regression"; "emit"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "RCPT-EMIT" in
+  let* emitter = TezEmitter.originate () in
+  let* evm_bridge_to_emitter =
+    EvmCrossRuntimeRunnerTez.deploy_and_init emitter
+  in
+  let* evm_inner =
+    EvmMultiRunCaller.deploy_and_init
+      ~callees:[(evm_bridge_to_emitter, false)]
+      ()
+  in
+  let (`Evm_runner evm_inner_addr) = evm_inner in
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_inner in
+  let* c1 = TezMultiRunCaller.originate ~callees:[tez_bridge] () in
+  let* evm_bridge_to_c1 = EvmCrossRuntimeRunnerTez.deploy_and_init c1 in
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge_to_c1, false)] ()
+  in
+  let* _ = EvmRunner.call_run evm_main in
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  let op_list = JSON.(ops |> as_list) in
+  Log.info "%s: %d manager operation(s)" prefix (List.length op_list) ;
+  Check.(
+    (List.length op_list = 1)
+      int
+      ~error_msg:"Expected 1 manager operation, got %L") ;
+  let top = JSON.(ops |=> 0 |-> "contents" |=> 0) in
+  let metadata = JSON.(top |-> "metadata") in
+  let internals = JSON.(metadata |-> "internal_operation_results" |> as_list) in
+  Log.info
+    "%s: %d internal op(s) on the synthetic CRAC tx receipt"
+    prefix
+    (List.length internals) ;
+  List.iteri
+    (fun i iop ->
+      Log.info
+        "%s:   [%d] kind=%s tag=%s"
+        prefix
+        i
+        JSON.(iop |-> "kind" |> as_string)
+        JSON.(iop |-> "tag" |> as_opt |> Option.fold ~none:"-" ~some:as_string))
+    internals ;
+  let user_emits =
+    List.filter
+      (fun iop ->
+        JSON.(iop |-> "kind" |> as_string) = "event"
+        &&
+        match JSON.(iop |-> "tag" |> as_opt) with
+        | Some t -> JSON.as_string t = "hello_l2_1301"
+        | None -> false)
+      internals
+  in
+  Log.info
+    "%s: found %d user-EMIT entries with tag %S"
+    prefix
+    (List.length user_emits)
+    "hello_l2_1301" ;
+  Check.(
+    (List.length user_emits = 1)
+      int
+      ~error_msg:
+        "Expected exactly 1 user EMIT (tag = \"hello_l2_1301\") on the \
+         synthetic CRAC tx receipt, got %L. Without the fix, \
+         drain_reentrant_crac_ops strips ALL Event variants from the \
+         re-entrant inner CRAC's internal_operation_results, dropping the user \
+         EMIT before it reaches the merged receipt.") ;
+  let user_emit = List.hd user_emits in
+  let payload = JSON.(user_emit |-> "payload" |-> "string" |> as_string) in
+  Check.(
+    (payload = "hello-l2-1301")
+      string
+      ~error_msg:
+        "Expected user EMIT payload %R, got %L (corruption in the EMIT data)") ;
+  let status = JSON.(user_emit |-> "result" |-> "status" |> as_string) in
+  Check.(
+    (status = "applied")
+      string
+      ~error_msg:
+        "Expected user EMIT status %R (the inner CRAC succeeded so its EMIT is \
+         Applied), got %L") ;
+  (* Sanity: the alias→Emitter transfer that triggered the EMIT must
+     also be present and applied — proves the EVM_inner→Emitter call
+     reached its target. *)
+  let (`Tez_runner (_, emitter_kt1)) = emitter in
+  let alias_to_emitter =
+    List.filter
+      (fun iop ->
+        JSON.(iop |-> "kind" |> as_string) = "transaction"
+        && JSON.(iop |-> "destination" |> as_string) = emitter_kt1
+        && JSON.(iop |-> "result" |-> "status" |> as_string) = "applied")
+      internals
+  in
+  Check.(
+    (List.length alias_to_emitter >= 1)
+      int
+      ~error_msg:
+        "Expected at least one applied transfer to Mich Emitter (proving the \
+         inner CRAC reached the Emitter contract), got %L. If this fails, the \
+         test scenario is broken — investigate before reading too much into \
+         the EMIT assertion.") ;
+  ignore evm_inner_addr ;
   unit
 
 (* Two EVM→TEZ CRACs from the SAME EVM transaction (RFC Example 5).
@@ -9478,6 +9667,7 @@ let () =
   test_crac_nested_catches_with_multiple_reverts [Alpha] ;
   test_crac_gas_model_alias_caching [Alpha] ;
   test_crac_evm_to_tez_receipt [Alpha] ;
+  test_crac_user_emit_in_reentrant_inner_crac [Alpha] ;
   test_crac_receipt_two_independent [Alpha] ;
   test_crac_receipt_separate_tx_two_cracs [Alpha] ;
   test_crac_receipt_evm_tez_evm [Alpha] ;

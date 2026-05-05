@@ -450,13 +450,49 @@ fn extract_callback(
     }
 }
 
+/// Tag used by the synthetic CRAC-ID event built in
+/// `tezosx-tezos-runtime/src/lib.rs::build_(failed_)crac_receipt`.
+/// Imported by the receipt builder so both producer and consumer
+/// agree on the tag.
+pub const SYNTHETIC_CRAC_EVENT_TAG: &str = "crac";
+
+/// Returns `true` if `iop` is the synthetic CRAC-ID event prepended to a
+/// CRAC receipt by `build_crac_receipt` / `build_failed_crac_receipt`.
+/// User-issued Michelson `EMIT` ops also reify as
+/// `InternalOperationSum::Event` but the kernel stamps the synthetic
+/// event with the null implicit sender (`crate::NULL_PKH`, set by
+/// `build_crac_receipt`) on top of the canonical `"crac"` tag — both
+/// must match.  A Michelson contract cannot impersonate the null
+/// implicit sender, since user EMITs always carry the executing
+/// contract's originated (KT1) sender via `sender_account.contract()`.
+pub fn is_synthetic_crac_event(iop: &InternalOperationSum) -> bool {
+    use tezos_protocol::contract::Contract;
+    match iop {
+        InternalOperationSum::Event(e) => {
+            let sender_is_null = matches!(
+                &e.sender,
+                Contract::Implicit(pkh) if pkh.to_b58check() == crate::NULL_PKH
+            );
+            sender_is_null
+                && e.content
+                    .tag
+                    .as_ref()
+                    .is_some_and(|t| t.as_str() == SYNTHETIC_CRAC_EVENT_TAG)
+        }
+        _ => false,
+    }
+}
+
 /// Drain re-entrant CRAC receipts that accumulated since `watermark`.
 ///
 /// After each internal operation that may have triggered a cross-runtime
 /// call (e.g. a gateway call that re-entered Michelson), this function
 /// drains the CRAC receipts that were pushed since the watermark and
-/// collects their non-Event internal operation results, preserving
-/// execution order (RFC Example 8).
+/// splices their internal operation results into the parent op's flat
+/// list, preserving execution order (RFC Example 8).
+///
+/// Synthetic CRAC-ID events are dropped (only the outermost CRAC carries
+/// one per RFC principle 6); user-issued `EMIT` ops are preserved.
 pub(crate) fn drain_reentrant_crac_ops(
     journal: &mut TezosXJournal,
     watermark: usize,
@@ -478,7 +514,7 @@ pub(crate) fn drain_reentrant_crac_ops(
                     result
                         .internal_operation_results
                         .into_iter()
-                        .filter(|iop| !matches!(iop, InternalOperationSum::Event(_))),
+                        .filter(|iop| !is_synthetic_crac_event(iop)),
                 );
             }
         }
