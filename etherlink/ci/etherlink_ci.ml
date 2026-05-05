@@ -199,7 +199,7 @@ let job_test_kernel =
     ~__POS__
     ~stage:Test
     ~description:"Check and test the etherlink kernel."
-    ~image:Images.Base_images.rust_toolchain_trixie
+    ~image:Images.Base_images.debian_rust_trixie
     ~only_if_changed:Files.(kernel @ sdks @ mir)
     ~needs:[(Job, Tezos_ci_jobs.Kernels.job_build_kernels)]
     ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
@@ -213,7 +213,7 @@ let job_test_evm_compatibility =
     ~__POS__
     ~stage:Test
     ~description:"Check and test EVM compatibility."
-    ~image:Images.Base_images.rust_toolchain_trixie
+    ~image:Images.Base_images.debian_rust_trixie
     ~only_if_changed:Files.evm_compatibility
     ~needs:[(Job, Tezos_ci_jobs.Kernels.job_build_kernels)]
     ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
@@ -234,7 +234,7 @@ let job_test_revm_compatibility =
     ~__POS__
     ~stage:Test
     ~description:"Check and test REVM compatibility."
-    ~image:Images.Base_images.rust_toolchain_trixie
+    ~image:Images.Base_images.debian_rust_trixie
     ~only_if_changed:Files.revm_compatibility
     ~needs:[(Job, Tezos_ci_jobs.Kernels.job_build_kernels)]
     ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]

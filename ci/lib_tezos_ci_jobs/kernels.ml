@@ -40,7 +40,7 @@ let job_check_riscv_kernels =
     ~stage:Test
     ~description:"Run 'make check' in 'src/riscv' and 'src/lib_riscv/kernels'."
     ~only_if_changed:Files.kernels
-    ~image:Tezos_ci.Images.Base_images.rust_toolchain_trixie
+    ~image:Tezos_ci.Images.Base_images.debian_rust_trixie
     [
       (* EXTRA_FLAGS ensure we don't need Ocaml installed in the check and test jobs. *)
       "make -C src/riscv CHECK_FLAGS= EXTRA_FLAGS='--no-default-features \
@@ -55,7 +55,7 @@ let job_audit_riscv_deps =
     ~stage:Test
     ~description:"Run 'make audit' in 'src/riscv' and 'src/lib_riscv/kernels'."
     ~only_if_changed:Files.kernels
-    ~image:Tezos_ci.Images.Base_images.rust_toolchain_trixie
+    ~image:Tezos_ci.Images.Base_images.debian_rust_trixie
     ["make -C src/riscv audit"; "make -C src/lib_riscv/kernels audit"]
 
 let job_test_kernels =
@@ -65,7 +65,7 @@ let job_test_kernels =
     ~stage:Test
     ~description:"Run 'make check' and 'make test' for kernels."
     ~only_if_changed:Files.test_kernels
-    ~image:Tezos_ci.Images.Base_images.rust_toolchain_trixie
+    ~image:Tezos_ci.Images.Base_images.debian_rust_trixie
     ["make -f kernels.mk check"; "make -f kernels.mk test"]
 
 let job_build_kernels =
@@ -75,7 +75,7 @@ let job_build_kernels =
     ~stage:Build
     ~description:"Build the kernels, including the Etherlink kernel."
     ~cpu:Very_high
-    ~image:Tezos_ci.Images.Base_images.rust_toolchain_trixie
+    ~image:Tezos_ci.Images.Base_images.debian_rust_trixie
     ~only_if_changed:
       [
         (* This job is used by other jobs such as [etherlink.test_kernels]

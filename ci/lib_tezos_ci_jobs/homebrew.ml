@@ -10,7 +10,7 @@ open Tezos_ci.Cache
 
 type homebrew_pipeline = Full | Release
 
-let image = Images.Base_images.homebrew
+let image = Images.Base_images.debian_homebrew_trixie
 
 let stage = Stages.build
 

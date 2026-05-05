@@ -1608,13 +1608,7 @@ module Images = struct
     let make_img distro version =
       Image.mk_external ~image_path:(sf "%s/%s-%s" path_prefix distro version)
 
-    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
-       May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
-       https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines
-
-       NB: some images may use a different commit hash. Do check for
-       each image specifically to be certain. *)
-    let common_version = "master-be43e621"
+    (* DEB packaging *)
 
     (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2491675993
        May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
@@ -1625,16 +1619,22 @@ module Images = struct
 
     let debian_trixie = make_img "debian:trixie" debian_version
 
-    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2439598666
-       after https://gitlab.com/tezos/tezos/-/merge_requests/21554 was merged *)
-    let debian_jsonnet_trixie =
-      make_img "debian-jsonnet:trixie" "master-d70f7d37"
-
     let ubuntu_22_04 = make_img "ubuntu:22.04" debian_version
 
     let ubuntu_24_04 = make_img "ubuntu:24.04" debian_version
 
-    let rpm_version = common_version
+    (* RPM packaging *)
+
+    (* Version created by
+       https://gitlab.com/tezos/tezos/-/pipelines/2412618967
+
+       NB: these images are currently not build in our regular
+       pipelines. If we build them again, we will need to build fresh
+       ones.
+
+       Pipelines of the commit.
+       https://gitlab.com/tezos/tezos/-/commit/d79172a8/pipelines *)
+    let rpm_version = "master-d79172a8"
 
     let rockylinux_9 = make_img "rockylinux:9" rpm_version
 
@@ -1644,21 +1644,37 @@ module Images = struct
 
     let fedora_42 = make_img "fedora:42" rpm_version
 
-    let homebrew_version = common_version
+    (* [debian-jsonnet-trixie] *)
+    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2439598666
+       after https://gitlab.com/tezos/tezos/-/merge_requests/21554 was merged *)
+    let debian_jsonnet_trixie =
+      make_img "debian-jsonnet:trixie" "master-d70f7d37"
 
-    let homebrew = make_img "debian-homebrew:trixie" homebrew_version
+    (* [debian-homebrew-trixie] *)
+    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
+       May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
+       https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines *)
+    let debian_homebrew_trixie =
+      make_img "debian-homebrew:trixie" "master-be43e621"
 
+    (* [debian-rust-trixie] *)
     (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2481391601
        which contains libclang for building rocksdb in CI.
 
        When the common_version is updated to a more recent commit this value can
        be reverted to [common_version] and this comment removed. *)
-    let rust_toolchain_version = "master-8afd610a"
 
-    let rust_toolchain_trixie =
-      make_img "debian-rust:trixie" rust_toolchain_version
+    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
+       May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
+       https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines *)
+    let debian_rust_trixie = make_img "debian-rust:trixie" "master-8afd610a"
 
-    let _ci_release_version = common_version
+    (* [ci-release] *)
+    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
+       May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
+       https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines *)
+    (* FIXME: currently not used. + make name consistent *)
+    let _ci_release_version = "master-be43e621"
 
     let ci_release =
       Image.mk_external
@@ -1688,10 +1704,7 @@ module Images = struct
           ^ Runner.Arch.show_uniform arch)
         ~ci_docker_hub:false
         ~variables:
-          [
-            ( "IMAGE",
-              Base_images.(Format.asprintf "%a" pp rust_toolchain_trixie) );
-          ]
+          [("IMAGE", Base_images.(Format.asprintf "%a" pp debian_rust_trixie))]
         ~artifacts:
           (artifacts
              ~reports:(reports ~dotenv:"rust_toolchain_image_tag.env" ())
