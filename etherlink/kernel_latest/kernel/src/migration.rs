@@ -932,6 +932,37 @@ where
 
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V54 => {
+            // Phase 3 of the durable storage reorganization: consolidate
+            // all feature flags under /base/feature_flags/.
+            //
+            // - Move the 5 flags at /evm/feature_flags/* (outside safe
+            //   storage) by moving the whole subtree.
+            // - Drop the 3 flags at /evm/world_state/feature_flags/
+            //   (enable_revm, enable_fast_withdrawal,
+            //   enable_fast_fa_withdrawal): none is read by
+            //   kernel_latest. revm and the fast-withdrawal code paths
+            //   became unconditional in pre-Farfadet kernels, so there
+            //   is no live data worth migrating.
+
+            // Move the /evm/feature_flags subtree wholesale.
+            allow_path_not_found(host.store_move(
+                &RefPath::assert_from(b"/evm/feature_flags"),
+                &RefPath::assert_from(b"/base/feature_flags"),
+            ))?;
+
+            // Drop dead flags rather than migrating them.
+            let legacy_drops: &[&[u8]] = &[
+                b"/evm/world_state/feature_flags/enable_revm",
+                b"/evm/world_state/feature_flags/enable_fast_withdrawal",
+                b"/evm/world_state/feature_flags/enable_fast_fa_withdrawal",
+            ];
+            for path in legacy_drops {
+                allow_path_not_found(host.store_delete(&RefPath::assert_from(path)))?;
+            }
+
+            Ok(MigrationStatus::Done)
+        }
         StorageVersion::V55 => {
             // L2-1296: clear the persisted balance of TEZOSX_CALLER_ADDRESS
             // (0x7e20580000000000000000000000000000000001) on networks that
@@ -980,36 +1011,70 @@ where
                 Ok(MigrationStatus::None)
             }
         }
-        StorageVersion::V54 => {
-            // Phase 3 of the durable storage reorganization: consolidate
-            // all feature flags under /base/feature_flags/.
+        StorageVersion::V56 => {
+            // NB:
+            // * Required for Previewnet, this migration will be a no-op
+            // on Mainnet.
+            // * Although the node does not key off the storage
+            // version, the kernel bump to V56 coincides with the
+            // `TezBlock` RLP layout switching to VERSION = 2 (see
+            // `tezos/src/block.rs`), which adds the `state_root`
+            // field. New blocks produced after this migration are
+            // encoded with the V2 layout.
+
+            // Phase 5 of the durable storage reorganization: unify all
+            // Tezos account state under /tez/tez_accounts/, with a flat
+            // layout (no intermediate `tezlink/` segment).
             //
-            // - Move the 5 flags at /evm/feature_flags/* (outside safe
-            //   storage) by moving the whole subtree.
-            // - Drop the 3 flags at /evm/world_state/feature_flags/
-            //   (enable_revm, enable_fast_withdrawal,
-            //   enable_fast_fa_withdrawal): none is read by
-            //   kernel_latest. revm and the fast-withdrawal code paths
-            //   became unconditional in pre-Farfadet kernels, so there
-            //   is no live data worth migrating.
+            // - Michelson contract state:
+            //     /tezlink/context/contracts/* -> /tez/tez_accounts/contracts/*
+            //     /tezlink/context/big_map/*   -> /tez/tez_accounts/big_map/*
+            // - TezosX projected accounts (info, aliases, native/ethereum):
+            //     /evm/world_state/eth_accounts/tezos/*
+            //                                  -> /tez/tez_accounts/tezosx/*
+            //
+            // SafeStorage root set changes from
+            //   [/evm/world_state, /tezlink, /tez/world_state]
+            // to
+            //   [/evm/world_state, /tez/world_state, /tez/tez_accounts]
+            // (see chains.rs::storage_root_paths). The /tezlink root is
+            // removed.
+            //
+            // The moves use store_move on the raw host (migration runs
+            // outside the SafeStorage wrapper), so crossing safe-root
+            // boundaries is fine. allow_path_not_found makes each step
+            // idempotent: on a network that never wrote at the legacy
+            // locations the moves are no-ops and the migration still
+            // completes. Only `contracts/` and `big_map/` ever lived
+            // under `/tezlink/context/` so moving those two children
+            // covers the whole subtree.
+            if crate::storage::enable_tezos_runtime(host) {
+                allow_path_not_found(host.store_move(
+                    &RefPath::assert_from(b"/tezlink/context/contracts"),
+                    &RefPath::assert_from(b"/tez/tez_accounts/contracts"),
+                ))?;
+                allow_path_not_found(host.store_move(
+                    &RefPath::assert_from(b"/tezlink/context/big_map"),
+                    &RefPath::assert_from(b"/tez/tez_accounts/big_map"),
+                ))?;
+                allow_path_not_found(host.store_move(
+                    &RefPath::assert_from(b"/evm/world_state/eth_accounts/tezos"),
+                    &RefPath::assert_from(b"/tez/tez_accounts/tezosx"),
+                ))?;
 
-            // Move the /evm/feature_flags subtree wholesale.
-            allow_path_not_found(host.store_move(
-                &RefPath::assert_from(b"/evm/feature_flags"),
-                &RefPath::assert_from(b"/base/feature_flags"),
-            ))?;
+                // /tezlink is no longer a SafeStorage root and has no active
+                // readers after the moves above. Drop the leftover subtree
+                // (including any bootstrap placeholder written at /tezlink
+                // by pre-Phase-5 kernels when /tezlink was a safe root) so
+                // we don't leak dead state.
+                allow_path_not_found(
+                    host.store_delete(&RefPath::assert_from(b"/tezlink")),
+                )?;
 
-            // Drop dead flags rather than migrating them.
-            let legacy_drops: &[&[u8]] = &[
-                b"/evm/world_state/feature_flags/enable_revm",
-                b"/evm/world_state/feature_flags/enable_fast_withdrawal",
-                b"/evm/world_state/feature_flags/enable_fast_fa_withdrawal",
-            ];
-            for path in legacy_drops {
-                allow_path_not_found(host.store_delete(&RefPath::assert_from(path)))?;
+                Ok(MigrationStatus::Done)
+            } else {
+                Ok(MigrationStatus::None)
             }
-
-            Ok(MigrationStatus::Done)
         }
     }
 }
