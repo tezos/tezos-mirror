@@ -626,8 +626,7 @@ where
                 .context
                 .implicit_from_public_key_hash(pkh)
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
-            // Allocated is not being used on purpose (see below the comment on the allocated_destination_contract field)
-            let _allocated = dest_account
+            let already_allocated = dest_account
                 .allocate(tc_ctx.host)
                 .map_err(|_| TransferError::FailedToAllocateDestination)?;
             let receipt = if skip_sender_debit {
@@ -640,11 +639,7 @@ where
                 transfer_tez(tc_ctx.host, sender_account, amount, &dest_account)?
             };
             Ok(TransferSuccess {
-                // This boolean is kept at false on purpose to maintain compatibility with TZKT.
-                // When transferring to a non-existent account, we need to allocate it (I/O to durable storage).
-                // This incurs a cost, and TZKT expects balance updates in the operation receipt representing this cost.
-                // So, as long as we don't have balance updates to represent this cost, we keep this boolean false.
-                allocated_destination_contract: false,
+                allocated_destination_contract: !already_allocated,
                 consumed_milligas: tc_ctx
                     .operation_gas
                     .get_and_reset_milligas_consumed()
@@ -3597,6 +3592,231 @@ mod tests {
             destination.storage(&host).unwrap(),
             initial_storage.encode().unwrap(),
             "destination storage must roll back to pre-op value",
+        );
+    }
+
+    #[test]
+    fn apply_transfer_to_unallocated_implicit_burns_slot() {
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+        let dest = bootstrap2();
+        // Source funded for: 15 fee + 30 transfer + 64_250 slot burn
+        // (ORIGINATION_SIZE × COST_PER_BYTES) + 5 mutez change.
+        let source = init_account(&mut host, &src.pkh, 64_300);
+        reveal_account(&mut host, &src);
+        // Note: dest is NOT pre-allocated (no init_account call).
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            21010,
+            5,
+            src.clone(),
+            30_u64.into(),
+            Contract::Implicit(dest.pkh.clone()),
+            Parameters::default(),
+        );
+
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &MockRegistry,
+                &mut TezosXJournal::default(),
+                &context::TezlinkContext::init_context(),
+                OperationHash::default(),
+                operation.clone(),
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect("validate_and_apply_operation should not return a kernel error"),
+        );
+
+        let expected_receipts = vec![OperationWithMetadata {
+            content: operation.content[0].clone(),
+            receipt: OperationResultSum::Transfer(OperationResult {
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
+                        changes: -15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::BlockFees,
+                        changes: 15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                result: ContentResult::Applied(TransferTarget::ToContrat(
+                    TransferSuccess {
+                        storage: None,
+                        lazy_storage_diff: None,
+                        balance_updates: vec![
+                            // Transfer pair (source → dest implicit)
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Implicit(
+                                    src.pkh.clone(),
+                                )),
+                                changes: -30,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Implicit(
+                                    dest.pkh.clone(),
+                                )),
+                                changes: 30,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                            // Slot burn pair (ORIGINATION_SIZE × COST_PER_BYTES = 64_250)
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Implicit(
+                                    src.pkh.clone(),
+                                )),
+                                changes: -64_250,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                            BalanceUpdate {
+                                balance: Balance::StorageFees,
+                                changes: 64_250,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                        ],
+                        ticket_receipt: vec![],
+                        originated_contracts: vec![],
+                        consumed_milligas: 2_168_615_u64.into(),
+                        storage_size: 0_u64.into(),
+                        paid_storage_size_diff: 0_u64.into(),
+                        allocated_destination_contract: true,
+                        address_registry_diff: vec![],
+                    },
+                )),
+                internal_operation_results: vec![],
+            }),
+        }];
+
+        assert_eq!(receipts, expected_receipts);
+
+        let context = context::TezlinkContext::init_context();
+        let dest_account = context
+            .implicit_from_public_key_hash(&dest.pkh)
+            .expect("dest account");
+        assert_eq!(dest_account.balance(&host).unwrap(), 30_u64.into());
+        // Source: 64_300 - 15 fee - 30 transfer - 64_250 slot burn = 5.
+        assert_eq!(source.balance(&host).unwrap(), 5_u64.into());
+    }
+
+    #[test]
+    fn apply_transfer_to_unallocated_implicit_cannot_pay_slot() {
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+        let dest = bootstrap2();
+        // 50 mutez covers fee (15) + transfer (30) but NOT the slot
+        // burn (64_250).
+        let source = init_account(&mut host, &src.pkh, 50);
+        reveal_account(&mut host, &src);
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            21010,
+            5,
+            src.clone(),
+            30_u64.into(),
+            Contract::Implicit(dest.pkh.clone()),
+            Parameters::default(),
+        );
+
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &MockRegistry,
+                &mut TezosXJournal::default(),
+                &context::TezlinkContext::init_context(),
+                OperationHash::default(),
+                operation.clone(),
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect("validate_and_apply_operation should not return a kernel error"),
+        );
+
+        let expected_receipts = vec![OperationWithMetadata {
+            content: operation.content[0].clone(),
+            receipt: OperationResultSum::Transfer(OperationResult {
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
+                        changes: -15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::BlockFees,
+                        changes: 15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                result: ContentResult::BackTracked(BacktrackedResult {
+                    errors: Some(ApplyOperationErrors {
+                        errors: vec![ApplyOperationError::CannotPayStorageFee(
+                            BalanceTooLow {
+                                contract: Contract::Implicit(src.pkh.clone()),
+                                // 50 - 15 fee - 30 transfer = 5
+                                balance: 5_u64.into(),
+                                // ORIGINATION_SIZE × COST_PER_BYTES
+                                amount: 64_250_u64.into(),
+                            },
+                        )],
+                    }),
+                    result: TransferTarget::ToContrat(TransferSuccess {
+                        storage: None,
+                        lazy_storage_diff: None,
+                        balance_updates: vec![
+                            // Transfer pair (source → fresh implicit dest).
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Implicit(
+                                    src.pkh.clone(),
+                                )),
+                                changes: -30,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Implicit(
+                                    dest.pkh.clone(),
+                                )),
+                                changes: 30,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                        ],
+                        ticket_receipt: vec![],
+                        originated_contracts: vec![],
+                        consumed_milligas: 2_168_615_u64.into(),
+                        storage_size: 0_u64.into(),
+                        paid_storage_size_diff: 0_u64.into(),
+                        allocated_destination_contract: true,
+                        address_registry_diff: vec![],
+                    }),
+                }),
+                internal_operation_results: vec![],
+            }),
+        }];
+
+        assert_eq!(receipts, expected_receipts);
+
+        // SafeStorage rolled back the allocation: the destination
+        // account is gone again, and the source paid only the fee.
+        assert_eq!(source.balance(&host).unwrap(), (50_u64 - 15).into());
+        let context = context::TezlinkContext::init_context();
+        let dest_account = context
+            .implicit_from_public_key_hash(&dest.pkh)
+            .expect("dest account");
+        assert!(
+            !dest_account.allocated(&host).unwrap(),
+            "implicit allocation must be rolled back"
         );
     }
 

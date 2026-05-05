@@ -147,8 +147,8 @@ fn burn_internals<Host: StorageV1>(
 }
 
 /// Charge the source for the storage allocated by a successful
-/// transfer to a contract. If the charging fails, the receipt is
-/// not modified.
+/// transfer to a contract, plus the contract slot when the
+/// transfer freshly allocates the destination.
 fn burn_for_transfer<Host: StorageV1>(
     host: &mut Host,
     payer: &impl TezlinkAccount,
@@ -156,6 +156,9 @@ fn burn_for_transfer<Host: StorageV1>(
 ) -> Result<Vec<BalanceUpdate>, ApplyOperationError> {
     let mut updates = burn_storage_fee(host, payer, &success.paid_storage_size_diff)?;
     updates.extend(success.balance_updates.iter().cloned());
+    if success.allocated_destination_contract {
+        updates.extend(burn_storage_fee(host, payer, &ORIGINATION_SIZE.into())?);
+    }
     Ok(updates)
 }
 
@@ -686,6 +689,222 @@ mod tests {
                     update_origin: UpdateOrigin::BlockApplication,
                 },
                 // Slot burn.
+                BalanceUpdate {
+                    balance: Balance::Account(payer.contract()),
+                    changes: -(SLOT_BURN as i64),
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+                BalanceUpdate {
+                    balance: Balance::StorageFees,
+                    changes: (SLOT_BURN as i64),
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+            ]
+        );
+    }
+
+    /// A Transfer that freshly allocated an implicit destination
+    /// (`allocated_destination_contract: true`) without storage
+    /// growth fires only the slot burn — variable burn short-circuits
+    /// on the zero `paid_storage_size_diff`.
+    #[test]
+    fn transfer_with_allocation_only_fires_slot_burn() {
+        let mut host = MockKernelHost::default();
+        let payer = init_payer(&mut host, 1_000_000);
+        let mut receipt = applied_transfer(TransferSuccess {
+            allocated_destination_contract: true,
+            ..Default::default()
+        });
+
+        burn_manager_storage_fees(&mut host, &payer, &mut receipt).unwrap();
+
+        assert_eq!(
+            payer.balance(&host).unwrap(),
+            (1_000_000 - SLOT_BURN).into()
+        );
+        let OperationResultSum::Transfer(op) = &receipt else {
+            panic!("expected Transfer receipt");
+        };
+        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &op.result
+        else {
+            panic!("expected Applied target");
+        };
+
+        assert_eq!(
+            success.balance_updates,
+            vec![
+                BalanceUpdate {
+                    balance: Balance::Account(payer.contract()),
+                    changes: -(SLOT_BURN as i64),
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+                BalanceUpdate {
+                    balance: Balance::StorageFees,
+                    changes: (SLOT_BURN as i64),
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+            ]
+        );
+    }
+
+    /// A Transfer that grew storage AND freshly allocated an
+    /// implicit destination fires both burns. Edge case — rare in
+    /// practice — but the burn pass must compose correctly.
+    #[test]
+    fn transfer_with_growth_and_allocation_fires_both_burns() {
+        let mut host = MockKernelHost::default();
+        let payer = init_payer(&mut host, 1_000_000);
+        let mut receipt = applied_transfer(TransferSuccess {
+            paid_storage_size_diff: 10_u64.into(),
+            allocated_destination_contract: true,
+            ..Default::default()
+        });
+
+        burn_manager_storage_fees(&mut host, &payer, &mut receipt).unwrap();
+
+        let variable = 10 * COST_PER_BYTES;
+        let total = variable + SLOT_BURN;
+        assert_eq!(payer.balance(&host).unwrap(), (1_000_000 - total).into());
+        let OperationResultSum::Transfer(op) = &receipt else {
+            panic!("expected Transfer receipt");
+        };
+        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &op.result
+        else {
+            panic!("expected Applied target");
+        };
+
+        assert_eq!(
+            success.balance_updates,
+            vec![
+                // Variable burn (paid_storage_size_diff = 10).
+                BalanceUpdate {
+                    balance: Balance::Account(payer.contract()),
+                    changes: -(variable as i64),
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+                BalanceUpdate {
+                    balance: Balance::StorageFees,
+                    changes: (variable as i64),
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+                // Slot burn (allocated_destination_contract = true).
+                BalanceUpdate {
+                    balance: Balance::Account(payer.contract()),
+                    changes: -(SLOT_BURN as i64),
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+                BalanceUpdate {
+                    balance: Balance::StorageFees,
+                    changes: (SLOT_BURN as i64),
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+            ]
+        );
+    }
+
+    /// Insolvent payer on the slot burn (after the variable burn
+    /// succeeded): the L1-shaped trace is returned and the success
+    /// body's `balance_updates` is left in its pre-burn state — no
+    /// half-applied burn pair survives in the receipt.
+    #[test]
+    fn transfer_insolvent_on_slot_burn_returns_cannot_pay() {
+        let mut host = MockKernelHost::default();
+        // Cover variable burn (10 × COST_PER_BYTES = 2_500) but not the slot burn.
+        // 3_000 - 2_500 = 500 remaining
+        let payer = init_payer(&mut host, 3_000);
+        let mut receipt = applied_transfer(TransferSuccess {
+            paid_storage_size_diff: 10_u64.into(),
+            allocated_destination_contract: true,
+            ..Default::default()
+        });
+
+        let err = burn_manager_storage_fees(&mut host, &payer, &mut receipt)
+            .expect_err("slot burn must fail when payer is insolvent");
+
+        assert_eq!(
+            err,
+            ApplyOperationError::CannotPayStorageFee(BalanceTooLow {
+                contract: payer.contract(),
+                balance: 500_u64.into(),
+                amount: SLOT_BURN.into(),
+            }),
+        );
+
+        let OperationResultSum::Transfer(op) = &receipt else {
+            panic!("expected Transfer receipt");
+        };
+        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &op.result
+        else {
+            panic!("expected Applied target");
+        };
+
+        assert!(
+            success.balance_updates.is_empty(),
+            "atomic-assignment: the variable burn pair must not land on \
+             the success body when the slot burn fails (got {:?})",
+            success.balance_updates
+        );
+    }
+
+    /// An `Applied` internal Transfer with
+    /// `allocated_destination_contract: true` fires its slot burn
+    /// against the same payer; the pair lands on the internal op's
+    /// success body.
+    #[test]
+    fn applied_internal_allocation_fires_slot_burn() {
+        let mut host = MockKernelHost::default();
+        let payer = init_payer(&mut host, 1_000_000);
+        let internal = InternalOperationSum::Transfer(InternalContentWithMetadata {
+            sender: payer.contract(),
+            nonce: 0,
+            content: TransferContent {
+                amount: 0_u64.into(),
+                destination: payer.contract(),
+                parameters: Parameters::default(),
+            },
+            result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+                allocated_destination_contract: true,
+                ..Default::default()
+            })),
+        });
+        let mut receipt = OperationResultSum::Transfer(OperationResult {
+            balance_updates: vec![],
+            result: ContentResult::Applied(TransferTarget::ToContrat(
+                TransferSuccess::default(),
+            )),
+            internal_operation_results: vec![internal],
+        });
+
+        burn_manager_storage_fees(&mut host, &payer, &mut receipt).unwrap();
+
+        assert_eq!(
+            payer.balance(&host).unwrap(),
+            (1_000_000 - SLOT_BURN).into()
+        );
+        let OperationResultSum::Transfer(op) = &receipt else {
+            panic!("expected Transfer receipt");
+        };
+        let ContentResult::Applied(TransferTarget::ToContrat(top_success)) = &op.result
+        else {
+            panic!("expected Applied top");
+        };
+        assert!(
+            top_success.balance_updates.is_empty(),
+            "top has no growth and no allocation, must not burn"
+        );
+
+        let InternalOperationSum::Transfer(inner) = &op.internal_operation_results[0]
+        else {
+            panic!("expected internal Transfer");
+        };
+        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &inner.result
+        else {
+            panic!("expected Applied internal target");
+        };
+
+        assert_eq!(
+            success.balance_updates,
+            vec![
                 BalanceUpdate {
                     balance: Balance::Account(payer.contract()),
                     changes: -(SLOT_BURN as i64),
