@@ -883,7 +883,7 @@ let register_plugin node_ctxt =
 
 let start configuration ctxt =
   let open Lwt_syntax in
-  let Configuration_file.{rpc_addr; _} = configuration in
+  let Configuration_file.{rpc_addr; rpc_acl_policy; _} = configuration in
   let dir = register ctxt (register_plugin ctxt) in
   let dir =
     Tezos_rpc.Directory.register_describe_directory_service
@@ -895,7 +895,12 @@ let start configuration ctxt =
   let host = Ipaddr.V6.to_string rpc_addr in
   let node = `TCP (`Port rpc_port) in
   let is_public = Ipaddr.V6.scope rpc_addr <> Ipaddr.Interface in
-  let acl = if is_public then dal_secure else RPC_server.Acl.allow_all in
+  let* acl_policy = RPC_server.Acl.resolve_domain_names rpc_acl_policy in
+  let acl =
+    match RPC_server.Acl.find_policy acl_policy (host, Some rpc_port) with
+    | Some custom -> custom
+    | None -> if is_public then dal_secure else RPC_server.Acl.allow_all
+  in
   let server =
     RPC_server.init_server dir ~acl ~media_types:Media_type.all_media_types
   in

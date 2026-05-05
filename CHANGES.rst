@@ -82,7 +82,9 @@ DAL node
   by default instead of ``0.0.0.0:10732``. Operators who need to expose the RPC
   interface publicly must explicitly pass ``--rpc-addr 0.0.0.0:10732``. When
   bound to a non-loopback address, a warning is emitted and a restrictive ACL is
-  applied (only safe/read-only endpoints are accessible).
+  applied (only safe/read-only endpoints are accessible). The ACL can be
+  overridden per-bind-address via the new ``acl`` field in ``config.json``,
+  using the same policy syntax as the L1 node's ``rpc.acl``.
 
 - Decoupled the storage lifetimes of slot payloads and shards. Shards are now
   always retained for a single, profile-independent period (about 150 levels);

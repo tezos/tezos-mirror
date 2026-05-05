@@ -3354,6 +3354,46 @@ let test_rpc_acl protocol _parameters _cryptobox node client _key =
   let* () = test_loopback "127.0.0.2" in
   unit
 
+let test_rpc_acl_override _protocol _parameters _cryptobox node client _key =
+  (* Verify that the [acl] field in [config.json] overrides the default
+     [dal_secure] policy. We inject a custom policy that allows everything on
+     the public bind, then assert PATCH /profiles — which would otherwise be
+     denied with 401 — succeeds. *)
+  let dal_node = Dal_node.create ~rpc_host:"0.0.0.0" ~node () in
+  let* () = Dal_node.init_config dal_node in
+  let config_path = Dal_node.Config_file.filename dal_node in
+  let port = Dal_node.rpc_port dal_node in
+  let acl_override =
+    JSON.parse
+      ~origin:"rpc_acl_override"
+      (Printf.sprintf {|[ { "address": "0.0.0.0:%d", "blacklist": [] } ]|} port)
+  in
+  let config = JSON.parse_file config_path in
+  let config = JSON.put ("acl", acl_override) config in
+  JSON.encode_to_file config_path config ;
+  let* () = Dal_node.run dal_node ~wait_ready:false in
+  let* () =
+    Lwt.join
+      [
+        Dal_node.wait_for dal_node "dal_plugin_resolved.v0" (fun _ -> Some ());
+        bake_for client;
+      ]
+  in
+  let* () = Dal_node.wait_for_ready dal_node in
+  let endpoint =
+    Endpoint.make
+      ~scheme:"http"
+      ~host:Constant.default_host
+      ~port:(Dal_node.rpc_port dal_node)
+      ()
+  in
+  let profile = Dal_RPC.Attester Constant.bootstrap1.public_key_hash in
+  let* resp =
+    Dal.RPC.Remote.call_raw endpoint @@ Dal_RPC.patch_profiles [profile]
+  in
+  RPC_core.check_string_response ~code:200 resp ;
+  Dal_node.terminate dal_node
+
 let test_default_rpc_addr_is_loopback ~__FILE__ () =
   Test.register
     ~__FILE__
@@ -3736,4 +3776,10 @@ let register ~__FILE__ ~protocols =
     ~uses:(fun _ -> [Constant.octez_dal_node])
     "DAL node RPC ACL: public bind blocks mutations, loopback allows all"
     test_rpc_acl
+    protocols ;
+  scenario_with_layer1_node
+    ~__FILE__
+    ~uses:(fun _ -> [Constant.octez_dal_node])
+    "DAL node RPC ACL: config override replaces default policy"
+    test_rpc_acl_override
     protocols

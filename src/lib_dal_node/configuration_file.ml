@@ -152,6 +152,7 @@ type t = {
   batching_configuration : batching_configuration;
   publish_slots_regularly : publish_slots_regularly option;
   profiling : Tezos_profiler.Profiler.profiling_config option;
+  rpc_acl_policy : Tezos_rpc_http_server.RPC_server.Acl.policy;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -233,6 +234,7 @@ let default =
     batching_configuration = default_batching_configuration;
     publish_slots_regularly = None;
     profiling = None;
+    rpc_acl_policy = Tezos_rpc_http_server.RPC_server.Acl.empty_policy;
   }
 
 let uri_encoding : Uri.t Data_encoding.t =
@@ -281,6 +283,7 @@ let encoding : t Data_encoding.t =
            batching_configuration;
            publish_slots_regularly;
            profiling;
+           rpc_acl_policy;
          }
        ->
       ( ( ( data_dir,
@@ -305,7 +308,8 @@ let encoding : t Data_encoding.t =
         ( banned_addrs,
           batching_configuration,
           publish_slots_regularly,
-          profiling ) ))
+          profiling,
+          rpc_acl_policy ) ))
     (fun ( ( ( data_dir,
                rpc_addr,
                listen_addr,
@@ -328,7 +332,8 @@ let encoding : t Data_encoding.t =
            ( banned_addrs,
              batching_configuration,
              publish_slots_regularly,
-             profiling ) )
+             profiling,
+             rpc_acl_policy ) )
        ->
       {
         data_dir;
@@ -356,6 +361,7 @@ let encoding : t Data_encoding.t =
         batching_configuration;
         publish_slots_regularly;
         profiling;
+        rpc_acl_policy;
       })
     (merge_objs
        (merge_objs
@@ -469,7 +475,7 @@ let encoding : t Data_encoding.t =
                    ~description:"Disable amplification"
                    bool
                    default.disable_amplification))))
-       (obj4
+       (obj5
           (dft
              "banned_addrs"
              ~description:
@@ -491,7 +497,15 @@ let encoding : t Data_encoding.t =
           (opt
              "profiling"
              ~description:"Configuration of profiling output"
-             Tezos_profiler.Profiler.profiling_config_encoding)))
+             Tezos_profiler.Profiler.profiling_config_encoding)
+          (dft
+             "acl"
+             ~description:
+               "A list of RPC ACL overrides per bind address. When an entry \
+                matches the configured rpc-addr, its ACL replaces the default \
+                dal_secure (public) / allow_all (loopback) policy."
+             Tezos_rpc_http_server.RPC_server.Acl.policy_encoding
+             default.rpc_acl_policy)))
 
 type error += DAL_node_unable_to_write_configuration_file of string
 
