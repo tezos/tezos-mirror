@@ -259,7 +259,7 @@ let bls_baker_test =
     Protocol.write_parameter_file
       ~overwrite_bootstrap_accounts:(Some (List.map (fun k -> (k, None)) keys))
       ~base:(Right (protocol, None))
-      [(["allow_tz4_delegate_enable"], `Bool true)]
+      []
   in
   let* _node, client =
     Client.init_with_node ~keys:(Constant.activator :: keys) `Client ()
@@ -701,8 +701,6 @@ let simple_attestation_aggregation ~abaab ~remote_mode protocol =
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
       ([
-         (["allow_tz4_delegate_enable"], `Bool true);
-         (["aggregate_attestation"], `Bool true);
          (* Diminish some constants to activate consensus keys faster *)
          (["blocks_per_cycle"], `Int 4);
          (["nonce_revelation_threshold"], `Int 1);
@@ -928,8 +926,6 @@ let attestations_aggregation_on_reproposal ~abaab ~remote_mode protocol =
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
       ([
-         (["allow_tz4_delegate_enable"], `Bool true);
-         (["aggregate_attestation"], `Bool true);
          (* Using custom consensus constants to be able to trigger reproposals *)
          (["consensus_committee_size"], `Int consensus_committee_size);
          (["consensus_threshold_size"], `Int 70);
@@ -1250,8 +1246,6 @@ let aggregated_operations_retrival_from_block_content ~abaab =
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
       ([
-         (["allow_tz4_delegate_enable"], `Bool true);
-         (["aggregate_attestation"], `Bool true);
          (* Diminish some constants to activate consensus keys faster *)
          (["blocks_per_cycle"], `Int 4);
          (["nonce_revelation_threshold"], `Int 1);
@@ -1480,8 +1474,6 @@ let test_reproposal_at_abaab_activation_level =
       ~overwrite_bootstrap_accounts
       ~base:(Right (protocol, None))
       ([
-         (["allow_tz4_delegate_enable"], `Bool true);
-         (["aggregate_attestation"], `Bool true);
          (* Using custom consensus constants to be able to trigger reproposals *)
          (["consensus_committee_size"], `Int consensus_committee_size);
          (["consensus_threshold_size"], `Int 70);
@@ -1838,8 +1830,6 @@ let test_abaab_with_small_baker =
       ~overwrite_bootstrap_accounts
       ~base:(Right (protocol, None))
       ([
-         (["allow_tz4_delegate_enable"], `Bool true);
-         (["aggregate_attestation"], `Bool true);
          (* We ask for all bakers to actually include their attestations *)
          (["consensus_committee_size"], `Int consensus_committee_size);
          (["consensus_threshold_size"], `Int consensus_committee_size);

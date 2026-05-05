@@ -158,8 +158,6 @@ val genesis :
   ?nonce_revelation_threshold:int32 ->
   ?dal:Constants.Parametric.dal ->
   ?adaptive_issuance:Constants.Parametric.adaptive_issuance ->
-  ?allow_tz4_delegate_enable:bool ->
-  ?aggregate_attestation:bool ->
   ?native_contracts_enable:bool ->
   ?tz5_account_enable:bool ->
   Parameters.bootstrap_account list ->
@@ -441,8 +439,6 @@ val prepare_initial_context_params :
   ?dal:Constants.Parametric.dal ->
   ?adaptive_issuance:Constants.Parametric.adaptive_issuance ->
   ?consensus_rights_delay:int ->
-  ?allow_tz4_delegate_enable:bool ->
-  ?aggregate_attestation:bool ->
   ?native_contracts_enable:bool ->
   ?tz5_account_enable:bool ->
   unit ->

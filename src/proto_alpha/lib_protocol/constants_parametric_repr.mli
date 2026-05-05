@@ -280,9 +280,6 @@ type t = {
   zk_rollup : zk_rollup;
   adaptive_issuance : adaptive_issuance;
   direct_ticket_spending_enable : bool;
-  (* attestation aggregation feature flag *)
-  aggregate_attestation : bool;
-  allow_tz4_delegate_enable : bool;
   (* Portion of tz4 bakers required to activate all bakers attest *)
   all_bakers_attest_activation_threshold : Ratio_repr.t;
   (* Native contracts feature flag *)

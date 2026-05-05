@@ -1297,8 +1297,6 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  zk_rollup = _;
                  adaptive_issuance = _;
                  direct_ticket_spending_enable;
-                 aggregate_attestation = _;
-                 allow_tz4_delegate_enable = _;
                  all_bakers_attest_activation_threshold;
                  native_contracts_enable;
                  swrr_new_baker_lottery_enable;
@@ -1354,8 +1352,6 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             zk_rollup;
             adaptive_issuance;
             direct_ticket_spending_enable;
-            aggregate_attestation = true;
-            allow_tz4_delegate_enable = true;
             all_bakers_attest_activation_threshold;
             native_contracts_enable;
             swrr_new_baker_lottery_enable;
@@ -1665,8 +1661,6 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             zk_rollup;
             adaptive_issuance;
             direct_ticket_spending_enable;
-            aggregate_attestation = true;
-            allow_tz4_delegate_enable = true;
             all_bakers_attest_activation_threshold;
             native_contracts_enable;
             swrr_new_baker_lottery_enable;

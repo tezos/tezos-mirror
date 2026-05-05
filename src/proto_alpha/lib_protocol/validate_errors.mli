@@ -84,7 +84,6 @@ module Consensus : sig
         conflict : operation_conflict;
       }
     | Missing_companion_key_for_bls_dal of Consensus_key.t
-    | Aggregate_disabled
     | Aggregate_in_mempool
     | Aggregate_not_implemented
     | Non_bls_key_in_aggregate

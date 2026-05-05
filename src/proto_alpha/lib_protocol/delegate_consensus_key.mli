@@ -36,8 +36,6 @@ type error +=
       (Cycle_repr.t * Operation_repr.consensus_key_kind)
   | Invalid_consensus_key_update_active of
       (Signature.Public_key_hash.t * Operation_repr.consensus_key_kind)
-  | Invalid_consensus_key_update_tz4 of
-      (Bls.Public_key.t * Operation_repr.consensus_key_kind)
   | Invalid_consensus_key_update_tz5 of
       (Mldsa44.Public_key.t * Operation_repr.consensus_key_kind)
   | Invalid_consensus_key_update_another_delegate of
@@ -71,10 +69,6 @@ val zero : t
 val pp : Format.formatter -> t -> unit
 
 val pkh : pk -> t
-
-(** [check_not_tz4 pk] checks that [pk] is not a BLS address. *)
-val check_not_tz4 :
-  Operation_repr.consensus_key_kind -> Signature.public_key -> unit tzresult
 
 (** [check_not_tz5 pk] checks that [pk] is not a ML-DSA-44 address. *)
 val check_not_tz5 :

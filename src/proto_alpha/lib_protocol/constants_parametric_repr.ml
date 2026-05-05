@@ -333,8 +333,6 @@ type t = {
   zk_rollup : zk_rollup;
   adaptive_issuance : adaptive_issuance;
   direct_ticket_spending_enable : bool;
-  aggregate_attestation : bool;
-  allow_tz4_delegate_enable : bool;
   all_bakers_attest_activation_threshold : Ratio_repr.t;
   native_contracts_enable : bool;
   swrr_new_baker_lottery_enable : bool;
@@ -649,8 +647,6 @@ let encoding =
                   ( (c.sc_rollup, c.zk_rollup),
                     ( c.adaptive_issuance,
                       ( c.direct_ticket_spending_enable,
-                        c.aggregate_attestation,
-                        c.allow_tz4_delegate_enable,
                         c.all_bakers_attest_activation_threshold,
                         c.native_contracts_enable,
                         c.swrr_new_baker_lottery_enable,
@@ -699,8 +695,6 @@ let encoding =
                      ( (sc_rollup, zk_rollup),
                        ( adaptive_issuance,
                          ( direct_ticket_spending_enable,
-                           aggregate_attestation,
-                           allow_tz4_delegate_enable,
                            all_bakers_attest_activation_threshold,
                            native_contracts_enable,
                            swrr_new_baker_lottery_enable,
@@ -752,8 +746,6 @@ let encoding =
         zk_rollup;
         adaptive_issuance;
         direct_ticket_spending_enable;
-        aggregate_attestation;
-        allow_tz4_delegate_enable;
         all_bakers_attest_activation_threshold;
         native_contracts_enable;
         swrr_new_baker_lottery_enable;
@@ -823,10 +815,8 @@ let encoding =
                          (merge_objs sc_rollup_encoding zk_rollup_encoding)
                          (merge_objs
                             adaptive_issuance_encoding
-                            (obj7
+                            (obj5
                                (req "direct_ticket_spending_enable" bool)
-                               (req "aggregate_attestation" bool)
-                               (req "allow_tz4_delegate_enable" bool)
                                (req
                                   "all_bakers_attest_activation_threshold"
                                   Ratio_repr.encoding)

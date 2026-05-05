@@ -128,8 +128,6 @@ let init_node_and_client ~protocol =
     [
       (["blocks_per_cycle"], `Int blocks_per_cycle);
       (["nonce_revelation_threshold"], `Int 2);
-      (["allow_tz4_delegate_enable"], `Bool true);
-      (["aggregate_attestation"], `Bool true);
     ]
     |> Protocol.parameters_with_custom_consensus_rights_delay
          ~protocol

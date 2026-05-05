@@ -680,7 +680,7 @@ module Consensus = struct
       match vi.mode with
       | Application _ | Partial_validation _ | Construction _ -> (
           match consensus_key.consensus_pk with
-          | Bls _ when Constants.aggregate_attestation vi.ctxt ->
+          | Bls _ ->
               (* A preattestation with a BLS signature must be included in a
                  Preattestations_aggregate, even if there is only one in the
                  block. *)
@@ -815,8 +815,7 @@ module Consensus = struct
     in
     let* dal_dependent_pk =
       match (consensus_key.Consensus_key.consensus_pk, dal_content) with
-      | Bls consensus_bls_pk, Some {attestations = dal_attestation}
-        when Constants.aggregate_attestation vi.ctxt -> (
+      | Bls consensus_bls_pk, Some {attestations = dal_attestation} -> (
           match consensus_key.companion_pk with
           | None ->
               tzfail
@@ -849,15 +848,13 @@ module Consensus = struct
                     (Signature.Bls dal_dependent_bls_pk
                       : Signature.Public_key.t)))
       | _ ->
-          (* When the feature flag is not set or the consensus key is
-             non-BLS, we use the old behavior: the signed content
-             (which includes the dal_content if any) is signed by the
-             consensus key alone.
+          (* When the consensus key is non-BLS, we use the old behavior: the
+             signed content (which includes the dal_content if any) is signed by
+             the consensus key alone.
 
-             When the dal_content is None (even with enabled feature
-             flag and BLS consensus key), it is represented by
-             [dal_dependent_pk = consensus_pk]. Notably, this allows a
-             BLS consensus key without any associated companion key to
+             When the dal_content is None (even with BLS consensus key), it is
+             represented by [dal_dependent_pk = consensus_pk]. Notably, this
+             allows a BLS consensus key without any associated companion key to
              still issue an attestation without DAL. *)
           return consensus_key.consensus_pk
     in
@@ -887,7 +884,7 @@ module Consensus = struct
               consensus_content.slot
           in
           match details.consensus_key.consensus_pk with
-          | Bls _ when Constants.aggregate_attestation vi.ctxt ->
+          | Bls _ ->
               (* An attestation with a BLS signature must be included in an
                  Attestations_aggregate, even if there is only one in the block.
               *)
@@ -1276,12 +1273,6 @@ module Consensus = struct
            propagated between mempools. *)
         tzfail Validate_errors.Consensus.Aggregate_in_mempool
     | Application _ | Partial_validation _ | Construction _ ->
-        let*? () =
-          (* Aggregates are currently under feature flag *)
-          error_unless
-            (Constants.aggregate_attestation info.ctxt)
-            Validate_errors.Consensus.Aggregate_disabled
-        in
         let*? consensus_info =
           Option.value_e
             ~error:(trace_of_error Consensus_operation_not_allowed)
@@ -1382,12 +1373,6 @@ module Consensus = struct
            should not be propagated between mempools. *)
         tzfail Validate_errors.Consensus.Aggregate_in_mempool
     | Application _ | Partial_validation _ | Construction _ ->
-        let*? () =
-          (* Attestations_aggregates are currently under feature flag *)
-          error_unless
-            (Constants.aggregate_attestation info.ctxt)
-            Validate_errors.Consensus.Aggregate_disabled
-        in
         let*? consensus_info =
           Option.value_e
             ~error:(trace_of_error Consensus_operation_not_allowed)
@@ -3216,67 +3201,52 @@ module Manager = struct
              {kind = Manager_pk; source; public_key})
     | (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _), None -> return_unit
 
-  let check_update_consensus_key vi remaining_gas source
+  let check_update_consensus_key _vi remaining_gas source
       (public_key : Signature.Public_key.t) proof
       (kind : Operation_repr.consensus_key_kind) =
     let open Result_syntax in
     let* () = Delegate.Consensus_key.check_not_tz5 kind public_key in
-    if Constants.allow_tz4_delegate_enable vi.ctxt then
-      match (public_key, proof, kind) with
-      | Bls _bls_public_key, None, kind ->
-          result_error
-            (Validate_errors.Manager.Missing_bls_proof
-               {
-                 kind = Operation_repr.consensus_to_public_key_kind kind;
-                 source;
-                 public_key;
-               })
-      | Bls bls_public_key, Some _, _kind ->
-          (* Gas budget reservation for the [pop_verify] performed at
-             apply time. See the comment in
-             {!check_bls_proof_for_manager_pk} above for rationale. *)
-          let gas_cost_for_sig_check =
-            let open Saturation_repr.Syntax in
-            let size = Bls.Public_key.size bls_public_key in
-            Operation_costs.serialization_cost size
-            + Michelson_v1_gas.Cost_of.Interpreter.check_signature_on_algo
-                Bls
-                size
-          in
-          let* (_ : Gas.Arith.fp) =
-            record_trace
-              Insufficient_gas_for_manager
-              (Gas.consume_from
-                 (Gas.Arith.fp remaining_gas)
-                 gas_cost_for_sig_check)
-          in
-          return_unit
-      | ( (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _),
-          _,
-          Operation_repr.Companion ) ->
-          result_error
-            (Validate_errors.Manager.Update_companion_key_not_tz4
-               {source; public_key})
-      | (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _), Some _proof, Consensus
-        ->
-          result_error
-            (Validate_errors.Manager.Unused_bls_proof
-               {kind = Consensus_pk; source; public_key})
-      | (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _), None, Consensus ->
-          return_unit
-    else
-      let* () = Delegate.Consensus_key.check_not_tz4 kind public_key in
-      match kind with
-      | Companion ->
-          result_error
-            (Validate_errors.Manager.Update_companion_key_not_tz4
-               {source; public_key})
-      | Consensus ->
-          if Option.is_some proof then
-            result_error
-              (Validate_errors.Manager.Unused_bls_proof
-                 {kind = Consensus_pk; source; public_key})
-          else return_unit
+    match (public_key, proof, kind) with
+    | Bls _bls_public_key, None, kind ->
+        result_error
+          (Validate_errors.Manager.Missing_bls_proof
+             {
+               kind = Operation_repr.consensus_to_public_key_kind kind;
+               source;
+               public_key;
+             })
+    | Bls bls_public_key, Some _, _kind ->
+        (* Gas budget reservation for the [pop_verify] performed at
+           apply time. See the comment in
+           {!check_bls_proof_for_manager_pk} above for rationale. *)
+        let gas_cost_for_sig_check =
+          let open Saturation_repr.Syntax in
+          let size = Bls.Public_key.size bls_public_key in
+          Operation_costs.serialization_cost size
+          + Michelson_v1_gas.Cost_of.Interpreter.check_signature_on_algo
+              Bls
+              size
+        in
+        let* (_ : Gas.Arith.fp) =
+          record_trace
+            Insufficient_gas_for_manager
+            (Gas.consume_from
+               (Gas.Arith.fp remaining_gas)
+               gas_cost_for_sig_check)
+        in
+        return_unit
+    | ( (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _),
+        _,
+        Operation_repr.Companion ) ->
+        result_error
+          (Validate_errors.Manager.Update_companion_key_not_tz4
+             {source; public_key})
+    | (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _), Some _proof, Consensus ->
+        result_error
+          (Validate_errors.Manager.Unused_bls_proof
+             {kind = Consensus_pk; source; public_key})
+    | (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _), None, Consensus ->
+        return_unit
 
   let validate_sc_rollup_refute ctxt source rollup opponent refutation =
     let open Lwt_result_syntax in
@@ -3347,8 +3317,7 @@ module Manager = struct
         return_unit
     | Delegation (Some pkh) ->
         let*? () = Delegate.check_not_tz5 pkh in
-        if Constants.allow_tz4_delegate_enable vi.ctxt then return_unit
-        else Delegate.check_not_tz4 pkh |> Lwt.return
+        return_unit
     | Update_consensus_key {public_key; proof; kind} ->
         check_update_consensus_key vi remaining_gas source public_key proof kind
         |> Lwt.return

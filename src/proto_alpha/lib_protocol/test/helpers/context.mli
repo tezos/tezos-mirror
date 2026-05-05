@@ -429,8 +429,6 @@ type 'accounts init :=
   ?nonce_revelation_threshold:int32 ->
   ?dal:Constants.Parametric.dal ->
   ?adaptive_issuance:Constants.Parametric.adaptive_issuance ->
-  ?allow_tz4_delegate_enable:bool ->
-  ?aggregate_attestation:bool ->
   ?native_contracts_enable:bool ->
   ?tz5_account_enable:bool ->
   unit ->

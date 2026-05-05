@@ -53,6 +53,11 @@ Protocol parameters
 - Added ``smart_rollup_canonical_rollup_address``, identifying the
   canonical rollup for the current chain. (MR :gl:`!21634`)
 
+- Removed ``allow_tz4_delegate_enable`` and ``aggregate_attestation`` from the
+  parametric constants. Both feature flags had been ``true`` since their
+  introduction (in protocols 022 and 023 respectively) and the conditional
+  logic they gated was dead code. (MR :gl:`!21007`)
+
 Bug Fixes
 ---------
 

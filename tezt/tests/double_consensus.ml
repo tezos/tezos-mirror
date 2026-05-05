@@ -537,8 +537,6 @@ let attestation_and_aggregation_wrong_payload_hash =
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
       (([
-          (["allow_tz4_delegate_enable"], `Bool true);
-          (["aggregate_attestation"], `Bool true);
           (* Diminish some constants to activate consensus keys faster *)
           (["blocks_per_cycle"], `Int 4);
           (["nonce_revelation_threshold"], `Int 1);
@@ -659,8 +657,6 @@ let double_aggregation_wrong_payload_hash =
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
       (([
-          (["allow_tz4_delegate_enable"], `Bool true);
-          (["aggregate_attestation"], `Bool true);
           (* Diminish some constants to activate consensus keys faster. *)
           (["blocks_per_cycle"], `Int 4);
           (["nonce_revelation_threshold"], `Int 1);

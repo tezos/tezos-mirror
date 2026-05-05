@@ -23,30 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error += (* `Permanent *) Forbidden_tz4_delegate of Bls.Public_key_hash.t
-
-let () =
-  register_error_kind
-    `Branch
-    ~id:"delegate.forbidden_tz4"
-    ~title:"Forbidden delegate"
-    ~description:"Delegates are forbidden to be tz4 (BLS) accounts."
-    ~pp:(fun ppf implicit ->
-      Format.fprintf
-        ppf
-        "The delegate %a is forbidden as it is a BLS public key hash."
-        Bls.Public_key_hash.pp
-        implicit)
-    Data_encoding.(obj1 (req "delegate" Bls.Public_key_hash.encoding))
-    (function Forbidden_tz4_delegate d -> Some d | _ -> None)
-    (fun d -> Forbidden_tz4_delegate d)
-
-let check_not_tz4 : Signature.Public_key_hash.t -> unit tzresult =
-  let open Result_syntax in
-  function
-  | Bls tz4 -> tzfail (Forbidden_tz4_delegate tz4)
-  | Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _ -> return_unit
-
 let find = Storage.Contract.Delegate.find
 
 type delegate_status =

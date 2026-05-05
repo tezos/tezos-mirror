@@ -208,11 +208,9 @@ let test_drain_empty_delegate ~exclude_ck () =
         "Drain delegate without enough balance for allocation burn or drain \
          fees")
 
-let test_tz4_consensus_key ~allow_tz4_delegate_enable () =
+let test_tz4_consensus_key () =
   let open Lwt_result_syntax in
-  let* genesis, contract =
-    Context.init_with_constants1 {constants with allow_tz4_delegate_enable}
-  in
+  let* genesis, contract = Context.init_with_constants1 constants in
   let account1_pkh = Context.Contract.pkh contract in
   let consensus_account = Account.new_account ~algo:Bls () in
   let delegate = account1_pkh in
@@ -224,102 +222,78 @@ let test_tz4_consensus_key ~allow_tz4_delegate_enable () =
   let* operation =
     Op.update_consensus_key (B blk') (Contract.Implicit delegate) consensus_pk
   in
-  let tz4_pk = match consensus_pk with Bls pk -> pk | _ -> assert false in
   let* inc = Incremental.begin_construction blk' in
-  if allow_tz4_delegate_enable then
-    let expect_failure =
-      Error_helpers.expect_missing_bls_proof
-        ~loc:__LOC__
-        ~kind_pk:Consensus_pk
-        ~pk:consensus_pk
-        ~source_pkh:delegate
-    in
-    let* (_i : Incremental.t) =
-      Incremental.validate_operation ~expect_failure inc operation
-    in
-    let proof_signer = Account.new_account ~algo:Bls () in
-    let* operation_with_incorrect_proof =
-      Op.update_consensus_key
-        ~proof_signer:(Contract.Implicit proof_signer.pkh)
-        (B blk')
-        (Contract.Implicit delegate)
-        consensus_pk
-    in
-    let expect_apply_failure =
-      Error_helpers.expect_incorrect_bls_proof
-        ~loc:__LOC__
-        ~kind_pk:Consensus_pk
-        ~pk:consensus_pk
-    in
-    let* (_i : Incremental.t) =
-      Incremental.add_operation
-        ~expect_apply_failure
-        inc
-        operation_with_incorrect_proof
-    in
-    (* update_consensus_key with incorrect ciphersuite *)
-    let proof_incorrect_ciphersuite =
-      match (consensus_account.sk, consensus_account.pk) with
-      | Bls sk, Bls pk ->
-          let signature =
-            Signature.Bls.sign sk (Bls12_381_signature.MinPk.pk_to_bytes pk)
-          in
-          Some signature
-      | _ -> None
-    in
-    let* operation_with_incorrect_ciphersuite =
-      Op.update_consensus_key
-        ~forge_proof:proof_incorrect_ciphersuite
-        (B blk')
-        (Contract.Implicit delegate)
-        consensus_pk
-    in
-    let expect_apply_failure =
-      Error_helpers.expect_incorrect_bls_proof
-        ~loc:__LOC__
-        ~kind_pk:Consensus_pk
-        ~pk:consensus_pk
-    in
-    let* (_i : Incremental.t) =
-      Incremental.add_operation
-        ~expect_apply_failure
-        inc
-        operation_with_incorrect_ciphersuite
-    in
-
-    (* update_consensus_key with correct proof *)
-    let* operation_with_correct_proof =
-      Op.update_consensus_key
-        ~proof_signer:(Contract.Implicit consensus_account.pkh)
-        (B blk')
-        (Contract.Implicit delegate)
-        consensus_pk
-    in
-    let* (_i : Incremental.t) =
-      Incremental.add_operation inc operation_with_correct_proof
-    in
-    return_unit
-  else
-    let expect_failure = function
-      | [
-          Environment.Ecoproto_error
-            (Delegate_consensus_key.Invalid_consensus_key_update_tz4 (pk, kind));
-        ]
-        when Signature.Bls.Public_key.(pk = tz4_pk) && kind = Consensus ->
-          return_unit
-      | err ->
-          failwith
-            "Error trace:@,\
-            \ %a does not match the \
-             [Delegate_consensus_key.Invalid_consensus_key_update_tz4] error"
-            Error_monad.pp_print_trace
-            err
-    in
-    let* inc = Incremental.begin_construction blk' in
-    let* (_i : Incremental.t) =
-      Incremental.validate_operation ~expect_failure inc operation
-    in
-    return_unit
+  let expect_failure =
+    Error_helpers.expect_missing_bls_proof
+      ~loc:__LOC__
+      ~kind_pk:Consensus_pk
+      ~pk:consensus_pk
+      ~source_pkh:delegate
+  in
+  let* (_i : Incremental.t) =
+    Incremental.validate_operation ~expect_failure inc operation
+  in
+  let proof_signer = Account.new_account ~algo:Bls () in
+  let* operation_with_incorrect_proof =
+    Op.update_consensus_key
+      ~proof_signer:(Contract.Implicit proof_signer.pkh)
+      (B blk')
+      (Contract.Implicit delegate)
+      consensus_pk
+  in
+  let expect_apply_failure =
+    Error_helpers.expect_incorrect_bls_proof
+      ~loc:__LOC__
+      ~kind_pk:Consensus_pk
+      ~pk:consensus_pk
+  in
+  let* (_i : Incremental.t) =
+    Incremental.add_operation
+      ~expect_apply_failure
+      inc
+      operation_with_incorrect_proof
+  in
+  (* update_consensus_key with incorrect ciphersuite *)
+  let proof_incorrect_ciphersuite =
+    match (consensus_account.sk, consensus_account.pk) with
+    | Bls sk, Bls pk ->
+        let signature =
+          Signature.Bls.sign sk (Bls12_381_signature.MinPk.pk_to_bytes pk)
+        in
+        Some signature
+    | _ -> None
+  in
+  let* operation_with_incorrect_ciphersuite =
+    Op.update_consensus_key
+      ~forge_proof:proof_incorrect_ciphersuite
+      (B blk')
+      (Contract.Implicit delegate)
+      consensus_pk
+  in
+  let expect_apply_failure =
+    Error_helpers.expect_incorrect_bls_proof
+      ~loc:__LOC__
+      ~kind_pk:Consensus_pk
+      ~pk:consensus_pk
+  in
+  let* (_i : Incremental.t) =
+    Incremental.add_operation
+      ~expect_apply_failure
+      inc
+      operation_with_incorrect_ciphersuite
+  in
+  (* update_consensus_key with correct proof *)
+  let* operation_with_correct_proof =
+    Op.update_consensus_key
+      ~proof_signer:(Contract.Implicit consensus_account.pkh)
+      (B blk')
+      (Contract.Implicit delegate)
+      consensus_pk
+  in
+  let* (_i : Incremental.t) =
+    Incremental.add_operation inc operation_with_correct_proof
+  in
+  return_unit
 
 let test_tz5_consensus_key () =
   let open Lwt_result_syntax in
@@ -479,14 +453,7 @@ let tests =
         "empty drain delegate with ck"
         `Quick
         (test_drain_empty_delegate ~exclude_ck:false);
-      tztest
-        "tz4 consensus key (allow_tz4_delegate_enable:false)"
-        `Quick
-        (test_tz4_consensus_key ~allow_tz4_delegate_enable:false);
-      tztest
-        "tz4 consensus key (allow_tz4_delegate_enable:true)"
-        `Quick
-        (test_tz4_consensus_key ~allow_tz4_delegate_enable:true);
+      tztest "tz4 consensus key" `Quick test_tz4_consensus_key;
       tztest "tz5 consensus key" `Quick test_tz5_consensus_key;
       tztest
         "consensus key update with unused proof"

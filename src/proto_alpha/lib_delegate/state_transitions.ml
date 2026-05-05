@@ -560,11 +560,7 @@ let prepare_block_to_bake ~attestations ?last_proposal
           branch = predecessor.grandparent;
         }
       in
-      let aggregate_attestation_feature_flag =
-        state.global_state.constants.parametric.aggregate_attestation
-      in
       (Operation_pool.filter_with_relevant_consensus_ops
-         ~aggregate_attestation_feature_flag
          ~attestation_filter
          ~preattestation_filter:None
          current_mempool.consensus
@@ -672,12 +668,8 @@ let propose_block_action state delegate round ~last_proposal =
               branch = proposal.predecessor.shell.predecessor;
             }
         in
-        let aggregate_attestation_feature_flag =
-          state.global_state.constants.parametric.aggregate_attestation
-        in
         Operation_pool.(
           filter_with_relevant_consensus_ops
-            ~aggregate_attestation_feature_flag
             ~attestation_filter
             ~preattestation_filter
             all_consensus_operations

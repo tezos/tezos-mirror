@@ -229,16 +229,14 @@ module Operation = struct
 
   include Operation_repr
 
-  let check_signature (type kind) ctxt (key : Signature.Public_key.t) chain_id
+  let check_signature (type kind) _ctxt (key : Signature.Public_key.t) chain_id
       (op : kind operation) =
     let encoding =
-      if Constants.aggregate_attestation ctxt then
-        (* Operations signed by BLS keys use a dedicated serialization encoding,
-           which differs only for attestations and preattestations. *)
-        match key with
-        | Bls _ -> bls_mode_unsigned_encoding
-        | _ -> unsigned_encoding
-      else unsigned_encoding
+      (* Operations signed by BLS keys use a dedicated serialization encoding,
+         which differs only for attestations and preattestations. *)
+      match key with
+      | Bls _ -> bls_mode_unsigned_encoding
+      | _ -> unsigned_encoding
     in
     check_signature encoding key chain_id op
 end
@@ -662,8 +660,6 @@ module Delegate = struct
     Delegate_activation_storage.last_cycle_before_deactivation
 
   let prepare_stake_distribution = Stake_storage.prepare_stake_distribution
-
-  let check_not_tz4 = Contract_delegate_storage.check_not_tz4
 
   let check_not_tz5 = Delegate_storage.Contract.check_not_tz5
 

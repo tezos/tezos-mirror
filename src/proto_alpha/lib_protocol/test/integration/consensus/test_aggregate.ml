@@ -15,8 +15,7 @@
 open Protocol
 
 (* Init genesis with 8 accounts including at least 5 BLS *)
-let init_genesis_with_some_bls_accounts ?policy ?dal_enable
-    ?aggregate_attestation () =
+let init_genesis_with_some_bls_accounts ?policy ?dal_enable () =
   let open Lwt_result_syntax in
   let*? random_accounts = Account.generate_accounts 3 in
   let*? bls_accounts =
@@ -27,11 +26,7 @@ let init_genesis_with_some_bls_accounts ?policy ?dal_enable
     Account.make_bootstrap_accounts (random_accounts @ bls_accounts)
   in
   let* genesis =
-    Block.genesis
-      ?dal_enable
-      ?aggregate_attestation
-      ~consensus_threshold_size:0
-      bootstrap_accounts
+    Block.genesis ?dal_enable ~consensus_threshold_size:0 bootstrap_accounts
   in
   let* b = Block.bake ?policy genesis in
   return (genesis, b)
@@ -260,11 +255,9 @@ let check_attestations_aggregate_validation_and_application ~loc ~attesters
     ~predecessor:attested_block
     operation
 
-let test_aggregate_feature_flag_enabled () =
+let test_aggregate_basic () =
   let open Lwt_result_syntax in
-  let* _genesis, b1 =
-    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
-  in
+  let* _genesis, b1 = init_genesis_with_some_bls_accounts () in
   let* b2 = Block.bake b1 in
   let* attesters = Context.get_attesters_with_bls_key (B b2) in
   let* () =
@@ -279,36 +272,11 @@ let test_aggregate_feature_flag_enabled () =
     ~loc:__LOC__
     ~attesters
     ~attested_block:b2
-    ()
-
-let test_aggregate_feature_flag_disabled () =
-  let open Lwt_result_syntax in
-  let* _genesis, b1 =
-    init_genesis_with_some_bls_accounts ~aggregate_attestation:false ()
-  in
-  let* b2 = Block.bake b1 in
-  let* attesters = Context.get_attesters_with_bls_key (B b2) in
-  let* () =
-    check_preattestations_aggregate_validation_and_application
-      ~loc:__LOC__
-      ~attesters
-      ~preattested_block:b2
-      ~preattested_block_predecessor:b1
-      ~error:Error_helpers.aggregate_disabled
-      ()
-  in
-  check_attestations_aggregate_validation_and_application
-    ~loc:__LOC__
-    ~attesters
-    ~attested_block:b2
-    ~error:Error_helpers.aggregate_disabled
     ()
 
 let test_attestations_aggregate_with_a_single_delegate () =
   let open Lwt_result_syntax in
-  let* _genesis, attested_block =
-    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
-  in
+  let* _genesis, attested_block = init_genesis_with_some_bls_accounts () in
   let* attester = Context.get_attester_with_bls_key (B attested_block) in
   check_attestations_aggregate_validation_and_application
     ~loc:__LOC__
@@ -319,7 +287,7 @@ let test_attestations_aggregate_with_a_single_delegate () =
 let test_preattestations_aggregate_with_a_single_delegate () =
   let open Lwt_result_syntax in
   let* _genesis, preattested_block_predecessor =
-    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+    init_genesis_with_some_bls_accounts ()
   in
   let* preattested_block = Block.bake preattested_block_predecessor in
   let* attester = Context.get_attester_with_bls_key (B preattested_block) in
@@ -332,9 +300,7 @@ let test_preattestations_aggregate_with_a_single_delegate () =
 
 let test_attestations_aggregate_with_multiple_delegates () =
   let open Lwt_result_syntax in
-  let* _genesis, attested_block =
-    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
-  in
+  let* _genesis, attested_block = init_genesis_with_some_bls_accounts () in
   let* attesters = Context.get_attesters_with_bls_key (B attested_block) in
   check_attestations_aggregate_validation_and_application
     ~loc:__LOC__
@@ -345,7 +311,7 @@ let test_attestations_aggregate_with_multiple_delegates () =
 let test_preattestations_aggregate_with_multiple_delegates () =
   let open Lwt_result_syntax in
   let* _genesis, preattested_block_predecessor =
-    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+    init_genesis_with_some_bls_accounts ()
   in
   let* preattested_block = Block.bake preattested_block_predecessor in
   let* attesters = Context.get_attesters_with_bls_key (B preattested_block) in
@@ -362,7 +328,7 @@ let test_preattestations_aggregate_with_multiple_delegates () =
 let test_non_canonical_slot () =
   let open Lwt_result_syntax in
   let* _genesis, attested_block_predecessor =
-    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+    init_genesis_with_some_bls_accounts ()
   in
   let* attested_block = Block.bake attested_block_predecessor in
   let* attesters = Context.get_attesters_with_bls_key (B attested_block) in
@@ -415,7 +381,7 @@ let test_non_canonical_slot () =
 let test_not_owned_slot () =
   let open Lwt_result_syntax in
   let* _genesis, attested_block_predecessor =
-    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+    init_genesis_with_some_bls_accounts ()
   in
   let* attested_block = Block.bake attested_block_predecessor in
   let* attesters = Context.get_attesters_with_bls_key (B attested_block) in
@@ -470,7 +436,7 @@ let test_not_owned_slot () =
 let test_duplicate_slot () =
   let open Lwt_result_syntax in
   let* _genesis, attested_block_predecessor =
-    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+    init_genesis_with_some_bls_accounts ()
   in
   let* attested_block = Block.bake attested_block_predecessor in
   let* attesters = Context.get_attesters_with_bls_key (B attested_block) in
@@ -512,9 +478,7 @@ let test_duplicate_slot () =
 
 let test_attestations_aggregate_invalid_signature () =
   let open Lwt_result_syntax in
-  let* _genesis, block =
-    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
-  in
+  let* _genesis, block = init_genesis_with_some_bls_accounts () in
   let* op = Op.attestations_aggregate block in
   let op_with_signature_zero =
     Op.set_op_signature op (Some (Bls Signature.Bls.zero))
@@ -529,9 +493,7 @@ let test_attestations_aggregate_invalid_signature () =
 
 let test_preattestations_aggregate_invalid_signature () =
   let open Lwt_result_syntax in
-  let* _genesis, block =
-    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
-  in
+  let* _genesis, block = init_genesis_with_some_bls_accounts () in
   let* block' = Block.bake block in
   let* op = Op.preattestations_aggregate block' in
   let op_with_signature_zero =
@@ -550,9 +512,7 @@ let test_preattestations_aggregate_invalid_signature () =
 
 let test_preattestations_aggregate_non_bls_delegate () =
   let open Lwt_result_syntax in
-  let* _genesis, block =
-    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
-  in
+  let* _genesis, block = init_genesis_with_some_bls_accounts () in
   let* block' = Block.bake block in
   (* Find an attester with a non-BLS consensus key. *)
   let* attesting_slot =
@@ -595,9 +555,7 @@ let test_preattestations_aggregate_non_bls_delegate () =
 
 let test_attestations_aggregate_non_bls_delegate () =
   let open Lwt_result_syntax in
-  let* _genesis, block =
-    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
-  in
+  let* _genesis, block = init_genesis_with_some_bls_accounts () in
   (* Find an attester with a non-BLS consensus key. *)
   let* attesting_slot =
     Op.get_attesting_slot_with_non_bls_key ~attested_block:block
@@ -638,9 +596,7 @@ let test_attestations_aggregate_non_bls_delegate () =
 
 let test_attestations_aggregate_dal_without_companion_key () =
   let open Lwt_result_syntax in
-  let* _genesis, attested_block =
-    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
-  in
+  let* _genesis, attested_block = init_genesis_with_some_bls_accounts () in
   let* attesting_slot = Op.get_attesting_slot_with_bls_key ~attested_block in
   List.iter_es
     (fun dal_content ->
@@ -660,9 +616,7 @@ let test_attestations_aggregate_dal_without_companion_key () =
 
 let test_multiple_aggregates_per_block_forbidden () =
   let open Lwt_result_syntax in
-  let* _genesis, block =
-    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
-  in
+  let* _genesis, block = init_genesis_with_some_bls_accounts () in
   (* Retrieve delegates with BLS keys that have at least one slot *)
   let* committee = Op.default_committee ~attested_block:block in
   (* Craft one attestations_aggregate per attester *)
@@ -710,9 +664,7 @@ let test_multiple_aggregates_per_block_forbidden () =
 
 let test_eligible_preattestation_must_be_aggregated () =
   let open Lwt_result_syntax in
-  let* _genesis, block =
-    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
-  in
+  let* _genesis, block = init_genesis_with_some_bls_accounts () in
   let* block' = Block.bake block in
   let* attesting_slot =
     Op.get_attesting_slot_with_bls_key ~attested_block:block'
@@ -740,9 +692,7 @@ let test_eligible_preattestation_must_be_aggregated () =
 
 let test_eligible_attestation_must_be_aggregated () =
   let open Lwt_result_syntax in
-  let* _genesis, block =
-    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
-  in
+  let* _genesis, block = init_genesis_with_some_bls_accounts () in
   let* attesting_slot =
     Op.get_attesting_slot_with_bls_key ~attested_block:block
   in
@@ -763,9 +713,7 @@ let test_eligible_attestation_must_be_aggregated () =
 
 let test_empty_committee () =
   let open Lwt_result_syntax in
-  let* _genesis, block =
-    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
-  in
+  let* _genesis, block = init_genesis_with_some_bls_accounts () in
   (* Crafting an attestations_aggregate with an empty committee *)
   let* consensus_content =
     let* attestation = Op.raw_attestation block in
@@ -824,9 +772,7 @@ let test_empty_committee () =
 
 let test_metadata_committee_is_correctly_ordered () =
   let open Lwt_result_syntax in
-  let* _genesis, block =
-    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
-  in
+  let* _genesis, block = init_genesis_with_some_bls_accounts () in
   (* Craft an attestations_aggregate including at least 3 delegates *)
   let* attestations, attestation_committee =
     let* committee = Op.default_committee ~attested_block:block in
@@ -954,7 +900,7 @@ let test_preattestation_signature_for_attestation ~attested_block
 
 let test_preattestation_signature_for_attestation_non_bls () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init_n 5 ~aggregate_attestation:true () in
+  let* genesis, _contracts = Context.init_n 5 () in
   let* attested_block = Block.bake genesis in
   let* attesting_slot =
     Op.get_attesting_slot_with_non_bls_key ~attested_block
@@ -963,17 +909,13 @@ let test_preattestation_signature_for_attestation_non_bls () =
 
 let test_preattestation_signature_for_attestation_bls () =
   let open Lwt_result_syntax in
-  let* _genesis, attested_block =
-    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
-  in
+  let* _genesis, attested_block = init_genesis_with_some_bls_accounts () in
   let* attesting_slot = Op.get_attesting_slot_with_bls_key ~attested_block in
   test_preattestation_signature_for_attestation ~attesting_slot ~attested_block
 
 let test_signature_bls_attestation_with_different_slot () =
   let open Lwt_result_wrap_syntax in
-  let* _genesis, block =
-    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
-  in
+  let* _genesis, block = init_genesis_with_some_bls_accounts () in
   let* attester = Context.get_attester_with_bls_key (B block) in
   let consensus_pkh = attester.consensus_key in
   let* csts = Context.get_constants (B block) in
@@ -1002,9 +944,7 @@ let test_signature_bls_attestation_with_different_slot () =
 
 let test_signature_bls_attestation_with_different_level () =
   let open Lwt_result_syntax in
-  let* _genesis, attested_block =
-    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
-  in
+  let* _genesis, attested_block = init_genesis_with_some_bls_accounts () in
   let* attesting_slot = Op.get_attesting_slot_with_bls_key ~attested_block in
   let*? level1 = Context.get_level (B attested_block) in
   let level2 = Alpha_context.Raw_level.add level1 1 in
@@ -1024,14 +964,7 @@ let test_signature_bls_attestation_with_different_level () =
 
 let tests =
   [
-    Tztest.tztest
-      "test_aggregate_feature_flag_enabled"
-      `Quick
-      test_aggregate_feature_flag_enabled;
-    Tztest.tztest
-      "test_aggregate_feature_flag_disabled"
-      `Quick
-      test_aggregate_feature_flag_disabled;
+    Tztest.tztest "test_aggregate_basic" `Quick test_aggregate_basic;
     Tztest.tztest
       "test_preattestations_aggregate_with_a_single_delegate"
       `Quick

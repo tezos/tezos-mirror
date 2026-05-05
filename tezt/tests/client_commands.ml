@@ -483,36 +483,6 @@ module Transfer = struct
     in
     Lwt_list.iter_s test_batch_transfer accounts
 
-  let forbidden_set_delegate_tz4 =
-    Protocol.register_test
-      ~__FILE__
-      ~title:"Set delegate forbidden on tz4"
-      ~tags:[team; "client"; "set_delegate"; "bls"; "tz4"]
-    @@ fun protocol ->
-    let* parameter_file =
-      Protocol.write_parameter_file
-        ~base:(Right (protocol, None))
-        [(["allow_tz4_delegate_enable"], `Bool false)]
-    in
-    let* _node, client =
-      Client.init_with_protocol `Client ~parameter_file ~protocol ()
-    in
-    let* () =
-      let Account.{alias; secret_key; _} = Constant.tz4_account in
-      Client.import_secret_key client ~alias secret_key
-    in
-    let* () = airdrop_and_reveal client [Constant.tz4_account] in
-    let set_delegate_process =
-      Client.spawn_set_delegate
-        client
-        ~src:Constant.tz4_account.public_key_hash
-        ~delegate:Constant.tz4_account.public_key_hash
-    in
-    let msg =
-      rex "The delegate tz4.*\\w is forbidden as it is a BLS public key hash"
-    in
-    Process.check_error set_delegate_process ~exit_code:1 ~msg
-
   let allowed_set_delegate_tz4 =
     Protocol.register_test
       ~__FILE__
@@ -520,14 +490,7 @@ module Transfer = struct
       ~tags:[team; "client"; "set_delegate"; "bls"; "tz4"]
       ~supports:Protocol.(From_protocol 22)
     @@ fun protocol ->
-    let* parameter_file =
-      Protocol.write_parameter_file
-        ~base:(Right (protocol, None))
-        [(["allow_tz4_delegate_enable"], `Bool true)]
-    in
-    let* _node, client =
-      Client.init_with_protocol `Client ~parameter_file ~protocol ()
-    in
+    let* _node, client = Client.init_with_protocol `Client ~protocol () in
     let* () =
       let Account.{alias; secret_key; _} = Constant.tz4_account in
       Client.import_secret_key client ~alias secret_key
@@ -860,7 +823,6 @@ module Transfer = struct
     alias_pkh_source protocols ;
     transfer_tz4 protocols ;
     batch_transfers_tz4 protocols ;
-    forbidden_set_delegate_tz4 protocols ;
     allowed_set_delegate_tz4 protocols ;
     set_delegate_and_stake protocols ;
     set_delegate_and_stake_less_6000 protocols ;
