@@ -6131,9 +6131,11 @@ let test_crac_synthetic_event_present_when_applied_crac_reverted_out =
          the merged receipt — proves CRAC #2 reached its destination before \
          the FAILWITH. If this fails, the test scenario didn't fire as \
          designed.") ;
-  (* Sanity: NO transaction targeting C_ok survives — its applied
-     CRAC was rolled back by the EVM revert (revert_frame truncates
-     pending_crac_receipts). *)
+  (* Sanity: a transaction targeting C_ok must be present with status
+     [backtracked].  The applied CRAC #1 is preserved across EVM revert
+     (revert_frame migrates pending receipts to backtracked_crac_receipts
+     instead of truncating, per L2-1304) — its state effects roll back
+     but the receipt entries survive as a `backtracked` record. *)
   let to_c_ok =
     List.filter
       (fun iop ->
@@ -6142,12 +6144,228 @@ let test_crac_synthetic_event_present_when_applied_crac_reverted_out =
       internals
   in
   Check.(
-    (List.length to_c_ok = 0)
+    (List.length to_c_ok >= 1)
       int
       ~error_msg:
-        "Sanity check: expected no transaction targeting C_ok (its applied \
-         CRAC was rolled back by the EVM tx revert), got %L. If this fails, \
-         the test scenario didn't fire as designed.") ;
+        "Sanity check: expected at least one transaction targeting C_ok (CRAC \
+         #1's body, preserved across EVM revert as backtracked per L2-1304), \
+         got %L. If this fails, the test scenario didn't fire as designed.") ;
+  let c_ok_status =
+    JSON.(List.hd to_c_ok |-> "result" |-> "status" |> as_string)
+  in
+  Check.(
+    (c_ok_status = "backtracked")
+      string
+      ~error_msg:
+        "Expected CRAC #1's body to C_ok to have status %R (applied CRAC \
+         reverted by enclosing EVM tx revert is backtracked, not failed), got \
+         %L") ;
+  unit
+
+(** Regression test (L2-1304): when an applied CRAC is reverted out
+    of the same EVM transaction by an uncaught EVM revert, its
+    receipt body — top-level transfer plus internal ops — must
+    survive on the merged synthetic Michelson manager-op as
+    [backtracked] entries, not vanish entirely.
+
+    Pre-fix, [MichelsonJournal::revert_frame] in
+    [etherlink/kernel_latest/tezosx-journal/src/michelson_journal.rs]
+    called [pending_crac_receipts.truncate(...)] on the watermark,
+    deleting every applied CRAC pushed during the reverting frame.
+    [failed_crac_receipts] survived by design but [pending_crac_receipts]
+    didn't — asymmetric and at odds with L1 semantics where applied
+    internals reverted by a later failure appear as [backtracked]
+    rather than disappear.
+
+    Fix: drain pending receipts pushed since the watermark, walk each
+    one and transform every result (top-level + internal ops) to
+    [BackTracked] via the existing [transform_result_backtrack]
+    helpers, and migrate to [backtracked_crac_receipts] (a new list
+    with the same NOT-subject-to-revert invariant as the failed list).
+    [drain_pending_crac_receipts] in [kernel/src/apply.rs] was
+    extended to merge the new list and to force the merged top-level
+    to [Failed] when no currently-Applied CRAC contributed but a
+    Failed sibling did (tri-state reconciliation).
+
+    Same call tree as the L2-1302 test: the sibling failed CRAC
+    triggers an uncaught EVM revert that wipes the applied CRAC's
+    pending receipt.  Asserts that:
+      - The synthetic Mich manager-op carries CRAC #1's body to
+        C_ok with status [backtracked] (the L2-1304 fix).
+      - CRAC #1 includes a self-call to [_incrementWitness] (proves
+        the body is the full receipt, not a stub) — also backtracked.
+      - The synthetic [crac] event is itself backtracked (cohérent
+        with the merged top-level [failed] under L1 semantics: no
+        Applied internals under a Failed parent).
+      - CRAC #2's body to C_fail is still present with status
+        [failed] (already covered by L2-1302 but kept here for
+        scenario completeness).
+
+    L2-1304. *)
+let test_crac_applied_body_preserved_as_backtracked_on_evm_revert =
+  register_crac_runner_test
+    ~title:
+      "CRAC: applied CRAC's body survives as backtracked when EVM tx reverts"
+    ~tags:["crac_receipt"; "regression"; "backtracked"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "RCPT-CRAC-BT" in
+  (* C_ok = TezMultiRunCaller (revert=false, no callees): the body
+     contains the alias→C_ok top-level transfer plus C_ok's
+     internal _incrementWitness self-call. *)
+  let* c_ok = TezMultiRunCaller.originate () in
+  let (`Tez_runner (_, c_ok_kt1)) = c_ok in
+  let* c_fail = TezMultiRunCaller.originate ~revert:true () in
+  let (`Tez_runner (_, c_fail_kt1)) = c_fail in
+  let* evm_caller_ok = EvmCrossRuntimeRunnerTez.deploy_and_init c_ok in
+  let* evm_caller_fail = EvmCrossRuntimeRunnerTez.deploy_and_init c_fail in
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init
+      ~callees:[(evm_caller_ok, false); (evm_caller_fail, false)]
+      ()
+  in
+  let* _ = EvmRunner.call_run ~expected_status:false evm_main in
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  let op_list = JSON.(ops |> as_list) in
+  Check.(
+    (List.length op_list = 1)
+      int
+      ~error_msg:"Expected 1 manager operation, got %L") ;
+  let top = JSON.(ops |=> 0 |-> "contents" |=> 0) in
+  let top_status =
+    JSON.(top |-> "metadata" |-> "operation_result" |-> "status" |> as_string)
+  in
+  Log.info "%s: top-level status=%s" prefix top_status ;
+  Check.(
+    (top_status = "failed")
+      string
+      ~error_msg:
+        "Expected merged synthetic Mich manager-op top-level status %R (a \
+         Failed sibling participated, no currently-Applied CRAC remains so the \
+         new tri-state reconciliation forces Failed), got %L") ;
+  let internals =
+    JSON.(top |-> "metadata" |-> "internal_operation_results" |> as_list)
+  in
+  Log.info
+    "%s: %d internal op(s) on the synthetic CRAC tx receipt"
+    prefix
+    (List.length internals) ;
+  List.iteri
+    (fun i iop ->
+      Log.info
+        "%s:   [%d] kind=%s src=%s dst=%s ep=%s tag=%s status=%s"
+        prefix
+        i
+        JSON.(iop |-> "kind" |> as_string)
+        JSON.(
+          iop |-> "source" |> as_opt |> Option.fold ~none:"-" ~some:as_string)
+        JSON.(
+          iop |-> "destination" |> as_opt
+          |> Option.fold ~none:"-" ~some:as_string)
+        JSON.(
+          iop |-> "parameters" |-> "entrypoint" |> as_opt
+          |> Option.fold ~none:"-" ~some:as_string)
+        JSON.(iop |-> "tag" |> as_opt |> Option.fold ~none:"-" ~some:as_string)
+        JSON.(
+          iop |-> "result" |-> "status" |> as_opt
+          |> Option.fold ~none:"-" ~some:as_string))
+    internals ;
+  (* Primary assertion: CRAC #1's body to C_ok must be present with
+     status [backtracked].  Without the L2-1304 fix the entry is
+     absent entirely (revert_frame truncates pending_crac_receipts). *)
+  let to_c_ok =
+    List.filter
+      (fun iop ->
+        JSON.(iop |-> "kind" |> as_string) = "transaction"
+        && JSON.(iop |-> "destination" |> as_string) = c_ok_kt1)
+      internals
+  in
+  Check.(
+    (List.length to_c_ok >= 1)
+      int
+      ~error_msg:
+        "Expected at least one transaction targeting C_ok in the merged \
+         synthetic receipt, got %L. Without the L2-1304 fix, revert_frame \
+         truncates pending_crac_receipts on EVM revert and the entire \
+         applied-CRAC body — top-level transfer to C_ok plus C_ok's internal \
+         _incrementWitness — vanishes.  L1 semantics require these to appear \
+         as `backtracked` instead.") ;
+  List.iter
+    (fun iop ->
+      let status = JSON.(iop |-> "result" |-> "status" |> as_string) in
+      Check.(
+        (status = "backtracked")
+          string
+          ~error_msg:
+            "Expected CRAC #1 body entry to C_ok with status %R (applied CRAC \
+             reverted by enclosing EVM tx is backtracked, not failed), got %L"))
+    to_c_ok ;
+  (* Sanity: among the to-C_ok entries there must be a self-call
+     entrypoint (_incrementWitness) — proves we recovered the full
+     CRAC #1 body, not just the synthetic top-level transfer. *)
+  let c_ok_witness =
+    List.filter
+      (fun iop ->
+        JSON.(iop |-> "kind" |> as_string) = "transaction"
+        && JSON.(
+             iop |-> "source" |> as_opt |> Option.fold ~none:"" ~some:as_string)
+           = c_ok_kt1
+        && JSON.(iop |-> "destination" |> as_string) = c_ok_kt1)
+      internals
+  in
+  Check.(
+    (List.length c_ok_witness >= 1)
+      int
+      ~error_msg:
+        "Expected at least one C_ok→C_ok internal (the _incrementWitness \
+         self-call inside multi_run_caller.tz) preserved as backtracked, got \
+         %L. If this is missing while the alias→C_ok entry is present, the fix \
+         is recovering only the top-level and not the full body — investigate \
+         backtrack_receipt's walk over internal_operation_results.") ;
+  (* Synthetic crac event must be present and backtracked: its parent
+     CRAC #1 was reverted, so under L1 semantics (no Applied internals
+     under a Failed top-level) it cannot stay Applied. *)
+  let crac_events =
+    List.filter
+      (fun iop ->
+        JSON.(iop |-> "kind" |> as_string) = "event"
+        &&
+        match JSON.(iop |-> "tag" |> as_opt) with
+        | Some t -> JSON.as_string t = "crac"
+        | None -> false)
+      internals
+  in
+  Check.(
+    (List.length crac_events = 1)
+      int
+      ~error_msg:
+        "Expected exactly 1 synthetic crac event in the merged receipt, got %L \
+         (covered by L2-1302 already; check stack interaction)") ;
+  let crac_event_status =
+    JSON.(List.hd crac_events |-> "result" |-> "status" |> as_string)
+  in
+  Check.(
+    (crac_event_status = "backtracked")
+      string
+      ~error_msg:
+        "Expected the synthetic crac event to have status %R after \
+         backtracking the applied CRAC #1's body (L1: no Applied internals \
+         under a Failed top-level), got %L") ;
+  (* Sanity: CRAC #2's body to C_fail still present with status failed
+     (covered by L2-1302; kept for scenario completeness). *)
+  let to_c_fail =
+    List.filter
+      (fun iop ->
+        JSON.(iop |-> "kind" |> as_string) = "transaction"
+        && JSON.(iop |-> "destination" |> as_string) = c_fail_kt1)
+      internals
+  in
+  Check.(
+    (List.length to_c_fail >= 1)
+      int
+      ~error_msg:
+        "Sanity check: expected at least one transaction targeting C_fail (the \
+         surviving failed CRAC), got %L") ;
   unit
 
 (* Two EVM→TEZ CRACs from the SAME EVM transaction (RFC Example 5).
@@ -10032,6 +10250,7 @@ let () =
   test_crac_user_emit_in_reentrant_inner_crac [Alpha] ;
   test_crac_synthetic_event_survives_failed_inner_with_emit [Alpha] ;
   test_crac_synthetic_event_present_when_applied_crac_reverted_out [Alpha] ;
+  test_crac_applied_body_preserved_as_backtracked_on_evm_revert [Alpha] ;
   test_crac_receipt_two_independent [Alpha] ;
   test_crac_receipt_separate_tx_two_cracs [Alpha] ;
   test_crac_receipt_evm_tez_evm [Alpha] ;

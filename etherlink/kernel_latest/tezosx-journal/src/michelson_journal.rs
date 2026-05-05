@@ -7,7 +7,33 @@ use tezos_smart_rollup_host::{
     runtime::RuntimeError,
     storage::StorageV1,
 };
-use tezos_tezlink::block::AppliedOperation;
+use tezos_tezlink::{
+    block::AppliedOperation,
+    operation_result::{OperationDataAndMetadata, OperationResultSum},
+};
+
+/// Walk an `AppliedOperation` and transform every `Applied` result —
+/// top-level and every internal op — to `BackTracked`.  Used by
+/// `MichelsonJournal::revert_frame` when migrating receipts from the
+/// pending list to the backtracked list.
+///
+/// `Failed` and `Skipped` results are left untouched (the dedicated
+/// `transform_result_backtrack` helpers no-op on non-Applied
+/// variants).  Origination/Reveal top-levels are not produced by the
+/// CRAC receipt builder but are handled defensively in case the
+/// shape evolves.
+fn backtrack_receipt(receipt: &mut AppliedOperation) {
+    let OperationDataAndMetadata::OperationWithMetadata(ref mut batch) =
+        receipt.op_and_receipt;
+    for op in batch.operations.iter_mut() {
+        op.receipt.transform_result_backtrack();
+        if let OperationResultSum::Transfer(ref mut result) = op.receipt {
+            for iop in result.internal_operation_results.iter_mut() {
+                iop.transform_result_backtrack();
+            }
+        }
+    }
+}
 
 #[derive(Debug, PartialEq, Eq)]
 struct ExternalCheckpoint {
@@ -46,19 +72,34 @@ impl std::error::Error for SetFrameResultError {}
 pub struct MichelsonJournal {
     snapshots: Vec<OwnedPath>,
     external_checkpoints: Vec<ExternalCheckpoint>,
-    /// Successful CRAC receipts (EVM → Michelson).  Subject to revert:
-    /// truncated by `revert_frame` when the calling EVM frame reverts.
-    /// Each entry is `(seq, receipt)` where `seq` is a monotonic counter
-    /// shared with `failed_crac_receipts`, used to recover cross-list
-    /// execution order at drain time.
+    /// Currently-applied CRAC receipts (EVM → Michelson).  Subject to
+    /// revert: when the calling EVM frame reverts, `revert_frame`
+    /// drains the entries pushed during the frame, transforms every
+    /// status to `BackTracked`, and migrates them to
+    /// `backtracked_crac_receipts` so the receipt survives the merge
+    /// — matching L1 manager-op semantics where applied internals
+    /// reverted by a later failure appear as `backtracked` rather
+    /// than vanishing.
+    /// Each entry is `(seq, receipt)` where `seq` is a monotonic
+    /// counter shared with the failed and backtracked lists, used to
+    /// recover cross-list execution order at drain time.
     pub pending_crac_receipts: Vec<(u64, AppliedOperation)>,
     /// Failed CRAC receipts.  NOT subject to revert: a failed CRAC is
     /// recorded even when the EVM transaction reverts entirely, so that
     /// the Michelson block shows the attempt with `status: failed`.
     pub failed_crac_receipts: Vec<(u64, AppliedOperation)>,
+    /// Reverted-but-recorded CRAC receipts.  Receipts of CRACs that
+    /// were Applied at execution time but whose enclosing EVM frame
+    /// later reverted: state effects are still rolled back via the
+    /// snapshot mechanism, but the receipt is kept (every result
+    /// transformed to `BackTracked`) so the merged synthetic
+    /// Michelson manager-op records what was attempted.  Like
+    /// `failed_crac_receipts`, NOT subject to further revert: once
+    /// migrated here, a subsequent inner revert does not re-delete.
+    pub backtracked_crac_receipts: Vec<(u64, AppliedOperation)>,
     /// Monotonic counter assigned to each CRAC receipt at push time,
-    /// shared across pending and failed lists so that merging them
-    /// recovers execution order.
+    /// shared across pending, failed, and backtracked lists so that
+    /// merging them recovers execution order.
     next_receipt_seq: u64,
 }
 
@@ -176,9 +217,15 @@ impl MichelsonJournal {
 
     // Called by EVM journal on checkpoint revert.
     //
-    // Pops the current frame's watermark, reverts durable storage to the
-    // state captured at the start of this call frame, and drops any
-    // CRAC receipts pushed since the checkpoint.
+    // Pops the current frame's watermark, reverts durable storage to
+    // the state captured at the start of this call frame, and migrates
+    // applied CRAC receipts pushed during this frame to the
+    // backtracked list with every result transformed to `BackTracked`.
+    // The state effects of those CRACs are rolled back via the
+    // snapshot mechanism — the receipt is kept purely as an indexer
+    // record of what was attempted (matching L1 manager-op semantics
+    // where applied internals reverted by a later failure appear as
+    // `backtracked` rather than vanishing).
     pub fn revert_frame<Host>(
         &mut self,
         host: &mut Host,
@@ -195,9 +242,20 @@ impl MichelsonJournal {
                 receipt_count: 0,
                 frame_result: None,
             });
-        // Drop CRAC receipts pushed during this frame.
-        self.pending_crac_receipts
-            .truncate(checkpoint.receipt_count);
+        // Drain (not truncate) the CRAC receipts pushed during this
+        // frame, transform their statuses to `BackTracked`, and
+        // migrate them to the backtracked list.  Like
+        // `failed_crac_receipts`, the backtracked list is NOT subject
+        // to further revert: once migrated, a subsequent inner revert
+        // does not re-delete the entry.
+        let drained: Vec<(u64, AppliedOperation)> = self
+            .pending_crac_receipts
+            .drain(checkpoint.receipt_count..)
+            .collect();
+        for (seq, mut receipt) in drained {
+            backtrack_receipt(&mut receipt);
+            self.backtracked_crac_receipts.push((seq, receipt));
+        }
         if checkpoint.snapshot_watermark >= self.snapshots.len() {
             return Ok(());
         }
@@ -1059,15 +1117,17 @@ mod tests {
         mgr.operation.amount.0.clone().try_into().unwrap()
     }
 
-    // Revert drops CRAC receipts pushed during the reverted frame.
+    // Revert migrates CRAC receipts pushed during the reverted frame
+    // from `pending_crac_receipts` to `backtracked_crac_receipts`,
+    // preserving them as a record of what was attempted.
     //
     //   EVM(A) checkpoint → push receipt 0
     //     EVM(B) checkpoint → push receipt 1
-    //     B reverts → receipt 1 dropped
+    //     B reverts → receipt 1 migrated (pending=[0], backtracked=[1])
     //   push receipt 2
-    //   A commits → receipts = [0, 2]
+    //   A commits → receipts = [0, 2]; backtracked = [1]
     #[test]
-    fn test_revert_frame_drops_receipts() {
+    fn test_revert_frame_migrates_receipts_to_backtracked() {
         let mut host = MockHost::default();
         let world = world_path();
         let mut journal = MichelsonJournal::new();
@@ -1082,11 +1142,14 @@ mod tests {
         journal.push_external_checkpoint();
         journal.push_pending_crac_receipt(dummy_receipt(1));
         assert_eq!(journal.pending_crac_receipts.len(), 2);
+        assert_eq!(journal.backtracked_crac_receipts.len(), 0);
 
-        // B reverts — receipt 1 should be dropped, receipt 0 kept
+        // B reverts — receipt 1 migrated to backtracked, receipt 0 kept.
         journal.revert_frame(&mut host, &world).unwrap();
         assert_eq!(journal.pending_crac_receipts.len(), 1);
         assert_eq!(receipt_id(&journal.pending_crac_receipts[0].1), 0);
+        assert_eq!(journal.backtracked_crac_receipts.len(), 1);
+        assert_eq!(receipt_id(&journal.backtracked_crac_receipts[0].1), 1);
 
         // Push another receipt after revert
         journal.push_pending_crac_receipt(dummy_receipt(2));
@@ -1094,12 +1157,41 @@ mod tests {
         assert_eq!(receipt_id(&journal.pending_crac_receipts[0].1), 0);
         assert_eq!(receipt_id(&journal.pending_crac_receipts[1].1), 2);
 
-        // A commits — both receipts preserved
+        // A commits — pending receipts preserved; backtracked list is
+        // NOT subject to commit/revert so receipt 1 remains.
         journal.checkpoint_commit(&mut host, 0).unwrap();
         journal.commit_frame(&mut host).unwrap();
         assert_eq!(journal.pending_crac_receipts.len(), 2);
         assert_eq!(receipt_id(&journal.pending_crac_receipts[0].1), 0);
         assert_eq!(receipt_id(&journal.pending_crac_receipts[1].1), 2);
+        assert_eq!(journal.backtracked_crac_receipts.len(), 1);
+        assert_eq!(receipt_id(&journal.backtracked_crac_receipts[0].1), 1);
+    }
+
+    // A second inner revert after a frame already migrated its
+    // receipts must not re-touch the backtracked list (the invariant
+    // documented on `backtracked_crac_receipts`: "NOT subject to
+    // further revert").
+    #[test]
+    fn test_revert_frame_does_not_re_revert_backtracked() {
+        let mut host = MockHost::default();
+        let world = world_path();
+        let mut journal = MichelsonJournal::new();
+        write_data(&mut host, &world, b"v0");
+
+        // A checkpoint
+        journal.push_external_checkpoint();
+        let _idx_a = journal.checkpoint(&mut host, &world).unwrap();
+        // B checkpoint — push and revert: B's receipt migrates.
+        journal.push_external_checkpoint();
+        journal.push_pending_crac_receipt(dummy_receipt(7));
+        journal.revert_frame(&mut host, &world).unwrap();
+        assert_eq!(journal.backtracked_crac_receipts.len(), 1);
+
+        // A reverts as well: must not affect the already-migrated entry.
+        journal.revert_frame(&mut host, &world).unwrap();
+        assert_eq!(journal.backtracked_crac_receipts.len(), 1);
+        assert_eq!(receipt_id(&journal.backtracked_crac_receipts[0].1), 7);
     }
 
     // --- frame result slot ---

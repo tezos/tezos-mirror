@@ -43,6 +43,20 @@
   leaving only failed siblings on the receipt. Indexers correlating
   Michelson activity to the originating EVM transaction by CRAC-ID
   would otherwise lose entire transactions. (!21811)
+- Preserve applied CRAC receipts on the synthetic Michelson manager-op
+  when the enclosing EVM transaction reverts. Previously, an applied
+  CRAC's entire body — top-level transfer plus internal operations —
+  vanished from the receipt when a sibling CRAC failed and the EVM tx
+  reverted, breaking parity with L1 manager-op semantics where
+  applied internals reverted by a later failure appear as
+  `backtracked` rather than disappear. Receipts pushed during a
+  reverting frame are now drained, transformed in place to
+  `BackTracked`, and migrated to a new backtracked list that — like
+  the failed list — is not subject to further revert; their state
+  effects still roll back via the snapshot mechanism. The merged
+  top-level status reconciles to `failed` when at least one Failed
+  sibling participated, `applied` when any currently-applied CRAC
+  remains, and `backtracked` otherwise. (!21812)
 - Raise the Michelson runtime `hard_gas_limit_per_operation` and
   `hard_gas_limit_per_block` from 1,040,000 to 3,000,000 gas units (i.e.
   3,000,000,000 milligas) to match the EVM 30M-gas per-transaction cap.
