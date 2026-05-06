@@ -154,8 +154,6 @@ let job_release_page =
       [
         "eval $(opam env)";
         "./scripts/rollup_node/releases/publish_release_page.sh";
-        (* Prepare artifacts. *)
-        "cp /tmp/release_page*/index.md ./index.md";
       ]
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
 
