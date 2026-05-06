@@ -8,17 +8,39 @@
 
 ### RPCs changes
 
-- Include `injectTezlinkOperation` in the list of supported EVM
-  methods used by the RPC node. (!21785)
-- Add an optional block parameter to `tez_kernelVersion` and
-  `tez_kernelRootHash`. Omitting it preserves the previous behavior
-  (returns the value at the latest block). (!21786)
-
 ### Monitoring changes
 
 ### Command-line interface changes
 
 ### Execution changes
+
+### Storage changes
+
+### Documentation changes
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.58 (2026-05-06)
+
+This release mainly adds compatibility for the EVM node to the latest version
+of Tezos X Previewnet testnet. Operators running nodes for this network will
+have to upgrade their node to be able to apply latest blocks.
+
+This release will not apply any migration to the node’s store (version 24),
+meaning it is possible to downgrade to previous version).
+
+### RPCs changes
+
+- Include `injectTezlinkOperation` in the list of supported EVM
+  methods used by the RPC node. (!21785)
+- Add an optional block parameter to `tez_kernelVersion` and
+  `tez_kernelRootHash`. Omitting it preserves the previous behavior
+  (returns the value at the latest block). (!21786)
 
 ### Storage changes
 
@@ -31,15 +53,6 @@
   Decode `Tezos_block` V2 blocks: adds a `state_root : bytes` field
   (fixed 32 bytes). V1 legacy blocks are still decoded, with
   `state_root` zero-filled on upgrade. (!21716)
-
-### Documentation changes
-
-### Experimental features changes
-
-*No guarantees are provided regarding backward compatibility of experimental
-features. They can be modified or removed without any deprecation notices. If
-you start using them, you probably want to use `octez-evm-node check config
---config-file PATH` to assert your configuration file is still valid.*
 
 ## Version 0.57 (2026-04-27)
 
