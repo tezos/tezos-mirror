@@ -70,8 +70,19 @@ let inject_entrapment_evidences
        and type tb_slot = tb_slot) attestations slot_to_committee_pkh node_ctxt
     rpc_ctxt ~attested_level tb_slot_to_int =
   let open Lwt_result_syntax in
+  (* Use the predecessor's protocol parameters: attestations included at
+     [attested_level] refer to (and are encoded under) the protocol active at
+     [attested_level - 1]. The corresponding [Plugin] (passed by the caller)
+     is also for the predecessor; sourcing [proto_parameters] from the same
+     level keeps [number_of_slots] and [attestation_lags] in agreement with
+     [Plugin.is_baker_attested]. Mixing them lets a single-lag attestation
+     produced under the previous protocol match every entry in a multi-lag
+     [attestation_lags] list of the new protocol. *)
+  let predecessor_level = Int32.max 1l (Int32.pred attested_level) in
   let*? proto_parameters =
-    Node_context.get_proto_parameters node_ctxt ~level:(`Level attested_level)
+    Node_context.get_proto_parameters
+      node_ctxt
+      ~level:(`Level predecessor_level)
   in
   when_ proto_parameters.incentives_enable (fun () ->
       let store = Node_context.get_store node_ctxt in
@@ -84,84 +95,101 @@ let inject_entrapment_evidences
           let published_level =
             Int32.(sub attested_level (of_int attestation_lag))
           in
-          let traps = Store.Traps.find traps_store ~level:published_level in
-          match traps with
-          | [] -> return_unit
-          | traps ->
-              let attestation_map =
-                get_attestation_map
-                  attestations
-                  slot_to_committee_pkh
-                  tb_slot_to_int
-              in
-              let traps_to_inject =
-                filter_injectable_traps attestation_map traps
-                |>
-                (* We do not emit two denunciations for the same level, delegate
+          (* TODO: https://gitlab.com/tezos/tezos/-/work_items/8064
+             Skip published_levels in the migration drop window: the protocol
+             treats their attestations as ambiguous (an attestation_lag change
+             across the migration boundary makes the attested_level either
+             collide with another publication or fall outside any valid
+             attestation window), so we should not produce entrapment evidence
+             for them. The query is only meaningful at levels >= 1, where the
+             plugin lookup on which it relies is defined. *)
+          let*? skip_due_to_migration =
+            if Compare.Int32.(published_level >= 1l) then
+              Attestable_slots.published_just_before_migration
+                node_ctxt
+                ~published_level
+            else Result_syntax.return_false
+          in
+          if skip_due_to_migration then return_unit
+          else
+            let traps = Store.Traps.find traps_store ~level:published_level in
+            match traps with
+            | [] -> return_unit
+            | traps ->
+                let attestation_map =
+                  get_attestation_map
+                    attestations
+                    slot_to_committee_pkh
+                    tb_slot_to_int
+                in
+                let traps_to_inject =
+                  filter_injectable_traps attestation_map traps
+                  |>
+                  (* We do not emit two denunciations for the same level, delegate
                    and slot index, even if 2 shards assigned to this delegate
                    were traps. *)
-                List.sort_uniq
-                  (fun
-                    (delegate1, slot_index1, _, _, _, _, _)
-                    (delegate2, slot_index2, _, _, _, _, _)
-                  ->
-                    let deleg_comp =
-                      Signature.Public_key_hash.compare delegate1 delegate2
-                    in
-                    if deleg_comp = 0 then compare slot_index1 slot_index2
-                    else deleg_comp)
-              in
-              List.iter_es
-                (fun ( delegate,
-                       slot_index,
-                       attestation,
-                       dal_attestation,
-                       shard,
-                       shard_proof,
-                       tb_slot )
-                   ->
-                  if
-                    Plugin.is_baker_attested
-                      dal_attestation
-                      ~number_of_slots
-                      ~number_of_lags
-                      ~lag_index
-                      slot_index
-                  then
-                    let*! () =
-                      Event.emit_trap_injection
-                        ~delegate
-                        ~published_level
-                        ~attested_level
-                        ~shard_index:shard.Cryptobox.index
-                        ~slot_index
+                  List.sort_uniq
+                    (fun
+                      (delegate1, slot_index1, _, _, _, _, _)
+                      (delegate2, slot_index2, _, _, _, _, _)
+                    ->
+                      let deleg_comp =
+                        Signature.Public_key_hash.compare delegate1 delegate2
+                      in
+                      if deleg_comp = 0 then compare slot_index1 slot_index2
+                      else deleg_comp)
+                in
+                List.iter_es
+                  (fun ( delegate,
+                         slot_index,
+                         attestation,
+                         dal_attestation,
+                         shard,
+                         shard_proof,
+                         tb_slot )
+                     ->
+                    if
+                      Plugin.is_baker_attested
+                        dal_attestation
+                        ~number_of_slots
+                        ~number_of_lags
                         ~lag_index
-                    in
-                    let*! res =
-                      Plugin.inject_entrapment_evidence
-                        rpc_ctxt
-                        ~attested_level
-                        attestation
-                        ~slot_index
-                        ~lag_index
-                        ~shard
-                        ~proof:shard_proof
-                        ~tb_slot
-                    in
-                    match res with
-                    | Ok () -> return_unit
-                    | Error error ->
-                        let*! () =
-                          Event.emit_trap_injection_failure
-                            ~delegate
-                            ~published_level
-                            ~attested_level
-                            ~slot_index
-                            ~shard_index:shard.Cryptobox.index
-                            ~lag_index
-                            ~error
-                        in
-                        return_unit
-                  else return_unit)
-                traps_to_inject)
+                        slot_index
+                    then
+                      let*! () =
+                        Event.emit_trap_injection
+                          ~delegate
+                          ~published_level
+                          ~attested_level
+                          ~shard_index:shard.Cryptobox.index
+                          ~slot_index
+                          ~lag_index
+                      in
+                      let*! res =
+                        Plugin.inject_entrapment_evidence
+                          rpc_ctxt
+                          ~attested_level
+                          attestation
+                          ~slot_index
+                          ~lag_index
+                          ~shard
+                          ~proof:shard_proof
+                          ~tb_slot
+                      in
+                      match res with
+                      | Ok () -> return_unit
+                      | Error error ->
+                          let*! () =
+                            Event.emit_trap_injection_failure
+                              ~delegate
+                              ~published_level
+                              ~attested_level
+                              ~slot_index
+                              ~shard_index:shard.Cryptobox.index
+                              ~lag_index
+                              ~error
+                          in
+                          return_unit
+                    else return_unit)
+                  traps_to_inject)
         proto_parameters.attestation_lags)
