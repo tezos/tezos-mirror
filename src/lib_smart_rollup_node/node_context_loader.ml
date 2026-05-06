@@ -215,7 +215,7 @@ let close ({cctxt; store; context; l1_ctxt; finaliser; _} as node_ctxt) =
 
 module For_snapshots = struct
   let create_node_context cctxt current_protocol store context ~data_dir
-      ~apply_unsafe_patches =
+      ~apply_unsafe_patches ?dal_node_endpoint () =
     let open Lwt_result_syntax in
     let loser_mode = Loser_mode.no_failures in
     let l1_blocks_cache_size = Configuration.default_l1_blocks_cache_size in
@@ -256,7 +256,7 @@ module For_snapshots = struct
           unsafe_disable_wasm_kernel_checks = false;
           execute_outbox_messages_filter =
             Configuration.default_execute_outbox_filter;
-          dal_node_endpoint = None;
+          dal_node_endpoint;
           batcher = Configuration.default_batcher;
           injector = Configuration.default_injector;
           l1_blocks_cache_size;
@@ -312,12 +312,17 @@ module For_snapshots = struct
         metadata.rollup_address
         config.unsafe_pvm_patches
     in
+    let dal_cctxt =
+      Option.map
+        Tezos_dal_node_lib.Dal_node_client.make_unix_cctxt
+        dal_node_endpoint
+    in
     return
       {
         config;
         cctxt :> Client_context.full;
         degraded = Reference.new_ false;
-        dal_cctxt = None;
+        dal_cctxt;
         data_dir;
         l1_ctxt;
         genesis_info = metadata.genesis_info;

@@ -285,6 +285,7 @@ let compute_pvm_state_for_genenis cctxt dest (store : _ Store.t) context
       context
       ~data_dir:dest
       ~apply_unsafe_patches
+      ()
   in
   Interpreter.genesis_state (Both (Read_write, Read_write)) plugin node_context
 
@@ -559,7 +560,8 @@ let reconstruct_level_context ctxt ~predecessor (node_ctxt : _ Node_context.t)
   return (block, ctxt)
 
 let with_modify_data_dir cctxt ~data_dir ~apply_unsafe_patches
-    ?(skip_condition = fun _ _ ~head:_ -> Lwt_result.return false) f =
+    ?(skip_condition = fun _ _ ~head:_ -> Lwt_result.return false)
+    ?dal_node_endpoint f =
   let open Lwt_result_syntax in
   let store_dir = Configuration.default_storage_dir data_dir in
   let context_dir = Configuration.default_context_dir data_dir in
@@ -607,6 +609,8 @@ let with_modify_data_dir cctxt ~data_dir ~apply_unsafe_patches
       context
       ~data_dir
       ~apply_unsafe_patches
+      ?dal_node_endpoint
+      ()
   in
   let* () = f node_ctxt ~head in
   let*! () = Context.close context in
@@ -644,11 +648,31 @@ let reconstruct_context_from_first_available_level
   in
   reconstruct_chain_from first_block first_ctxt
 
-let maybe_reconstruct_context cctxt ~data_dir ~apply_unsafe_patches =
+let maybe_reconstruct_context cctxt ~data_dir ~apply_unsafe_patches
+    ?dal_node_endpoint () =
+  let skip_condition (store : _ Store.t) (context : _ Context.index) ~head:_ =
+    let is_in_context (block : Sc_rollup_block.t option) =
+      let open Lwt_syntax in
+      match block with
+      | None -> return_false
+      | Some block -> (
+          match block.header.context_hash with
+          | None -> return_false
+          | Some hash ->
+              let+ context = Context.checkout context hash in
+              Option.is_some context)
+    in
+    let open Lwt_result_syntax in
+    let* last_committed = Store.L2_blocks.find_last_committed store in
+    let*! last_committed_in_context = is_in_context last_committed in
+    return last_committed_in_context
+  in
   with_modify_data_dir
     cctxt
     ~data_dir
     ~apply_unsafe_patches
+    ~skip_condition
+    ?dal_node_endpoint
     reconstruct_context_from_first_available_level
 
 let post_checks ?(apply_unsafe_patches = false)
@@ -1085,8 +1109,8 @@ let correct_history_mode ~data_dir (snapshot_header : Header.t)
       let* store = Store.init Read_write ~data_dir in
       Store.State.History_mode.set store Full
 
-let import ~apply_unsafe_patches ~no_checks ~force ?level cctxt ~data_dir
-    ~snapshot_file =
+let import ~apply_unsafe_patches ~no_checks ~force ?dal_node_endpoint ?level
+    cctxt ~data_dir ~snapshot_file =
   let open Lwt_result_syntax in
   let* () = unless force (check_data_dir_unpopulated data_dir) in
   let*! () = Lwt_utils_unix.create_dir data_dir in
@@ -1116,7 +1140,14 @@ let import ~apply_unsafe_patches ~no_checks ~force ?level cctxt ~data_dir
   in
   List.iter rm Store.extra_sqlite_files ;
   let* () = check_store_version (Configuration.default_storage_dir data_dir) in
-  let* () = maybe_reconstruct_context cctxt ~data_dir ~apply_unsafe_patches in
+  let* () =
+    maybe_reconstruct_context
+      cctxt
+      ~data_dir
+      ~apply_unsafe_patches
+      ?dal_node_endpoint
+      ()
+  in
   let* () =
     correct_history_mode ~data_dir snapshot_header original_history_mode
   in

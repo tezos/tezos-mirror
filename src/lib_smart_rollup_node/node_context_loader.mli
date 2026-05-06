@@ -56,9 +56,11 @@ val close : _ t -> unit tzresult Lwt.t
 
 module For_snapshots : sig
   (** [create_node_context cctxt protocol store context ~data_dir
-      ~apply_unsafe_patches] creates a node context which does not monitor the
-      L1 chain but which can be used to reconstruct the context from historical
-      data. This function is used by the {!Snapshots} module. *)
+      ~apply_unsafe_patches ?dal_node_endpoint] creates a node context which
+      does not monitor the L1 chain but which can be used to reconstruct the
+      context from historical data. This function is used by the {!Snapshots}
+      module. If [dal_node_endpoint] is provided, the resulting node context
+      can fetch DAL pages during reconstruction. *)
   val create_node_context :
     #Client_context.full ->
     current_protocol ->
@@ -66,6 +68,8 @@ module For_snapshots : sig
     'context Context.index ->
     data_dir:string ->
     apply_unsafe_patches:bool ->
+    ?dal_node_endpoint:Uri.t ->
+    unit ->
     < store : 'store ; context : 'context > t tzresult Lwt.t
 end
 

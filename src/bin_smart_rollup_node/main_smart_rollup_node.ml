@@ -635,14 +635,20 @@ let import_snapshot =
   command
     ~group
     ~desc:"Import a snapshot file in a rollup node."
-    (args5
+    (args6
        data_dir_arg
        Cli.no_checks_arg
        Cli.import_force_switch
        Cli.apply_unsafe_patches_switch
-       Cli.import_level_arg)
+       Cli.import_level_arg
+       Cli.dal_node_endpoint_arg)
     (prefixes ["snapshot"; "import"] @@ Cli.snapshot_file_or_url_param @@ stop)
-    (fun (data_dir, no_checks, force, apply_unsafe_patches, level)
+    (fun ( data_dir,
+           no_checks,
+           force,
+           apply_unsafe_patches,
+           level,
+           dal_node_endpoint )
          snapshot_file
          cctxt
        ->
@@ -653,6 +659,7 @@ let import_snapshot =
           cctxt
           ~no_checks
           ~force
+          ?dal_node_endpoint
           ?level
           ~data_dir
           ~snapshot_file

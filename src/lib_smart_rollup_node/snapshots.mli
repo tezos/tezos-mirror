@@ -75,18 +75,21 @@ val export_compact :
   level:Cli.snapshot_level ->
   string tzresult Lwt.t
 
-(** [import ~apply_unsafe_patches ~no_checks ~force ?level cctxt ~data_dir
-    ~snapshot_file] imports the snapshot at path [snapshot_file] into
-    the data directory [data_dir]. If [no_checks] is [true], the
-    integrity of the imported data is not checked at the end. Import
-    will fail if [data_dir] is already populated unless [force] is set
+(** [import ~apply_unsafe_patches ~no_checks ~force ?dal_node_endpoint ?level
+    cctxt ~data_dir ~snapshot_file] imports the snapshot at path
+    [snapshot_file] into the data directory [data_dir]. If [no_checks] is
+    [true], the integrity of the imported data is not checked at the end.
+    Import will fail if [data_dir] is already populated unless [force] is set
     to [true]. if [apply_unsafe_patches] is [true] and there is
-    [unsafe_pvm_patches] in the configuration they will be applied. If
-    [level] is provided, the imported store is reset to this level. *)
+    [unsafe_pvm_patches] in the configuration they will be applied.  If
+    [dal_node_endpoint] is provided, it is used to fetch DAL pages when
+    reconstructing the context from a compact snapshot. If [level] is
+    provided, the imported store is reset to this level. *)
 val import :
   apply_unsafe_patches:bool ->
   no_checks:bool ->
   force:bool ->
+  ?dal_node_endpoint:Uri.t ->
   ?level:int32 ->
   #Client_context.full ->
   data_dir:string ->
@@ -100,12 +103,13 @@ val info :
   (Header.t * [`Compressed | `Uncompressed]) tzresult Lwt.t
 
 (** [with_modify_data_dir cctxt ~data_dir ~apply_unsafe_patches ?skip_condition
-    f] applies [f] in a read-write context that is created from [data-dir] (and
-    a potential existing configuration). The node context given to [f] does not
-    follow the L1 chain and [f] is only supposed to modify the data of the
-    rollup node. It is used internally by this module to reconstruct contexts
-    from a snapshot but can also be use by the {!Repair} module to apply fixes
-    off-line. *)
+    ?dal_node_endpoint f] applies [f] in a read-write context that is created
+    from [data-dir] (and a potential existing configuration). The node context
+    given to [f] does not follow the L1 chain and [f] is only supposed to
+    modify the data of the rollup node. If [dal_node_endpoint] is provided,
+    the node context can fetch DAL pages. It is used internally by this module
+    to reconstruct contexts from a snapshot but can also be use by the
+    {!Repair} module to apply fixes off-line. *)
 val with_modify_data_dir :
   #Client_context.full ->
   data_dir:string ->
@@ -115,5 +119,6 @@ val with_modify_data_dir :
     Context.rw_index ->
     head:Sc_rollup_block.t ->
     bool tzresult Lwt.t) ->
+  ?dal_node_endpoint:Uri.t ->
   (Node_context.rw -> head:Sc_rollup_block.t -> unit tzresult Lwt.t) ->
   unit tzresult Lwt.t
