@@ -83,7 +83,8 @@ let job_docker_build =
       ]
     ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
     ~description:(sf "Build EVM node docker image for %s." arch_string)
-    ["./scripts/ci/docker_initialize.sh"; "./scripts/ci/docker_release.sh"]
+    ~script:
+      ["./scripts/ci/docker_initialize.sh"; "./scripts/ci/docker_release.sh"]
 
 let job_build_evm_node_static =
   Cacio.parameterize @@ fun arch ->
@@ -127,11 +128,12 @@ let job_build_evm_node_static =
             ( "EXECUTABLE_FILES",
               "script-inputs/etherlink-experimental-executables" );
           ])
-    [
-      "./scripts/ci/take_ownership.sh";
-      "eval $(opam env)";
-      "./scripts/ci/build_static_binaries.sh";
-    ]
+    ~script:
+      [
+        "./scripts/ci/take_ownership.sh";
+        "eval $(opam env)";
+        "./scripts/ci/build_static_binaries.sh";
+      ]
 
 let job_lint_wasm_runtime =
   CI.job
@@ -143,12 +145,13 @@ let job_lint_wasm_runtime =
     ~only_if_changed:Files.lib_wasm_runtime_rust
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    [
-      "./scripts/ci/take_ownership.sh";
-      ". ./scripts/version.sh";
-      "eval $(opam env)";
-      "etherlink/lib_wasm_runtime/lint.sh";
-    ]
+    ~script:
+      [
+        "./scripts/ci/take_ownership.sh";
+        ". ./scripts/version.sh";
+        "eval $(opam env)";
+        "etherlink/lib_wasm_runtime/lint.sh";
+      ]
 
 let job_lint_solidity_artifacts =
   CI.job
@@ -162,14 +165,15 @@ let job_lint_solidity_artifacts =
         "etherlink/kernel_latest/revm/contracts/predeployed/*.sol";
         "etherlink/kernel_latest/revm/contracts/predeployed/*.bin";
       ]
-    [
-      "./scripts/ci/take_ownership.sh";
-      ". ./scripts/version.sh";
-      "make -C etherlink/kernel_latest/revm/contracts/predeployed bytecode";
-      "forge --version";
-      "git status";
-      "git diff-index --quiet HEAD --";
-    ]
+    ~script:
+      [
+        "./scripts/ci/take_ownership.sh";
+        ". ./scripts/version.sh";
+        "make -C etherlink/kernel_latest/revm/contracts/predeployed bytecode";
+        "forge --version";
+        "git status";
+        "git diff-index --quiet HEAD --";
+      ]
 
 let job_unit_tests =
   CI.job
@@ -191,7 +195,8 @@ let job_unit_tests =
     ~dune_cache:true
     ~variables:[("DUNE_ARGS", "-j 12")]
     ~retry:{max = 2; when_ = []}
-    [". ./scripts/version.sh"; "eval $(opam env)"; "make test-etherlink-unit"]
+    ~script:
+      [". ./scripts/version.sh"; "eval $(opam env)"; "make test-etherlink-unit"]
 
 let job_test_kernel =
   CI.job
@@ -205,7 +210,7 @@ let job_test_kernel =
     ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    ["make -f etherlink.mk check"; "make -f etherlink.mk test"]
+    ~script:["make -f etherlink.mk check"; "make -f etherlink.mk test"]
 
 let job_test_evm_compatibility =
   CI.job
@@ -219,14 +224,15 @@ let job_test_evm_compatibility =
     ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    [
-      "make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs \
-       evm-evaluation-assessor";
-      "git clone --depth 1 --branch v14.1@etherlink \
-       https://github.com/functori/tests ethereum_tests";
-      "./evm-evaluation-assessor --eth-tests ./ethereum_tests/ --resources \
-       ./etherlink/kernel_latest/evm_evaluation/resources/ -c";
-    ]
+    ~script:
+      [
+        "make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs \
+         evm-evaluation-assessor";
+        "git clone --depth 1 --branch v14.1@etherlink \
+         https://github.com/functori/tests ethereum_tests";
+        "./evm-evaluation-assessor --eth-tests ./ethereum_tests/ --resources \
+         ./etherlink/kernel_latest/evm_evaluation/resources/ -c";
+      ]
 
 let job_test_revm_compatibility =
   CI.job
@@ -240,13 +246,14 @@ let job_test_revm_compatibility =
     ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    [
-      "make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs \
-       revm-evaluation-assessor";
-      "git clone --depth 1 https://github.com/functori/evm-fixtures \
-       evm_fixtures";
-      "./revm-evaluation-assessor --test-cases ./evm_fixtures/";
-    ]
+    ~script:
+      [
+        "make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs \
+         revm-evaluation-assessor";
+        "git clone --depth 1 https://github.com/functori/evm-fixtures \
+         evm_fixtures";
+        "./revm-evaluation-assessor --test-cases ./evm_fixtures/";
+      ]
 
 let job_mir_unit =
   CI.job
@@ -257,7 +264,7 @@ let job_mir_unit =
     ~stage:Test
     ~only_if_changed:Files.mir
     ~cargo_cache:true
-    ["cargo test --manifest-path contrib/mir/Cargo.toml"]
+    ~script:["cargo test --manifest-path contrib/mir/Cargo.toml"]
 
 let job_mir_tzt =
   CI.job
@@ -268,10 +275,11 @@ let job_mir_tzt =
     ~stage:Test
     ~only_if_changed:Files.(mir @ tzt)
     ~cargo_cache:true
-    [
-      "cargo run --manifest-path contrib/mir/Cargo.toml --bin tzt_runner \
-       tzt_reference_test_suite/*.tzt";
-    ]
+    ~script:
+      [
+        "cargo run --manifest-path contrib/mir/Cargo.toml --bin tzt_runner \
+         tzt_reference_test_suite/*.tzt";
+      ]
 
 let job_build_tezt =
   CI.job
@@ -289,12 +297,13 @@ let job_build_tezt =
     ~dune_cache:true
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    [
-      "./scripts/ci/take_ownership.sh";
-      ". ./scripts/version.sh";
-      "eval $(opam env)";
-      "scripts/ci/dune.sh build etherlink/tezt/tests/main.exe";
-    ]
+    ~script:
+      [
+        "./scripts/ci/take_ownership.sh";
+        ". ./scripts/version.sh";
+        "eval $(opam env)";
+        "scripts/ci/dune.sh build etherlink/tezt/tests/main.exe";
+      ]
 
 (* Specialization of Cacio's [tezt_job] with defaults that are specific to this component. *)
 (* Note: for now the changeset is the same as the one for regular Tezt jobs,
@@ -379,7 +388,7 @@ let job_gitlab_release =
         (Artifacts, job_build_evm_node_static Arm64 Release);
       ]
     ~description:"Create a GitLab release for Etherlink."
-    ["./scripts/ci/create_gitlab_octez_evm_node_release.sh"]
+    ~script:["./scripts/ci/create_gitlab_octez_evm_node_release.sh"]
 
 let job_docker_merge =
   Cacio.parameterize @@ fun test ->
@@ -401,10 +410,11 @@ let job_docker_merge =
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
     ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
     ~description:"Merge manifest for arm64 and arm64 docker images."
-    [
-      "./scripts/ci/docker_initialize.sh";
-      "./scripts/ci/docker_merge_manifests.sh";
-    ]
+    ~script:
+      [
+        "./scripts/ci/docker_initialize.sh";
+        "./scripts/ci/docker_merge_manifests.sh";
+      ]
 
 let job_docker_promote_to_latest =
   Cacio.parameterize @@ fun test ->
@@ -421,11 +431,12 @@ let job_docker_promote_to_latest =
         ("CI_DOCKER_HUB", match test with `real -> "true" | `test -> "false");
       ]
     ~description:"Promote the docker images to octez-evm-node-latest."
-    [
-      "./scripts/ci/docker_initialize.sh";
-      "./scripts/ci/docker_promote_to_latest.sh octez-evm-node-latest \
-       ./scripts/ci/octez-evm-node-release.sh";
-    ]
+    ~script:
+      [
+        "./scripts/ci/docker_initialize.sh";
+        "./scripts/ci/docker_promote_to_latest.sh octez-evm-node-latest \
+         ./scripts/ci/octez-evm-node-release.sh";
+      ]
 
 let register () =
   let open Runner.Arch in

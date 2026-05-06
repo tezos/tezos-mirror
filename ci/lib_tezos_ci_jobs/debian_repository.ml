@@ -117,7 +117,6 @@ let job_build_data_packages =
     ~variables:
       [("DISTRIBUTION", "debian"); ("RELEASE", "trixie"); ("TAGS", "gcp")]
     ~target:"zcash"
-    []
 
 (* These jobs build the packages in a matrix using the
    build dependencies images *)
@@ -131,7 +130,6 @@ let job_build_debian =
     ~parallel:(Matrix (debian_package_release_matrix ~ramfs:true pipeline_type))
     ~sccache:(Cacio.sccache ())
     ~target:"binaries"
-    []
 
 let job_build_ubuntu =
   Cacio.parameterize @@ fun pipeline_type ->
@@ -143,7 +141,6 @@ let job_build_ubuntu =
     ~parallel:(Matrix (ubuntu_package_release_matrix ~ramfs:true pipeline_type))
     ~sccache:(Cacio.sccache ())
     ~target:"binaries"
-    []
 
 let make_apt_repo_job ~pipeline_type ~build_job ~distribution ~releases =
   CI.job
@@ -178,7 +175,6 @@ let job_apt_repo_debian =
     ~image:Images.Base_images.debian_trixie
     ~distribution:"debian"
     ~releases:["bookworm"; "trixie"]
-    []
 
 let job_apt_repo_ubuntu =
   Cacio.parameterize @@ fun pipeline_type ->
@@ -190,7 +186,6 @@ let job_apt_repo_ubuntu =
     ~image:Images.Base_images.ubuntu_24_04
     ~distribution:"ubuntu"
     ~releases:["22.04"; "24.04"; "26.04"]
-    []
 
 let make_lintian_job ~distribution ~releases =
   CI.job
@@ -215,7 +210,6 @@ let job_lintian_ubuntu =
     ~image:Images.Base_images.ubuntu_24_04
     ~distribution:"ubuntu"
     ~releases:["22.04"; "24.04"; "26.04"]
-    []
 
 let job_lintian_debian =
   Cacio.parameterize @@ fun pipeline_type ->
@@ -226,7 +220,6 @@ let job_lintian_debian =
     ~image:Images.Base_images.debian_bookworm
     ~distribution:"debian"
     ~releases:["bookworm"]
-    []
 
 let make_install_bin_job ~distribution ~release =
   CI.job
@@ -245,7 +238,6 @@ let job_install_bin_ubuntu_22_04 =
     ~image:Images.Base_images.ubuntu_22_04
     ~distribution:"ubuntu"
     ~release:"22.04"
-    []
 
 let job_install_bin_ubuntu_24_04 =
   Cacio.parameterize @@ fun pipeline_type ->
@@ -256,7 +248,6 @@ let job_install_bin_ubuntu_24_04 =
     ~image:Images.Base_images.ubuntu_24_04
     ~distribution:"ubuntu"
     ~release:"24.04"
-    []
 
 let job_install_bin_ubuntu_26_04 =
   Cacio.parameterize @@ fun pipeline_type ->
@@ -267,7 +258,6 @@ let job_install_bin_ubuntu_26_04 =
     ~image:Images.Base_images.ubuntu_26_04
     ~distribution:"ubuntu"
     ~release:"26.04"
-    []
 
 let job_install_bin_debian_bookworm =
   Cacio.parameterize @@ fun pipeline_type ->
@@ -278,7 +268,6 @@ let job_install_bin_debian_bookworm =
     ~image:Images.Base_images.debian_bookworm
     ~distribution:"debian"
     ~release:"bookworm"
-    []
 
 let make_systemd_test_job ~script ~distribution ~release =
   CI.job
@@ -317,7 +306,6 @@ let job_install_bin_ubuntu_24_04_systemd =
     ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
     ~distribution:"ubuntu"
     ~release:"24.04"
-    []
 
 let job_install_bin_ubuntu_26_04_systemd =
   Cacio.parameterize @@ fun pipeline_type ->
@@ -327,7 +315,6 @@ let job_install_bin_ubuntu_26_04_systemd =
     ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
     ~distribution:"ubuntu"
     ~release:"26.04"
-    []
 
 let job_upgrade_bin_ubuntu_22_04_systemd =
   Cacio.parameterize @@ fun pipeline_type ->
@@ -337,7 +324,6 @@ let job_upgrade_bin_ubuntu_22_04_systemd =
     ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
     ~distribution:"ubuntu"
     ~release:"22.04"
-    []
 
 let job_upgrade_bin_ubuntu_24_04_systemd =
   Cacio.parameterize @@ fun pipeline_type ->
@@ -347,7 +333,6 @@ let job_upgrade_bin_ubuntu_24_04_systemd =
     ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
     ~distribution:"ubuntu"
     ~release:"24.04"
-    []
 
 let job_install_bin_debian_bookworm_systemd =
   Cacio.parameterize @@ fun pipeline_type ->
@@ -357,7 +342,6 @@ let job_install_bin_debian_bookworm_systemd =
     ~needs:[(Job, job_apt_repo_debian pipeline_type)]
     ~distribution:"debian"
     ~release:"bookworm"
-    []
 
 (* Note: this job is in the publish stage because it depends on a job
    that is in the publish stage, but it is a test.
@@ -371,7 +355,6 @@ let job_upgrade_bin_debian_bookworm_systemd =
     ~needs:[(Job, job_apt_repo_debian pipeline_type)]
     ~distribution:"debian"
     ~release:"bookworm"
-    []
 
 let () =
   (* In merge pipelines we tests only Debian.

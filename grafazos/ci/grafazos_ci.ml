@@ -25,14 +25,15 @@ let job_build =
          ~expire_in:(Duration (Days 1))
          ~when_:On_success
          ["grafazos/output/**/*.json"])
-    [
-      "cd grafazos/";
-      (* For security, we explicitly install v11.1.0
-         which corresponds to commit [1ce5aec]. *)
-      "jb install \
-       github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec95ce32336fe47c8881361847c475b5254";
-      "make";
-    ]
+    ~script:
+      [
+        "cd grafazos/";
+        (* For security, we explicitly install v11.1.0
+           which corresponds to commit [1ce5aec]. *)
+        "jb install \
+         github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec95ce32336fe47c8881361847c475b5254";
+        "make";
+      ]
 
 let job_gitlab_release =
   CI.job
@@ -42,7 +43,7 @@ let job_gitlab_release =
     ~stage:Publish
     ~description:"Create a GitLab release for Grafazos."
     ~needs:[(Artifacts, job_build Build)]
-    ["./grafazos/scripts/releases/create_gitlab_release.sh"]
+    ~script:["./grafazos/scripts/releases/create_gitlab_release.sh"]
 
 let job_release_page =
   Cacio.parameterize @@ fun pipeline_type ->
@@ -81,7 +82,10 @@ let job_release_page =
             ("BUCKET_PATH", "/releases");
             ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
           ])
-    ["eval $(opam env)"; "./grafazos/scripts/releases/publish_release_page.sh"]
+    ~script:
+      [
+        "eval $(opam env)"; "./grafazos/scripts/releases/publish_release_page.sh";
+      ]
 
 let register () =
   Cacio.register_merge_request_jobs [(Auto, job_build Test)] ;

@@ -28,15 +28,16 @@ let job_check_lift_limits_patch =
       ]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    [
-      ". ./scripts/version.sh";
-      "eval $(opam env)";
-      (* Check that the patch only modifies the src/proto_alpha/lib_protocol. *)
-      "[ $(git apply --numstat src/bin_tps_evaluation/lift_limits.patch | cut \
-       -f3) = \"src/proto_alpha/lib_protocol/main.ml\" ]";
-      "git apply src/bin_tps_evaluation/lift_limits.patch";
-      "scripts/ci/dune.sh build @src/proto_alpha/lib_protocol/check";
-    ]
+    ~script:
+      [
+        ". ./scripts/version.sh";
+        "eval $(opam env)";
+        (* Check that the patch only modifies the src/proto_alpha/lib_protocol. *)
+        "[ $(git apply --numstat src/bin_tps_evaluation/lift_limits.patch | \
+         cut -f3) = \"src/proto_alpha/lib_protocol/main.ml\" ]";
+        "git apply src/bin_tps_evaluation/lift_limits.patch";
+        "scripts/ci/dune.sh build @src/proto_alpha/lib_protocol/check";
+      ]
 
 let job_python_check =
   CI.job
@@ -48,12 +49,13 @@ let job_python_check =
        typecheck)."
     ~image:Tezos_ci.Images.CI.test
     ~only_if_changed:["poetry.lock"; "pyproject.toml"; "**/*.py"]
-    [
-      "./scripts/ci/take_ownership.sh";
-      ". ./scripts/version.sh";
-      ". $HOME/.venv/bin/activate";
-      "./scripts/ci/lint_misc_python_check.sh";
-    ]
+    ~script:
+      [
+        "./scripts/ci/take_ownership.sh";
+        ". ./scripts/version.sh";
+        ". $HOME/.venv/bin/activate";
+        "./scripts/ci/lint_misc_python_check.sh";
+      ]
 
 let job_integration_compiler_rejections =
   CI.job
@@ -65,11 +67,12 @@ let job_integration_compiler_rejections =
     ~only_if_changed:(Changesets.changeset_octez |> Tezos_ci.Changeset.encode)
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    [
-      ". ./scripts/version.sh";
-      "eval $(opam env)";
-      "scripts/ci/dune.sh build @runtest_rejections";
-    ]
+    ~script:
+      [
+        ". ./scripts/version.sh";
+        "eval $(opam env)";
+        "scripts/ci/dune.sh build @runtest_rejections";
+      ]
 
 let job_script_test_gen_genesis =
   CI.job
@@ -80,10 +83,11 @@ let job_script_test_gen_genesis =
     ~image:Tezos_ci.Images.CI.build
     ~cargo_cache:true
     ~only_if_changed:(Changesets.changeset_octez |> Tezos_ci.Changeset.encode)
-    [
-      "eval $(opam env)";
-      "scripts/ci/dune.sh build scripts/gen-genesis/gen_genesis.exe";
-    ]
+    ~script:
+      [
+        "eval $(opam env)";
+        "scripts/ci/dune.sh build scripts/gen-genesis/gen_genesis.exe";
+      ]
 
 let job_script_snapshot_alpha_and_link =
   CI.job
@@ -104,12 +108,13 @@ let job_script_snapshot_alpha_and_link =
       ]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    [
-      "./scripts/ci/take_ownership.sh";
-      ". ./scripts/version.sh";
-      "eval $(opam env)";
-      "./scripts/ci/script:snapshot_alpha_and_link.sh";
-    ]
+    ~script:
+      [
+        "./scripts/ci/take_ownership.sh";
+        ". ./scripts/version.sh";
+        "eval $(opam env)";
+        "./scripts/ci/script:snapshot_alpha_and_link.sh";
+      ]
 
 (* Requires Python.
    Can be changed to a python image, but using the build docker image
@@ -126,13 +131,14 @@ let job_script_b58_prefix =
         "scripts/b58_prefix/b58_prefix.py";
         "scripts/b58_prefix/test_b58_prefix.py";
       ]
-    [
-      ". ./scripts/version.sh";
-      ". $HOME/.venv/bin/activate";
-      "poetry run pylint scripts/b58_prefix/b58_prefix.py \
-       --disable=missing-docstring --disable=invalid-name";
-      "poetry run pytest scripts/b58_prefix/test_b58_prefix.py";
-    ]
+    ~script:
+      [
+        ". ./scripts/version.sh";
+        ". $HOME/.venv/bin/activate";
+        "poetry run pylint scripts/b58_prefix/b58_prefix.py \
+         --disable=missing-docstring --disable=invalid-name";
+        "poetry run pytest scripts/b58_prefix/test_b58_prefix.py";
+      ]
 
 let job_test_liquidity_baking_scripts =
   CI.job
@@ -153,11 +159,12 @@ let job_test_liquidity_baking_scripts =
         "scripts/ci/test_liquidity_baking_scripts.sh";
         "scripts/check-liquidity-baking-scripts.sh";
       ]
-    [
-      ". ./scripts/version.sh";
-      "eval $(opam env)";
-      "./scripts/ci/test_liquidity_baking_scripts.sh";
-    ]
+    ~script:
+      [
+        ". ./scripts/version.sh";
+        "eval $(opam env)";
+        "./scripts/ci/test_liquidity_baking_scripts.sh";
+      ]
 
 let job_oc_script_test_release_versions =
   CI.job
@@ -168,12 +175,13 @@ let job_oc_script_test_release_versions =
     ~image:Tezos_ci.Images.CI.build
     ~only_if_changed:
       ["scripts/test_octez_release_version.sh"; "src/lib_version/**/*"]
-    [
-      "./scripts/ci/take_ownership.sh";
-      ". ./scripts/version.sh";
-      "eval $(opam env)";
-      "./scripts/test_octez_release_version.sh";
-    ]
+    ~script:
+      [
+        "./scripts/ci/take_ownership.sh";
+        ". ./scripts/version.sh";
+        "eval $(opam env)";
+        "./scripts/test_octez_release_version.sh";
+      ]
 
 let job_test_release_versions =
   CI.job
@@ -189,7 +197,7 @@ let job_test_release_versions =
         "scripts/ci/octez-packages-version.sh";
         "scripts/ci/test_release_values.sh";
       ]
-    ["scripts/ci/test_release_values.sh"]
+    ~script:["scripts/ci/test_release_values.sh"]
 
 let job_resto_unit =
   Cacio.parameterize @@ fun arch ->
@@ -203,7 +211,7 @@ let job_resto_unit =
     ~stage:Test
     ~timeout:(Minutes 10)
     ~only_if_changed:["resto/**"]
-    ["eval $(opam env)"; "dune runtest resto"]
+    ~script:["eval $(opam env)"; "dune runtest resto"]
 
 (* "de" stands for "data-encoding". *)
 let job_de_unit =
@@ -217,7 +225,7 @@ let job_de_unit =
     ~image:Tezos_ci.Images.CI.test
     ~stage:Test
     ~only_if_changed:["data-encoding/**"]
-    ["eval $(opam env)"; "dune runtest data-encoding"]
+    ~script:["eval $(opam env)"; "dune runtest data-encoding"]
 
 let job_oc_unit_protocol_compiles =
   CI.job
@@ -233,11 +241,12 @@ let job_oc_unit_protocol_compiles =
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    [
-      ". ./scripts/version.sh";
-      "eval $(opam env)";
-      "scripts/ci/dune.sh build @runtest_compile_protocol";
-    ]
+    ~script:
+      [
+        ". ./scripts/version.sh";
+        "eval $(opam env)";
+        "scripts/ci/dune.sh build @runtest_compile_protocol";
+      ]
 
 let job_oc_unit_webassembly_x86_64 =
   CI.job
@@ -255,7 +264,8 @@ let job_oc_unit_webassembly_x86_64 =
          hangs. We use a timeout to retry the test in this case. The
          underlying issue should be fixed eventually, turning this timeout
          unnecessary. *)
-    [". ./scripts/version.sh"; "eval $(opam env)"; "make test-webassembly"]
+    ~script:
+      [". ./scripts/version.sh"; "eval $(opam env)"; "make test-webassembly"]
 
 (* Artifacts that are generated by test_wrapper.sh. *)
 let artifacts_test_results_xml arch =
@@ -286,12 +296,13 @@ let job_oc_unit_non_proto_x86_64 =
     ~dune_cache:true
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    [
-      ". ./scripts/version.sh";
-      "eval $(opam env)";
-      (* [test-webassembly] is only tested on arm64. *)
-      "make test-nonproto-unit";
-    ]
+    ~script:
+      [
+        ". ./scripts/version.sh";
+        "eval $(opam env)";
+        (* [test-webassembly] is only tested on arm64. *)
+        "make test-nonproto-unit";
+      ]
 
 let job_oc_unit_non_proto_arm64 =
   CI.job
@@ -318,11 +329,12 @@ let job_oc_unit_non_proto_arm64 =
     ~artifacts:(artifacts_test_results_xml Arm64)
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    [
-      ". ./scripts/version.sh";
-      "eval $(opam env)";
-      "make test-nonproto-unit test-webassembly";
-    ]
+    ~script:
+      [
+        ". ./scripts/version.sh";
+        "eval $(opam env)";
+        "make test-nonproto-unit test-webassembly";
+      ]
 
 let job_oc_unit_proto_x86_64 =
   CI.job
@@ -338,7 +350,8 @@ let job_oc_unit_proto_x86_64 =
     ~variables:[("DUNE_ARGS", "-j 12")]
     ~artifacts:(artifacts_test_results_xml Amd64)
     ~dune_cache:true
-    [". ./scripts/version.sh"; "eval $(opam env)"; "make test-proto-unit"]
+    ~script:
+      [". ./scripts/version.sh"; "eval $(opam env)"; "make test-proto-unit"]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
 
@@ -356,7 +369,8 @@ let job_oc_unit_other_x86_64 =
     ~cpu:High
     ~variables:[("DUNE_ARGS", "-j 12")]
     ~artifacts:(artifacts_test_results_xml Amd64)
-    [". ./scripts/version.sh"; "eval $(opam env)"; "make test-other-unit"]
+    ~script:
+      [". ./scripts/version.sh"; "eval $(opam env)"; "make test-other-unit"]
     ~dune_cache:true
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
@@ -373,15 +387,16 @@ let job_ocaml_check =
       ["src/**/*"; "tezt/**/*"; "devtools/**/*"; "**/*.ml"; "**/*.mli"]
     ~variables:[("CARGO_NET_OFFLINE", "false")]
     ~dune_cache:true
-    [
-      "./scripts/ci/take_ownership.sh";
-      ". ./scripts/version.sh";
-      "eval $(opam env)";
-      (* Stops on first error for easier detection of problems in
-         the log and to reduce time to merge of other MRs further
-         down the merge train. *)
-      "scripts/ci/dune.sh build @check --stop-on-first-error";
-    ]
+    ~script:
+      [
+        "./scripts/ci/take_ownership.sh";
+        ". ./scripts/version.sh";
+        "eval $(opam env)";
+        (* Stops on first error for easier detection of problems in
+           the log and to reduce time to merge of other MRs further
+           down the merge train. *)
+        "scripts/ci/dune.sh build @check --stop-on-first-error";
+      ]
 
 let job_test_sdk_rust =
   CI.job
@@ -395,7 +410,7 @@ let job_test_sdk_rust =
       @ ["sdk/rust/**/*"])
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ~policy:Pull_push ())
-    ["make -C sdk/rust check"; "make -C sdk/rust test"]
+    ~script:["make -C sdk/rust check"; "make -C sdk/rust test"]
 
 let register () =
   Cacio.register_merge_request_jobs

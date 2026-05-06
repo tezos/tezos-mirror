@@ -29,7 +29,7 @@ let job_build =
            "_build/default/ci/bin_release_page/src/version_manager.exe";
            "_build/default/ci/bin_release_page/src/release_page.exe";
          ])
-    ["eval $(opam env)"; "make -C ci/bin_release_page/ build"]
+    ~script:["eval $(opam env)"; "make -C ci/bin_release_page/ build"]
 
 let job_build_tezt =
   CI.job
@@ -45,7 +45,7 @@ let job_build_tezt =
          ~expire_in:(Duration (Days 1))
          ["_build/default/ci/bin_release_page/tezt/main.exe"])
     ~sccache:(Cacio.sccache ())
-    ["eval $(opam env)"; "dune build ci/bin_release_page/tezt/"]
+    ~script:["eval $(opam env)"; "dune build ci/bin_release_page/tezt/"]
 
 let job_test =
   CI.tezt_job

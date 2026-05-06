@@ -192,13 +192,7 @@ module type COMPONENT_API = sig
       it will be removed once the image feature is implemented in Cacio.
       See the Future work section for more details.
 
-      [?script] and the unnamed [string list] can both be used
-      to specify the job's script. If [?script] is specified and non-empty,
-      the unnamed list must be empty.
-      Using [?script] is convenient for partial applications.
-      In the future, we should probably remove the unlabeled [script] argument,
-      and we could also turn the [name] argument into a labeled argument
-      for the same reason (facilitating partial applications).
+      [?script] is used to specify the job's script.
 
       See {!Tezos_ci.job} for information about other arguments.
 
@@ -236,7 +230,6 @@ module type COMPONENT_API = sig
     ?id_tokens:Gitlab_ci.Types.id_tokens ->
     ?script:string list ->
     string ->
-    string list ->
     job
 
   (** Time interval for timeouts passed to {!tezt_job}. *)

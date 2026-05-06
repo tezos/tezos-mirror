@@ -782,7 +782,6 @@ module type COMPONENT_API = sig
     ?id_tokens:Gitlab_ci.Types.id_tokens ->
     ?script:string list ->
     string ->
-    string list ->
     job
 
   type tezt_timeout = No_timeout | Minutes of int
@@ -991,16 +990,8 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ?variables ?artifacts ?cache ?(cargo_cache = false) ?sccache
       ?(dune_cache = false) ?(disable_datadog = false) ?allow_failure ?retry
       ?timeout ?(image_dependencies = []) ?services ?id_tokens ?(script = [])
-      name script2 =
+      name =
     let name = make_name name in
-    let script =
-      match (script, script2) with
-      | [], x | x, [] -> x
-      | _ :: _, _ :: _ ->
-          invalid_arg
-            "Cacio.job: cannot specify both ?script and the unnamed script \
-             argument"
-    in
     declared_jobs := String_map.add name source_location !declared_jobs ;
     (* Check that no dependency is in an ulterior stage. *)
     ( Fun.flip List.iter needs @@ fun (_, dep) ->
@@ -1299,13 +1290,14 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
         (match global_timeout with
         | No_timeout -> None
         | Minutes m -> Some (Minutes (m + 10)))
-      (before_script
-      @ [
-          ". ./scripts/version.sh";
-          cmd_echo_variables;
-          cmd_store_list_of_selected_tests;
-          wrap_with_exit_code (wrap_with_timeout cmd_run_tests);
-        ])
+      ~script:
+        (before_script
+        @ [
+            ". ./scripts/version.sh";
+            cmd_echo_variables;
+            cmd_store_list_of_selected_tests;
+            wrap_with_exit_code (wrap_with_timeout cmd_run_tests);
+          ])
 
   (* Helper for other functions below, that is not exposed to users of this module.
      It is responsible for:
@@ -1419,8 +1411,9 @@ let () =
               ~when_:Always
               ["selected_tezts.tsl"])
          ~allow_failure:(With_exit_codes [17])
-         [
-           "./scripts/ci/take_ownership.sh";
-           "eval $(opam env)";
-           "scripts/ci/select_tezts.sh || exit $?";
-         ])
+         ~script:
+           [
+             "./scripts/ci/take_ownership.sh";
+             "eval $(opam env)";
+             "scripts/ci/select_tezts.sh || exit $?";
+           ])

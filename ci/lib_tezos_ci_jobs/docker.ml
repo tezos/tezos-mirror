@@ -56,7 +56,7 @@ let make_job_docker ~__POS__ ~name ~description ~scripts contents mode arch =
                script-inputs/experimental-executables"
           | `released -> "script-inputs/released-executables" );
       ]
-    scripts
+    ~script:scripts
 
 let job_docker_snapshot =
   Cacio.parameterize @@ fun contents ->
@@ -111,7 +111,7 @@ let make_job_docker_merge_manifests ~__POS__ ~name ~description ~needs ~scripts
         ("DOCKER_VERSION", version);
         ("CI_DOCKER_HUB", match mode with `real -> "true" | `test -> "false");
       ]
-    scripts
+    ~script:scripts
 
 let job_docker_merge_manifests_snapshot =
   Cacio.parameterize @@ fun contents ->
@@ -221,10 +221,11 @@ let job_script_docker_verify_image =
     ~variables:
       [("DOCKER_VERSION", version); ("IMAGE_ARCH_PREFIX", arch_string ^ "_")]
     ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
-    [
-      "./scripts/ci/docker_initialize.sh";
-      "./scripts/ci/docker_verify_signature.sh";
-    ]
+    ~script:
+      [
+        "./scripts/ci/docker_initialize.sh";
+        "./scripts/ci/docker_verify_signature.sh";
+      ]
 
 let register () =
   Cacio.register_jobs
