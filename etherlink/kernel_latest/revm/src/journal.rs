@@ -27,6 +27,7 @@ use std::vec::Vec;
 use tezosx_journal::{LayeredStateError, TezosXJournal};
 
 use crate::database::EtherlinkVMDB;
+use crate::storage::world_state_handler::StorageAccount;
 use crate::tezosx::{get_alias, store_alias};
 use evm_types::{
     CustomPrecompileError, DatabaseCommitPrecompileStateChanges,
@@ -38,7 +39,9 @@ use tezos_crypto_rs::{blake2b, hash::ContractKt1Hash};
 use tezos_ethereum::block::BlockConstants;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezosx_interfaces::{AliasInfo, CrossRuntimeContext, Registry, RuntimeId};
+use tezosx_interfaces::{
+    resolve_routing, AliasInfo, CrossRuntimeContext, Registry, RoutingDecision, RuntimeId,
+};
 
 /// A journal of state changes internal to the EVM
 ///
@@ -656,53 +659,59 @@ where
             block_number: self.database.block.number,
         };
         let remaining = Gas::new(remaining_evm_gas);
-        match get_alias(self.database.host, &source, target_runtime)
+        let origin = StorageAccount::from_address(&source)
+            .and_then(|a| a.get_origin(self.database.host))
+            .map_err(|e| e.into_with_remainder(remaining))?;
+        let alias_info = match resolve_routing(origin, target_runtime)
+            .map_err(|e| Error::from(e).into_with_remainder(remaining))?
+        {
+            RoutingDecision::RoundTrip(target) => return Ok((target, 0)),
+            RoutingDecision::Transitive(info) => info,
+            RoutingDecision::Native => AliasInfo {
+                runtime: RuntimeId::Ethereum,
+                native_address: source.to_string().to_lowercase().into_bytes(),
+            },
+        };
+        if let Some(alias) = get_alias(self.database.host, &source, target_runtime)
             .map_err(|e| e.into_with_remainder(remaining))?
         {
-            Some(alias) => Ok((alias, 0)),
-            None => {
-                // Convert remaining EVM gas to target runtime units to cap
-                // the generation cost.
-                let target_gas_budget = tezosx_interfaces::gas::convert(
-                    RuntimeId::Ethereum,
-                    target_runtime,
-                    remaining_evm_gas,
-                )
-                .ok_or_else(|| {
-                    CustomPrecompileError::Revert(
-                        "alias generation: EVM gas overflows target runtime units".into(),
-                        remaining,
-                    )
-                })?;
-                let source_hex = source.to_string().to_lowercase();
-                let alias_info = AliasInfo {
-                    runtime: RuntimeId::Ethereum,
-                    native_address: source_hex.into_bytes(),
-                };
-                let (alias_str, target_gas_remaining) = self
-                    .database
-                    .registry
-                    .ensure_alias(
-                        self.database.host,
-                        self.journal,
-                        alias_info,
-                        None,
-                        target_runtime,
-                        context,
-                        target_gas_budget,
-                    )
-                    .map_err(|e| {
-                        CustomPrecompileError::Revert(
-                            format!("Failed to generate alias for source address: {e:?}"),
-                            remaining,
-                        )
-                    })?;
-                store_alias(self.database.host, &source, target_runtime, &alias_str)
-                    .map_err(|e| e.into_with_remainder(remaining))?;
-                let consumed_target = target_gas_budget - target_gas_remaining;
-                Ok((alias_str, consumed_target))
-            }
+            return Ok((alias, 0));
         }
+        // Convert remaining EVM gas to target runtime units to cap
+        // the generation cost.
+        let target_gas_budget = tezosx_interfaces::gas::convert(
+            RuntimeId::Ethereum,
+            target_runtime,
+            remaining_evm_gas,
+        )
+        .ok_or_else(|| {
+            CustomPrecompileError::Revert(
+                "alias generation: EVM gas overflows target runtime units".into(),
+                remaining,
+            )
+        })?;
+        let (alias_str, target_gas_remaining) = self
+            .database
+            .registry
+            .ensure_alias(
+                self.database.host,
+                self.journal,
+                alias_info,
+                None,
+                target_runtime,
+                context,
+                target_gas_budget,
+            )
+            .map_err(|e| {
+                CustomPrecompileError::Revert(
+                    format!("Failed to generate alias for source address: {e:?}"),
+                    remaining,
+                )
+            })?;
+        store_alias(self.database.host, &source, target_runtime, &alias_str)
+            .map_err(|e| e.into_with_remainder(remaining))?;
+        let consumed_target = target_gas_budget - target_gas_remaining;
+        Ok((alias_str, consumed_target))
     }
 
     fn tezosx_resolve_source_alias_readonly(
@@ -712,6 +721,16 @@ where
         remaining_evm_gas: u64,
     ) -> Result<String, CustomPrecompileError> {
         let remaining = Gas::new(remaining_evm_gas);
+        let origin = StorageAccount::from_address(&source)
+            .and_then(|a| a.get_origin(self.database.host))
+            .map_err(|e| e.into_with_remainder(remaining))?;
+        let native_bytes = match resolve_routing(origin, target_runtime)
+            .map_err(|e| Error::from(e).into_with_remainder(remaining))?
+        {
+            RoutingDecision::RoundTrip(target) => return Ok(target),
+            RoutingDecision::Transitive(info) => info.native_address,
+            RoutingDecision::Native => source.to_string().to_lowercase().into_bytes(),
+        };
         if let Some(alias) = get_alias(self.database.host, &source, target_runtime)
             .map_err(|e| e.into_with_remainder(remaining))?
         {
@@ -726,15 +745,13 @@ where
         // canonical implementation — and must stay in sync with it.
         // If either formula changes, this read-only path must change
         // too.
-        let source_hex = source.to_string().to_lowercase();
         match target_runtime {
             RuntimeId::Tezos => {
-                let kt1 =
-                    ContractKt1Hash::from(blake2b::digest_160(source_hex.as_bytes()));
+                let kt1 = ContractKt1Hash::from(blake2b::digest_160(&native_bytes));
                 Ok(kt1.to_base58_check())
             }
             RuntimeId::Ethereum => {
-                let hash = revm::primitives::keccak256(source_hex.as_bytes());
+                let hash = revm::primitives::keccak256(&native_bytes);
                 Ok(Address::from_slice(&hash.0[..20]).to_string())
             }
         }
@@ -776,4 +793,93 @@ where
     let state = journal.finalize();
     DatabaseCommit::commit(journal.db_mut(), state);
     Ok(journal.db_mut().take_withdrawals())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezosx_interfaces::{AliasInfo, Origin};
+
+    fn alias_origin(runtime: RuntimeId, native: &[u8]) -> Origin {
+        Origin::Alias(AliasInfo {
+            runtime,
+            native_address: native.to_vec(),
+        })
+    }
+
+    #[test]
+    fn routing_returns_round_trip_for_matching_alias() {
+        let mut host = MockKernelHost::default();
+        let source = Address::from_slice(&[0xaa; 20]);
+        let mut account = StorageAccount::from_address(&source).unwrap();
+        account
+            .set_origin(&mut host, &alias_origin(RuntimeId::Tezos, b"tz1abcdef"))
+            .unwrap();
+
+        let origin = StorageAccount::from_address(&source)
+            .unwrap()
+            .get_origin(&host)
+            .unwrap();
+        match resolve_routing(origin, RuntimeId::Tezos).unwrap() {
+            RoutingDecision::RoundTrip(target) => assert_eq!(target, "tz1abcdef"),
+            other => panic!(
+                "expected RoundTrip, got {:?}",
+                std::mem::discriminant(&other)
+            ),
+        }
+    }
+
+    #[test]
+    fn routing_returns_native_for_native_origin() {
+        let mut host = MockKernelHost::default();
+        let source = Address::from_slice(&[0xcc; 20]);
+        let mut account = StorageAccount::from_address(&source).unwrap();
+        account.set_origin(&mut host, &Origin::Native).unwrap();
+
+        let origin = account.get_origin(&host).unwrap();
+        assert!(matches!(
+            resolve_routing(origin, RuntimeId::Tezos).unwrap(),
+            RoutingDecision::Native,
+        ));
+    }
+
+    #[test]
+    fn routing_returns_native_for_unrecorded_source() {
+        let host = MockKernelHost::default();
+        let source = Address::from_slice(&[0xdd; 20]);
+
+        let origin = StorageAccount::from_address(&source)
+            .unwrap()
+            .get_origin(&host)
+            .unwrap();
+        assert!(matches!(
+            resolve_routing(origin, RuntimeId::Tezos).unwrap(),
+            RoutingDecision::Native,
+        ));
+    }
+
+    #[test]
+    fn routing_returns_transitive_for_mismatched_runtime() {
+        // The recorded info is the basis for derivation toward a third target.
+        // Unreachable in two runtime mode.
+        let mut host = MockKernelHost::default();
+        let source = Address::from_slice(&[0xbb; 20]);
+        let mut account = StorageAccount::from_address(&source).unwrap();
+        account
+            .set_origin(&mut host, &alias_origin(RuntimeId::Tezos, b"tz1abcdef"))
+            .unwrap();
+
+        let origin = account.get_origin(&host).unwrap();
+        match resolve_routing(origin, RuntimeId::Ethereum).unwrap() {
+            RoutingDecision::Transitive(info) => {
+                assert_eq!(info.runtime, RuntimeId::Tezos);
+                assert_eq!(info.native_address, b"tz1abcdef".to_vec());
+            }
+            other => panic!(
+                "expected Transitive, got {:?}",
+                std::mem::discriminant(&other)
+            ),
+        }
+    }
 }

@@ -31,4 +31,10 @@ impl From<PathError> for Error {
     }
 }
 
+impl From<std::string::FromUtf8Error> for Error {
+    fn from(e: std::string::FromUtf8Error) -> Self {
+        Error::Custom(e.to_string())
+    }
+}
+
 impl DBErrorMarker for Error {}

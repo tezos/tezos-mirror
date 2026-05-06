@@ -243,6 +243,36 @@ pub enum Origin {
     Alias(AliasInfo),
 }
 
+/// How a source's translation toward a chosen target runtime should be routed.
+pub enum RoutingDecision {
+    /// Source is recorded as an alias of an account in the target
+    /// runtime. The recorded bytes are the answer; decode and return.
+    RoundTrip(String),
+    /// Source is recorded as an alias of an account in a runtime other
+    /// than the target. Use the recorded info as the basis for derivation
+    /// so chained translations agree with the direct path. Unreachable in
+    /// two runtime mode.
+    Transitive(AliasInfo),
+    /// Source is recorded as native, or has no classification. Derive
+    /// from the source address as if it were native on the source runtime.
+    Native,
+}
+
+/// Resolve the routing of the source's translation toward the target
+/// runtime from the source's classification record.
+pub fn resolve_routing(
+    origin: Option<Origin>,
+    target_runtime: RuntimeId,
+) -> Result<RoutingDecision, std::string::FromUtf8Error> {
+    match origin {
+        Some(Origin::Alias(info)) if info.runtime == target_runtime => {
+            String::from_utf8(info.native_address).map(RoutingDecision::RoundTrip)
+        }
+        Some(Origin::Alias(info)) => Ok(RoutingDecision::Transitive(info)),
+        Some(Origin::Native) | None => Ok(RoutingDecision::Native),
+    }
+}
+
 impl From<RuntimeId> for u8 {
     fn from(value: RuntimeId) -> Self {
         match value {
