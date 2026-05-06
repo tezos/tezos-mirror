@@ -480,6 +480,22 @@ module Config_file = struct
         ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
       ]
 
+  let ushuaianet_network_config : JSON.u =
+    `O
+      [
+        ( "genesis",
+          mk_genesis
+            ~timestamp:"2026-04-21T14:00:00Z"
+            ~block:"BLTL5xNANUbfrdHsVzdbpYfccoqE3mPuNZjumQiaFAJJpL5taZr"
+            ~protocol:"Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P" );
+        ( "genesis_parameters",
+          mk_genesis_parameters
+            ~genesis_pubkey:
+              "edpktosVHk2f3Yrz9Jb6rMrk6uVy4sTxVhP2iyF39AdgzvsTWgbaLy" );
+        ("chain_name", `String "TEZOS_USHUAIANET_2026-04-21T14:00:00Z");
+        ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
+      ]
+
   (* Copied from Octez_node_config.Config_file *)
   let mainnet_network_config : JSON.u =
     `O
@@ -602,6 +618,11 @@ module Config_file = struct
     set_network
       ?user_activated_upgrades
       ("set_tallinnnet_network", tallinnnet_network_config)
+
+  let set_ushuaianet_network ?user_activated_upgrades () =
+    set_network
+      ?user_activated_upgrades
+      ("set_ushuaianet_network", ushuaianet_network_config)
 
   let set_shadownet_network ?user_activated_upgrades () =
     set_network

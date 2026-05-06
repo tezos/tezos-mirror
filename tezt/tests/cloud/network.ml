@@ -12,7 +12,8 @@ type public =
   | `Shadownet
   | `Nextnet of string
   | `Weeklynet of string
-  | `Tallinnnet ]
+  | `Tallinnnet
+  | `Ushuaianet ]
 
 type t = [`Sandbox | public]
 
@@ -30,12 +31,14 @@ let to_string = function
   | `Weeklynet date -> sf "weeklynet-%s" date
   | `Sandbox -> "sandbox"
   | `Tallinnnet -> "tallinnnet"
+  | `Ushuaianet -> "ushuaianet"
 
 let parse = function
   | "mainnet" -> Some `Mainnet
   | "ghostnet" -> Some `Ghostnet
   | "shadownet" -> Some `Shadownet
   | "tallinnnet" -> Some `Tallinnnet
+  | "ushuaianet" -> Some `Ushuaianet
   | s when String.length s = 20 && String.sub s 0 10 = "weeklynet-" ->
       (* format: weeklynet-2025-01-29 (with dashes) *)
       let date = String.sub s 10 10 in
@@ -76,12 +79,14 @@ let default_protocol : t -> Protocol.t = function
   | `Sandbox -> Alpha
   | `Nextnet _ -> T024
   | `Tallinnnet -> T024
+  | `Ushuaianet -> U025
 
 let block_time : t -> int = function
   | `Mainnet -> 6
   | `Shadownet -> 6
   | `Ghostnet -> 4
   | `Tallinnnet -> 4
+  | `Ushuaianet -> 4
   | `Sandbox -> 6
   | network ->
       failwith
@@ -103,7 +108,8 @@ let public_rpc_endpoint testnet =
       | `Shadownet -> "rpc.shadownet.teztnets.com"
       | `Nextnet date -> sf "rpc.nextnet-%s.teztnets.com" date
       | `Weeklynet date -> sf "rpc.weeklynet-%s.teztnets.com" date
-      | `Tallinnnet -> "rpc.tallinnnet.teztnets.com")
+      | `Tallinnnet -> "rpc.tallinnnet.teztnets.com"
+      | `Ushuaianet -> "rpc.ushuaianet.teztnets.com")
     ~port:443
     ()
 
@@ -114,6 +120,7 @@ let snapshot_service = function
   | `Nextnet _ -> "https://snapshots.eu.tzinit.org/nextnet"
   | `Weeklynet _ -> "https://snapshots.eu.tzinit.org/weeklynet"
   | `Tallinnnet -> "https://snapshots.tzinit.org/tallinnnet"
+  | `Ushuaianet -> "https://snapshots.tzinit.org/ushuaianet"
 
 (* Argument to give to the --network option of `octez-node config init`. *)
 let to_octez_network_options = function
@@ -124,6 +131,7 @@ let to_octez_network_options = function
   | `Nextnet date -> sf "https://teztnets.com/nextnet-%s" date
   | `Weeklynet date -> sf "https://teztnets.com/weeklynet-%s" date
   | `Tallinnnet -> "https://teztnets.com/tallinnnet"
+  | `Ushuaianet -> "https://teztnets.com/ushuaianet"
 
 let default_bootstrap = function
   | `Mainnet -> "boot.tzinit.org"
@@ -132,6 +140,7 @@ let default_bootstrap = function
   | `Nextnet date -> sf "nextnet-%s.teztnets.com" date
   | `Weeklynet date -> sf "weeklynet-%s.teztnets.com" date
   | `Tallinnnet -> "tallinnnet.teztnets.com"
+  | `Ushuaianet -> "ushuaianet.teztnets.com"
 
 let default_dal_bootstrap = function
   | `Mainnet -> "dalboot.mainnet.tzboot.net"
@@ -141,6 +150,7 @@ let default_dal_bootstrap = function
   | `Nextnet date -> sf "dal.nextnet-%s.teztnets.com" date
   | `Weeklynet date -> sf "dal.weeklynet-%s.teztnets.com" date
   | `Tallinnnet -> "dal.tallinnnet.teztnets.com"
+  | `Ushuaianet -> "dal.ushuaianet.teztnets.com"
 
 let get_level endpoint =
   let* json = RPC_core.call endpoint (RPC.get_chain_block_header_shell ()) in
@@ -150,7 +160,8 @@ let expected_pow = function `Sandbox -> 0. | _ -> 26.
 
 let versions network =
   match network with
-  | (`Mainnet | `Ghostnet | `Shadownet | `Tallinnnet) as public_network -> (
+  | (`Mainnet | `Ghostnet | `Shadownet | `Tallinnnet | `Ushuaianet) as
+    public_network -> (
       let decoder json =
         json |> JSON.as_list |> List.to_seq
         |> Seq.map (fun json_account ->
@@ -197,7 +208,8 @@ let versions network =
 
 let delegates ?(accounts = []) network =
   match network with
-  | (`Mainnet | `Ghostnet | `Shadownet | `Tallinnnet) as network -> (
+  | (`Mainnet | `Ghostnet | `Shadownet | `Tallinnnet | `Ushuaianet) as network
+    -> (
       let decoder json =
         json |> JSON.as_list
         |> List.map (fun json_account ->
