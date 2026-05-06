@@ -27,8 +27,8 @@ use revm_etherlink::{
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::{
-    CrossRuntimeContext, Registry, RuntimeInterface, TezosXRuntimeError,
-    X_TEZOS_GAS_CONSUMED,
+    AliasInfo, CrossRuntimeContext, Origin, Registry, RuntimeInterface,
+    TezosXRuntimeError, X_TEZOS_GAS_CONSUMED,
 };
 use tezosx_journal::TezosXJournal;
 
@@ -264,12 +264,12 @@ where
 }
 
 impl RuntimeInterface for EthereumRuntime {
-    fn generate_alias<Host>(
+    fn ensure_alias<Host>(
         &self,
         registry: &impl Registry,
         host: &mut Host,
         journal: &mut TezosXJournal,
-        native_address: &str,
+        alias_info: AliasInfo,
         native_public_key: Option<&[u8]>,
         context: CrossRuntimeContext,
         gas_remaining: u64,
@@ -277,29 +277,79 @@ impl RuntimeInterface for EthereumRuntime {
     where
         Host: StorageV1,
     {
+        // The native address is stored in `alias_info` as the UTF-8
+        // bytes of the canonical address string. Decode once for the
+        // EVM init call below; the hash and the classification record
+        // both work on the bytes directly.
+        let native_address =
+            std::str::from_utf8(&alias_info.native_address).map_err(|e| {
+                TezosXRuntimeError::ConversionError(format!(
+                    "alias_info.native_address is not valid UTF-8: {e}"
+                ))
+            })?;
+
         // Step 1: Compute the alias address deterministically from the native address
         let mut hasher = Keccak256::new();
-        hasher.update(native_address.as_bytes());
+        hasher.update(&alias_info.native_address);
         let hash = hasher.finalize();
         let alias = Address::from_slice(&hash[0..20]);
 
-        // Step 2: Set up EIP-7702 delegation bytecode at the alias address
-        // The delegation bytecode points to the AliasForwarder precompile
+        // Set up the EIP-7702 delegation bytecode and its hash so we
+        // can both detect whether a forwarder is already deployed and
+        // deploy one if needed.
         let delegation_bytecode =
             Bytecode::new_eip7702(ALIAS_FORWARDER_PRECOMPILE_ADDRESS);
-
-        // Store the delegation bytecode at the alias address
-        let mut alias_account = StorageAccount::from_address(&alias)?;
-        let mut alias_info = alias_account.info(host)?;
-
-        // Store the delegation code
         let code_bytes = delegation_bytecode.original_byte_slice();
-        let code_hash = revm_etherlink::helpers::storage::bytes_hash(code_bytes);
+        let delegation_code_hash =
+            revm_etherlink::helpers::storage::bytes_hash(code_bytes);
 
-        alias_info.code_hash = code_hash;
-        alias_account.set_info(host, alias_info)?;
+        let mut alias_account = StorageAccount::from_address(&alias)?;
 
-        CodeStorage::add(host, code_bytes, Some(code_hash)).map_err(|e| {
+        // Branch 1: already classified as alias. The kernel reaches
+        // this on the second and later calls to ensure_alias for the
+        // same source. Returning early preserves the gas budget and
+        // performs no durable writes.
+        match alias_account.get_origin(host).map_err(|e| {
+            TezosXRuntimeError::Custom(format!("Failed to read alias origin: {e}"))
+        })? {
+            Some(Origin::Alias(_)) => {
+                // TODO: once the forwarder forwards tez to the origin
+                // runtime, a cross-runtime call from this alias toward
+                // its origin should target the native address held in
+                // the Alias record instead of the alias address. The
+                // early return here drops that information.
+                return Ok((alias.to_string(), gas_remaining));
+            }
+            Some(Origin::Native) => {
+                return Err(TezosXRuntimeError::Custom(format!(
+                    "ensure_alias: address {alias} is recorded as Native, refusing to overwrite"
+                )));
+            }
+            None => {}
+        }
+
+        // Branch 2: a forwarder is already deployed but the
+        // classification path is empty. This is the legacy account
+        // case. Write the classification record only and skip the
+        // redeploy.
+        let mut storage_info = alias_account.info(host)?;
+        if storage_info.code_hash == delegation_code_hash {
+            let new_origin = Origin::Alias(alias_info);
+            alias_account.set_origin(host, &new_origin).map_err(|e| {
+                TezosXRuntimeError::Custom(format!("Failed to write alias origin: {e}"))
+            })?;
+            return Ok((alias.to_string(), gas_remaining));
+        }
+
+        // Branch 3: full materialization. Deploy the forwarder, run
+        // the existing init transaction, and record the classification
+        // at the end.
+
+        // Set up EIP-7702 delegation bytecode at the alias address.
+        storage_info.code_hash = delegation_code_hash;
+        alias_account.set_info(host, storage_info)?;
+
+        CodeStorage::add(host, code_bytes, Some(delegation_code_hash)).map_err(|e| {
             TezosXRuntimeError::Custom(format!("Failed to store delegation code: {e}"))
         })?;
 
@@ -372,7 +422,22 @@ impl RuntimeInterface for EthereumRuntime {
         let gas_used = outcome.result.gas_used();
         let remaining_after = gas_remaining.saturating_sub(gas_used);
         match outcome.result {
-            ExecutionResult::Success { .. } => Ok((alias.to_string(), remaining_after)),
+            ExecutionResult::Success { .. } => {
+                // Record the classification only after init succeeded.
+                // The forwarder bytecode and the classification record
+                // share the same persistence model: both go to durable
+                // storage, both survive a revert in the surrounding
+                // frame, and the next call to ensure_alias finds the
+                // no-op branch.
+                let mut alias_account = StorageAccount::from_address(&alias)?;
+                let new_origin = Origin::Alias(alias_info);
+                alias_account.set_origin(host, &new_origin).map_err(|e| {
+                    TezosXRuntimeError::Custom(format!(
+                        "Failed to write alias origin: {e}"
+                    ))
+                })?;
+                Ok((alias.to_string(), remaining_after))
+            }
             ExecutionResult::Revert { output, .. } => Err(TezosXRuntimeError::Custom(
                 format!("init_tezosx_alias reverted: {output:?}"),
             )),
@@ -440,7 +505,8 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::storage::StorageV1;
     use tezosx_interfaces::{
-        CrossRuntimeContext, Registry, RuntimeId, RuntimeInterface, TezosXRuntimeError,
+        AliasInfo, CrossRuntimeContext, Registry, RuntimeId, RuntimeInterface,
+        TezosXRuntimeError,
     };
     use tezosx_journal::TezosXJournal;
 
@@ -450,13 +516,13 @@ mod tests {
     struct StubRegistry;
 
     impl Registry for StubRegistry {
-        fn generate_alias<Host>(
+        fn ensure_alias<Host>(
             &self,
             _host: &mut Host,
             _journal: &mut TezosXJournal,
-            _native_address: &str,
+            _alias_info: AliasInfo,
             _native_public_key: Option<&[u8]>,
-            _runtime_id: RuntimeId,
+            _target_runtime: RuntimeId,
             _context: CrossRuntimeContext,
             _gas_remaining: u64,
         ) -> Result<(String, u64), TezosXRuntimeError>
@@ -678,7 +744,7 @@ mod tests {
     fn test_alias_address_is_deterministic() {
         let native_address = b"tz1abc123";
 
-        // Compute alias address using the same algorithm as generate_alias
+        // Compute alias address using the same algorithm as ensure_alias
         let mut hasher = Keccak256::new();
         hasher.update(native_address);
         let hash = hasher.finalize();
@@ -976,7 +1042,7 @@ mod tests {
         // The cross-runtime call path uses gas_price = 0 and amount = 0,
         // so REVM's pre-flight balance requirement on the caller is 0 — no
         // need to fund TEZOSX_CALLER_ADDRESS (the production code in
-        // `generate_alias` doesn't either).
+        // `ensure_alias` doesn't either).
         let caller_addr = revm_etherlink::precompiles::constants::TEZOSX_CALLER_ADDRESS;
         let url = format!(
             "http://ethereum/{}",

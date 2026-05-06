@@ -27,34 +27,34 @@ use tezosx_journal::TezosXJournal;
 use tezosx_tezos_runtime::TezosRuntime;
 
 impl Registry for RegistryImpl {
-    fn generate_alias<Host>(
+    fn ensure_alias<Host>(
         &self,
         host: &mut Host,
         journal: &mut TezosXJournal,
-        native_address: &str,
+        alias_info: tezosx_interfaces::AliasInfo,
         native_public_key: Option<&[u8]>,
-        runtime_id: tezosx_interfaces::RuntimeId,
+        target_runtime: tezosx_interfaces::RuntimeId,
         context: tezosx_interfaces::CrossRuntimeContext,
         gas_remaining: u64,
     ) -> Result<(String, u64), tezosx_interfaces::TezosXRuntimeError>
     where
         Host: StorageV1,
     {
-        match runtime_id {
-            tezosx_interfaces::RuntimeId::Tezos => self.tezos.generate_alias(
+        match target_runtime {
+            tezosx_interfaces::RuntimeId::Tezos => self.tezos.ensure_alias(
                 self,
                 host,
                 journal,
-                native_address,
+                alias_info,
                 native_public_key,
                 context,
                 gas_remaining,
             ),
-            tezosx_interfaces::RuntimeId::Ethereum => self.ethereum.generate_alias(
+            tezosx_interfaces::RuntimeId::Ethereum => self.ethereum.ensure_alias(
                 self,
                 host,
                 journal,
-                native_address,
+                alias_info,
                 native_public_key,
                 context,
                 gas_remaining,

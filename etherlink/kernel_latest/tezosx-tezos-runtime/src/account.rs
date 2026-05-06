@@ -32,7 +32,7 @@ const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
 /// implicit and originated KT1 accounts: the segment is appended to
 /// whichever account prefix the caller already has, and the resulting
 /// path lives next to the rest of the account state.
-const ORIGIN_PATH: RefPath = RefPath::assert_from(b"/origin");
+pub(crate) const ORIGIN_PATH: RefPath = RefPath::assert_from(b"/origin");
 
 pub fn narith_to_u256(
     narith: &Narith,

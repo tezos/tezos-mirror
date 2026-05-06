@@ -39,7 +39,7 @@ use tezos_ethereum::block::BlockConstants;
 use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::{path::OwnedPath, runtime::RuntimeError};
-use tezosx_interfaces::{CrossRuntimeContext, Registry, RuntimeId};
+use tezosx_interfaces::{AliasInfo, CrossRuntimeContext, Registry, RuntimeId};
 
 /// A journal of state changes internal to the EVM
 ///
@@ -603,7 +603,7 @@ pub trait CrossRuntimeCall {
     ///
     /// The deterministic alias is the same value
     /// [`Self::tezosx_resolve_source_alias`] would persist — by design
-    /// of [`Registry::generate_alias`]:
+    /// of [`Registry::ensure_alias`]:
     /// - `RuntimeId::Tezos` → `blake2b-160(lowercase_hex(address))`
     ///   formatted as a `KT1...` base58check string;
     /// - `RuntimeId::Ethereum` → `keccak256(lowercase_hex(address))[..20]`
@@ -674,13 +674,17 @@ where
                     )
                 })?;
                 let source_hex = source.to_string().to_lowercase();
+                let alias_info = AliasInfo {
+                    runtime: RuntimeId::Ethereum,
+                    native_address: source_hex.into_bytes(),
+                };
                 let (alias_str, target_gas_remaining) = self
                     .database
                     .registry
-                    .generate_alias(
+                    .ensure_alias(
                         self.database.host,
                         self.journal,
-                        &source_hex,
+                        alias_info,
                         None,
                         target_runtime,
                         context,
@@ -713,11 +717,11 @@ where
             return Ok(alias);
         }
         // Deterministic fallback: reproduce the alias that the target
-        // runtime's `generate_alias` would compute (and persist on the
+        // runtime's `ensure_alias` would compute (and persist on the
         // state-mutating path), but skip the storage writes.
         //
         // Each branch duplicates the deterministic name-derivation
-        // step from the corresponding runtime's `generate_alias` — the
+        // step from the corresponding runtime's `ensure_alias` — the
         // canonical implementation — and must stay in sync with it.
         // If either formula changes, this read-only path must change
         // too.

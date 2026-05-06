@@ -558,7 +558,7 @@ mod test {
     use tezos_data_encoding::enc::BinWriter;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::storage::StorageV1;
-    use tezosx_interfaces::Registry as RegistryTrait;
+    use tezosx_interfaces::{AliasInfo, Registry as RegistryTrait};
     use tezosx_journal::TezosXJournal;
     use utilities::MOCK_TEZOS_GAS_CONSUMED;
 
@@ -614,8 +614,8 @@ mod test {
         };
         use tezosx_ethereum_runtime::EthereumRuntime;
         use tezosx_interfaces::{
-            CrossRuntimeContext, Registry as RegistryTrait, RuntimeId, RuntimeInterface,
-            TezosXRuntimeError,
+            AliasInfo, CrossRuntimeContext, Registry as RegistryTrait, RuntimeId,
+            RuntimeInterface, TezosXRuntimeError,
         };
         use tezosx_journal::TezosXJournal;
 
@@ -657,34 +657,34 @@ mod test {
         }
 
         impl RegistryTrait for Registry {
-            fn generate_alias<Host>(
+            fn ensure_alias<Host>(
                 &self,
                 host: &mut Host,
                 journal: &mut TezosXJournal,
-                native_address: &str,
+                alias_info: AliasInfo,
                 native_public_key: Option<&[u8]>,
-                runtime_id: RuntimeId,
+                target_runtime: RuntimeId,
                 context: CrossRuntimeContext,
                 gas_remaining: u64,
             ) -> Result<(String, u64), TezosXRuntimeError>
             where
                 Host: StorageV1,
             {
-                match runtime_id {
-                    RuntimeId::Tezos => self.mock_tezos.generate_alias(
+                match target_runtime {
+                    RuntimeId::Tezos => self.mock_tezos.ensure_alias(
                         self,
                         host,
                         journal,
-                        native_address,
+                        alias_info,
                         native_public_key,
                         context,
                         gas_remaining,
                     ),
-                    RuntimeId::Ethereum => self.ethereum.generate_alias(
+                    RuntimeId::Ethereum => self.ethereum.ensure_alias(
                         self,
                         host,
                         journal,
-                        native_address,
+                        alias_info,
                         native_public_key,
                         context,
                         gas_remaining,
@@ -749,12 +749,12 @@ mod test {
         pub(crate) struct MockTezosRuntime;
 
         impl RuntimeInterface for MockTezosRuntime {
-            fn generate_alias<Host>(
+            fn ensure_alias<Host>(
                 &self,
                 _registry: &impl RegistryTrait,
                 _host: &mut Host,
                 _journal: &mut TezosXJournal,
-                native_address: &str,
+                alias_info: AliasInfo,
                 _native_public_key: Option<&[u8]>,
                 _context: CrossRuntimeContext,
                 gas_remaining: u64,
@@ -764,8 +764,9 @@ mod test {
             {
                 // Deterministic mock: compute a KT1 from native_address bytes
                 use tezos_crypto_rs::{blake2b, hash::ContractKt1Hash};
-                let kt1 =
-                    ContractKt1Hash::from(blake2b::digest_160(native_address.as_bytes()));
+                let kt1 = ContractKt1Hash::from(blake2b::digest_160(
+                    &alias_info.native_address,
+                ));
                 Ok((kt1.to_base58_check(), gas_remaining))
             }
 
@@ -968,10 +969,13 @@ mod test {
         let registry = Registry::new();
         let mut journal = TezosXJournal::default();
         let alias = registry
-            .generate_alias(
+            .ensure_alias(
                 &mut host,
                 &mut journal,
-                &destination.to_string(),
+                AliasInfo {
+                    runtime: tezosx_interfaces::RuntimeId::Ethereum,
+                    native_address: destination.to_string().into_bytes(),
+                },
                 None,
                 tezosx_interfaces::RuntimeId::Tezos,
                 test_alias_creation_context(),
@@ -1053,10 +1057,13 @@ mod test {
         let registry = Registry::new();
         let mut journal = TezosXJournal::default();
         let alias = registry
-            .generate_alias(
+            .ensure_alias(
                 &mut host,
                 &mut journal,
-                &destination.to_string(),
+                AliasInfo {
+                    runtime: tezosx_interfaces::RuntimeId::Ethereum,
+                    native_address: destination.to_string().into_bytes(),
+                },
                 None,
                 tezosx_interfaces::RuntimeId::Tezos,
                 test_alias_creation_context(),
@@ -3030,10 +3037,13 @@ mod test {
         let registry = Registry::new();
         let mut journal = TezosXJournal::default();
         let alias_bytes = registry
-            .generate_alias(
+            .ensure_alias(
                 &mut host,
                 &mut journal,
-                native_address,
+                AliasInfo {
+                    runtime: tezosx_interfaces::RuntimeId::Tezos,
+                    native_address: native_address.as_bytes().to_vec(),
+                },
                 None,
                 tezosx_interfaces::RuntimeId::Ethereum,
                 test_alias_creation_context(),
@@ -3090,7 +3100,7 @@ mod test {
         let native_address = "tz1PreexistingBal";
 
         // First, we need to compute the alias address to set pre-existing balance
-        // We use the same algorithm as generate_alias: keccak256(native_address)[0..20]
+        // We use the same algorithm as ensure_alias: keccak256(native_address)[0..20]
         let alias = {
             let hash = bytes_hash(native_address.as_bytes());
             Address::from_slice(&hash.0[0..20])
@@ -3116,10 +3126,13 @@ mod test {
         let registry = Registry::new();
         let mut journal = TezosXJournal::default();
         let alias_bytes = registry
-            .generate_alias(
+            .ensure_alias(
                 &mut host,
                 &mut journal,
-                native_address,
+                AliasInfo {
+                    runtime: tezosx_interfaces::RuntimeId::Tezos,
+                    native_address: native_address.as_bytes().to_vec(),
+                },
                 None,
                 tezosx_interfaces::RuntimeId::Ethereum,
                 test_alias_creation_context(),
@@ -3129,7 +3142,7 @@ mod test {
         let alias_bytes = alias_bytes.0;
 
         // Verify the alias was created at the expected address
-        // (case-insensitive: generate_alias returns lowercase, Address::to_string uses EIP-55 checksum)
+        // (case-insensitive: ensure_alias returns lowercase, Address::to_string uses EIP-55 checksum)
         assert_eq!(
             alias_bytes.to_lowercase(),
             alias.to_string().to_lowercase(),
@@ -3171,10 +3184,13 @@ mod test {
         let registry = Registry::new();
         let mut journal = TezosXJournal::default();
         let alias_bytes = registry
-            .generate_alias(
+            .ensure_alias(
                 &mut host,
                 &mut journal,
-                native_address,
+                AliasInfo {
+                    runtime: tezosx_interfaces::RuntimeId::Tezos,
+                    native_address: native_address.as_bytes().to_vec(),
+                },
                 None,
                 tezosx_interfaces::RuntimeId::Ethereum,
                 test_alias_creation_context(),

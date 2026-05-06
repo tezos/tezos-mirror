@@ -1743,14 +1743,14 @@ pub(crate) mod test_utils {
     use std::cell::RefCell;
     use tezos_smart_rollup_host::storage::StorageV1;
     use tezosx_interfaces::{
-        CrossRuntimeContext, Registry, RuntimeId, TezosXRuntimeError,
+        AliasInfo, CrossRuntimeContext, Registry, RuntimeId, TezosXRuntimeError,
     };
     use tezosx_journal::TezosXJournal;
 
     /// Mock Registry for testing gateway operations.
-    /// Tracks all calls to serve and generate_alias for verification.
+    /// Tracks all calls to serve and ensure_alias for verification.
     pub struct MockRegistry {
-        pub generate_alias_calls: RefCell<Vec<(String, RuntimeId)>>,
+        pub ensure_alias_calls: RefCell<Vec<(AliasInfo, RuntimeId)>>,
         pub serve_calls: RefCell<Vec<http::Request<Vec<u8>>>>,
         generated_alias: String,
     }
@@ -1758,7 +1758,7 @@ pub(crate) mod test_utils {
     impl MockRegistry {
         pub fn new(generated_alias: String) -> Self {
             Self {
-                generate_alias_calls: RefCell::new(Vec::new()),
+                ensure_alias_calls: RefCell::new(Vec::new()),
                 serve_calls: RefCell::new(Vec::new()),
                 generated_alias,
             }
@@ -1766,22 +1766,22 @@ pub(crate) mod test_utils {
     }
 
     impl Registry for MockRegistry {
-        fn generate_alias<Host>(
+        fn ensure_alias<Host>(
             &self,
             _host: &mut Host,
             _journal: &mut TezosXJournal,
-            native_address: &str,
+            alias_info: AliasInfo,
             _native_public_key: Option<&[u8]>,
-            runtime_id: RuntimeId,
+            target_runtime: RuntimeId,
             _context: CrossRuntimeContext,
             gas_remaining: u64,
         ) -> Result<(String, u64), TezosXRuntimeError>
         where
             Host: StorageV1,
         {
-            self.generate_alias_calls
+            self.ensure_alias_calls
                 .borrow_mut()
-                .push((native_address.to_string(), runtime_id));
+                .push((alias_info, target_runtime));
             Ok((self.generated_alias.clone(), gas_remaining))
         }
 
@@ -1837,13 +1837,13 @@ pub(crate) mod test_utils {
     }
 
     impl Registry for MockRegistryWithStatus {
-        fn generate_alias<Host>(
+        fn ensure_alias<Host>(
             &self,
             _host: &mut Host,
             _journal: &mut TezosXJournal,
-            _native_address: &str,
+            _alias_info: AliasInfo,
             _native_public_key: Option<&[u8]>,
-            _runtime_id: RuntimeId,
+            _target_runtime: RuntimeId,
             _context: CrossRuntimeContext,
             gas_remaining: u64,
         ) -> Result<(String, u64), TezosXRuntimeError>
@@ -1938,27 +1938,27 @@ mod tests {
     use crate::{make_default_ctx, COST_PER_BYTES};
     use primitive_types::U256;
     use tezosx_interfaces::{
-        CrossRuntimeContext, Registry, RuntimeId, TezosXRuntimeError,
+        AliasInfo, CrossRuntimeContext, Registry, RuntimeId, TezosXRuntimeError,
     };
 
     // Mock Registry for tests that don't need cross-runtime functionality
     struct MockRegistry;
 
     impl Registry for MockRegistry {
-        fn generate_alias<Host>(
+        fn ensure_alias<Host>(
             &self,
             _host: &mut Host,
             _journal: &mut TezosXJournal,
-            _native_address: &str,
+            _alias_info: AliasInfo,
             _native_public_key: Option<&[u8]>,
-            runtime_id: RuntimeId,
+            target_runtime: RuntimeId,
             _context: CrossRuntimeContext,
             _gas_remaining: u64,
         ) -> Result<(String, u64), TezosXRuntimeError>
         where
             Host: StorageV1,
         {
-            Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
+            Err(TezosXRuntimeError::RuntimeNotFound(target_runtime))
         }
 
         fn address_from_string(
@@ -6958,13 +6958,13 @@ mod tests {
         struct RevertRegistry;
 
         impl Registry for RevertRegistry {
-            fn generate_alias<Host>(
+            fn ensure_alias<Host>(
                 &self,
                 _host: &mut Host,
                 _journal: &mut TezosXJournal,
-                _native_address: &str,
+                _alias_info: AliasInfo,
                 _native_public_key: Option<&[u8]>,
-                _runtime_id: RuntimeId,
+                _target_runtime: RuntimeId,
                 _context: CrossRuntimeContext,
                 gas_remaining: u64,
             ) -> Result<(String, u64), TezosXRuntimeError>
