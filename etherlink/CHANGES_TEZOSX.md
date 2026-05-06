@@ -110,6 +110,21 @@
   `FailedToFetchContractCode` can be safely promoted to `BlockAbort`
   alongside the other infrastructure variants without giving any
   user a block-abort handle. (!21781)
+- Consolidate all Tezos account state under a single new SafeStorage
+  keyspace `/tez/tez_accounts/`: Michelson contracts and big_map move
+  from `/tezlink/context/` and originated KT1s in TezosX mode also
+  unify under `/tez/tez_accounts/contracts/` and
+  `/tez/tez_accounts/big_map/`, while TezosX projected accounts,
+  aliases and cross-runtime alias resolution move from
+  `/evm/world_state/eth_accounts/tezos/` to `/tez/tez_accounts/tezosx/`.
+  `/tezlink` is removed and standalone-Tezlink block storage is unified
+  with TezosX-mode at `/tez/world_state/tez_blocks/`. The Michelson
+  `TezBlock` gains a `state_root` field
+  (`keccak256(h(/tez/tez_accounts) || blueprint_hash)`, RLP bumped to
+  V2 with a 9-element list) so two blueprints at the same level with
+  divergent Michelson ops produce distinct Michelson block hashes,
+  upholding the ADR `adr_tzx_state_hash.md` invariant on both
+  runtimes. (!21716)
 
 ## Version 0.2 (017753c894e5bdaae7838c9501814c1ccc7290d6)
 
@@ -160,21 +175,6 @@
   `/entrypoints` RPC output is deterministic across runs and across
   native vs WASM kernel executions (`HashMap` iteration order depends
   on a per-process random seed). (!21715)
-- Consolidate all Tezos account state under a single new SafeStorage
-  keyspace `/tez/tez_accounts/`: Michelson contracts and big_map move
-  from `/tezlink/context/` and originated KT1s in TezosX mode also
-  unify under `/tez/tez_accounts/contracts/` and
-  `/tez/tez_accounts/big_map/`, while TezosX projected accounts,
-  aliases and cross-runtime alias resolution move from
-  `/evm/world_state/eth_accounts/tezos/` to `/tez/tez_accounts/tezosx/`.
-  `/tezlink` is removed and standalone-Tezlink block storage is unified
-  with TezosX-mode at `/tez/world_state/tez_blocks/`. The Michelson
-  `TezBlock` gains a `state_root` field
-  (`keccak256(h(/tez/tez_accounts) || blueprint_hash)`, RLP bumped to
-  V2 with a 9-element list) so two blueprints at the same level with
-  divergent Michelson ops produce distinct Michelson block hashes,
-  upholding the ADR `adr_tzx_state_hash.md` invariant on both
-  runtimes. (!21716)
 - Tezos operations now trigger a reboot if they can exceed the per-reboot gas
   budget. (!21765)
 
