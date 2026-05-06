@@ -18,7 +18,9 @@ use evm_types::{
 };
 use michelson_types::Withdrawal;
 use revm::{
-    primitives::{Address, AddressMap, HashMap, StorageKey, StorageValue, B256, U256},
+    primitives::{
+        Address, AddressMap, HashMap, StorageKey, StorageValue, B256, KECCAK_EMPTY, U256,
+    },
     state::{Account, AccountInfo, Bytecode, EvmStorage, EvmStorageSlot},
     Database, DatabaseCommit,
 };
@@ -29,7 +31,7 @@ use tezos_crypto_rs::{
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, tracing::instrument, Level};
 use tezos_smart_rollup_host::{runtime::RuntimeError, storage::StorageV1};
-use tezosx_interfaces::Registry;
+use tezosx_interfaces::{Origin, Registry};
 
 pub struct EtherlinkVMDB<'a, Host: StorageV1, R: Registry> {
     pub registry: &'a R,
@@ -121,6 +123,41 @@ where
                             ),
                             "DatabaseCommit `CodeStorage::add`"
                         );
+                    }
+                    // Mark Native if the account signed (nonce bump)
+                    // or was just deployed (empty to non-empty code).
+                    // Only writes when the path is empty, so existing
+                    // classifications survive.
+                    let original_info = self.original_account_infos.get(&address);
+                    let nonce_increased = match original_info {
+                        Some(prev) => info.nonce > prev.nonce,
+                        None => info.nonce > 0,
+                    };
+                    let original_code_hash = original_info
+                        .map(|prev| prev.code_hash)
+                        .unwrap_or(KECCAK_EMPTY);
+                    let code_was_set = original_code_hash == KECCAK_EMPTY
+                        && info.code_hash != KECCAK_EMPTY;
+                    if nonce_increased || code_was_set {
+                        match storage_account.get_origin(self.host) {
+                            Ok(None) => {
+                                abort_on_error!(
+                                    self,
+                                    storage_account
+                                        .set_origin(self.host, &Origin::Native),
+                                    "DatabaseCommit `set_origin(Native)`"
+                                );
+                            }
+                            Ok(Some(_)) => {}
+                            Err(err) => {
+                                self.abort();
+                                log!(
+                                    Level::Error,
+                                    "DatabaseCommit `get_origin` error: {err:?}"
+                                );
+                                return;
+                            }
+                        }
                     }
                     // Avoid rewriting the account info if it hasn't changed
                     if self.original_account_infos.get(&address) != Some(&info) {

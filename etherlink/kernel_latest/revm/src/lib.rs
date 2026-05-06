@@ -954,6 +954,14 @@ mod test {
         );
         let destination_info = destination_account.info(&mut host).unwrap();
         assert_eq!(destination_info.balance, value_sent);
+
+        // Caller is marked Native via the nonce bump. The destination
+        // only received funds, so it stays unrecorded.
+        assert_eq!(
+            caller_account.get_origin(&host).unwrap(),
+            Some(tezosx_interfaces::Origin::Native)
+        );
+        assert!(destination_account.get_origin(&host).unwrap().is_none());
     }
 
     #[test]
@@ -1320,7 +1328,20 @@ mod test {
                         .unwrap()
                         .unwrap()
                         .original_bytes()
-                )
+                );
+
+                // Deployed contract is marked Native via the code
+                // transition; caller is marked Native via the nonce
+                // bump.
+                assert_eq!(
+                    contract_account.get_origin(&host).unwrap(),
+                    Some(tezosx_interfaces::Origin::Native)
+                );
+                let caller_account = StorageAccount::from_address(&caller).unwrap();
+                assert_eq!(
+                    caller_account.get_origin(&host).unwrap(),
+                    Some(tezosx_interfaces::Origin::Native)
+                );
             }
             other => panic!("ERROR: ended up in {other:?}"),
         }
