@@ -266,26 +266,35 @@ impl<'a, Host: StorageV1, C: Context> CtxTrait<'a> for Ctx<'_, 'a, Host, C> {
         )>,
         tezos_data_encoding::enc::BinError,
     > {
+        use tezos_data_encoding::enc::BinError;
+        // Contract not originated: legitimate "view does not exist on this
+        // contract" case → Ok(None), matching L1 VIEW semantics.
         let Ok(account) = self.tc_ctx.context.originated_from_kt1(contract) else {
             return Ok(None);
         };
-        let Ok(serialized_script) = account.code(self.tc_ctx.host) else {
-            return Ok(None);
-        };
+        // The contract IS originated past this point; any further failure
+        // means a corrupted/unreadable durable state on a known contract,
+        // which must surface as an error rather than impersonate "view
+        // not found".
+        let serialized_script = account.code(self.tc_ctx.host).map_err(|e| {
+            BinError::custom(format!("view lookup: failed to read code: {e}"))
+        })?;
         match serialized_script {
             Code::Code(serialized_script) => {
-                let Ok(decoded) = Micheline::decode_raw(arena, &serialized_script) else {
-                    return Ok(None);
-                };
-                let Ok(MichelineContractScript {
+                let decoded =
+                    Micheline::decode_raw(arena, &serialized_script).map_err(|e| {
+                        BinError::custom(format!(
+                            "view lookup: failed to decode contract code: {e}"
+                        ))
+                    })?;
+                let MichelineContractScript {
                     code: _,
                     parameter_ty: _,
                     storage_ty,
                     views,
-                }) = decoded.split_script()
-                else {
-                    return Ok(None);
-                };
+                } = decoded.split_script().map_err(|e| {
+                    BinError::custom(format!("view lookup: failed to split script: {e}"))
+                })?;
                 let Some(view) = views.get(view_name) else {
                     return Ok(None);
                 };
@@ -294,15 +303,15 @@ impl<'a, Host: StorageV1, C: Context> CtxTrait<'a> for Ctx<'_, 'a, Host, C> {
                     output_type: view.output_type.clone(),
                     code: view.code.clone(),
                 };
-                let Ok(storage) = account.storage(self.tc_ctx.host) else {
-                    return Ok(None);
-                };
-                let Ok(balance) = account.balance(self.tc_ctx.host) else {
-                    return Ok(None);
-                };
-                let Ok(balance) = balance.0.try_into() else {
-                    return Ok(None);
-                };
+                let storage = account.storage(self.tc_ctx.host).map_err(|e| {
+                    BinError::custom(format!("view lookup: failed to read storage: {e}"))
+                })?;
+                let balance = account.balance(self.tc_ctx.host).map_err(|e| {
+                    BinError::custom(format!("view lookup: failed to read balance: {e}"))
+                })?;
+                let balance: i64 = balance.0.try_into().map_err(|_| {
+                    BinError::custom("view lookup: balance overflows i64".to_string())
+                })?;
                 Ok(Some((owned_view, storage_ty.clone(), storage, balance)))
             }
             Code::Enshrined(_) => {

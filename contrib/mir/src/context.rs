@@ -102,8 +102,12 @@ pub trait CtxTrait<'a>: TypecheckingCtx<'a> {
     /// - the packed (serialized) storage,
     /// - the contract balance in mutez.
     ///
-    /// Returns [`Ok(None)`] if the contract or the view does not exist. Returns
-    /// [`Err`] if encoding the view storage fails.
+    /// Returns [`Ok(None)`] if the contract is not originated or the named
+    /// view does not exist. Returns [`Err`] if the lookup itself fails —
+    /// host I/O error, corrupted contract code/storage, or a serialization
+    /// failure when producing the view's storage bytes. Implementations
+    /// must not collapse these latter cases into [`Ok(None)`], as that
+    /// would silently impersonate a missing view.
     fn lookup_view_storage_balance(
         &self,
         contract: &ContractKt1Hash,
