@@ -38,8 +38,8 @@
              SWAP ;
              DIG 4 ;
              UPDATE ;
-             DUP 4 ;
-             DIG 4 ;
+             SWAP ;
+             DIG 3 ;
              CAR ;
              PUSH nat 0 ;
              DUP 4 ;
@@ -48,11 +48,9 @@
              EQ ;
              IF { DIG 2 ; DROP ; NONE (map key_hash (pair bool (option (set address)))) }
                 { DIG 2 ; SOME } ;
-             DIG 4 ;
+             DIG 3 ;
              UPDATE ;
-             UPDATE 1 ;
-             SWAP ;
-             UPDATE 2 }
+             PAIR }
            { UNPAIR 3 ;
              UNIT ;
              DIG 5 ;
