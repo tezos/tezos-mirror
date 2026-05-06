@@ -1287,8 +1287,8 @@ fn interpret_one<'a>(
             stack.push(V::new_option(None));
         }
         I::Compare => {
-            let l = pop!();
-            let r = pop!();
+            let l = pop_rc!();
+            let r = pop_rc!();
             ctx.gas().consume(interpret_cost::compare(&l, &r)?)?;
             let cmp = l.partial_cmp(&r).expect("comparison failed") as i8;
             stack.push(V::Int(cmp.into()));
@@ -1328,12 +1328,13 @@ fn interpret_one<'a>(
                 stack.push(V::Bytes(bs1))
             }
             overloads::Concat::ListOfStrings => {
-                let list = pop!(V::List);
+                let list_rc = pop_rc!();
+                let list = irrefutable_match!(&*list_rc; V::List);
                 ctx.gas()
                     .consume(interpret_cost::concat_list_precheck(list.len())?)?;
 
                 let mut total_len = Checked::zero();
-                for val in &list {
+                for val in list {
                     let s = match val.as_ref() {
                         V::String(s) => s,
                         _ => unreachable_state(),
@@ -1354,12 +1355,13 @@ fn interpret_one<'a>(
                 stack.push(V::String(result))
             }
             overloads::Concat::ListOfBytes => {
-                let list = pop!(V::List);
+                let list_rc = pop_rc!();
+                let list = irrefutable_match!(&*list_rc; V::List);
                 ctx.gas()
                     .consume(interpret_cost::concat_list_precheck(list.len())?)?;
 
                 let mut total_len = Checked::zero();
-                for val in &list {
+                for val in list {
                     let bs = match val.as_ref() {
                         V::Bytes(bs) => bs,
                         _ => unreachable_state(),
@@ -1370,7 +1372,7 @@ fn interpret_one<'a>(
                     .consume(interpret_cost::concat_bytes_list(total_len)?)?;
 
                 let mut result = Vec::with_capacity(total_len.ok_or(OutOfGas)?);
-                for val in &list {
+                for val in list {
                     let bs = match val.as_ref() {
                         V::Bytes(bs) => bs,
                         _ => unreachable_state(),
@@ -1891,7 +1893,8 @@ fn interpret_one<'a>(
         }
         #[cfg(feature = "bls")]
         I::PairingCheck => {
-            let list = pop!(V::List);
+            let list_rc = pop_rc!();
+            let list = irrefutable_match!(&*list_rc; V::List);
             ctx.gas()
                 .consume(interpret_cost::pairing_check(list.len())?)?;
             let it = list.iter().map(|elt| {
