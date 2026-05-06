@@ -59,8 +59,8 @@ use crate::gas::Cost;
 pub use crate::gas::TezlinkOperationGas;
 use crate::mir_ctx::{
     clear_temporary_big_maps, convert_big_map_diff, BlockCtx, Ctx, ExecCtx,
-    HasContractAccount, HasHost, HasOperationGas, HasSourcePublicKey, OperationCtx,
-    TcCtx,
+    HasContractAccount, HasHost, HasOperationGas, HasOriginLookup, HasSourcePublicKey,
+    OperationCtx, TcCtx,
 };
 
 /// Result of applying a single operation within a batch.
@@ -1295,7 +1295,8 @@ fn execute_smart_contract<'a, Host>(
               + HasHost<Host>
               + HasContractAccount
               + HasOperationGas
-              + HasSourcePublicKey),
+              + HasSourcePublicKey
+              + HasOriginLookup),
     registry: &impl Registry,
     journal: &mut TezosXJournal,
 ) -> Result<ExecutionResult<'a, impl Iterator<Item = OperationInfo<'a>>>, CracError>

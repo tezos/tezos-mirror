@@ -23,17 +23,20 @@ use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::block::AppliedOperation;
 use tezos_tezlink::operation_result::{InternalOperationSum, TransferError};
 use tezosx_interfaces::{
-    gas::convert as convert_gas, headers::format_tez_from_mutez, AliasInfo,
-    CrossRuntimeContext, Registry, RuntimeId, ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT,
-    X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT,
-    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
+    gas::convert as convert_gas, headers::format_tez_from_mutez, resolve_routing,
+    AliasInfo, CrossRuntimeContext, Registry, RoutingDecision, RuntimeId,
+    ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_ID,
+    X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE,
+    X_TEZOS_TIMESTAMP,
 };
 use tezosx_journal::TezosXJournal;
 
 use crate::alias::{get_alias, store_alias};
 
 use crate::account_storage::TezlinkAccount;
-use crate::mir_ctx::{HasContractAccount, HasHost, HasOperationGas, HasSourcePublicKey};
+use crate::mir_ctx::{
+    HasContractAccount, HasHost, HasOperationGas, HasOriginLookup, HasSourcePublicKey,
+};
 
 /// Errors from CRAC-capable operations. The two variants have fundamentally
 /// different semantics and must be handled at different levels.
@@ -190,7 +193,8 @@ pub(crate) fn execute_enshrined_contract<'a, Host>(
               + HasHost<Host>
               + HasContractAccount
               + HasOperationGas
-              + HasSourcePublicKey),
+              + HasSourcePublicKey
+              + HasOriginLookup),
     registry: &impl Registry,
     journal: &mut TezosXJournal,
 ) -> Result<Vec<OperationInfo<'a>>, CracError>
@@ -751,7 +755,11 @@ fn inject_context_headers_raw(
 /// units before being written to `X-Tezos-Gas-Limit`.
 fn inject_context_headers<'a, Host>(
     mut request: http::Request<Vec<u8>>,
-    ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasOperationGas + HasSourcePublicKey),
+    ctx: &mut (impl CtxTrait<'a>
+              + HasHost<Host>
+              + HasOperationGas
+              + HasSourcePublicKey
+              + HasOriginLookup),
     journal: &mut TezosXJournal,
     registry: &impl Registry,
 ) -> Result<http::Request<Vec<u8>>, TransferError>
@@ -803,36 +811,50 @@ where
     ctx.operation_gas()
         .cast_and_consume_milligas(ALIAS_CACHE_HIT_MILLIGAS)
         .map_err(|_| TransferError::OutOfGas)?;
-    let remaining_milligas = ctx.gas().milligas().ok_or(TransferError::OutOfGas)? as u64;
-    // Convert remaining milligas to target runtime gas: this caps the budget
-    // that get_or_create_alias may spend on alias generation.
-    let target_budget = convert_gas(RuntimeId::Tezos, target_runtime, remaining_milligas)
-        .ok_or(TransferError::OutOfGas)?;
     // When sender == source (the common case for implicit account
     // transfers), pass the source pubkey so the alias is created with
     // the credential attached.
     let sender_is_source = sender == source;
-    let sender_pubkey: Option<&[u8]> = if sender_is_source {
-        Some(&source_public_key)
-    } else {
-        None
+    let sender_alias = 'sender: {
+        let alias_info = match read_and_resolve_routing(ctx, &sender, target_runtime)? {
+            RoutingDecision::RoundTrip(target) => break 'sender target,
+            RoutingDecision::Transitive(info) => info,
+            RoutingDecision::Native => AliasInfo {
+                runtime: RuntimeId::Tezos,
+                native_address: sender.to_base58_check().into_bytes(),
+            },
+        };
+        let remaining_milligas =
+            ctx.gas().milligas().ok_or(TransferError::OutOfGas)? as u64;
+        // Convert remaining milligas to target runtime gas: this caps the budget
+        // that get_or_create_alias may spend on alias generation.
+        let target_budget =
+            convert_gas(RuntimeId::Tezos, target_runtime, remaining_milligas)
+                .ok_or(TransferError::OutOfGas)?;
+        let sender_pubkey: Option<&[u8]> = if sender_is_source {
+            Some(&source_public_key)
+        } else {
+            None
+        };
+        let (sender_alias, sender_target_consumed) = get_or_create_alias(
+            ctx.host(),
+            journal,
+            &sender,
+            alias_info,
+            sender_pubkey,
+            context.clone(),
+            registry,
+            target_runtime,
+            target_budget,
+        )?;
+        let sender_milligas =
+            convert_gas(target_runtime, RuntimeId::Tezos, sender_target_consumed)
+                .ok_or(TransferError::OutOfGas)?;
+        ctx.operation_gas()
+            .cast_and_consume_milligas(sender_milligas)
+            .map_err(|_| TransferError::OutOfGas)?;
+        sender_alias
     };
-    let (sender_alias, sender_target_consumed) = get_or_create_alias(
-        ctx.host(),
-        journal,
-        &sender,
-        sender_pubkey,
-        context.clone(),
-        registry,
-        target_runtime,
-        target_budget,
-    )?;
-    let sender_milligas =
-        convert_gas(target_runtime, RuntimeId::Tezos, sender_target_consumed)
-            .ok_or(TransferError::OutOfGas)?;
-    ctx.operation_gas()
-        .cast_and_consume_milligas(sender_milligas)
-        .map_err(|_| TransferError::OutOfGas)?;
 
     // --- source alias ---
     // Fast path: when sender == source (a user's implicit account calling
@@ -844,28 +866,40 @@ where
         ctx.operation_gas()
             .cast_and_consume_milligas(ALIAS_CACHE_HIT_MILLIGAS)
             .map_err(|_| TransferError::OutOfGas)?;
-        let remaining_milligas =
-            ctx.gas().milligas().ok_or(TransferError::OutOfGas)? as u64;
-        let target_budget =
-            convert_gas(RuntimeId::Tezos, target_runtime, remaining_milligas)
-                .ok_or(TransferError::OutOfGas)?;
-        let (source_alias, source_target_consumed) = get_or_create_alias(
-            ctx.host(),
-            journal,
-            &source,
-            Some(&source_public_key),
-            context,
-            registry,
-            target_runtime,
-            target_budget,
-        )?;
-        let source_milligas =
-            convert_gas(target_runtime, RuntimeId::Tezos, source_target_consumed)
-                .ok_or(TransferError::OutOfGas)?;
-        ctx.operation_gas()
-            .cast_and_consume_milligas(source_milligas)
-            .map_err(|_| TransferError::OutOfGas)?;
-        source_alias
+        'source: {
+            let alias_info = match read_and_resolve_routing(ctx, &source, target_runtime)?
+            {
+                RoutingDecision::RoundTrip(target) => break 'source target,
+                RoutingDecision::Transitive(info) => info,
+                RoutingDecision::Native => AliasInfo {
+                    runtime: RuntimeId::Tezos,
+                    native_address: source.to_base58_check().into_bytes(),
+                },
+            };
+            let remaining_milligas =
+                ctx.gas().milligas().ok_or(TransferError::OutOfGas)? as u64;
+            let target_budget =
+                convert_gas(RuntimeId::Tezos, target_runtime, remaining_milligas)
+                    .ok_or(TransferError::OutOfGas)?;
+            let (source_alias, source_target_consumed) = get_or_create_alias(
+                ctx.host(),
+                journal,
+                &source,
+                alias_info,
+                Some(&source_public_key),
+                context,
+                registry,
+                target_runtime,
+                target_budget,
+            )?;
+            let source_milligas =
+                convert_gas(target_runtime, RuntimeId::Tezos, source_target_consumed)
+                    .ok_or(TransferError::OutOfGas)?;
+            ctx.operation_gas()
+                .cast_and_consume_milligas(source_milligas)
+                .map_err(|_| TransferError::OutOfGas)?;
+            source_alias
+        }
     };
     // Convert remaining Tezos milligas to the target runtime's units.
     // Use current remaining gas (not the pre-alias tezos_gas_limit) so the
@@ -969,9 +1003,24 @@ fn compute_selector(method_signature: &str) -> [u8; 4] {
     [hash[0], hash[1], hash[2], hash[3]]
 }
 
+/// Read the source's classification record and delegate to the shared
+/// `resolve_routing` helper, mapping its error variants into the
+/// gateway envelope.
+fn read_and_resolve_routing(
+    ctx: &impl HasOriginLookup,
+    address: &AddressHash,
+    target_runtime: RuntimeId,
+) -> Result<RoutingDecision, TransferError> {
+    let origin = ctx
+        .read_origin_for_address(address)
+        .map_err(|e| TransferError::GatewayError(format!("read origin failed: {e}")))?;
+    resolve_routing(origin, target_runtime)
+        .map_err(|e| TransferError::GatewayError(e.to_string()))
+}
+
 /// Look up the alias for `address` on the given `target_runtime`. If none
-/// exists, generate one via `registry`, passing `gas_remaining` (in target
-/// runtime units) as budget.
+/// exists, generate one via `registry` using `alias_info` as the derivation
+/// basis, passing `gas_remaining` (in target runtime units) as budget.
 ///
 /// Returns `(alias, generation_gas_consumed)` where the gas is in the
 /// target runtime's units (0 on cache hit).
@@ -980,6 +1029,7 @@ fn get_or_create_alias<Host>(
     host: &mut Host,
     journal: &mut TezosXJournal,
     address: &AddressHash,
+    alias_info: AliasInfo,
     native_public_key: Option<&[u8]>,
     context: CrossRuntimeContext,
     registry: &impl Registry,
@@ -992,11 +1042,6 @@ where
     if let Some(alias) = get_alias(host, address, target_runtime)? {
         return Ok((alias, 0));
     }
-    let address_b58 = address.to_base58_check();
-    let alias_info = AliasInfo {
-        runtime: RuntimeId::Tezos,
-        native_address: address_b58.into_bytes(),
-    };
     let (alias_str, gas_remaining_after) = registry
         .ensure_alias(
             host,
@@ -1056,7 +1101,8 @@ fn dispatch_crac_call<'a, Host>(
               + HasHost<Host>
               + HasContractAccount
               + HasOperationGas
-              + HasSourcePublicKey),
+              + HasSourcePublicKey
+              + HasOriginLookup),
     request: http::Request<Vec<u8>>,
 ) -> Result<Vec<u8>, CracError>
 where
@@ -1268,7 +1314,7 @@ mod tests {
     use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_tezlink::operation_result::{ContentResult, InternalOperationSum};
-    use tezosx_interfaces::RuntimeId;
+    use tezosx_interfaces::{Origin, RuntimeId};
     use tezosx_journal::TezosXJournal;
 
     use super::*;
@@ -3027,6 +3073,89 @@ mod tests {
                     panic!("{label} must route to Operation, not BlockAbort")
                 }
             }
+        }
+    }
+
+    /// Stub that returns a fixed origin classification regardless of address.
+    /// Used to drive `read_and_resolve_routing` without instantiating a full ctx.
+    struct OriginLookupStub(Option<Origin>);
+
+    impl HasOriginLookup for OriginLookupStub {
+        fn read_origin_for_address(
+            &self,
+            _address: &AddressHash,
+        ) -> Result<Option<Origin>, tezos_storage::error::Error> {
+            Ok(self.0.clone())
+        }
+    }
+
+    fn alias_origin(runtime: RuntimeId, native_address: &[u8]) -> Origin {
+        Origin::Alias(AliasInfo {
+            runtime,
+            native_address: native_address.to_vec(),
+        })
+    }
+
+    fn some_address() -> AddressHash {
+        AddressHash::from_base58_check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap()
+    }
+
+    #[test]
+    fn routing_returns_round_trip_for_matching_alias() {
+        let stub = OriginLookupStub(Some(alias_origin(
+            RuntimeId::Ethereum,
+            b"0xabcdef0123456789abcdef0123456789abcdef01",
+        )));
+        match read_and_resolve_routing(&stub, &some_address(), RuntimeId::Ethereum)
+            .unwrap()
+        {
+            RoutingDecision::RoundTrip(target) => {
+                assert_eq!(target, "0xabcdef0123456789abcdef0123456789abcdef01")
+            }
+            other => panic!(
+                "expected RoundTrip, got {:?}",
+                std::mem::discriminant(&other)
+            ),
+        }
+    }
+
+    #[test]
+    fn routing_returns_native_for_native_origin() {
+        let stub = OriginLookupStub(Some(Origin::Native));
+        assert!(matches!(
+            read_and_resolve_routing(&stub, &some_address(), RuntimeId::Ethereum)
+                .unwrap(),
+            RoutingDecision::Native,
+        ));
+    }
+
+    #[test]
+    fn routing_returns_native_for_unrecorded_source() {
+        let stub = OriginLookupStub(None);
+        assert!(matches!(
+            read_and_resolve_routing(&stub, &some_address(), RuntimeId::Ethereum)
+                .unwrap(),
+            RoutingDecision::Native,
+        ));
+    }
+
+    #[test]
+    fn routing_returns_transitive_for_mismatched_runtime() {
+        // Path-independence: the recorded info is the basis for
+        // derivation toward a third target. Unreachable in two
+        // runtime mode.
+        let stub = OriginLookupStub(Some(alias_origin(RuntimeId::Tezos, b"tz1abcdef")));
+        match read_and_resolve_routing(&stub, &some_address(), RuntimeId::Ethereum)
+            .unwrap()
+        {
+            RoutingDecision::Transitive(info) => {
+                assert_eq!(info.runtime, RuntimeId::Tezos);
+                assert_eq!(info.native_address, b"tz1abcdef".to_vec());
+            }
+            other => panic!(
+                "expected Transitive, got {:?}",
+                std::mem::discriminant(&other)
+            ),
         }
     }
 }

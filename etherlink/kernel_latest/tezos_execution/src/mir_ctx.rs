@@ -325,6 +325,16 @@ pub trait HasSourcePublicKey {
     fn source_public_key(&self) -> &[u8];
 }
 
+/// Read the runtime classification record for an address.
+/// Handles host and context access so callers can resolve
+/// cross-runtime aliases without separate borrows.
+pub trait HasOriginLookup {
+    fn read_origin_for_address(
+        &self,
+        address: &AddressHash,
+    ) -> Result<Option<tezosx_interfaces::Origin>, tezos_storage::error::Error>;
+}
+
 impl<'a, 'operation, Host: StorageV1, C: Context> HasContractAccount
     for Ctx<'a, 'operation, Host, C>
 {
@@ -339,6 +349,19 @@ impl<'a, 'operation, Host: StorageV1, C: Context> HasHost<Host>
 {
     fn host(&mut self) -> &mut Host {
         self.tc_ctx.host
+    }
+}
+
+impl<'a, 'operation, Host: StorageV1, C: Context> HasOriginLookup
+    for Ctx<'a, 'operation, Host, C>
+{
+    fn read_origin_for_address(
+        &self,
+        address: &AddressHash,
+    ) -> Result<Option<tezosx_interfaces::Origin>, tezos_storage::error::Error> {
+        self.tc_ctx
+            .context
+            .read_origin_for_address(&*self.tc_ctx.host, address)
     }
 }
 
@@ -1115,6 +1138,7 @@ pub(crate) mod mock {
         pub operation_gas: crate::gas::TezlinkOperationGas,
         pub contract_account: TezlinkOriginatedAccount,
         pub operation_counter: u128,
+        pub context: crate::context::TezlinkContext,
     }
 
     impl<'a, Host: StorageV1> MockCtx<'a, Host> {
@@ -1132,7 +1156,18 @@ pub(crate) mod mock {
                     path: RefPath::assert_from(b"/mock").into(),
                     kt1: ContractKt1Hash::from([0u8; 20]),
                 },
+                context: crate::context::TezlinkContext::init_context(),
             }
+        }
+    }
+
+    impl<'a, Host: StorageV1> HasOriginLookup for MockCtx<'a, Host> {
+        fn read_origin_for_address(
+            &self,
+            address: &AddressHash,
+        ) -> Result<Option<tezosx_interfaces::Origin>, tezos_storage::error::Error>
+        {
+            self.context.read_origin_for_address(&*self.host, address)
         }
     }
 
