@@ -371,20 +371,24 @@ mod origin_tests {
 /// (for the limit) and on the way back (for consumed); receiving runtimes
 /// read/write directly without conversion.
 ///
-/// **Ratio**: 1 EVM gas = 100 Tezos milligas.
+/// **Ratio**: 1 EVM gas = [`tezosx_constants::EVM_GAS_TO_MILLIGAS`] Tezos
+/// milligas.
 /// **Tezos unit**: milligas (the native unit of the Tezos runtime).
 pub mod gas {
     use crate::RuntimeId;
+    use tezosx_constants::EVM_GAS_TO_MILLIGAS;
 
     /// Convert `gas` from `source` runtime units to `target` runtime units.
     ///
     /// Returns `None` on overflow (only possible for Ethereum→Tezos when
-    /// `gas > u64::MAX / 100`). Returns `Some(gas)` unchanged when
-    /// `source == target`.
+    /// `gas > u64::MAX / EVM_GAS_TO_MILLIGAS`). Returns `Some(gas)`
+    /// unchanged when `source == target`.
     pub fn convert(source: RuntimeId, target: RuntimeId, gas: u64) -> Option<u64> {
         match (source, target) {
-            (RuntimeId::Ethereum, RuntimeId::Tezos) => gas.checked_mul(100),
-            (RuntimeId::Tezos, RuntimeId::Ethereum) => Some(gas / 100),
+            (RuntimeId::Ethereum, RuntimeId::Tezos) => {
+                gas.checked_mul(EVM_GAS_TO_MILLIGAS)
+            }
+            (RuntimeId::Tezos, RuntimeId::Ethereum) => Some(gas / EVM_GAS_TO_MILLIGAS),
             _ => Some(gas),
         }
     }
@@ -397,31 +401,43 @@ pub mod gas {
         fn ethereum_to_tezos() {
             assert_eq!(
                 convert(RuntimeId::Ethereum, RuntimeId::Tezos, 100),
-                Some(10_000)
+                Some(100 * EVM_GAS_TO_MILLIGAS)
             );
             assert_eq!(
                 convert(RuntimeId::Ethereum, RuntimeId::Tezos, 1_000_000),
-                Some(100_000_000)
+                Some(1_000_000 * EVM_GAS_TO_MILLIGAS)
             );
         }
 
         #[test]
         fn ethereum_to_tezos_overflow() {
-            let large = u64::MAX / 100 + 1;
+            let large = u64::MAX / EVM_GAS_TO_MILLIGAS + 1;
             assert_eq!(convert(RuntimeId::Ethereum, RuntimeId::Tezos, large), None);
         }
 
         #[test]
         fn tezos_to_ethereum() {
             assert_eq!(
-                convert(RuntimeId::Tezos, RuntimeId::Ethereum, 10_000),
+                convert(
+                    RuntimeId::Tezos,
+                    RuntimeId::Ethereum,
+                    100 * EVM_GAS_TO_MILLIGAS
+                ),
                 Some(100)
             );
         }
 
         #[test]
         fn tezos_to_ethereum_truncates() {
-            assert_eq!(convert(RuntimeId::Tezos, RuntimeId::Ethereum, 150), Some(1));
+            // EVM_GAS_TO_MILLIGAS + half a unit's worth → still 1 EVM gas.
+            assert_eq!(
+                convert(
+                    RuntimeId::Tezos,
+                    RuntimeId::Ethereum,
+                    EVM_GAS_TO_MILLIGAS + EVM_GAS_TO_MILLIGAS / 2
+                ),
+                Some(1)
+            );
         }
 
         #[test]

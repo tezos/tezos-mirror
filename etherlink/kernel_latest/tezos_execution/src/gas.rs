@@ -68,14 +68,27 @@ impl Cost {
 impl TezlinkOperationGas {
     /// Maximum gas (in milligas) for a single Tezos operation in Tezos X.
     ///
-    /// Raised above the L1 mainnet default (1_040_000 gas = 1_040_000_000
-    /// milligas) so that a cross-runtime call originating on the EVM side,
-    /// which can carry up to 30_000_000 EVM gas of remaining budget, can
-    /// propagate its full gas limit through `X-Tezos-Gas-Limit` (1 EVM gas
-    /// = 100 milligas, so 30_000_000 * 100 = 3_000_000_000 milligas).
-    /// This value is overridden in the Tezlink parametric constants
-    /// (`etherlink/bin_node/lib_dev/tezlink/tezlink_constants.ml`).
-    pub const MAX_LIMIT: u32 = 3_000_000_000;
+    /// Derived from the EVM per-transaction cap to keep the two runtimes
+    /// on the same gas-budget envelope: a cross-runtime call originating
+    /// on the EVM side can carry up to
+    /// [`tezosx_constants::EVM_MAX_GAS_PER_TRANSACTION`] of remaining
+    /// gas, which the runtime gateway forwards as
+    /// `X-Tezos-Gas-Limit = remaining_evm_gas * EVM_GAS_TO_MILLIGAS`.
+    /// Capping the Michelson side at the same product makes the
+    /// translation lossless and avoids the spurious rejections that
+    /// motivated L2-1295.
+    ///
+    /// 30_000_000 EVM gas × 100 milligas/gas = 3_000_000_000 milligas.
+    /// The Tezlink parametric constants override
+    /// `hard_gas_limit_per_operation` to the gas-unit equivalent
+    /// (3_000_000) — see
+    /// `etherlink/bin_node/lib_dev/tezlink/tezlink_constants.ml`.
+    ///
+    /// Typed as `u64` to match the upstream constant and leave headroom
+    /// for raising the cap above `u32::MAX`. `mir::gas::Gas` itself is
+    /// `u32`-backed; we narrow at the boundary via `try_into` so a
+    /// future bump never silently truncates.
+    pub const MAX_LIMIT: u64 = tezosx_constants::MICHELSON_MAX_MILLIGAS_PER_OPERATION;
 
     /// Initializes operation gas from the provided limit (in gas units) and
     /// validates it against the per-operation hard limit.
@@ -85,7 +98,7 @@ impl TezlinkOperationGas {
         let limit_in_milligas = &limit_in_gas_unit.0 * 1000u32;
         if limit_in_milligas > num_bigint::BigUint::from(Self::MAX_LIMIT) {
             return Err(GasLimitError::GasLimitTooHigh(
-                Self::MAX_LIMIT / 1000,
+                (Self::MAX_LIMIT / 1000) as u32,
                 limit_in_milligas / 1000u32,
             ));
         }
@@ -107,18 +120,20 @@ impl TezlinkOperationGas {
     /// This is used by the cross-runtime protocol where `X-Tezos-Gas-Limit`
     /// carries milligas directly, avoiding a redundant milligas↔gas round-trip.
     pub fn start_milligas(limit_in_milligas: u64) -> Result<Self, GasLimitError> {
+        if limit_in_milligas > Self::MAX_LIMIT {
+            return Err(GasLimitError::GasLimitTooHigh(
+                (Self::MAX_LIMIT / 1000) as u32,
+                num_bigint::BigUint::from(limit_in_milligas / 1000),
+            ));
+        }
+        // The MAX_LIMIT check above guarantees the value fits in u32 as
+        // long as `MAX_LIMIT <= u32::MAX`.
         let limit: u32 = limit_in_milligas.try_into().map_err(|_| {
             GasLimitError::GasLimitTooHigh(
-                Self::MAX_LIMIT / 1000,
+                (Self::MAX_LIMIT / 1000) as u32,
                 num_bigint::BigUint::from(limit_in_milligas / 1000),
             )
         })?;
-        if limit > Self::MAX_LIMIT {
-            return Err(GasLimitError::GasLimitTooHigh(
-                Self::MAX_LIMIT / 1000,
-                num_bigint::BigUint::from(limit / 1000),
-            ));
-        }
         Ok(Self {
             initial_limit: limit,
             current_limit: limit,
@@ -207,10 +222,18 @@ impl TezlinkOperationGas {
 impl Default for TezlinkOperationGas {
     /// Constructs [Gas] with [MAX_LIMIT] gas remaining.
     fn default() -> Self {
+        // MAX_LIMIT is u64 to leave headroom; the underlying mir gas
+        // counter is u32-backed. The narrowing here is safe as long as
+        // `MAX_LIMIT <= u32::MAX` (3_000_000_000 ≤ 4_294_967_295). If
+        // the cap is ever raised above `u32::MAX`, the `try_into` will
+        // catch it loudly rather than silently truncating.
+        let limit: u32 = Self::MAX_LIMIT
+            .try_into()
+            .expect("TezlinkOperationGas::MAX_LIMIT must fit in u32");
         Self {
-            initial_limit: Self::MAX_LIMIT,
-            current_limit: Self::MAX_LIMIT,
-            remaining: gas::Gas::new(Self::MAX_LIMIT),
+            initial_limit: limit,
+            current_limit: limit,
+            remaining: gas::Gas::new(limit),
         }
     }
 }

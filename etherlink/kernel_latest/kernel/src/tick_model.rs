@@ -13,8 +13,14 @@ use tezos_ethereum::transaction::IndexedLog;
 pub mod constants {
 
     /// Maximum of gas allowed for a transaction.
-    /// Comes from the block limit, defined in EIP-1559 as 2 * gas target
-    pub const MAXIMUM_GAS_LIMIT: u64 = 30_000_000;
+    ///
+    /// Network performance choice for Tezos X (bounds worst-case kernel
+    /// work per transaction), not an Ethereum-mainnet-derived value.
+    /// The base value lives in the [`tezosx_constants`] leaf crate so
+    /// the Michelson runtime per-operation cap (in milligas) can be
+    /// derived from the same source — see
+    /// [`tezos_execution_latest::gas::TezlinkOperationGas::MAX_LIMIT`].
+    pub const MAXIMUM_GAS_LIMIT: u64 = tezosx_constants::EVM_MAX_GAS_PER_TRANSACTION;
 
     /// Maximum number of ticks for a kernel run.
     /// Order of magnitude lower than the limit set by the PVM to provide

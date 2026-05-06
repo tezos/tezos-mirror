@@ -1239,6 +1239,7 @@ dependencies = [
  "tezos_data_encoding",
  "tezos_ethereum_latest",
  "tezos_tezlink_latest",
+ "tezosx-constants",
  "tezosx-ethereum-runtime",
  "tezosx-interfaces",
  "tezosx-journal",
@@ -2569,6 +2570,7 @@ dependencies = [
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "tezos_ethereum_latest",
+ "tezosx-constants",
  "tezosx-ethereum-runtime",
  "tezosx-interfaces",
  "tezosx-journal",
@@ -3223,6 +3225,7 @@ dependencies = [
  "tezos_data_encoding",
  "tezos_ethereum_latest",
  "tezos_tezlink_latest",
+ "tezosx-constants",
  "tezosx-interfaces",
  "tezosx-journal",
  "thiserror 1.0.69",
@@ -3528,6 +3531,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "tezosx-constants"
+version = "0.1.0"
+
+[[package]]
 name = "tezosx-ethereum-runtime"
 version = "0.1.0"
 dependencies = [
@@ -3560,6 +3567,7 @@ dependencies = [
  "tezos-smart-rollup-host",
  "tezos-storage-latest",
  "tezos_data_encoding",
+ "tezosx-constants",
  "tezosx-journal",
  "thiserror 1.0.69",
 ]
