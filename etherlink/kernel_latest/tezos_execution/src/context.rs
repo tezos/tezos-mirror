@@ -6,6 +6,7 @@ use mir::ast::{big_map::BigMapId, PublicKeyHash};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, Path, PathError, RefPath};
+use tezos_smart_rollup_host::storage::StorageV1;
 
 use crate::account_storage::{
     TezlinkImplicitAccount, TezlinkOriginatedAccount, TezosImplicitAccount,
@@ -56,6 +57,17 @@ pub trait Context {
         &self,
         kt1: &ContractKt1Hash,
     ) -> Result<Self::OriginatedAccountType, tezos_storage::error::Error>;
+
+    /// Record that an originated account is recognized as native.
+    /// Default is a no-op for runtimes without classification storage.
+    /// TezosX overrides this to write Native at the origin storage path.
+    fn record_native_origin(
+        &self,
+        _host: &mut impl StorageV1,
+        _kt1: &ContractKt1Hash,
+    ) -> Result<(), tezos_storage::error::Error> {
+        Ok(())
+    }
 
     fn path(&self) -> OwnedPath;
 
