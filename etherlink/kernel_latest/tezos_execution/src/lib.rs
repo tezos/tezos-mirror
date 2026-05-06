@@ -18,7 +18,7 @@ use mir::{
 use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedMul;
 use num_traits::ops::checked::CheckedSub;
-use num_traits::ToPrimitive;
+use num_traits::{ToPrimitive, Zero};
 use primitive_types::U256;
 use std::collections::{BTreeMap, HashMap};
 use std::vec::IntoIter;
@@ -52,7 +52,9 @@ use tezos_tezlink::{
 use tezosx_interfaces::Registry;
 use tezosx_journal::TezosXJournal;
 
-use crate::account_storage::{TezosImplicitAccount, TezosOriginatedAccount};
+use crate::account_storage::{
+    StorageSpace, TezosImplicitAccount, TezosOriginatedAccount,
+};
 pub use crate::address::OriginationNonce;
 use crate::context::Context;
 use crate::gas::Cost;
@@ -698,6 +700,11 @@ where
                 .map_err(|_| TransferError::OutOfGas)?;
             let lazy_storage_diff =
                 convert_big_map_diff(std::mem::take(&mut ctx.tc_ctx.big_map_diff));
+
+            let _: StorageSpace = dest_account
+                .update_storage_space(ctx.host())
+                .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
+
             match execute_internal_operations(
                 ctx.tc_ctx,
                 ctx.operation_ctx,
@@ -1036,16 +1043,17 @@ where
         .originated_from_kt1(&contract)
         .map_err(|_| OriginationError::FailedToFetchOriginated)?;
 
-    let total_size = smart_contract
+    let StorageSpace {
+        used_bytes: total_size,
+    } = smart_contract
         .init(ctx.host, script_code, &new_storage)
         .map_err(|_| OriginationError::CantInitContract)?;
 
     // There's this line in the origination `assert (Compare.Z.(total_size >= Z.zero)) ;`
-    // This error is unreachable because of the simulation, but as we don't have simulation
-    // yet it's possible.
-    if total_size.eq(&0u64.into()) {
-        return Err(OriginationError::CantOriginateEmptyContract);
-    }
+    let total_size_unsigned: BigUint = match BigUint::try_from(total_size.0.clone()) {
+        Ok(b) if !b.is_zero() => b,
+        _ => return Err(OriginationError::CantOriginateEmptyContract),
+    };
 
     // Compute the initial_balance setup of the smart contract as a balance update for the origination.
     let mut balance_updates =
@@ -1054,7 +1062,7 @@ where
 
     // Balance updates for the impacts of origination on storage space.
     // storage_fees = total_size * COST_PER_BYTES
-    let storage_fees = BigUint::from(total_size.clone())
+    let storage_fees = total_size_unsigned
         .checked_mul(&BigUint::from(COST_PER_BYTES))
         .ok_or(OriginationError::FailedToComputeBalanceUpdate)?;
     let storage_fees_balance_updates =
@@ -1099,8 +1107,8 @@ where
         // These are probably not the right values for storage_size and
         // paid_storage_size_diff, but having something different than 0
         // participates in having the TzKT front-end not crash when originating.
-        storage_size: total_size.clone().into(),
-        paid_storage_size_diff: total_size.into(),
+        storage_size: total_size.clone(),
+        paid_storage_size_diff: total_size,
         lazy_storage_diff,
     };
     Ok(dummy_origination_sucess)
