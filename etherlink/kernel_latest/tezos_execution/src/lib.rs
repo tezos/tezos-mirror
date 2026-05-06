@@ -1025,11 +1025,14 @@ fn handle_storage_with_big_maps<'a, Host: StorageV1, C: Context>(
     // Dump big_map allocation, starting with empty big_maps
     mir::ast::big_map::dump_big_map_updates(ctx, &[], &mut big_maps, false)
         .map_err(|err| OriginationError::MirBigMapAllocation(err.to_string()))?;
+    // Drain the diff before the fallible encode below: otherwise an
+    // encode failure leaves `ctx.big_map_diff` half-populated and the
+    // next operation in the same batch inherits stale entries.
+    let lazy_storage_diff = convert_big_map_diff(std::mem::take(&mut ctx.big_map_diff));
     let storage = storage
         .into_micheline_optimized_legacy(&parser.arena)
         .encode()
         .map_err(|e| OriginationError::MichelineSerializationError(e.to_string()))?;
-    let lazy_storage_diff = convert_big_map_diff(std::mem::take(&mut ctx.big_map_diff));
     Ok((storage, lazy_storage_diff))
 }
 
