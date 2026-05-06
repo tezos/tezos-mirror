@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### EVM Runtime
+
+### Michelson Runtime
+
+### Native atomic composability
+
+### Internals
+
+## Version 0.3 (d2a6743ebef523c88c986c21311307a4251e67e4)
+
 ### Native atomic composability
 
 - Stop persisting a `U256::MAX` balance for the internal
@@ -71,6 +81,9 @@
   that triggered the re-entry instead of the EOA. Indexers and any
   downstream code resolving per-CRAC source identity could no longer
   recover which EOA originated the transaction. (!21817)
+
+### Michelson Runtime
+
 - Raise the Michelson runtime `hard_gas_limit_per_operation` and
   `hard_gas_limit_per_block` from 1,040,000 to 3,000,000 gas units (i.e.
   3,000,000,000 milligas) to match the EVM 30M-gas per-transaction cap.
