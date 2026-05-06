@@ -3,11 +3,16 @@
 // SPDX-License-Identifier: MIT
 
 use tezos_crypto_rs::{hash::ContractKt1Hash, public_key_hash::PublicKeyHash};
-use tezos_execution::{account_storage::TezlinkOriginatedAccount, context::Context};
+use tezos_execution::{
+    account_storage::{TezlinkAccount, TezlinkOriginatedAccount},
+    context::Context,
+};
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, Path, PathError};
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezosx_interfaces::Origin;
 
-use crate::account::{path_to_tezos_account, TezosImplicitAccount};
+use crate::account::{path_to_tezos_account, set_origin_at, TezosImplicitAccount};
 
 pub struct TezosRuntimeContext {
     path: OwnedPath,
@@ -47,6 +52,19 @@ impl Context for TezosRuntimeContext {
         })
     }
 
+    fn record_native_origin(
+        &self,
+        host: &mut impl StorageV1,
+        kt1: &ContractKt1Hash,
+    ) -> Result<(), tezos_storage::error::Error> {
+        // Origination is the only writer of the origin path for a
+        // freshly created KT1, so write Native unconditionally.
+        let originated = self.originated_from_kt1(kt1)?;
+        let path = originated.path().clone();
+        set_origin_at(host, &path, &Origin::Native)
+            .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))
+    }
+
     fn from_root(root: &impl Path) -> Result<Self, PathError> {
         Ok(Self {
             path: root.to_owned().into(),
@@ -55,5 +73,33 @@ impl Context for TezosRuntimeContext {
 
     fn path(&self) -> OwnedPath {
         self.path.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::account::get_origin_at;
+    use tezos_crypto_rs::blake2b;
+    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
+
+    #[test]
+    fn record_native_origin_writes_native_for_kt1() {
+        let mut host = MockKernelHost::default();
+        let context =
+            TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH).unwrap();
+        let kt1 = ContractKt1Hash::from(blake2b::digest_160(b"some-test-seed"));
+
+        let originated = context.originated_from_kt1(&kt1).unwrap();
+        let path = originated.path().clone();
+
+        // Before origination, no classification.
+        assert!(get_origin_at(&host, &path).unwrap().is_none());
+
+        context.record_native_origin(&mut host, &kt1).unwrap();
+
+        // After origination, Native.
+        assert_eq!(get_origin_at(&host, &path).unwrap(), Some(Origin::Native));
     }
 }

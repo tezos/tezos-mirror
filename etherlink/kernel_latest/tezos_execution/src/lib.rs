@@ -1083,6 +1083,12 @@ where
     let _ = burn_tez(ctx.host, source_account, &(ORIGINATION_COST + storage_fees))
         .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
 
+    // Record the new contract as native. Default trait impl is a
+    // no-op for runtimes without classification storage.
+    ctx.context
+        .record_native_origin(ctx.host, &contract)
+        .map_err(|_| OriginationError::CantInitContract)?;
+
     let dummy_origination_sucess = OriginationSuccess {
         balance_updates,
         originated_contracts: vec![Originated { contract }],
