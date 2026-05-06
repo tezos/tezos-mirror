@@ -66,7 +66,15 @@ Smart Rollup node
 -----------------
 
 - Registered the missing handler for the ``/global/last_cemented_commitment``
-  RPC, which previously returned 404 even though the service was declared.
+  RPC, which previously returned 404 even though the service was declared. (MR
+  :gl:`!21757`)
+
+- Skip context reconstruction during ``snapshot import`` when the head's commit
+  is already present in the imported context, so non-compact snapshots no longer
+  pay for unnecessary PVM replay. Fixes a regression. (MR :gl:`!21810`)
+
+- Add a ``--dal-node`` option to ``snapshot import`` so reconstruction of
+  compact snapshots can fetch DAL pages from a DAL node. (MR :gl:`!21810`)
 
 Smart Rollup WASM Debugger
 --------------------------
