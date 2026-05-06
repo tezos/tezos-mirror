@@ -56,16 +56,17 @@ impl Context for TezosRuntimeContext {
         })
     }
 
-    fn record_native_origin(
+    fn record_origin(
         &self,
         host: &mut impl StorageV1,
         kt1: &ContractKt1Hash,
+        origin: &Origin,
     ) -> Result<(), tezos_storage::error::Error> {
         // Origination is the only writer of the origin path for a
-        // freshly created KT1, so write Native unconditionally.
+        // freshly created KT1, so write the given origin unconditionally.
         let originated = self.originated_from_kt1(kt1)?;
         let path = originated.path().clone();
-        set_origin_at(host, &path, &Origin::Native)
+        set_origin_at(host, &path, origin)
             .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))
     }
 
@@ -108,7 +109,7 @@ mod tests {
     use tezosx_interfaces::{AliasInfo, RuntimeId};
 
     #[test]
-    fn record_native_origin_writes_native_for_kt1() {
+    fn record_origin_writes_given_origin_for_kt1() {
         let mut host = MockKernelHost::default();
         let context =
             TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH).unwrap();
@@ -120,10 +121,20 @@ mod tests {
         // Before origination, no classification.
         assert!(get_origin_at(&host, &path).unwrap().is_none());
 
-        context.record_native_origin(&mut host, &kt1).unwrap();
+        context
+            .record_origin(&mut host, &kt1, &Origin::Native)
+            .unwrap();
 
         // After origination, Native.
         assert_eq!(get_origin_at(&host, &path).unwrap(), Some(Origin::Native));
+
+        // record_origin with Alias overwrites with Alias.
+        let alias = Origin::Alias(AliasInfo {
+            runtime: RuntimeId::Ethereum,
+            native_address: b"0xfeedface".to_vec(),
+        });
+        context.record_origin(&mut host, &kt1, &alias).unwrap();
+        assert_eq!(get_origin_at(&host, &path).unwrap(), Some(alias));
     }
 
     #[test]
@@ -175,7 +186,9 @@ mod tests {
             .is_none());
 
         // Native: returns Native.
-        context.record_native_origin(&mut host, &kt1).unwrap();
+        context
+            .record_origin(&mut host, &kt1, &Origin::Native)
+            .unwrap();
         assert_eq!(
             context.read_origin_for_address(&host, &address).unwrap(),
             Some(Origin::Native),

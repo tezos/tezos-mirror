@@ -49,7 +49,7 @@ use tezos_tezlink::{
         UpdateOrigin,
     },
 };
-use tezosx_interfaces::Registry;
+use tezosx_interfaces::{Origin, Registry};
 use tezosx_journal::TezosXJournal;
 
 use crate::account_storage::{
@@ -488,6 +488,7 @@ where
                         &amount,
                         &script.code,
                         storage,
+                        &Origin::Native,
                     );
                     InternalOperationSum::Origination(InternalContentWithMetadata {
                         content: OriginationContent {
@@ -986,7 +987,7 @@ where
 
 /// This function typechecks both fields of a &Script: the code and the storage.
 /// It returns the typechecked storage.
-fn typecheck_code_and_storage<'a, Host: StorageV1, C: Context>(
+pub fn typecheck_code_and_storage<'a, Host: StorageV1, C: Context>(
     ctx: &mut TcCtx<'a, Host, C>,
     parser: &'a Parser<'a>,
     script: &Script,
@@ -1032,18 +1033,19 @@ fn handle_storage_with_big_maps<'a, Host: StorageV1, C: Context>(
 }
 
 /// Originate a contract: install its code and initial storage, run
-/// the initial-balance transfer from the sender, and return the
-/// success body that the post-execution burn pass will charge.
-///
-/// TODO(L2-1294): the alias-forwarder origination bypasses this
-/// function and is currently unbilled.
-fn originate_contract<'a, Host, C: Context>(
+/// the initial-balance transfer from the sender, record the
+/// classification of the new contract under `origin`, and return the
+/// success body that the post-execution burn pass will charge. User-
+/// issued and internal MIR originations pass [`Origin::Native`]; the
+/// alias-forwarder materialization path passes [`Origin::Alias`].
+pub fn originate_contract<'a, Host, C: Context>(
     ctx: &mut TcCtx<'a, Host, C>,
     contract: ContractKt1Hash,
     sender_account: &impl TezlinkAccount,
     initial_balance: &Narith,
     script_code: &[u8],
     script_storage: TypedValue<'a>,
+    origin: &Origin,
 ) -> Result<OriginationSuccess, OriginationError>
 where
     Host: StorageV1,
@@ -1087,10 +1089,10 @@ where
     )
     .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
 
-    // Record the new contract as native. Default trait impl is a
-    // no-op for runtimes without classification storage.
+    // Record the classification of the new contract. Default trait
+    // impl is a no-op for runtimes without classification storage.
     ctx.context
-        .record_native_origin(ctx.host, &contract)
+        .record_origin(ctx.host, &contract, origin)
         .map_err(|_| OriginationError::CantInitContract)?;
 
     let origination_success = OriginationSuccess {
@@ -1695,6 +1697,7 @@ where
                     balance,
                     &script.code,
                     storage,
+                    &Origin::Native,
                 ),
                 Err(err) => Err(err),
             };

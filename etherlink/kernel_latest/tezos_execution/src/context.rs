@@ -59,13 +59,15 @@ pub trait Context {
         kt1: &ContractKt1Hash,
     ) -> Result<Self::OriginatedAccountType, tezos_storage::error::Error>;
 
-    /// Record that an originated account is recognized as native.
+    /// Record the origin classification of an originated account.
     /// Default is a no-op for runtimes without classification storage.
-    /// TezosX overrides this to write Native at the origin storage path.
-    fn record_native_origin(
+    /// TezosX overrides this to write the given origin at the origin
+    /// storage path.
+    fn record_origin(
         &self,
         _host: &mut impl StorageV1,
         _kt1: &ContractKt1Hash,
+        _origin: &Origin,
     ) -> Result<(), tezos_storage::error::Error> {
         Ok(())
     }
