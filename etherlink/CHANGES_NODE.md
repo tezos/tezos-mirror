@@ -22,6 +22,16 @@
 
 ### Storage changes
 
+- Read Michelson contract state from `/tez/tez_accounts/contracts/`
+  and `/tez/tez_accounts/big_map/`, and TezosX projected accounts,
+  aliases and cross-runtime alias resolution from
+  `/tez/tez_accounts/tezosx/`. The installer is updated accordingly.
+  Michelson block reads (including standalone Tezlink) now share the
+  `/tez/world_state/tez_blocks/` root with TezosX-mode.
+  Decode `Tezos_block` V2 blocks: adds a `state_root : bytes` field
+  (fixed 32 bytes). V1 legacy blocks are still decoded, with
+  `state_root` zero-filled on upgrade. (!21716)
+
 ### Documentation changes
 
 ### Experimental features changes

@@ -109,11 +109,7 @@ let make (ctxt : Evm_ro_context.t) =
       | Originated _ -> failwith "Only implicit account are supported"
 
     let contract_path contract suffix =
-      Durable_storage_path.michelson_contracts_index ^ "/"
-      ^ Tezlink_durable_storage.Path.to_path
-          Tezos_types.Contract.encoding
-          contract
-      ^ suffix
+      Tezlink_durable_storage.Path.account contract ^ suffix
 
     let constants chain (_block : block_param) =
       let open Lwt_result_syntax in
@@ -316,16 +312,7 @@ let make (ctxt : Evm_ro_context.t) =
       let `Main = chain in
       let* block = shell_block_param_to_eth_block_param block in
       let* state = Evm_ro_context.get_state ctxt ~block () in
-      let raw_hash =
-        Tezlink_imports.Imported_protocol.Script_expr_hash.to_bytes key_hash
-      in
-      let (`Hex key_hex) = Hex.of_bytes raw_hash in
-      let path =
-        "/evm/world_state/big_map/"
-        ^ Z.to_string
-            (Tezlink_imports.Imported_context.Big_map.Id.unparse_to_z id)
-        ^ "/" ^ key_hex
-      in
+      let path = Tezlink_durable_storage.Path.big_map_value id key_hash in
       let decode =
         Data_encoding.Binary.of_bytes_opt
           Tezlink_imports.Imported_context.Script.expr_encoding
@@ -337,12 +324,7 @@ let make (ctxt : Evm_ro_context.t) =
 
     let big_map_key_type state id =
       let open Lwt_result_syntax in
-      let path =
-        "/evm/world_state/big_map/"
-        ^ Z.to_string
-            (Tezlink_imports.Imported_context.Big_map.Id.unparse_to_z id)
-        ^ "/key_type"
-      in
+      let path = Tezlink_durable_storage.Path.big_map_key_type id in
       let decode =
         Data_encoding.Binary.of_bytes_opt
           Tezlink_imports.Imported_context.Script.expr_encoding
@@ -354,12 +336,7 @@ let make (ctxt : Evm_ro_context.t) =
 
     let big_map_value_type state id =
       let open Lwt_result_syntax in
-      let path =
-        "/evm/world_state/big_map/"
-        ^ Z.to_string
-            (Tezlink_imports.Imported_context.Big_map.Id.unparse_to_z id)
-        ^ "/value_type"
-      in
+      let path = Tezlink_durable_storage.Path.big_map_value_type id in
       let decode =
         Data_encoding.Binary.of_bytes_opt
           Tezlink_imports.Imported_context.Script.expr_encoding

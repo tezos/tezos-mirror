@@ -16,7 +16,8 @@ use crate::account_storage::{
 
 // Instead of using directly the paths, we construct a Context object that holds the
 // path to the context and does the concatenations.
-// This will prevent '/tezlink/context' to appear at multiple place like '/evm/world_state'
+// This prevents the root path (e.g. '/tez/tez_accounts') from
+// appearing at multiple places in the codebase.
 pub struct TezlinkContext {
     path: OwnedPath,
 }
@@ -95,9 +96,9 @@ impl Context for TezlinkContext {
     }
 
     fn from_root(root: &impl Path) -> Result<Self, PathError> {
-        let context = RefPath::assert_from(b"/context");
-        let path = concat(root, &context)?;
-        Ok(Self { path })
+        Ok(Self {
+            path: OwnedPath::from(root),
+        })
     }
 
     fn path(&self) -> OwnedPath {
@@ -108,7 +109,7 @@ impl Context for TezlinkContext {
 impl TezlinkContext {
     #[cfg(test)]
     pub fn init_context() -> Self {
-        let path = RefPath::assert_from(b"/tezlink/context");
+        let path = RefPath::assert_from(b"/tez/tez_accounts");
         Self {
             path: OwnedPath::from(path),
         }

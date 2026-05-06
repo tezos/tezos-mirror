@@ -173,10 +173,19 @@ module Tezos_block_latest_tool = struct
   let name = "Tez block"
 
   let make ~level ~timestamp ~parent_hash ~protocol ~next_protocol ~operations
-      () =
+      ~state_root () =
     let hash = zero_hash in
     let block_without_hash =
-      {level; hash; timestamp; parent_hash; protocol; next_protocol; operations}
+      {
+        level;
+        hash;
+        timestamp;
+        parent_hash;
+        protocol;
+        next_protocol;
+        operations;
+        state_root;
+      }
     in
     let hash =
       hash_tez_block ~encode:encode_block_for_store block_without_hash
@@ -193,6 +202,7 @@ module Tezos_block_latest_tool = struct
           protocol;
           next_protocol;
           operations;
+          state_root;
         } =
     Check.(
       (level = expected.level)
@@ -224,6 +234,10 @@ module Tezos_block_latest_tool = struct
       (operations = expected.operations)
         bytes_typ
         ~error_msg:"Wrong decoded of operations for block: got %L instead of %R") ;
+    Check.(
+      (state_root = expected.state_root)
+        bytes_typ
+        ~error_msg:"Wrong decoded of state_root for block: got %L instead of %R") ;
     ()
 end
 
@@ -255,6 +269,7 @@ module Tezos_block_v0_tool = struct
           protocol;
           next_protocol;
           operations;
+          state_root;
         } =
     Check.(
       (expected.level = level)
@@ -286,6 +301,12 @@ module Tezos_block_v0_tool = struct
       (operations = expected.operations)
         bytes_typ
         ~error_msg:"Wrong decoded of operations for block: got %L instead of %R") ;
+    (* V0 -> V2 upgrade zero-fills state_root. *)
+    Check.(
+      (state_root = Bytes.make 32 '\x00')
+        bytes_typ
+        ~error_msg:
+          "V0-upgraded state_root should be all zeros: got %L instead of %R") ;
     ()
 end
 
@@ -375,6 +396,9 @@ let () =
     ~version:V1
     () ;
 
+  let zero_state_root = Bytes.make 32 '\x00' in
+  let nonzero_state_root = Bytes.make 32 '\x2a' in
+
   test_tez_latest_block_roundtrip ~title:"all zeros tez block"
   @@ Tezos_block_latest_tool.make
        ~level:0l
@@ -383,6 +407,7 @@ let () =
        ~protocol:S023
        ~next_protocol:S023
        ~operations:Bytes.empty
+       ~state_root:zero_state_root
        () ;
 
   test_tez_latest_block_roundtrip ~title:"genesis successor"
@@ -393,6 +418,7 @@ let () =
        ~protocol:S023
        ~next_protocol:S023
        ~operations:Bytes.empty
+       ~state_root:zero_state_root
        () ;
 
   test_tez_latest_block_roundtrip ~title:"with operations"
@@ -403,6 +429,7 @@ let () =
        ~protocol:S023
        ~next_protocol:S023
        ~operations:(Bytes.of_string "txntxntxn")
+       ~state_root:nonzero_state_root
        () ;
 
   test_tez_latest_block_roundtrip ~title:"T024 protocol"
@@ -413,6 +440,7 @@ let () =
        ~protocol:T024
        ~next_protocol:T024
        ~operations:Bytes.empty
+       ~state_root:nonzero_state_root
        () ;
 
   test_tez_latest_block_roundtrip ~title:"S023 to T024 transition"
@@ -423,6 +451,7 @@ let () =
        ~protocol:S023
        ~next_protocol:T024
        ~operations:Bytes.empty
+       ~state_root:nonzero_state_root
        () ;
 
   test_tez_v0_block_roundtrip ~title:"all zeros tez block"

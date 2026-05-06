@@ -38,10 +38,8 @@ use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::TezosXRuntimeError;
 use tezosx_journal::TezosXJournal;
 
-use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
-
 use crate::context::TezosRuntimeContext;
-use crate::{headers, url, NULL_PKH};
+use crate::{headers, url, NULL_PKH, TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH};
 
 /// Classify a MIR typechecker error into the right HTTP-surface error.
 ///
@@ -120,7 +118,8 @@ where
     let destination_kt1 = parsed.destination;
     let view_name = parsed.view_name;
 
-    let context = TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
+    let context =
+        TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)?;
     let dest_account = context.originated_from_kt1(&destination_kt1).map_err(|e| {
         TezosXRuntimeError::NotFound(format!(
             "destination contract {destination_kt1:?} not found: {e:?}"

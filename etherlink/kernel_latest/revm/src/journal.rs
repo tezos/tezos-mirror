@@ -36,9 +36,8 @@ use evm_types::{
 use michelson_types::Withdrawal;
 use tezos_crypto_rs::{blake2b, hash::ContractKt1Hash};
 use tezos_ethereum::block::BlockConstants;
-use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
+use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_host::{path::OwnedPath, runtime::RuntimeError};
 use tezosx_interfaces::{AliasInfo, CrossRuntimeContext, Registry, RuntimeId};
 
 /// A journal of state changes internal to the EVM
@@ -334,12 +333,14 @@ impl<'a, Host: StorageV1, R: Registry> JournalTr for Journal<'a, Host, R> {
     fn checkpoint_revert(&mut self, checkpoint: JournalCheckpoint) {
         self.journal.evm.layered_state.checkpoint_revert();
         self.journal.evm.inner.checkpoint_revert(checkpoint);
-        let world_state = OwnedPath::from(&ETHERLINK_SAFE_STORAGE_ROOT_PATH);
-        if let Err(e) = self
-            .journal
-            .michelson
-            .revert_frame(self.database.host, &world_state)
-        {
+        // The Michelson journal recovers each snapshot's revert target
+        // from the snapshot itself, so no path is supplied here. CRACs
+        // may snapshot subtrees other than `/evm/world_state` (e.g.
+        // `/tez/tez_accounts` for the Michelson), and hard-coding
+        // `/evm/world_state` here would store_move a Tezlink snapshot onto
+        // the EVM world state and wipe out kernel-managed paths like
+        // `/evm/world_state/fees/da_fee_per_byte`.
+        if let Err(e) = self.journal.michelson.revert_frame(self.database.host) {
             self.deferred_error.get_or_insert(e);
         }
     }

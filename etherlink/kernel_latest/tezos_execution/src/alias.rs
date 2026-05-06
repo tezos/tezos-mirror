@@ -11,7 +11,7 @@ use tezosx_interfaces::RuntimeId;
 // Path where aliases are stored for tezos execution context
 // built from tezosx-tezos-runtime::account::TEZOS_ACCOUNTS_PATH but copied here
 // for now to avoid a circular dependency.
-const TEZLINK_ALIASES_PATH_STR: &str = "/evm/world_state/eth_accounts/tezos/aliases";
+const TEZLINK_ALIASES_PATH_STR: &str = "/tez/tez_accounts/tezosx/aliases";
 
 /// Maximum length of the full alias path: prefix + "/" + up to 44 hex
 /// digits (`AddressHash::BYTE_SIZE = 22`) + "/" + up to 2 hex digits

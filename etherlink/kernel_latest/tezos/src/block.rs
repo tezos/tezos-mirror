@@ -67,13 +67,18 @@ pub struct TezBlock {
     pub protocol: Protocol,
     pub next_protocol: Protocol,
     pub operations: OperationsWithReceipts,
+    /// `keccak256(h(/tez/tez_accounts) || blueprint_hash)`. Commits to the
+    /// Michelson account state and to the blueprint inputs (EVM txs,
+    /// delayed txs, Michelson ops, timestamp) of the producing blueprint
+    /// -- see `kernel/src/state_hash.rs` and `adr_tzx_state_hash.md`.
+    pub state_root: [u8; 32],
 }
 
-const VERSION: u8 = 1;
+const VERSION: u8 = 2;
 
 impl Encodable for TezBlock {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.begin_list(8);
+        s.begin_list(9);
         s.append(&VERSION);
         s.append(&self.hash.as_ref());
         s.append(&self.number);
@@ -82,6 +87,7 @@ impl Encodable for TezBlock {
         s.append(&self.protocol);
         s.append(&self.next_protocol);
         s.append(&self.operations);
+        s.append(&self.state_root.as_ref());
     }
 }
 
@@ -112,6 +118,7 @@ impl TezBlock {
         timestamp: Timestamp,
         previous_hash: primitive_types::H256,
         operations: Vec<AppliedOperation>,
+        state_root: [u8; 32],
     ) -> Result<Self, BinError> {
         let block = Self {
             hash: BlockHash::default(), // Placeholder, will be computed
@@ -121,6 +128,7 @@ impl TezBlock {
             protocol,
             next_protocol,
             operations: OperationsWithReceipts { list: operations },
+            state_root,
         };
         let hash = block.hash()?;
         // Genesis convention: the first Tezos block is its own predecessor.
@@ -148,10 +156,44 @@ mod tests {
     use mir::ast::micheline::Micheline;
     use mir::ast::Entrypoint;
     use mir::lexer::Prim;
+    use primitive_types::H256;
     use tezos_crypto_rs::hash::{ContractKt1Hash, UnknownSignature};
     use tezos_data_encoding::types::{Narith, Zarith};
     use tezos_smart_rollup::types::Contract;
     use tezos_smart_rollup::types::PublicKeyHash;
+
+    /// The block hash must commit to `state_root`: flipping it produces a
+    /// different block hash and a different RLP encoding.
+    #[test]
+    fn state_root_is_committed_to_block_hash() {
+        let number: BlockNumber = 1u32.into();
+        let ts = tezos_smart_rollup::types::Timestamp::from(1_700_000_000i64);
+        let parent = H256::zero();
+
+        let a = TezBlock::new(
+            Protocol::S023,
+            Protocol::S023,
+            number,
+            ts,
+            parent,
+            vec![],
+            [7u8; 32],
+        )
+        .expect("TezBlock::new with fixed state_root");
+        let b = TezBlock::new(
+            Protocol::S023,
+            Protocol::S023,
+            number,
+            ts,
+            parent,
+            vec![],
+            [8u8; 32],
+        )
+        .expect("TezBlock::new with different state_root");
+
+        assert_ne!(a.hash, b.hash);
+        assert_ne!(a.to_bytes(), b.to_bytes());
+    }
 
     /// Build an `AppliedOperation` that mimics a CRAC receipt (handler → alias,
     /// with an Event internal op).  Then round-trip through BinWriter/NomReader

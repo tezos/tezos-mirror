@@ -70,12 +70,13 @@ end
 
 module Tezos_block = struct
   module Version = struct
-    type t = V0 | V1
+    type t = V0 | V1 | V2
 
     let from_bytes (bytes : bytes) : t =
       match Rlp.decode_int bytes with
       | Ok 0 -> V0
       | Ok 1 -> V1
+      | Ok 2 -> V2
       | Ok _ -> raise (Invalid_argument "Expected a valid version")
       | Error _ ->
           (* TODO: Instead of raising an exception, return the Result *)
@@ -83,7 +84,7 @@ module Tezos_block = struct
             (Invalid_argument "Unexpected version read for a L2 Tezos block")
 
     let to_bytes (version : t) : bytes =
-      let version = match version with V0 -> 0 | V1 -> 1 in
+      let version = match version with V0 -> 0 | V1 -> 1 | V2 -> 2 in
       Rlp.encode_int version
   end
 
@@ -113,8 +114,6 @@ module Tezos_block = struct
       (Hex "8fcf233671b6a04fcf679d2a381c2544ea6c1ea29ba6157776ed8423e7c02934")
 
   module V1 = struct
-    let version = Version.V1
-
     type t = {
       hash : Ethereum_types.block_hash;
       level : int32;
@@ -162,9 +161,101 @@ module Tezos_block = struct
             (Invalid_argument
                "Expected a RLP list of 8 elements (including the version field)")
 
+    (* V1 -> V2 upgrade lives in `V2.of_v1` since it needs the V2 type
+       which is defined below. V1 is kept as a decode-only stepping
+       stone: a post-V2 node must still be able to read store entries
+       written by a pre-V2 kernel during a cut-over, but never emits
+       V1-shaped blocks. *)
+  end
+
+  module V2 = struct
+    let version = Version.V2
+
+    type t = {
+      hash : Ethereum_types.block_hash;
+      level : int32;
+      timestamp : Time.Protocol.t;
+      parent_hash : Ethereum_types.block_hash;
+      protocol : Protocol.t;
+      next_protocol : Protocol.t;
+          (* Deserialization of operation and receipts is delayed to
+             avoid introducing a dependency from this lib_encodings to
+             the protocol. *)
+      operations : bytes;
+          (* Fixed 32 bytes:
+             keccak256(h(/tez/tez_accounts) || blueprint_hash). A block
+             with an all-zero state_root pre-dates the feature (V0/V1
+             upgrades fill zeros). *)
+      state_root : bytes;
+    }
+
+    let from_rlp (block_rlp : Rlp.item list) : t =
+      let open Rlp in
+      match block_rlp with
+      | [
+       Value hash;
+       Value level;
+       Value previous_hash;
+       Value timestamp;
+       Value protocol;
+       Value next_protocol;
+       Value operations;
+       Value state_root;
+      ] ->
+          let level = Bytes.get_int32_le level 0 in
+          let hash = decode_block_hash hash in
+          let parent_hash = decode_block_hash previous_hash in
+          let timestamp =
+            Time.Protocol.of_seconds @@ Bytes.get_int64_le timestamp 0
+          in
+          let protocol = Protocol.from_bytes protocol in
+          let next_protocol = Protocol.from_bytes next_protocol in
+          {
+            hash;
+            level;
+            timestamp;
+            parent_hash;
+            protocol;
+            next_protocol;
+            operations;
+            state_root;
+          }
+      | _ ->
+          raise
+            (Invalid_argument
+               "Expected a RLP list of 9 elements (including the version field)")
+
     let to_latest = Fun.id
 
-    (* Serialize a block using the V1 version of the block RLP format. *)
+    (* Upgrade a V1 block to V2 by zero-filling `state_root`. V1 blocks
+       pre-date the state_root feature; no Michelson chain ever produced
+       such a block in production, but we still decode them because the
+       node must be able to read store entries written by a pre-V2
+       kernel during a cut-over. *)
+    let of_v1 (v : V1.t) : t =
+      let {
+        V1.hash;
+        level;
+        timestamp;
+        parent_hash;
+        protocol;
+        next_protocol;
+        operations;
+      } =
+        v
+      in
+      {
+        hash;
+        level;
+        timestamp;
+        parent_hash;
+        protocol;
+        next_protocol;
+        operations;
+        state_root = Bytes.make 32 '\x00';
+      }
+
+    (* Serialize a block using the V2 version of the block RLP format. *)
     let block_to_rlp
         {
           hash;
@@ -174,6 +265,7 @@ module Tezos_block = struct
           protocol;
           next_protocol;
           operations;
+          state_root;
         } =
       let open Rlp in
       let level = Helpers.encode_i32_le level in
@@ -194,6 +286,7 @@ module Tezos_block = struct
             Value protocol;
             Value next_protocol;
             Value operations;
+            Value state_root;
           ]
       in
       encode item
@@ -202,7 +295,7 @@ module Tezos_block = struct
       Ok (Bytes.to_string (block_to_rlp block))
   end
 
-  module Latest = V1
+  module Latest = V2
 
   module V0 = struct
     let version = Version.V0
@@ -238,8 +331,9 @@ module Tezos_block = struct
             (Invalid_argument
                "Expected a RLP list of 6 elements (including the version field)")
 
-    let to_latest ({hash; level; timestamp; parent_hash; operations} : t) :
-        Latest.t =
+    (* Upgrade a V0 block to V1. V0 lacked the protocol fields added
+       in V1; fill them with the pre-upgrade S023 protocol. *)
+    let to_v1 ({hash; level; timestamp; parent_hash; operations} : t) : V1.t =
       {
         hash;
         level;
@@ -249,6 +343,8 @@ module Tezos_block = struct
         protocol = Protocol.S023;
         next_protocol = Protocol.S023;
       }
+
+    let to_latest (v : t) : Latest.t = V2.of_v1 (to_v1 v)
 
     (* Serialize a block using the V0 version of the block RLP format. *)
     let block_to_rlp {hash; level; timestamp; parent_hash; operations} =
@@ -332,7 +428,8 @@ module Tezos_block = struct
         let version = Version.from_bytes version in
         match version with
         | V0 -> V0.to_latest @@ V0.from_rlp block_rlp
-        | V1 -> V1.to_latest @@ V1.from_rlp block_rlp)
+        | V1 -> V2.of_v1 @@ V1.from_rlp block_rlp
+        | V2 -> V2.to_latest @@ V2.from_rlp block_rlp)
     | _ ->
         (* The octez-evm-node needs to be retro compatible with legacy Data_encoding *)
         Legacy.to_latest

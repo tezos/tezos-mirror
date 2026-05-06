@@ -512,13 +512,13 @@ impl BlockInProgress {
         let michelson_commitment = crate::state_hash::michelson_ops_commitment(
             &self.cumulative_tezos_operation_receipts.list,
         );
-        let state_root = crate::state_hash::tzx_state_hash(
-            host,
+        let blueprint_hash = crate::state_hash::blueprint_hash(
             &self.valid_txs,
             &self.delayed_txs,
             &michelson_commitment,
             self.timestamp,
         );
+        let state_root = crate::state_hash::evm_state_hash(host, &blueprint_hash);
         let receipts_root = self.receipts_root();
         block_storage::store_current_transactions_receipts(
             host,
@@ -547,6 +547,10 @@ impl BlockInProgress {
             };
             let mut tezos_ops = self.cumulative_tezos_operation_receipts.list;
             crate::apply::renumber_nonces(&mut tezos_ops);
+            let tez_state_root =
+                crate::state_hash::tez_accounts_state_hash(host, &blueprint_hash)
+                    .try_into()
+                    .expect("tez_accounts_state_hash must be 32 bytes");
             let tez_block = TezBlock::new(
                 protocol,
                 TARGET_TEZOS_PROTOCOL,
@@ -554,6 +558,7 @@ impl BlockInProgress {
                 self.timestamp,
                 self.tezos_parent_hash,
                 tezos_ops,
+                tez_state_root,
             )?;
             let new_header = TezBlockHeader {
                 hash: H256(*tez_block.hash),

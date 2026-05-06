@@ -68,9 +68,22 @@ impl core::fmt::Display for SetFrameResultError {
 
 impl std::error::Error for SetFrameResultError {}
 
+/// A pending revert target: the indexed location where the world-state
+/// subtree was copied at checkpoint time, paired with the original path
+/// it was copied from. On revert we [`store_move`] the snapshot back to
+/// `from_path`, so each snapshot must remember its own origin — different
+/// CRACs may snapshot different subtrees (e.g. `/tez/tez_accounts`
+/// for the Michelson context), and the EVM frame revert path must not
+/// hard-code one of them.
+#[derive(Debug, PartialEq, Eq)]
+struct Snapshot {
+    snapshot_path: OwnedPath,
+    from_path: OwnedPath,
+}
+
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct MichelsonJournal {
-    snapshots: Vec<OwnedPath>,
+    snapshots: Vec<Snapshot>,
     external_checkpoints: Vec<ExternalCheckpoint>,
     /// Currently-applied CRAC receipts (EVM → Michelson).  Subject to
     /// revert: when the calling EVM frame reverts, `revert_frame`
@@ -210,7 +223,7 @@ impl MichelsonJournal {
             (checkpoint.snapshot_watermark + 1).min(self.snapshots.len())
         };
         for snapshot in self.snapshots.drain(drain_from..) {
-            host.store_delete(&snapshot)?;
+            host.store_delete(&snapshot.snapshot_path)?;
         }
         Ok(())
     }
@@ -225,12 +238,10 @@ impl MichelsonJournal {
     // snapshot mechanism — the receipt is kept purely as an indexer
     // record of what was attempted (matching L1 manager-op semantics
     // where applied internals reverted by a later failure appear as
-    // `backtracked` rather than vanishing).
-    pub fn revert_frame<Host>(
-        &mut self,
-        host: &mut Host,
-        to_path: &OwnedPath,
-    ) -> Result<(), RuntimeError>
+    // `backtracked` rather than vanishing). The revert target is
+    // recovered from the snapshot itself — see [`Snapshot`] for why
+    // this must not be a caller-supplied parameter.
+    pub fn revert_frame<Host>(&mut self, host: &mut Host) -> Result<(), RuntimeError>
     where
         Host: StorageV1,
     {
@@ -260,10 +271,10 @@ impl MichelsonJournal {
             return Ok(());
         }
         for snapshot in self.snapshots.drain(checkpoint.snapshot_watermark + 1..) {
-            host.store_delete(&snapshot)?;
+            host.store_delete(&snapshot.snapshot_path)?;
         }
         if let Some(snapshot) = self.snapshots.pop() {
-            host.store_move(&snapshot, to_path)?;
+            host.store_move(&snapshot.snapshot_path, &snapshot.from_path)?;
         }
         Ok(())
     }
@@ -281,9 +292,12 @@ impl MichelsonJournal {
         Host: StorageV1,
     {
         let new_index = self.snapshots.len();
-        let indexed_path = indexed_path(new_index, from_path)?;
-        host.store_copy(from_path, &indexed_path)?;
-        self.snapshots.push(indexed_path);
+        let snapshot_path = indexed_path(new_index, from_path)?;
+        host.store_copy(from_path, &snapshot_path)?;
+        self.snapshots.push(Snapshot {
+            snapshot_path,
+            from_path: from_path.clone(),
+        });
         Ok(new_index)
     }
 
@@ -301,7 +315,7 @@ impl MichelsonJournal {
     {
         let start = (checkpoint_index + 1).min(self.snapshots.len());
         for snapshot in self.snapshots.drain(start..) {
-            host.store_delete(&snapshot)?;
+            host.store_delete(&snapshot.snapshot_path)?;
         }
         Ok(())
     }
@@ -309,11 +323,11 @@ impl MichelsonJournal {
     // Called by Michelson CRAC logic.
     //
     // Removes snapshots taken after checkpoint_index, then restores durable
-    // storage from the snapshot at checkpoint_index.
+    // storage from the snapshot at checkpoint_index. The revert target is
+    // recovered from the snapshot itself.
     pub fn checkpoint_revert<Host>(
         &mut self,
         host: &mut Host,
-        to_path: &OwnedPath,
         checkpoint_index: usize,
     ) -> Result<(), RuntimeError>
     where
@@ -321,10 +335,10 @@ impl MichelsonJournal {
     {
         let start = (checkpoint_index + 1).min(self.snapshots.len());
         for snapshot in self.snapshots.drain(start..) {
-            host.store_delete(&snapshot)?;
+            host.store_delete(&snapshot.snapshot_path)?;
         }
         if let Some(snapshot) = self.snapshots.pop() {
-            host.store_move(&snapshot, to_path)?;
+            host.store_move(&snapshot.snapshot_path, &snapshot.from_path)?;
         }
         Ok(())
     }
@@ -369,7 +383,7 @@ mod tests {
         let idx_b = journal.checkpoint(&mut host, &world).unwrap();
         write_data(&mut host, &world, b"vb");
         // B FAILWITH: snap 0 consumed, world restored to v0
-        journal.checkpoint_revert(&mut host, &world, idx_b).unwrap();
+        journal.checkpoint_revert(&mut host, idx_b).unwrap();
 
         assert_eq!(read_data(&host, &world), b"v0");
         assert!(!has_snap(&host, 0, &world));
@@ -404,15 +418,15 @@ mod tests {
         write_data(&mut host, &world, b"vd");
 
         // D FAILWITH: snap 2 consumed, world restored to vc
-        journal.checkpoint_revert(&mut host, &world, idx_d).unwrap();
+        journal.checkpoint_revert(&mut host, idx_d).unwrap();
         assert_eq!(read_data(&host, &world), b"vc");
 
         // C propagates: snap 1 consumed, world restored to vb
-        journal.checkpoint_revert(&mut host, &world, idx_c).unwrap();
+        journal.checkpoint_revert(&mut host, idx_c).unwrap();
         assert_eq!(read_data(&host, &world), b"vb");
 
         // B propagates: snap 0 consumed, world restored to v0
-        journal.checkpoint_revert(&mut host, &world, idx_b).unwrap();
+        journal.checkpoint_revert(&mut host, idx_b).unwrap();
         assert_eq!(read_data(&host, &world), b"v0");
 
         // A catches: no snapshots remain, commit is noop
@@ -447,7 +461,7 @@ mod tests {
         let idx_d = journal.checkpoint(&mut host, &world).unwrap();
         write_data(&mut host, &world, b"vd");
         // D FAILWITH: snap 1 consumed, world restored to vb
-        journal.checkpoint_revert(&mut host, &world, idx_d).unwrap();
+        journal.checkpoint_revert(&mut host, idx_d).unwrap();
         assert_eq!(read_data(&host, &world), b"vb");
 
         // C catches: sub-call (A still on stack), drains snaps[2..], nothing to drain
@@ -487,16 +501,16 @@ mod tests {
         let idx_c = journal.checkpoint(&mut host, &world).unwrap();
         write_data(&mut host, &world, b"vc");
         // C FAILWITH: snap 1 consumed, world restored to va
-        journal.checkpoint_revert(&mut host, &world, idx_c).unwrap();
+        journal.checkpoint_revert(&mut host, idx_c).unwrap();
         assert_eq!(read_data(&host, &world), b"va");
 
         // B has no catch: revert_frame is noop (no snaps at watermark or above remain)
-        journal.revert_frame(&mut host, &world).unwrap();
+        journal.revert_frame(&mut host).unwrap();
         assert_eq!(read_data(&host, &world), b"va");
         assert!(has_snap(&host, 0, &world));
 
         // A propagates failure: snap 0 consumed, world restored to v0
-        journal.checkpoint_revert(&mut host, &world, idx_a).unwrap();
+        journal.checkpoint_revert(&mut host, idx_a).unwrap();
 
         assert_eq!(read_data(&host, &world), b"v0");
         assert!(!has_snap(&host, 0, &world));
@@ -522,7 +536,7 @@ mod tests {
         assert!(has_snap(&host, 0, &world));
 
         // EVM op fails: try block reverts, snap 0 consumed, world restored to v0
-        journal.revert_frame(&mut host, &world).unwrap();
+        journal.revert_frame(&mut host).unwrap();
 
         assert_eq!(read_data(&host, &world), b"v0");
         assert!(!has_snap(&host, 0, &world));
@@ -561,11 +575,11 @@ mod tests {
         let idx_f = journal.checkpoint(&mut host, &world).unwrap();
         write_data(&mut host, &world, b"vf");
         // F FAILWITH: snap 2 consumed, world restored to vd
-        journal.checkpoint_revert(&mut host, &world, idx_f).unwrap();
+        journal.checkpoint_revert(&mut host, idx_f).unwrap();
         assert_eq!(read_data(&host, &world), b"vd");
 
         // E reverts: noop (no snaps at watermark=2 or above remain)
-        journal.revert_frame(&mut host, &world).unwrap();
+        journal.revert_frame(&mut host).unwrap();
         assert_eq!(read_data(&host, &world), b"vd");
 
         // snaps 0 and 1 are intact: only F's snap was consumed
@@ -611,7 +625,7 @@ mod tests {
         assert!(has_snap(&host, 0, &world));
 
         // A reverts: outermost, snap 0 consumed, world restored to v0
-        journal.revert_frame(&mut host, &world).unwrap();
+        journal.revert_frame(&mut host).unwrap();
 
         assert_eq!(read_data(&host, &world), b"v0");
         assert!(!has_snap(&host, 0, &world));
@@ -648,12 +662,12 @@ mod tests {
         // A makes a second EVM call: D enters, no Michelson CRACs
         journal.push_external_checkpoint();
         // D reverts: outermost, noop (no snaps at watermark=1 or above)
-        journal.revert_frame(&mut host, &world).unwrap();
+        journal.revert_frame(&mut host).unwrap();
         assert_eq!(read_data(&host, &world), b"vc");
         assert!(has_snap(&host, 0, &world));
 
         // A reverts all-or-nothing: snap 0 consumed, world restored to v0
-        journal.checkpoint_revert(&mut host, &world, idx_a).unwrap();
+        journal.checkpoint_revert(&mut host, idx_a).unwrap();
 
         assert_eq!(read_data(&host, &world), b"v0");
         assert!(!has_snap(&host, 0, &world));
@@ -688,7 +702,7 @@ mod tests {
         assert!(has_snap(&host, 0, &world));
 
         // EVM(top) reverts: outermost, snap 0 consumed, world restored to v0
-        journal.revert_frame(&mut host, &world).unwrap();
+        journal.revert_frame(&mut host).unwrap();
 
         assert_eq!(read_data(&host, &world), b"v0");
         assert!(!has_snap(&host, 0, &world));
@@ -704,7 +718,7 @@ mod tests {
         write_data(&mut host, &world, b"v0");
 
         journal.push_external_checkpoint();
-        journal.revert_frame(&mut host, &world).unwrap();
+        journal.revert_frame(&mut host).unwrap();
 
         assert_eq!(read_data(&host, &world), b"v0");
     }
@@ -725,7 +739,7 @@ mod tests {
 
         // frame with no CRACs: watermark=1, revert is noop
         journal.push_external_checkpoint();
-        journal.revert_frame(&mut host, &world).unwrap();
+        journal.revert_frame(&mut host).unwrap();
 
         assert_eq!(read_data(&host, &world), b"v1");
         assert!(has_snap(&host, 0, &world));
@@ -792,7 +806,7 @@ mod tests {
         journal.checkpoint_commit(&mut host, idx2b).unwrap();
 
         // revert: outermost, only snap 2 consumed, snaps 0 and 1 untouched, world restored to v3
-        journal.revert_frame(&mut host, &world).unwrap();
+        journal.revert_frame(&mut host).unwrap();
 
         assert!(!has_snap(&host, 2, &world));
         assert!(has_snap(&host, 0, &world));
@@ -860,7 +874,7 @@ mod tests {
         assert!(has_snap(&host, 1, &world));
 
         // EVM(top) reverts: snap 1 deleted, snap 0 restores v0
-        journal.revert_frame(&mut host, &world).unwrap();
+        journal.revert_frame(&mut host).unwrap();
         assert_eq!(read_data(&host, &world), b"v0");
         assert!(!has_snap(&host, 0, &world));
         assert!(!has_snap(&host, 1, &world));
@@ -924,7 +938,7 @@ mod tests {
         assert!(!has_snap(&host, 1, &world));
 
         // EVM(top) reverts: snap 0 restores v0
-        journal.revert_frame(&mut host, &world).unwrap();
+        journal.revert_frame(&mut host).unwrap();
         assert_eq!(read_data(&host, &world), b"v0");
         assert!(!has_snap(&host, 0, &world));
     }
@@ -984,7 +998,7 @@ mod tests {
         assert!(has_snap(&host, 0, &world));
 
         // A reverts: outermost, snap 0 restores v0
-        journal.revert_frame(&mut host, &world).unwrap();
+        journal.revert_frame(&mut host).unwrap();
         assert_eq!(read_data(&host, &world), b"v0");
         assert!(!has_snap(&host, 0, &world));
     }
@@ -1007,12 +1021,12 @@ mod tests {
         journal.checkpoint_commit(&mut host, idx).unwrap();
 
         // B reverts: restores v0, snap 0 consumed
-        journal.revert_frame(&mut host, &world).unwrap();
+        journal.revert_frame(&mut host).unwrap();
         assert_eq!(read_data(&host, &world), b"v0");
         assert!(!has_snap(&host, 0, &world));
 
         // EVM(top) reverts: no snaps, noop
-        journal.revert_frame(&mut host, &world).unwrap();
+        journal.revert_frame(&mut host).unwrap();
         assert_eq!(read_data(&host, &world), b"v0");
     }
 
@@ -1034,7 +1048,7 @@ mod tests {
         journal.checkpoint_commit(&mut host, idx).unwrap();
 
         // B reverts: snap 0 consumed, world back to v0
-        journal.revert_frame(&mut host, &world).unwrap();
+        journal.revert_frame(&mut host).unwrap();
         assert_eq!(read_data(&host, &world), b"v0");
 
         // EVM(top) commits: no snaps to clean up, v0 persists
@@ -1145,7 +1159,7 @@ mod tests {
         assert_eq!(journal.backtracked_crac_receipts.len(), 0);
 
         // B reverts — receipt 1 migrated to backtracked, receipt 0 kept.
-        journal.revert_frame(&mut host, &world).unwrap();
+        journal.revert_frame(&mut host).unwrap();
         assert_eq!(journal.pending_crac_receipts.len(), 1);
         assert_eq!(receipt_id(&journal.pending_crac_receipts[0].1), 0);
         assert_eq!(journal.backtracked_crac_receipts.len(), 1);
@@ -1185,11 +1199,11 @@ mod tests {
         // B checkpoint — push and revert: B's receipt migrates.
         journal.push_external_checkpoint();
         journal.push_pending_crac_receipt(dummy_receipt(7));
-        journal.revert_frame(&mut host, &world).unwrap();
+        journal.revert_frame(&mut host).unwrap();
         assert_eq!(journal.backtracked_crac_receipts.len(), 1);
 
         // A reverts as well: must not affect the already-migrated entry.
-        journal.revert_frame(&mut host, &world).unwrap();
+        journal.revert_frame(&mut host).unwrap();
         assert_eq!(journal.backtracked_crac_receipts.len(), 1);
         assert_eq!(receipt_id(&journal.backtracked_crac_receipts[0].1), 7);
     }
@@ -1252,7 +1266,7 @@ mod tests {
 
         journal.push_external_checkpoint();
         journal.set_frame_result(vec![0xBB]).unwrap();
-        journal.revert_frame(&mut host, &world).unwrap();
+        journal.revert_frame(&mut host).unwrap();
 
         journal.push_external_checkpoint();
         assert_eq!(journal.frame_result(), None);

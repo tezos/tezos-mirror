@@ -54,7 +54,7 @@ use tezos_execution::{
     FeeRefundConfig, ProcessedOperation,
 };
 use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
-use tezos_smart_rollup_host::path::{Path, RefPath};
+use tezos_smart_rollup_host::path::{OwnedPath, Path, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_tezlink::protocol::TARGET_TEZOS_PROTOCOL;
@@ -76,14 +76,18 @@ use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
 pub use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 
-pub const TEZLINK_SAFE_STORAGE_ROOT_PATH: RefPath = RefPath::assert_from(b"/tezlink");
-
 pub const TEZ_SAFE_STORAGE_ROOT_PATH: RefPath = RefPath::assert_from(b"/tez/world_state");
 
 /// Path for TezBlock storage. Sits under TEZ_SAFE_STORAGE_ROOT_PATH so it's
 /// included in SafeStorage transactions and snapshotted as part of the
 /// Michelson world state.
 pub const TEZ_BLOCKS_PATH: RefPath = RefPath::assert_from(b"/tez/world_state/tez_blocks");
+
+/// Unified SafeStorage root for all Tezos account state. Holds Michelson
+/// contract / big_map state directly (ex `/tezlink/context/`) and TezosX
+/// projected accounts under `tezosx/`.
+pub const TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH: RefPath =
+    RefPath::assert_from(b"/tez/tez_accounts");
 
 #[derive(Clone, Copy, Debug)]
 pub enum ChainFamily {
@@ -596,11 +600,17 @@ impl ChainConfigTrait for EvmChainConfig {
         coinbase: H160,
     ) -> anyhow::Result<Self::BlockConstants> {
         let level: BlockNumber = block_in_progress.number.try_into()?;
-        let context = TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
+        let context =
+            TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)?;
         let da_fee_per_byte_mutez = mutez_from_wei(da_fee_per_byte)
             .map_err(|_| crate::Error::InvalidConversion)?;
         let michelson_to_evm_gas_multiplier =
             read_or_init_michelson_to_evm_gas_multiplier(host);
+        let safe_roots = self
+            .storage_root_paths(level.into())
+            .iter()
+            .map(OwnedPath::from)
+            .collect();
         Ok(TezosXBlockConstants {
             evm_runtime_block_constants: block_in_progress.constants(
                 self.chain_id,
@@ -615,6 +625,7 @@ impl ChainConfigTrait for EvmChainConfig {
                 context,
                 da_fee_per_byte_mutez,
                 michelson_to_evm_gas_multiplier,
+                safe_roots,
             },
         })
     }
@@ -765,6 +776,7 @@ impl ChainConfigTrait for EvmChainConfig {
                     &self.spec_id,
                     &self.limits,
                     http_trace_enabled,
+                    &block_constants.michelson_runtime_block_constants.safe_roots,
                 )
             }
             TezosXTransaction::Tezos(operation) => {
@@ -844,8 +856,8 @@ impl ChainConfigTrait for EvmChainConfig {
         if self.is_tezos_runtime_enabled(block_number) {
             vec![
                 ETHERLINK_SAFE_STORAGE_ROOT_PATH,
-                TEZLINK_SAFE_STORAGE_ROOT_PATH,
                 TEZ_SAFE_STORAGE_ROOT_PATH,
+                TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
             ]
         } else {
             vec![ETHERLINK_SAFE_STORAGE_ROOT_PATH]
@@ -912,6 +924,11 @@ pub struct TezlinkBlockConstants<Context: context::Context> {
     /// Conversion factor from Michelson gas to EVM gas, read once at block
     /// start from durable storage (falls back to the compile-time constant).
     pub michelson_to_evm_gas_multiplier: u64,
+    /// SafeStorage roots to snapshot when validating/applying a Tezos
+    /// operation. Mirrors `ChainConfigTrait::storage_root_paths` so the
+    /// inner transactional wrap covers every subtree that a Tezos operation
+    /// may read or write.
+    pub safe_roots: Vec<OwnedPath>,
 }
 
 fn credit_da_fees<Host>(
@@ -1148,6 +1165,7 @@ where
                 skip_signature_check,
                 fees,
                 fee_refund_config,
+                &block_constants.safe_roots,
             ) {
                 Ok(receipt) => receipt,
                 Err(OperationError::Validation(err)) => {
@@ -1283,18 +1301,24 @@ impl ChainConfigTrait for MichelsonChainConfig {
         da_fee_per_byte: U256,
         _coinbase: H160,
     ) -> anyhow::Result<Self::BlockConstants> {
-        let level = block_in_progress.number.try_into()?;
+        let level: BlockNumber = block_in_progress.number.try_into()?;
         let context =
-            context::TezlinkContext::from_root(&TEZLINK_SAFE_STORAGE_ROOT_PATH)?;
+            context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)?;
         let da_fee_per_byte_mutez = mutez_from_wei(da_fee_per_byte)
             .map_err(|_| crate::Error::InvalidConversion)?;
         let michelson_to_evm_gas_multiplier =
             read_or_init_michelson_to_evm_gas_multiplier(host);
+        let safe_roots = self
+            .storage_root_paths(level.into())
+            .iter()
+            .map(OwnedPath::from)
+            .collect();
         Ok(TezlinkBlockConstants {
             level,
             context,
             da_fee_per_byte_mutez,
             michelson_to_evm_gas_multiplier,
+            safe_roots,
         })
     }
 
@@ -1474,6 +1498,23 @@ impl ChainConfigTrait for MichelsonChainConfig {
         crate::apply::renumber_nonces(
             &mut block_in_progress.cumulative_tezos_operation_receipts.list,
         );
+        // Standalone Tezlink has no EVM txs, so `blueprint_hash` only
+        // commits to the Michelson ops and the timestamp. Kept in the
+        // same shape as the TezosX path so a future extension (e.g.
+        // delayed Tezlink ops) only needs to fill the empty vectors.
+        let michelson_commitment = crate::state_hash::michelson_ops_commitment(
+            &block_in_progress.cumulative_tezos_operation_receipts.list,
+        );
+        let blueprint_hash = crate::state_hash::blueprint_hash(
+            &[],
+            &[],
+            &michelson_commitment,
+            block_in_progress.timestamp,
+        );
+        let state_root =
+            crate::state_hash::tez_accounts_state_hash(host, &blueprint_hash)
+                .try_into()
+                .expect("tez_accounts_state_hash must be 32 bytes");
         let tezblock = TezBlock::new(
             chain_header.next_protocol,
             TARGET_TEZOS_PROTOCOL,
@@ -1481,10 +1522,10 @@ impl ChainConfigTrait for MichelsonChainConfig {
             block_in_progress.timestamp,
             block_in_progress.ethereum_parent_hash,
             block_in_progress.cumulative_tezos_operation_receipts.list,
+            state_root,
         )?;
         let new_block = L2Block::Tezlink(tezblock);
-        let root = TEZLINK_SAFE_STORAGE_ROOT_PATH;
-        crate::block_storage::store_current(host, &root, &new_block)
+        crate::block_storage::store_current(host, &TEZ_BLOCKS_PATH, &new_block)
             .context("Failed to store the current block")?;
         Ok(new_block)
     }
@@ -1546,7 +1587,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
             operation_bytes.len()
         );
         let context =
-            context::TezlinkContext::from_root(&TEZLINK_SAFE_STORAGE_ROOT_PATH)?;
+            context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)?;
 
         let BlueprintHeader { number, timestamp } = read_current_blueprint_header(host)?;
         let block_ctx = BlockCtx {
@@ -1560,6 +1601,11 @@ impl ChainConfigTrait for MichelsonChainConfig {
         // because it doesn't know the fees yet (that's what simulation computes).
         // The OCaml node-side prevalidation also skips fees during simulation.
         let mut tezosx_journal = TezosXJournal::default();
+        let safe_roots: Vec<OwnedPath> = self
+            .storage_root_paths(number)
+            .iter()
+            .map(OwnedPath::from)
+            .collect();
         let processed_operations = tezos_execution::validate_and_apply_operation(
             host,
             registry,
@@ -1571,6 +1617,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
             skip_signature_check,
             None,
             None, // No fee refund in Tezlink
+            &safe_roots,
         )?;
         let operations = ProcessedOperation::into_receipts(processed_operations);
         let result = AppliedOperation {
@@ -1591,9 +1638,9 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
     fn storage_root_paths(&self, _block_number: U256) -> Vec<RefPath> {
         vec![
-            TEZLINK_SAFE_STORAGE_ROOT_PATH,
             ETHERLINK_SAFE_STORAGE_ROOT_PATH,
             TEZ_SAFE_STORAGE_ROOT_PATH,
+            TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
         ]
     }
 }
