@@ -56,7 +56,10 @@ let typecheck_module module_ =
       Tezos_webassembly_interpreter.Valid.check_module module_)
 
 (* [import_pvm_host_functions ~version ()] registers the host
-   functions of the PVM. *)
+   functions of the PVM. The debugger is a kernel-development tool,
+   so it exposes every host function the [version] allows, including
+   NDS — the protocol-gated [Nds_host_functions] feature flag is
+   effectively forced on here. *)
 let import_pvm_host_functions ~version () =
   let lookup name =
     Lwt.return (Tezos_scoru_wasm.Host_funcs.lookup ~version name)

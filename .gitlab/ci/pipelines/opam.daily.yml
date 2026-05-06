@@ -151,12 +151,12 @@ opam:all_6:
       - tezos-benchmark
       - octez-tar-helpers
       - octez-riscv-pvm
+      - octez-riscv-nds
       - octez-proto-libs
       - octez-performance-metrics
       - octez-libs
       - octez-lib-upnp
       - octez-l2-libs
-      - octez-internal-libs
       - octez-distributed-lwt-internal
       - efunc_core
       - bls12-381
@@ -786,12 +786,16 @@ opam:all_7:
       - octez-rustzcash-deps
       - octez-rust-tezos-context
       - octez-rust-deps
+      - octez-rollup-node-rust-deps
+      - octez-riscv-nds-memory-api
+      - octez-riscv-nds-disk-api
       - octez-riscv-api
       - octez-protocol-compiler-compat
       - octez-ml-dsa
       - octez-lwt-domain
       - octez-libcrux-ml-dsa
       - octez-lib-upnp-args
+      - octez-internal-libs
       - octez-igd-next
       - octez-distributed-internal
       - octez-alcotezt

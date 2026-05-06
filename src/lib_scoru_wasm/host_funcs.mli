@@ -26,24 +26,41 @@
 (** [lookup ~version name] retrieves or instantiates a host function
     by the given [name].
 
-    Used to plug host function wrappers in the WASN interpreter linker. *)
+    Used to plug host function wrappers in the WASM interpreter linker.
+    NDS host functions are gated purely on the PVM [version] (V6 and
+    above): the [nds_host_functions_enabled] feature flag is enforced
+    at runtime by {!registry}, not at link time, so a kernel importing
+    NDS on V6+ always links successfully. *)
 val lookup :
   version:Wasm_pvm_state.version ->
   Tezos_webassembly_interpreter.Ast.name ->
   Tezos_webassembly_interpreter.Instance.extern
 
-(** [lookup_opt ~version name] is exactly [lookup name] but returns an option instead of
-      raising `Not_found`. *)
+(** [lookup_opt ~version name] is exactly [lookup] but returns an
+    option instead of raising [Not_found]. *)
 val lookup_opt :
   version:Wasm_pvm_state.version ->
   Tezos_webassembly_interpreter.Ast.name ->
   Tezos_webassembly_interpreter.Instance.extern option
 
-(** [registry ~version ~write_debug] returns the host functions registry for
-    the expected PVM [version], and with the expected implementation for the
-    [write_debug] function.  *)
+(** [registry ~version ~write_debug ?nds_host_functions_enabled]
+    returns the host functions registry for the expected PVM
+    [version], with the expected implementation for [write_debug].
+
+    NDS host functions (registered as [Nds_host_func] for V6 and
+    above) receive the [New_durable_storage.t] threaded through
+    [Eval.step].  When [nds] is absent ([Durable_only] storage),
+    the interpreter raises a crash error (unreachable in normal
+    operation since NDS functions require Dual storage).
+
+    [nds_host_functions_enabled] gates the runtime behaviour of NDS
+    host functions: when [false], every [nds_*] call becomes a no-op
+    returning [I32 0l] with the same tick cost as a successful real
+    call — no NDS state is read or mutated. Pre-V6 versions are
+    unaffected by this flag. *)
 val registry :
   version:Wasm_pvm_state.version ->
+  nds_host_functions_enabled:bool ->
   write_debug:Builtins.write_debug ->
   Tezos_webassembly_interpreter.Host_funcs.registry
 
@@ -87,6 +104,18 @@ module Error : sig
     | Store_value_already_exists
         (** Trying to create a value at a key that already has an associated
             value. Has code `-13`. *)
+    | Nds_database_out_of_bounds
+        (** NDS-only: the registry has fewer databases than the [db_index]
+            requested. Distinct from {!Store_not_a_node}, which refers to
+            the classic tree storage. Has code `-14`. *)
+    | Nds_resize_too_large
+        (** NDS-only: the registry can only be resized by one database at
+            a time. Has code `-15`. *)
+    | Nds_not_enabled
+        (** NDS-only: an NDS host function was invoked while the
+            [nds_host_functions_enabled] runtime flag is off. Lets the
+            kernel distinguish "feature disabled" from a successful
+            zero-byte result. Has code `-16`. *)
 
   (** [code error] returns the error code associated to the error. *)
   val code : t -> int32
@@ -101,7 +130,14 @@ module type Memory_access = sig
 
   val store_bytes : t -> addr -> string -> unit Lwt.t
 
+  (** [store_bytes_from_bytes mem addr data] is {!store_bytes} from a
+      [bytes] without going through an intermediate [string], saving one
+      copy on the hot write path. *)
+  val store_bytes_from_bytes : t -> addr -> bytes -> unit Lwt.t
+
   val load_bytes : t -> addr -> size -> string Lwt.t
+
+  val load_bytes_to_bytes : t -> addr -> size -> bytes Lwt.t
 
   val store_num :
     t -> addr -> addr -> Tezos_webassembly_interpreter.Values.num -> unit Lwt.t
@@ -126,6 +162,22 @@ module Aux : sig
         adress. *)
     val load_bytes :
       memory:memory -> addr:int32 -> size:int32 -> (string, int32) result Lwt.t
+
+    (** [load_raw_bytes ~memory ~addr ~size] is {!load_bytes} followed by
+        [Bytes.of_string]. *)
+    val load_raw_bytes :
+      memory:memory -> addr:int32 -> size:int32 -> (bytes, int32) result Lwt.t
+
+    (** [store_bytes ~memory ~addr ~data] writes [data] into [memory] at
+        [addr]. Returns [Error.Memory_invalid_access] (as an [int32]
+        error code) on out-of-bounds writes rather than raising. *)
+    val store_bytes :
+      memory:memory -> addr:int32 -> data:string -> (unit, int32) result Lwt.t
+
+    (** [store_bytes_from_bytes ~memory ~addr ~data] is {!store_bytes}
+        from a [bytes] without going through an intermediate [string]. *)
+    val store_bytes_from_bytes :
+      memory:memory -> addr:int32 -> data:bytes -> (unit, int32) result Lwt.t
 
     (** [aux_write_output ~input_buffer ~output_buffer ~module_inst ~src
      ~num_bytes] reads num_bytes from the memory of module_inst starting at
@@ -353,6 +405,29 @@ module Tick_model : sig
   (* [tree_read] is tick consumption of reading a tree in the durable
      storage. *)
   val tree_read : tick
+
+  (** {2 NDS backend tick costs}
+
+      Same model as tree operations: one tick per backend call,
+      plus memory I/O costs per byte read/written. *)
+
+  val nds_access : tick
+
+  val nds_read : tick
+
+  val nds_write : tick
+
+  val nds_delete : tick
+
+  val nds_move : tick
+
+  val nds_copy : tick
+
+  val nds_clear : tick
+
+  val nds_resize : tick
+
+  val nds_hash : tick
 end
 
 module Internal_for_tests : sig
@@ -397,4 +472,28 @@ module Internal_for_tests : sig
   val store_get_hash : Tezos_webassembly_interpreter.Instance.func_inst
 
   val write_debug : Tezos_webassembly_interpreter.Instance.func_inst
+
+  val nds_registry_resize : Tezos_webassembly_interpreter.Instance.func_inst
+
+  val nds_registry_copy : Tezos_webassembly_interpreter.Instance.func_inst
+
+  val nds_registry_move : Tezos_webassembly_interpreter.Instance.func_inst
+
+  val nds_registry_clear : Tezos_webassembly_interpreter.Instance.func_inst
+
+  val nds_registry_get_hash : Tezos_webassembly_interpreter.Instance.func_inst
+
+  val nds_store_exists : Tezos_webassembly_interpreter.Instance.func_inst
+
+  val nds_store_read : Tezos_webassembly_interpreter.Instance.func_inst
+
+  val nds_store_write : Tezos_webassembly_interpreter.Instance.func_inst
+
+  val nds_store_set : Tezos_webassembly_interpreter.Instance.func_inst
+
+  val nds_store_delete : Tezos_webassembly_interpreter.Instance.func_inst
+
+  val nds_store_value_size : Tezos_webassembly_interpreter.Instance.func_inst
+
+  val nds_database_get_hash : Tezos_webassembly_interpreter.Instance.func_inst
 end

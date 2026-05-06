@@ -5,10 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type feature = |
+type feature = Nds_host_functions
 
 let feature_compare : feature -> feature -> int =
- fun f _ -> match f with _ -> .
+ fun a b -> match (a, b) with Nds_host_functions, Nds_host_functions -> 0
 
 module Feature_map = Map.Make (struct
   type t = feature
@@ -29,9 +29,17 @@ let activation_level {features} f = Feature_map.find_opt f features
 
 let equal a b = Feature_map.equal Int32.equal a.features b.features
 
-let signal_name_of_feature : feature -> string = fun f -> match f with _ -> .
+let nds_host_functions_signal = "nds_host_functions"
 
-let feature_of_signal_name _ = None
+let signal_name_of_feature : feature -> string = function
+  | Nds_host_functions -> nds_host_functions_signal
+
+let feature_of_signal_name = function
+  | s when String.equal s nds_host_functions_signal -> Some Nds_host_functions
+  | _ -> None
+
+let nds_host_functions_enabled t ~current_level =
+  is_enabled t Nds_host_functions ~current_level
 
 let of_signals signals =
   let features =

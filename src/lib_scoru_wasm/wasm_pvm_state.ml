@@ -26,6 +26,41 @@
 
 type version = V0 | V1 | V2 | V3 | V4 | V5 | V6 | VExperimental
 
+(** [int_of_version v] is the rank of [v] in the linear order
+    [V0 < V1 < V2 < V3 < V4 < V5 < V6 < ... < VExperimental].
+    [VExperimental] is mapped to [max_int] so it remains strictly
+    above every concrete version — present *and* future. Adding a
+    [V7] constructor then only requires extending the concrete tail
+    ([V6 -> 6 | V7 -> 7]) without touching [VExperimental].
+
+    Kept as an explicit mapping so that reordering or inserting
+    constructors produces a compile error (non-exhaustive match)
+    rather than a silent semantic change (as [Stdlib.compare]
+    would). *)
+let int_of_version = function
+  | V0 -> 0
+  | V1 -> 1
+  | V2 -> 2
+  | V3 -> 3
+  | V4 -> 4
+  | V5 -> 5
+  | V6 -> 6
+  | VExperimental -> max_int
+
+(** [compare_version va vb] is negative if [va] is a less recent
+    version than [vb], positive if [va] is more recent, and [0] if
+    they are equal. [VExperimental] is strictly more recent than
+    every concrete version, so [compare_version V6 VExperimental < 0]
+    and would remain so even after a [V7] is introduced. *)
+let compare_version a b =
+  Compare.Int.compare (int_of_version a) (int_of_version b)
+
+(** [at_least v min] is [true] iff [v] is [min] or a more recent
+    version. Shortcut for [compare_version v min >= 0]. Useful to
+    gate host functions, storage layouts, or any other behaviour
+    that became available at a given PVM version. *)
+let at_least v min = int_of_version v >= int_of_version min
+
 let versions =
   [
     ("2.0.0", V0);
