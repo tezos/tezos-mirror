@@ -66,7 +66,7 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
 
     # Push checksums for x86_64 binaries
     echo "Generating checksums for x86_64 binaries"
-    for binary in ./teztale-binaries/arm64/*; do
+    for binary in ./teztale-binaries/x86_64/*; do
       filename=$(basename "$binary")
       [ -f "$binary" ] && sha256sum "$binary" | awk -v name="$filename" '{print $1, name}' >> "./x86_64_sha256sums.txt"
     done
