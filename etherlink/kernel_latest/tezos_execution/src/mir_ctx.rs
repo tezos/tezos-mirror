@@ -463,7 +463,7 @@ impl<Host: StorageV1, C: Context> TcCtx<'_, Host, C> {
             let id: BigMapId =
                 read_nom_value(self.host, &next_id_path).unwrap_or(0.into());
             store_bin(&id.succ(), self.host, &next_id_path)
-                .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
+                .map_err(storage_error_to_lazy)?;
             Ok(id)
         }
     }
@@ -509,6 +509,18 @@ fn hash_micheline_expr(
     expr: &Micheline<'_>,
 ) -> Result<ScriptExprHash, tezos_data_encoding::enc::BinError> {
     Ok(digest_256(&expr.encode_for_pack()?).into())
+}
+
+/// Adapter for the legacy `tezos_storage::Error → LazyStorageError`
+/// stringification path. `tezos_storage::Error` is not a `BinError`, so
+/// the new `From<BinError>` impl on `LazyStorageError` does not apply
+/// here; keep the explicit conversion isolated in one helper instead of
+/// inlining `.map_err(|e| LazyStorageError::BinWriteError(...))` at
+/// each call site.
+fn storage_error_to_lazy(e: tezos_storage::error::Error) -> LazyStorageError {
+    LazyStorageError::BinWriteError(std::rc::Rc::new(
+        tezos_data_encoding::enc::BinError::custom(e.to_string()),
+    ))
 }
 
 /// Computes the hash of a big_map key (TypedValue), used for storage path
@@ -575,8 +587,7 @@ impl BigMapKeys {
         let mut big_map_keys: Self = read_nom_value(host, &path)
             .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?;
         big_map_keys.keys.retain(|elt| elt != key);
-        store_bin(&big_map_keys, host, &path)
-            .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
+        store_bin(&big_map_keys, host, &path).map_err(storage_error_to_lazy)?;
         Ok(())
     }
 
@@ -635,8 +646,7 @@ impl BigMapKeys {
         }
 
         let dest_path = keys_of_big_map(context, dest)?;
-        store_bin(&big_map_keys, host, &dest_path)
-            .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
+        store_bin(&big_map_keys, host, &dest_path).map_err(storage_error_to_lazy)?;
 
         Ok(())
     }
@@ -649,12 +659,7 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         id: &BigMapId,
         key: &TypedValue,
     ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
-        let value_path = value_path(
-            self.context,
-            id,
-            &hash_key(key.clone())
-                .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?,
-        )?;
+        let value_path = value_path(self.context, id, &hash_key(key.clone())?)?;
         if self.host.store_has(&value_path)?.is_none() {
             return Ok(None);
         }
@@ -673,12 +678,7 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         id: &BigMapId,
         key: &TypedValue,
     ) -> Result<bool, LazyStorageError> {
-        let path = value_path(
-            self.context,
-            id,
-            &hash_key(key.clone())
-                .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?,
-        )?;
+        let path = value_path(self.context, id, &hash_key(key.clone())?)?;
         Ok(self.host.store_has(&path)?.is_some())
     }
 
@@ -691,13 +691,10 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         let parser = Parser::new();
         let micheline_expr = key.into_micheline_optimized_legacy(&parser.arena);
         // key_encoded: raw Micheline encoding (no 0x05 prefix), used in big_map_diff receipts
-        let key_encoded = micheline_expr
-            .encode()
-            .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
+        let key_encoded = micheline_expr.encode()?;
         // key_hashed: hash of packed encoding (with 0x05 prefix), used for storage path
         // See: https://gitlab.com/tezos/tezos/-/blob/master/src/proto_023_PtSeouLo/lib_protocol/script_ir_translator.ml#L5563
-        let key_hashed = hash_micheline_expr(&micheline_expr)
-            .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
+        let key_hashed = hash_micheline_expr(&micheline_expr)?;
         let value_path = value_path(self.context, id, &key_hashed)?;
         match value {
             None => {
@@ -712,10 +709,7 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
             }
             Some(v) => {
                 let arena = Arena::new();
-                let encoded = v
-                    .into_micheline_optimized_legacy(&arena)
-                    .encode()
-                    .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
+                let encoded = v.into_micheline_optimized_legacy(&arena).encode()?;
                 if self.host.store_has(&value_path)?.is_none() {
                     // We should write the key in the list only if it's an add in the big_map not an update
                     BigMapKeys::add_key(self.host, self.context, id, &key_hashed)?;
@@ -745,17 +739,11 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         let id = self.generate_id(temporary)?;
         let key_type_path = key_type_path(self.context, &id)?;
         let value_type_path = value_type_path(self.context, &id)?;
-        let encode_err = |e: tezos_data_encoding::enc::BinError| {
-            LazyStorageError::BinWriteError(e.to_string())
-        };
-        let key_type_encoded = key_type
-            .into_micheline_optimized_legacy(&arena)
-            .encode()
-            .map_err(encode_err)?;
+        let key_type_encoded =
+            key_type.into_micheline_optimized_legacy(&arena).encode()?;
         let value_type_encoded = value_type
             .into_micheline_optimized_legacy(&arena)
-            .encode()
-            .map_err(encode_err)?;
+            .encode()?;
         self.host
             .store_write_all(&value_type_path, &value_type_encoded)?;
         self.host

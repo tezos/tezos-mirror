@@ -58,8 +58,12 @@ pub enum InterpretError<'a> {
     #[error("lazy storage error: {0}")]
     LazyStorageError(#[from] LazyStorageError),
     /// Error when encoding serialized data
+    ///
+    /// Wrapped in `Rc` because [`tezos_data_encoding::enc::BinError`]
+    /// does not implement [`Clone`] (its `IOError` variant carries a
+    /// non-Clone `std::io::Error`), and this enum derives `Clone`.
     #[error("encoding error: {0}")]
-    EncodeError(String),
+    EncodeError(Rc<tezos_data_encoding::enc::BinError>),
     /// Error when decoding serialized data
     #[error(transparent)]
     DecodeError(#[from] DecodeError),
@@ -74,6 +78,12 @@ pub enum InterpretError<'a> {
 impl<'a> From<OutOfGas> for InterpretError<'a> {
     fn from(_: OutOfGas) -> Self {
         InterpretError::OutOfGas
+    }
+}
+
+impl<'a> From<tezos_data_encoding::enc::BinError> for InterpretError<'a> {
+    fn from(err: tezos_data_encoding::enc::BinError) -> Self {
+        InterpretError::EncodeError(Rc::new(err))
     }
 }
 
@@ -1506,8 +1516,7 @@ fn interpret_one<'a>(
             ctx.gas()
                 .consume(interpret_cost::micheline_encoding(&mich)?)?;
             let encoded = mich
-                .encode_for_pack()
-                .map_err(|e| InterpretError::EncodeError(e.to_string()))?;
+                .encode_for_pack()?;
             stack.push(V::Bytes(encoded));
         }
         I::Unpack(ty) => {
@@ -1904,8 +1913,7 @@ fn interpret_one<'a>(
             };
 
             let Some((view, view_storage_ty, view_storage, view_balance)) = ctx
-                .lookup_view_storage_balance(&kt1, name, arena)
-                .map_err(|e| InterpretError::EncodeError(e.to_string()))?
+                .lookup_view_storage_balance(&kt1, name, arena)?
             else {
                 stack.push(V::Option(None));
                 return Ok(());
