@@ -173,9 +173,12 @@ module type LAYER1_HELPERS = sig
   val find_last_whitelist_update :
     #Client_context.full -> Address.t -> (Z.t * Int32.t) option tzresult Lwt.t
 
-  (** Retrieve a commitment published on L1. *)
+  (** Retrieve a commitment published on L1. The optional [block] argument
+      selects the L1 block at which the commitment is queried (defaults to
+      [`Head 0]). *)
   val get_commitment :
     #Client_context.full ->
+    ?block:Tezos_shell_services.Block_services.block ->
     Address.t ->
     Commitment.Hash.t ->
     Commitment.t tzresult Lwt.t
