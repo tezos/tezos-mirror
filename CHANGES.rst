@@ -82,6 +82,12 @@ Smart Rollup node
   archive L1 node when the snapshot is older than the savepoint. (MR
   :gl:`!21841`)
 
+- The rollup node no longer exits when the L1 RPC is unreachable at startup;
+  the initial connection is retried with the configured
+  ``--reconnection-delay`` exponential backoff, matching the existing behaviour
+  for runtime disconnections. A ``reconnected`` notice is emitted once the
+  connection is re-established. (MR :gl:`!21854`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
