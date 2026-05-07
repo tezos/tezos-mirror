@@ -20,8 +20,10 @@ let pp_runtime fmt runtime =
 let feature_flag = function
   | Tezos -> Durable_storage_path.Feature_flags.tezos_runtime
 
-let target_sunrise_level_path = function
-  | Tezos -> Durable_storage_path.michelson_runtime_target_sunrise_level
+let target_sunrise_level_path ~storage_version = function
+  | Tezos ->
+      Durable_storage_path.michelson_runtime_target_sunrise_level
+        ~storage_version
 
 let encode_target_sunrise_level n =
   Bytes.unsafe_to_string
