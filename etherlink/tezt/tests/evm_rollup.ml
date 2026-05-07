@@ -3140,7 +3140,10 @@ let test_kernel_upgrade_activates_michelson_runtime =
         Set
           {
             value = activation_target;
-            to_ = Tezosx_runtime.target_sunrise_level Tezosx_runtime.Tezos;
+            to_ =
+              Tezosx_runtime.target_sunrise_level
+                Kernel.Latest
+                Tezosx_runtime.Tezos;
           };
       ]
   in
@@ -3199,7 +3202,10 @@ let test_kernel_upgrade_activates_michelson_runtime =
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
          ~pvm_kind
          ~operation:Sc_rollup_rpc.Value
-         ~key:(Tezosx_runtime.target_sunrise_level Tezosx_runtime.Tezos)
+         ~key:
+           (Tezosx_runtime.target_sunrise_level
+              Kernel.Latest
+              Tezosx_runtime.Tezos)
          ()
   in
   Check.((target_sunrise_value = Some activation_target) (option string))
@@ -3211,7 +3217,7 @@ let test_kernel_upgrade_activates_michelson_runtime =
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
          ~pvm_kind
          ~operation:Sc_rollup_rpc.Value
-         ~key:(Tezosx_runtime.sunrise_level Tezosx_runtime.Tezos)
+         ~key:(Tezosx_runtime.sunrise_level Kernel.Latest Tezosx_runtime.Tezos)
          ()
   in
   Check.((sunrise_value = None) (option string))
@@ -3268,7 +3274,7 @@ let test_kernel_upgrade_activates_michelson_runtime =
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
          ~pvm_kind
          ~operation:Sc_rollup_rpc.Value
-         ~key:(Tezosx_runtime.sunrise_level Tezosx_runtime.Tezos)
+         ~key:(Tezosx_runtime.sunrise_level Kernel.Latest Tezosx_runtime.Tezos)
          ()
   in
   Check.((sunrise_value = Some activation_target) (option string))

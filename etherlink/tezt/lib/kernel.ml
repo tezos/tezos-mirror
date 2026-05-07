@@ -61,6 +61,18 @@ let supports_revm = function
   | Latest | Previewnet | Mainnet -> true
   | Tezlink_shadownet -> false
 
+(* Storage version baked into each kernel binary at build time, as read at
+   each kernel's commit (see [commit_of]) from
+   `etherlink/kernel_latest/kernel/src/storage.rs:STORAGE_VERSION`. Bump the
+   value for a network when that network's kernel is rebaked; treat this as
+   the single source of truth when picking storage-version-gated paths in
+   tezt. *)
+let storage_version = function
+  | Latest -> 57
+  | Previewnet -> 56
+  | Mainnet -> 45
+  | Tezlink_shadownet -> 44
+
 let of_tag tag =
   let contain_exp ~exp =
     let re = Str.regexp_string exp in
