@@ -1184,6 +1184,16 @@ let pre_import_checks cctxt ~no_checks ~data_dir ?level
   in
   let* () =
     unless (no_checks || skip_commitment_check) @@ fun () ->
+    let* savepoint_level = get_l1_savepoint_level cctxt in
+    let*? () =
+      error_when (snapshot_header.head_level <= savepoint_level)
+      @@ error_of_fmt
+           "Cannot verify the commitment publication of the snapshot: the \
+            snapshot's head level %ld is at or below the L1 node's savepoint \
+            %ld. Use an archive L1 node, or skip the check with --no-checks."
+           snapshot_header.head_level
+           savepoint_level
+    in
     check_commitment_published
       ~hint_level:snapshot_header.head_level
       cctxt
