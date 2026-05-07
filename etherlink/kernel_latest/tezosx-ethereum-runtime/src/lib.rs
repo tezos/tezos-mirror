@@ -123,6 +123,11 @@ fn build_response(
                 ExecutionResult::Halt { reason, .. } => {
                     let status = match reason {
                         HaltReason::OutOfGas(_) => StatusCode::TOO_MANY_REQUESTS,
+                        // STATICCALL violation on the read-only entry
+                        // (HTTP `GET`): catchable client error.
+                        HaltReason::StateChangeDuringStaticCall => {
+                            StatusCode::BAD_REQUEST
+                        }
                         _ => StatusCode::INTERNAL_SERVER_ERROR,
                     };
                     (
@@ -175,12 +180,42 @@ sol! {
     );
 }
 
-/// Execute a cross-runtime request: parse the URL, extract the
-/// destination address, and run the EVM transaction.
+/// Dispatch a cross-runtime request on the HTTP method:
 ///
-/// This is the core logic behind [`EthereumRuntime::serve`], separated
-/// so that `serve` only handles the result-to-HTTP-status mapping.
+/// - `POST` → [`execute_call`] (state-mutating).
+/// - `GET`  → [`execute_static_call`] (read-only, top frame runs
+///   with `is_static = true` — REVM enforces strict `STATICCALL`).
+/// - else  → catchable `405`.
+///
+/// `serve` then only handles the result-to-HTTP-status mapping.
 fn execute_request<Host>(
+    runtime: &EthereumRuntime,
+    registry: &impl Registry,
+    host: &mut Host,
+    journal: &mut TezosXJournal,
+    request: http::Request<Vec<u8>>,
+) -> Result<ExecutionOutcome, TezosXRuntimeError>
+where
+    Host: StorageV1,
+{
+    match *request.method() {
+        http::Method::POST => execute_call(runtime, registry, host, journal, request),
+        http::Method::GET => {
+            execute_static_call(runtime, registry, host, journal, request)
+        }
+        ref other => Err(TezosXRuntimeError::MethodNotAllowed(format!(
+            "HTTP method {other} not allowed (use POST for entrypoint calls or GET for static calls)"
+        ))),
+    }
+}
+
+/// Execute a state-mutating cross-runtime entrypoint call (POST).
+///
+/// Unchanged behavior from pre-L2-1259: emits `CracReceived`, credits the
+/// sender, and runs the EVM transaction with state changes preserved
+/// (the journal is not committed here — the outer block builder handles
+/// that for the whole CRAC).
+fn execute_call<Host>(
     runtime: &EthereumRuntime,
     registry: &impl Registry,
     host: &mut Host,
@@ -259,6 +294,99 @@ where
         },
     )
     .map_err(|e| TezosXRuntimeError::Custom(format!("EVM execution failed: {e:?}")))?;
+
+    Ok(outcome)
+}
+
+/// Read-only cross-runtime call (HTTP `GET`): the EVM-side entry
+/// point for any originating runtime that wants to read EVM state
+/// without leaving observable on-chain effects.
+///
+/// Differences from [`execute_call`]:
+/// - rejects `X-Tezos-Amount != 0` (catchable `400`);
+/// - no `CracReceived` log emission;
+/// - runs the EVM transaction under [`TransactionOrigin::CrossRuntimeStatic`],
+///   so the top-level frame has `is_static = true` and any state
+///   mutation halts with `StateChangeDuringStaticCall` (surfaced as
+///   `400`).
+fn execute_static_call<Host>(
+    runtime: &EthereumRuntime,
+    registry: &impl Registry,
+    host: &mut Host,
+    journal: &mut TezosXJournal,
+    request: http::Request<Vec<u8>>,
+) -> Result<ExecutionOutcome, TezosXRuntimeError>
+where
+    Host: StorageV1,
+{
+    let parsed = url::parse_ethereum_url(request.uri())?;
+    let hdrs = headers::parse_request_headers(request.headers())?;
+    let call_data = Bytes::from(request.into_body());
+
+    if !hdrs.amount.is_zero() {
+        return Err(TezosXRuntimeError::BadRequest(
+            "static calls (GET) cannot carry value (X-Tezos-Amount must be 0)".into(),
+        ));
+    }
+
+    // Verify CRAC-ID from incoming header (debug/consistency check).
+    if let Some(crac_id) = hdrs.crac_id {
+        journal
+            .verify_crac_id(&crac_id)
+            .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
+    }
+
+    // Set CRAC tx info on first hit (forced `amount = 0`); same
+    // sender/source headers as `execute_call`.
+    if !journal.evm.has_crac_data() {
+        journal
+            .evm
+            .set_crac_tx_info(tezosx_journal::CracTransactionInfo {
+                source: hdrs.source.unwrap_or_default(),
+                sender: hdrs.sender,
+                gas_limit: revm::primitives::U256::from(hdrs.gas_limit),
+                amount: revm::primitives::U256::ZERO,
+            })
+            .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
+    }
+
+    let context = CrossRuntimeContext {
+        gas_limit: hdrs.gas_limit,
+        timestamp: hdrs.timestamp,
+        block_number: hdrs.block_number,
+    };
+
+    let evm_version = read_evm_version(host);
+    let block_constants = runtime.create_block_constants(host, &context);
+    let gas_data = GasData::new(hdrs.gas_limit, 0, hdrs.gas_limit);
+
+    // Intentionally no `CracReceived` log on the static path.
+
+    let outcome = run_transaction(
+        host,
+        registry,
+        journal,
+        evm_version.into(),
+        &block_constants,
+        None,
+        hdrs.sender,
+        Some(parsed.destination),
+        call_data,
+        gas_data,
+        revm::primitives::U256::ZERO,
+        None,
+        None,
+        // `is_simulation = true` disables EIP-3607 so a contract-aliased
+        // caller (e.g. a Michelson contract's deterministic EVM alias,
+        // which we expect to have code deployed for forwarder usage)
+        // can sponsor a static read without being rejected at
+        // validation time.
+        true,
+        TransactionOrigin::CrossRuntimeStatic,
+    )
+    .map_err(|e| {
+        TezosXRuntimeError::Custom(format!("EVM static execution failed: {e:?}"))
+    })?;
 
     Ok(outcome)
 }
@@ -555,11 +683,18 @@ mod tests {
         amount: &str,
         body: Vec<u8>,
     ) -> http::Request<Vec<u8>> {
+        // POST is the explicit method for state-mutating cross-runtime
+        // entrypoint calls. The HTTP default is GET, which since L2-1259
+        // routes to the read-only static path; without this explicit
+        // method, every existing transfer/invoke test would silently
+        // hit the static path and either reject (amount != 0) or revert
+        // its writes, producing confusing failures.
         let url = format!(
             "http://ethereum/{}",
             alloy_primitives::hex::encode(destination.0 .0)
         );
         http::Request::builder()
+            .method(http::Method::POST)
             .uri(&url)
             .header(
                 tezosx_interfaces::X_TEZOS_SENDER,
@@ -1044,6 +1179,7 @@ mod tests {
             alloy_primitives::hex::encode(contract.0 .0)
         );
         let request = http::Request::builder()
+            .method(http::Method::POST)
             .uri(&url)
             .header(
                 tezosx_interfaces::X_TEZOS_SENDER,
@@ -1059,5 +1195,253 @@ mod tests {
         let mut journal = TezosXJournal::default();
         let resp = runtime.serve(&registry, &mut host, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
+    }
+
+    // ── L2-1259: HTTP method dispatch and GET-static path ────────────
+
+    /// Build an HTTP request with an explicit method, used by the
+    /// L2-1259 dispatch tests.
+    fn build_serve_request_with_method(
+        method: http::Method,
+        sender: &Address,
+        destination: &Address,
+        amount: &str,
+        body: Vec<u8>,
+    ) -> http::Request<Vec<u8>> {
+        let url = format!(
+            "http://ethereum/{}",
+            alloy_primitives::hex::encode(destination.0 .0)
+        );
+        http::Request::builder()
+            .method(method)
+            .uri(&url)
+            .header(
+                tezosx_interfaces::X_TEZOS_SENDER,
+                format!("0x{}", alloy_primitives::hex::encode(sender.0 .0)),
+            )
+            .header(tezosx_interfaces::X_TEZOS_AMOUNT, amount)
+            .header(tezosx_interfaces::X_TEZOS_GAS_LIMIT, u64::MAX.to_string())
+            .header(tezosx_interfaces::X_TEZOS_TIMESTAMP, "1")
+            .header(tezosx_interfaces::X_TEZOS_BLOCK_NUMBER, "1")
+            .body(body)
+            .unwrap()
+    }
+
+    /// Deploy a bytecode at `address` (test helper).
+    fn deploy_at(host: &mut MockKernelHost, address: &Address, bytecode_raw: Bytes) {
+        let code_hash = bytes_hash(&bytecode_raw);
+        let mut account = StorageAccount::from_address(address).unwrap();
+        account
+            .set_info(
+                host,
+                AccountInfo {
+                    balance: revm::primitives::U256::ZERO,
+                    nonce: 0,
+                    code_hash,
+                    account_id: None,
+                    code: Some(Bytecode::new_raw(bytecode_raw.clone())),
+                },
+            )
+            .unwrap();
+        CodeStorage::add(host, &bytecode_raw, Some(code_hash)).unwrap();
+    }
+
+    /// Read `slot` from `address`'s storage.
+    fn read_slot(
+        host: &mut MockKernelHost,
+        address: &Address,
+        slot: revm::primitives::U256,
+    ) -> revm::primitives::U256 {
+        let account = StorageAccount::from_address(address).unwrap();
+        account.get_storage(host, &slot).unwrap_or_default()
+    }
+
+    #[test]
+    fn test_serve_unsupported_method_returns_405() {
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let registry = StubRegistry;
+
+        let sender = Address::from_slice(&[0x11; 20]);
+        let destination = Address::from_slice(&[0x22; 20]);
+
+        for method in [
+            http::Method::PUT,
+            http::Method::DELETE,
+            http::Method::PATCH,
+            http::Method::HEAD,
+            http::Method::OPTIONS,
+        ] {
+            let mut journal = TezosXJournal::default();
+            let request = build_serve_request_with_method(
+                method.clone(),
+                &sender,
+                &destination,
+                "0",
+                vec![],
+            );
+            let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+            assert_eq!(
+                resp.status(),
+                http::StatusCode::METHOD_NOT_ALLOWED,
+                "method {method} should be rejected with 405",
+            );
+        }
+    }
+
+    #[test]
+    fn test_static_call_with_nonzero_amount_is_rejected() {
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let registry = StubRegistry;
+
+        let sender = Address::from_slice(&[0x11; 20]);
+        let destination = Address::from_slice(&[0x22; 20]);
+
+        let mut journal = TezosXJournal::default();
+        let request = build_serve_request_with_method(
+            http::Method::GET,
+            &sender,
+            &destination,
+            "1",
+            vec![],
+        );
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        assert_eq!(resp.status(), http::StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_static_call_returns_view_result() {
+        // Bytecode that returns the constant 0x42 left-padded to 32 bytes.
+        // No state mutation: a pure Solidity-`view`-style read.
+        //
+        //   PUSH1 0x42     (0x6042)  -- value
+        //   PUSH1 0x00     (0x6000)  -- mem offset
+        //   MSTORE         (0x52)
+        //   PUSH1 0x20     (0x6020)  -- return size
+        //   PUSH1 0x00     (0x6000)  -- return offset
+        //   RETURN         (0xF3)
+        let bytecode_raw = Bytes::from_hex("604260005260206000F3").unwrap();
+
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let registry = StubRegistry;
+
+        let sender = Address::from_slice(&[0x11; 20]);
+        let destination = Address::from_slice(&[0x33; 20]);
+        deploy_at(&mut host, &destination, bytecode_raw);
+
+        let mut journal = TezosXJournal::default();
+        let request = build_serve_request_with_method(
+            http::Method::GET,
+            &sender,
+            &destination,
+            "0",
+            vec![],
+        );
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        // Body is 32 bytes ending in 0x42.
+        let body = resp.body();
+        assert_eq!(body.len(), 32);
+        assert_eq!(body[31], 0x42);
+        for &b in &body[..31] {
+            assert_eq!(b, 0);
+        }
+    }
+
+    #[test]
+    fn test_static_call_rejects_state_mutation() {
+        // A `GET` runs the EVM transaction with `is_static = true` on
+        // the top-level frame, so REVM enforces the standard
+        // `STATICCALL` contract: any state-mutating opcode (`SSTORE`,
+        // `LOG*`, `CREATE*`, `SELFDESTRUCT`, value-bearing `CALL`)
+        // halts the call with `StateChangeDuringStaticCall`. We
+        // surface that as a catchable 400 BadRequest so the
+        // originating runtime can revert just this call.
+        //
+        // Bytecode: SSTORE 1 into slot 0 then RETURN — the SSTORE
+        // alone is enough to trip the static check.
+        //   PUSH1 0x01     (0x6001)
+        //   PUSH1 0x00     (0x6000)
+        //   SSTORE         (0x55)
+        //   PUSH1 0x00     (0x6000)
+        //   PUSH1 0x00     (0x6000)
+        //   RETURN         (0xF3)
+        let bytecode_raw = Bytes::from_hex("60016000556000600060F3").unwrap();
+
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let block_constants = BlockConstants::test_block_with_no_fees();
+        let registry = StubRegistry;
+
+        let sender = Address::from_slice(&[0x11; 20]);
+        let destination = Address::from_slice(&[0x44; 20]);
+        deploy_at(&mut host, &destination, bytecode_raw);
+
+        // Pre-condition: slot 0 starts at zero.
+        assert_eq!(
+            read_slot(&mut host, &destination, revm::primitives::U256::ZERO),
+            revm::primitives::U256::ZERO,
+        );
+
+        let mut journal = TezosXJournal::default();
+        let request = build_serve_request_with_method(
+            http::Method::GET,
+            &sender,
+            &destination,
+            "0",
+            vec![],
+        );
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        // The SSTORE attempt halts the EVM; we surface it as 400.
+        assert_eq!(resp.status(), http::StatusCode::BAD_REQUEST);
+
+        // Top-level commit applies whatever the journal accumulated.
+        // Since REVM aborted the call on the SSTORE attempt, slot 0
+        // stays at zero.
+        commit_evm_journal_from_external(
+            &mut host,
+            &registry,
+            &block_constants,
+            &mut journal,
+        )
+        .unwrap();
+
+        assert_eq!(
+            read_slot(&mut host, &destination, revm::primitives::U256::ZERO),
+            revm::primitives::U256::ZERO,
+        );
+    }
+
+    #[test]
+    fn test_static_call_revert_surfaces_as_bad_request() {
+        // Bytecode that REVERTs unconditionally with a 1-byte payload.
+        //   PUSH1 0x42     (0x6042)
+        //   PUSH1 0x00     (0x6000)
+        //   MSTORE         (0x52)
+        //   PUSH1 0x20     (0x6020)
+        //   PUSH1 0x00     (0x6000)
+        //   REVERT         (0xFD)
+        let bytecode_raw = Bytes::from_hex("604260005260206000FD").unwrap();
+
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let registry = StubRegistry;
+
+        let sender = Address::from_slice(&[0x11; 20]);
+        let destination = Address::from_slice(&[0x55; 20]);
+        deploy_at(&mut host, &destination, bytecode_raw);
+
+        let mut journal = TezosXJournal::default();
+        let request = build_serve_request_with_method(
+            http::Method::GET,
+            &sender,
+            &destination,
+            "0",
+            vec![],
+        );
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        assert_eq!(resp.status(), http::StatusCode::BAD_REQUEST);
     }
 }
