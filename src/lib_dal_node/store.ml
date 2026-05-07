@@ -552,6 +552,11 @@ module Shards = struct
     let open Lwt_result_syntax in
     let* () = Cache.remove cache slot_id in
     match disk with Some d -> Disk.remove d slot_id | None -> return_unit
+
+  let close {disk; _} =
+    match disk with
+    | Some d -> KVS.close d.shards_store
+    | None -> Lwt_result_syntax.return_unit
 end
 
 module Slots = struct
@@ -645,6 +650,8 @@ module Slots = struct
     let open Lwt_result_syntax in
     let* file_layout = get_file_layout ~slot_id in
     KVS.remove_file t file_layout slot_id
+
+  let close t = KVS.close t
 end
 
 module Slot_id_cache = struct
@@ -1197,6 +1204,16 @@ let init config profile_ctxt proto_parameters =
       first_seen_level;
       skip_list_cells_store;
     }
+
+let close t =
+  let open Lwt_result_syntax in
+  let* () = Shards.close t.shards in
+  let* () = Slots.close t.slots in
+  let*! () = Dal_store_sqlite3.Skip_list_cells.close t.skip_list_cells_store in
+  let* () = Chain_id.close t.chain_id in
+  let* () = Last_processed_level.close t.last_processed_level in
+  let* () = First_seen_level.close t.first_seen_level in
+  return_unit
 
 let add_slot_headers ~number_of_slots ~block_level slot_headers t =
   let module SI = Set.Make (Int) in

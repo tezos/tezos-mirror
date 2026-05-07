@@ -669,6 +669,16 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
   in
   (* Initialize store *)
   let* store = Store.init config profile_ctxt proto_parameters in
+  let (_ : Lwt_exit.clean_up_callback_id) =
+    Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _exit_status ->
+        let open Lwt_syntax in
+        let* r = Store.close store in
+        match r with
+        | Ok () -> Lwt.return_unit
+        | Error errs ->
+            let*! () = Event.emit_closing_store_failed errs in
+            Lwt.return_unit)
+  in
   let* current_chain_id = L1_helpers.fetch_l1_chain_id cctxt in
   let chain_id_store = Store.chain_id store in
   let* stored_chain_id = Store.Chain_id.load chain_id_store in

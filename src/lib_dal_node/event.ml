@@ -1412,6 +1412,15 @@ open struct
       ("status", Data_encoding.string)
       ("min_level", Data_encoding.string)
       ("max_level", Data_encoding.string)
+
+  let closing_store_failed =
+    declare_1
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"closing_store_failed"
+      ~msg:"failed to close the store: {error}"
+      ~level:Warning
+      ("error", Error_monad.trace_encoding)
 end
 
 (* DAL node event emission functions *)
@@ -1817,3 +1826,5 @@ let emit_publish_crosses_migration ~published_level ~migration_level
   emit
     publish_crosses_migration
     (published_level, migration_level, attested_level)
+
+let emit_closing_store_failed errs = emit closing_store_failed errs
