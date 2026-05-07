@@ -164,11 +164,7 @@ let execute ~pool ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
   in
   return evm_state
 
-let flag_local_exec evm_state ~storage_version =
-  Durable_storage.write
-    (Raw_path Durable_storage_path.(evm_node_flag ~storage_version))
-    Bytes.empty
-    evm_state
+let flag_local_exec evm_state = Durable_storage.write Evm_node_flag () evm_state
 
 let init_reboot_counter evm_state =
   let initial_reboot_counter =
@@ -211,14 +207,11 @@ let current_block_height ~chain_family evm_state =
 
 let current_block_hash ~chain_family evm_state =
   let open Lwt_result_syntax in
-  let root = Durable_storage_path.root_of_chain_family chain_family in
   let* current_hash =
-    Durable_storage.read_opt
-      (Raw_path (Durable_storage_path.Block.current_hash ~root))
-      evm_state
+    Durable_storage.read_opt (Current_block_hash chain_family) evm_state
   in
   match current_hash with
-  | Some h -> return (decode_block_hash h)
+  | Some h -> return h
   | None -> return (L2_types.genesis_parent_hash ~chain_family)
 
 let execute_and_inspect ~pool ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint
@@ -262,45 +255,34 @@ let execute_and_inspect ~pool ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint
   in
   return values
 
-let store_blueprint_chunk ~storage_version evm_state
-    (chunk : Sequencer_blueprint.unsigned_chunk) =
-  let open Lwt_result_syntax in
-  let (Qty number) = chunk.number in
-  let key =
-    Durable_storage_path.Blueprint.chunk
-      ~storage_version
-      ~blueprint_number:number
-      ~chunk_index:chunk.chunk_index
-  in
-  let value =
-    (* We want to encode a [StoreBlueprint] (see blueprint_storage.rs in
-       kernel_latest/kernel). The [StoreBlueprint] has two variants, and we
-       want to store a [SequencerChunk] whose tag is 0. [Value ""] is the
-       RLP-encoded for 0. *)
-    Rlp.List [Rlp.Value (Bytes.of_string ""); Value chunk.value] |> Rlp.encode
-  in
-  let* evm_state = Durable_storage.write (Raw_path key) value evm_state in
-  return evm_state
-
 let store_blueprint_chunks ~blueprint_number evm_state
     (chunks : Sequencer_blueprint.unsigned_chunked_blueprint) =
   let open Lwt_result_syntax in
   let chunks = (chunks :> Sequencer_blueprint.unsigned_chunk list) in
   let nb_chunks = List.length chunks in
   let* version = Durable_storage.storage_version evm_state in
-  let* evm_state =
-    List.fold_left_es
-      (store_blueprint_chunk ~storage_version:version)
-      evm_state
+  let chunk_writes =
+    List.map
+      (fun (chunk : Sequencer_blueprint.unsigned_chunk) ->
+        let (Qty number) = chunk.number in
+        let value =
+          (* We want to encode a [StoreBlueprint] (see blueprint_storage.rs
+             in kernel_latest/kernel). The [StoreBlueprint] has two variants,
+             and we want to store a [SequencerChunk] whose tag is 0. [Value ""]
+             is the RLP-encoded for 0. *)
+          Rlp.List [Rlp.Value (Bytes.of_string ""); Value chunk.value]
+          |> Rlp.encode
+        in
+        ( Durable_storage.Blueprint_chunk
+            {blueprint_number = number; chunk_index = chunk.chunk_index},
+          value ))
       chunks
   in
+  let* evm_state = Durable_storage.write_all chunk_writes evm_state in
   let* evm_state =
     Durable_storage.write
-      (Raw_path
-         (Durable_storage_path.Blueprint.nb_chunks
-            ~storage_version:version
-            ~blueprint_number))
-      (Bytes.of_string (Z.to_bits (Z.of_int nb_chunks)))
+      (Blueprint_nb_chunks blueprint_number)
+      nb_chunks
       evm_state
   in
   if version >= 39 then
@@ -314,11 +296,8 @@ let store_blueprint_chunks ~blueprint_number evm_state
     in
     let* evm_state =
       Durable_storage.write
-        (Raw_path
-           (Durable_storage_path.Blueprint.generation
-              ~storage_version:version
-              ~blueprint_number))
-        (encode_u256_le current_generation)
+        (Blueprint_generation blueprint_number)
+        current_generation
         evm_state
     in
     return evm_state
@@ -375,12 +354,7 @@ let execute_single_transaction ~storage_version ~data_dir ~pool
         Value (Ethereum_types.encode_u256_le block_in_progress.number);
       ]
   in
-  let* evm_state =
-    Durable_storage.write
-      (Raw_path (Durable_storage_path.Single_tx.input_tx ~storage_version))
-      (Rlp.encode rlp)
-      evm_state
-  in
+  let* evm_state = Durable_storage.write Single_tx_input rlp evm_state in
   let* evm_state =
     execute
       ~pool
@@ -392,25 +366,8 @@ let execute_single_transaction ~storage_version ~data_dir ~pool
       (`Inbox [])
   in
   if read_receipt then
-    let* read_res =
-      Durable_storage.read_opt
-        (Raw_path
-           (Durable_storage_path.Block.current_receipts
-              ~root:Durable_storage_path.etherlink_safe_root))
-        evm_state
-    in
-    match read_res with
-    | Some bytes ->
-        let receipt =
-          Transaction_receipt.decode_last_from_list
-            Ethereum_types.(Block_hash (Hex (String.make 64 '0')))
-            bytes
-        in
-        return (L2_types.Ethereum receipt, evm_state)
-    | None ->
-        failwith
-          "No value found in context where transactions receipts should be \
-           stored"
+    let* receipt = Durable_storage.read Current_receipts evm_state in
+    return (L2_types.Ethereum receipt, evm_state)
   else return (L2_types.Tezos, evm_state)
 
 let execute_entrypoint ~data_dir ~pool ~native_execution_policy ~config
@@ -445,24 +402,16 @@ let execute_entrypoint ~data_dir ~pool ~native_execution_policy ~config
   | [Some bytes] -> return bytes
   | _ -> failwith "No value found at the entrypoint output path %s" output_path
 
-let retrieve_block_at_root ~chain_family ~root evm_state =
+let retrieve_block_at_root ~chain_family evm_state =
   let open Lwt_result_syntax in
   let* storage_version = Durable_storage.storage_version evm_state in
   if not (Storage_version.legacy_storage_compatible ~storage_version) then
-    let* bytes =
-      Durable_storage.read_opt
-        (Raw_path (Durable_storage_path.Block.current_block ~root))
-        evm_state
-    in
-    return (Option.map (L2_types.block_from_bytes ~chain_family) bytes)
+    Durable_storage.read_opt (Current_block chain_family) evm_state
   else
     let* current_block_hash = current_block_hash ~chain_family evm_state in
-    let* bytes =
-      Durable_storage.read_opt
-        (Raw_path (Durable_storage_path.Block.by_hash ~root current_block_hash))
-        evm_state
-    in
-    return (Option.map (L2_types.block_from_bytes ~chain_family) bytes)
+    Durable_storage.read_opt
+      (Block_by_hash (chain_family, current_block_hash))
+      evm_state
 
 (** [retrieve_block ~chain_family evm_state] returns 0, 1, or 2 blocks
     as a (first_block * second_block option) option as follows:
@@ -483,13 +432,9 @@ let retrieve_block_at_root ~chain_family ~root evm_state =
 *)
 let retrieve_block ~chain_family evm_state =
   let open Lwt_result_syntax in
-  let root = Durable_storage_path.root_of_chain_family chain_family in
-  let* block_opt = retrieve_block_at_root ~chain_family ~root evm_state in
+  let* block_opt = retrieve_block_at_root ~chain_family evm_state in
   let* tezos_block_opt =
-    retrieve_block_at_root
-      ~chain_family:Michelson
-      ~root:Durable_storage_path.tezosx_tezos_blocks_root
-      evm_state
+    Durable_storage.read_opt Tezosx_tezos_current_block evm_state
   in
   let tezos_block =
     match tezos_block_opt with
@@ -499,7 +444,7 @@ let retrieve_block ~chain_family evm_state =
   in
   return (Option.map (fun block -> (block, tezos_block)) block_opt)
 
-let assemble_block (type f) ~storage_version ~pool ~data_dir
+let assemble_block (type f) ~pool ~data_dir
     ~(chain_family : f L2_types.chain_family) ~config ~timestamp ~number
     ~native_execution evm_state =
   let open Lwt_result_syntax in
@@ -516,12 +461,7 @@ let assemble_block (type f) ~storage_version ~pool ~data_dir
         Value (Ethereum_types.encode_u256_le number);
       ]
   in
-  let* evm_state =
-    Durable_storage.write
-      (Raw_path (Durable_storage_path.Assemble_block.input ~storage_version))
-      (Rlp.encode rlp)
-      evm_state
-  in
+  let* evm_state = Durable_storage.write Assemble_block_input rlp evm_state in
   let* evm_state =
     execute
       ~pool
@@ -659,17 +599,15 @@ let clear_block_storage chain_family block evm_state =
      necessary to produce the next block. Block production starts by reading
      the head to retrieve information such as parent block hash.
   *)
-    let root = Durable_storage_path.root_of_chain_family chain_family in
     let block_parent = L2_types.block_parent block in
     let block_number = L2_types.block_number block in
     let (Qty number) = block_number in
     (* Handles case (1.). *)
     let* evm_state =
       if number > Z.zero then
-        let pred_block_path =
-          Durable_storage_path.Block.by_hash ~root block_parent
-        in
-        Durable_storage.delete (Raw_path pred_block_path) evm_state
+        Durable_storage.delete
+          (Block_by_hash (chain_family, block_parent))
+          evm_state
       else return evm_state
     in
     (* Handles case (2.). *)
@@ -680,12 +618,9 @@ let clear_block_storage chain_family block evm_state =
        so we garbage collect only what's possible. *)
       let to_keep = Z.of_int 256 in
       if number >= to_keep then
-        let index_path =
-          Durable_storage_path.Indexes.block_by_number
-            ~root
-            (Nth (Z.sub number to_keep))
-        in
-        Durable_storage.delete (Raw_path index_path) evm_state
+        Durable_storage.delete
+          (Block_index (chain_family, Nth (Z.sub number to_keep)))
+          evm_state
       else return evm_state
     in
     (* Receipts are not necessary for the kernel, we can just remove

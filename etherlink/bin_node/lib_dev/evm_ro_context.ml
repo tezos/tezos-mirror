@@ -575,7 +575,6 @@ let assemble_blueprint ?log_file ?profile ctxt blueprint evm_state =
     in
 
     Evm_state.assemble_block
-      ~storage_version
       ~pool:ctxt.execution_pool
       ~data_dir:ctxt.data_dir
       ~chain_family:EVM

@@ -72,12 +72,10 @@ val current_block_hash :
   t ->
   Ethereum_types.block_hash tzresult Lwt.t
 
-(** [retrieve_block_at_root ~chain_family ~root evm_state] reads the current
-    block from durable storage at the given [root] path, decoding it using
-    [chain_family]. *)
+(** [retrieve_block_at_root ~chain_family evm_state] reads the current
+    block from durable storage, decoding it using [chain_family]. *)
 val retrieve_block_at_root :
   chain_family:_ L2_types.chain_family ->
-  root:Durable_storage_path.path ->
   t ->
   Ethereum_types.legacy_transaction_object L2_types.block option tzresult Lwt.t
 
@@ -156,7 +154,6 @@ val execute_entrypoint :
     assembles the block from already recorded effects and returns the result
     of this operation. *)
 val assemble_block :
-  storage_version:int ->
   pool:Lwt_domain.pool ->
   data_dir:string ->
   chain_family:'a L2_types.chain_family ->
@@ -169,7 +166,7 @@ val assemble_block :
 
 (** [flag_local_exec evm_state] adds a flag telling the kernel it is executed
     by an EVM node, not a rollup node. *)
-val flag_local_exec : t -> storage_version:int -> t tzresult Lwt.t
+val flag_local_exec : t -> t tzresult Lwt.t
 
 (** [clear_delayed_inbox evm_state] removes the delayed inbox from the current
     EVM state. *)
