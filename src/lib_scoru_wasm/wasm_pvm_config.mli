@@ -12,7 +12,7 @@
     bump. This module is the typed counterpart used inside
     [lib_scoru_wasm]: the env implementation calls {!of_signals} to
     convert the opaque list into a [t], which is then threaded into
-    the PVM machine via the [Make_pvm_machine_with_config] functor. *)
+    the PVM machine via the [Wasm_vm.Make_vm] functor. *)
 
 (** Features the protocol can enable via canonical rollup signals. *)
 type feature =

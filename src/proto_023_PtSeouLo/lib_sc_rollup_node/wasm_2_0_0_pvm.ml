@@ -64,7 +64,7 @@ end
 
 module Make_backend (Tree : TreeS) = struct
   include
-    Tezos_scoru_wasm_fast.Pvm.Make
+    Tezos_scoru_wasm_fast.Pvm.Make_machine
       (Tezos_scoru_wasm.Tree_state.Make (Make_wrapped_tree (Tree)))
 
   let compute_step =

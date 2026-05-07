@@ -105,12 +105,11 @@ module State_in_memory = struct
 end
 
 let wasm_pvm_machine ~config =
-  let module Config = struct
+  let module Vm = Tezos_scoru_wasm.Wasm_vm.Make_vm (struct
     let config = config
-  end in
-  (module Tezos_scoru_wasm.Wasm_pvm.Make_pvm_machine_with_config
-            (Config)
-            (State_in_memory) : Tezos_scoru_wasm.Wasm_pvm_sig.S
+  end) in
+  (module Tezos_scoru_wasm.Wasm_pvm.Make_pvm (Vm) (State_in_memory)
+  : Tezos_scoru_wasm.Wasm_pvm_sig.S
     with type context = State_in_memory.context
      and type state = State_in_memory.state
      and type proof = State_in_memory.proof)

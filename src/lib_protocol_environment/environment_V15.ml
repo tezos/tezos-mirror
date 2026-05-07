@@ -1260,8 +1260,10 @@ struct
       type Tezos_tree_encoding.tree_instance += PVM_tree of Tree.tree
 
       include
-        Tezos_scoru_wasm.Wasm_pvm.Make_machine (Tezos_scoru_wasm.Tree_state.Make
-                                                  (struct
+        Tezos_protocol_environment_structs.V15.Wasm_pvm_machine.Make (Tezos_scoru_wasm
+                                                                      .Tree_state
+                                                                      .Make
+                                                                        (struct
         include Tree
 
         let select = function
