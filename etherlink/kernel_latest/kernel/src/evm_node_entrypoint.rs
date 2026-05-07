@@ -646,6 +646,66 @@ mod tests {
         assert_roundtrip(map);
     }
 
+    /// Regression test for the determinism guarantee documented on
+    /// `encode_entrypoints_result`. The same logical input must produce
+    /// byte-identical output regardless of `HashMap` insertion order
+    /// (and, by extension, of any per-process hash-seed randomization),
+    /// because the bytes end up in the rollup PVM state.
+    #[test]
+    fn test_encode_is_deterministic_regardless_of_insertion_order() {
+        let entries = [
+            ("alpha", Type::String),
+            ("beta", Type::Nat),
+            ("gamma", Type::Bytes),
+            ("delta", Type::Int),
+        ];
+
+        let mut forward = HashMap::new();
+        for (name, ty) in entries.iter() {
+            forward.insert(Entrypoint::try_from(*name).expect("valid"), ty.clone());
+        }
+
+        let mut reversed = HashMap::new();
+        for (name, ty) in entries.iter().rev() {
+            reversed.insert(Entrypoint::try_from(*name).expect("valid"), ty.clone());
+        }
+
+        let encoded_forward =
+            encode_entrypoints_result(Some(forward)).expect("encode ok");
+        let encoded_reversed =
+            encode_entrypoints_result(Some(reversed)).expect("encode ok");
+        assert_eq!(encoded_forward, encoded_reversed);
+    }
+
+    /// Stronger guarantee: the encoded entries are emitted in
+    /// lexicographic byte order of their names. Pinning the actual
+    /// ordering catches any future change that might preserve
+    /// determinism while shifting the canonical key (e.g. a switch to a
+    /// non-byte-wise comparator that is invariant on ASCII but differs
+    /// on multi-byte UTF-8).
+    #[test]
+    fn test_encode_emits_entries_in_lexicographic_byte_order() {
+        let mut map = HashMap::new();
+        map.insert(Entrypoint::try_from("zulu").expect("valid"), Type::Unit);
+        map.insert(Entrypoint::try_from("alpha").expect("valid"), Type::Unit);
+        map.insert(Entrypoint::try_from("mike").expect("valid"), Type::Unit);
+
+        let encoded = encode_entrypoints_result(Some(map)).expect("encode ok");
+
+        let outer = rlp::Rlp::new(&encoded);
+        let inner = outer.at(0).expect("inner list");
+        let names: Vec<String> = (0..inner.item_count().expect("entry count"))
+            .map(|i| {
+                let pair = inner.at(i).expect("pair");
+                let bytes: Vec<u8> =
+                    pair.at(0).expect("name").as_val().expect("name val");
+                String::from_utf8(bytes).expect("utf8 name")
+            })
+            .collect();
+
+        assert_eq!(names, vec!["alpha", "mike", "zulu"]);
+    }
+
     fn run_entrypoints_query(host: &mut MockHost, addr_hash: &[u8]) -> Vec<u8> {
         host.store_write_all(&TEZOSX_ENTRYPOINTS_INPUT, addr_hash)
             .expect("write input");
