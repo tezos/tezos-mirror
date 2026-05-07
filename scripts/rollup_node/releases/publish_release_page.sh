@@ -89,7 +89,7 @@ aws s3 cp "./$versions_list_filename" "s3://${S3_BUCKET}${BUCKET_PATH}/octez-sma
 
 echo "Building release page"
 dune exec ./ci/bin_release_page/src/release_page.exe -- --component 'octez-smart-rollup-node' \
-  --title 'Octez Smart Rollup node releases' --bucket "${S3_BUCKET}" --path \
+  --title 'Octez Smart Rollup node releases' --bucket "${S3_BUCKET}" --url "${URL:-${S3_BUCKET}}" --path \
   "${BUCKET_PATH:-}" binaries
 
 echo "Syncing html files to remote s3 bucket"
