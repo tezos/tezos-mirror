@@ -2,11 +2,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-use mir::ast::{big_map::BigMapId, PublicKeyHash};
+use mir::ast::{big_map::BigMapId, AddressHash, PublicKeyHash};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, Path, PathError, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezosx_interfaces::Origin;
 
 use crate::account_storage::{
     TezlinkImplicitAccount, TezlinkOriginatedAccount, TezosImplicitAccount,
@@ -67,6 +68,17 @@ pub trait Context {
         _kt1: &ContractKt1Hash,
     ) -> Result<(), tezos_storage::error::Error> {
         Ok(())
+    }
+
+    /// Read the origin classification (native / alias) for the given address.
+    /// Default returns None for runtimes without classification storage.
+    /// TezosX overrides this to read the origin path.
+    fn read_origin_for_address(
+        &self,
+        _host: &impl StorageV1,
+        _address: &AddressHash,
+    ) -> Result<Option<Origin>, tezos_storage::error::Error> {
+        Ok(None)
     }
 
     fn path(&self) -> OwnedPath;
