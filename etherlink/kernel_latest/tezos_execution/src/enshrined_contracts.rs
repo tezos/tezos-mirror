@@ -31,8 +31,6 @@ use tezosx_interfaces::{
 };
 use tezosx_journal::TezosXJournal;
 
-use crate::alias::{get_alias, store_alias};
-
 use crate::account_storage::TezlinkAccount;
 use crate::mir_ctx::{
     HasContractAccount, HasHost, HasOperationGas, HasOriginLookup, HasSourcePublicKey,
@@ -350,7 +348,7 @@ const CALLBACK_DISPATCH_MILLIGAS: u64 = 220;
 
 /// Durable storage read for alias lookup, equivalent to cold SLOAD
 /// (2,100 EVM gas × 100).
-pub(crate) const ALIAS_CACHE_HIT_MILLIGAS: u64 = 210_000;
+pub(crate) const ALIAS_LOOKUP_MILLIGAS: u64 = 210_000;
 
 /// Size-independent portion of the %collect_result triptych:
 /// - `100` mgas — frame-slot store
@@ -798,18 +796,17 @@ where
 
     // Alias gas is accounted in two phases:
     //
-    // Phase 1 (upfront): charge ALIAS_CACHE_HIT_MILLIGAS for the durable
-    //   storage lookup. This is always paid, whether the alias exists or not.
+    // Phase 1 (upfront): charge ALIAS_LOOKUP_MILLIGAS for the durable
+    //   origin read that classifies the source. Always paid.
     //
-    // Phase 2 (generation): if the alias does not exist, get_or_create_alias
-    //   forwards the remaining gas (converted to target runtime units) to the
-    //   target runtime's ensure_alias, which consumes gas internally. The
-    //   consumed gas is returned, converted back to milligas, and charged.
-    //   On cache hit, phase 2 costs nothing (consumed = 0).
+    // Phase 2 (generation): forward remaining gas (converted to target
+    //   runtime units) to the target runtime's ensure_alias, which
+    //   consumes gas internally. Idempotent: a second call on the same
+    //   source short-circuits and reports zero consumed.
 
     // --- sender alias ---
     ctx.operation_gas()
-        .cast_and_consume_milligas(ALIAS_CACHE_HIT_MILLIGAS)
+        .cast_and_consume_milligas(ALIAS_LOOKUP_MILLIGAS)
         .map_err(|_| TransferError::OutOfGas)?;
     // When sender == source (the common case for implicit account
     // transfers), pass the source pubkey so the alias is created with
@@ -827,7 +824,7 @@ where
         let remaining_milligas =
             ctx.gas().milligas().ok_or(TransferError::OutOfGas)? as u64;
         // Convert remaining milligas to target runtime gas: this caps the budget
-        // that get_or_create_alias may spend on alias generation.
+        // that ensure_alias may spend on alias generation.
         let target_budget =
             convert_gas(RuntimeId::Tezos, target_runtime, remaining_milligas)
                 .ok_or(TransferError::OutOfGas)?;
@@ -836,17 +833,18 @@ where
         } else {
             None
         };
-        let (sender_alias, sender_target_consumed) = get_or_create_alias(
-            ctx.host(),
-            journal,
-            &sender,
-            alias_info,
-            sender_pubkey,
-            context.clone(),
-            registry,
-            target_runtime,
-            target_budget,
-        )?;
+        let (sender_alias, target_remaining) = registry
+            .ensure_alias(
+                ctx.host(),
+                journal,
+                alias_info,
+                sender_pubkey,
+                target_runtime,
+                context.clone(),
+                target_budget,
+            )
+            .map_err(|e| TransferError::GatewayError(e.to_string()))?;
+        let sender_target_consumed = target_budget - target_remaining;
         let sender_milligas =
             convert_gas(target_runtime, RuntimeId::Tezos, sender_target_consumed)
                 .ok_or(TransferError::OutOfGas)?;
@@ -859,12 +857,12 @@ where
     // --- source alias ---
     // Fast path: when sender == source (a user's implicit account calling
     // the gateway directly), reuse the resolved alias and skip the second
-    // storage lookup. This saves one ALIAS_CACHE_HIT_MILLIGAS charge.
+    // origin read. This saves one ALIAS_LOOKUP_MILLIGAS charge.
     let source_alias = if sender_is_source {
         sender_alias.clone()
     } else {
         ctx.operation_gas()
-            .cast_and_consume_milligas(ALIAS_CACHE_HIT_MILLIGAS)
+            .cast_and_consume_milligas(ALIAS_LOOKUP_MILLIGAS)
             .map_err(|_| TransferError::OutOfGas)?;
         'source: {
             let alias_info = match read_and_resolve_routing(ctx, &source, target_runtime)?
@@ -881,17 +879,18 @@ where
             let target_budget =
                 convert_gas(RuntimeId::Tezos, target_runtime, remaining_milligas)
                     .ok_or(TransferError::OutOfGas)?;
-            let (source_alias, source_target_consumed) = get_or_create_alias(
-                ctx.host(),
-                journal,
-                &source,
-                alias_info,
-                Some(&source_public_key),
-                context,
-                registry,
-                target_runtime,
-                target_budget,
-            )?;
+            let (source_alias, target_remaining) = registry
+                .ensure_alias(
+                    ctx.host(),
+                    journal,
+                    alias_info,
+                    Some(&source_public_key),
+                    target_runtime,
+                    context,
+                    target_budget,
+                )
+                .map_err(|e| TransferError::GatewayError(e.to_string()))?;
+            let source_target_consumed = target_budget - target_remaining;
             let source_milligas =
                 convert_gas(target_runtime, RuntimeId::Tezos, source_target_consumed)
                     .ok_or(TransferError::OutOfGas)?;
@@ -1016,46 +1015,6 @@ fn read_and_resolve_routing(
         .map_err(|e| TransferError::GatewayError(format!("read origin failed: {e}")))?;
     resolve_routing(origin, target_runtime)
         .map_err(|e| TransferError::GatewayError(e.to_string()))
-}
-
-/// Look up the alias for `address` on the given `target_runtime`. If none
-/// exists, generate one via `registry` using `alias_info` as the derivation
-/// basis, passing `gas_remaining` (in target runtime units) as budget.
-///
-/// Returns `(alias, generation_gas_consumed)` where the gas is in the
-/// target runtime's units (0 on cache hit).
-#[allow(clippy::too_many_arguments)]
-fn get_or_create_alias<Host>(
-    host: &mut Host,
-    journal: &mut TezosXJournal,
-    address: &AddressHash,
-    alias_info: AliasInfo,
-    native_public_key: Option<&[u8]>,
-    context: CrossRuntimeContext,
-    registry: &impl Registry,
-    target_runtime: RuntimeId,
-    gas_remaining: u64,
-) -> Result<(String, u64), TransferError>
-where
-    Host: StorageV1,
-{
-    if let Some(alias) = get_alias(host, address, target_runtime)? {
-        return Ok((alias, 0));
-    }
-    let (alias_str, gas_remaining_after) = registry
-        .ensure_alias(
-            host,
-            journal,
-            alias_info,
-            native_public_key,
-            target_runtime,
-            context,
-            gas_remaining,
-        )
-        .map_err(|e| TransferError::GatewayError(e.to_string()))?;
-    let consumed = gas_remaining - gas_remaining_after;
-    store_alias(host, address, target_runtime, &alias_str)?;
-    Ok((alias_str, consumed))
 }
 
 /// Build a `CrossRuntimeContext` from the current execution context.
@@ -1470,7 +1429,7 @@ mod tests {
     }
 
     #[test]
-    fn test_tezosx_transfer_reuses_existing_alias() {
+    fn test_tezosx_transfer_calls_ensure_alias_per_transfer() {
         let mut host = MockKernelHost::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
@@ -1494,7 +1453,10 @@ mod tests {
         );
         assert!(result1.is_ok());
 
-        // Second transfer should reuse aliases
+        // Second transfer calls ensure_alias again. Dedup is the
+        // responsibility of ensure_alias itself (Branch 1: returns
+        // early when the alias account is already classified) — it
+        // is no longer the resolver's concern.
         let result2 = dispatch_crac_call(
             &registry,
             &mut journal,
@@ -1503,11 +1465,9 @@ mod tests {
         );
         assert!(result2.is_ok());
 
-        // ensure_alias should have been called twice (sender + source on first call)
         let alias_calls = registry.ensure_alias_calls.borrow();
-        assert_eq!(alias_calls.len(), 2);
+        assert_eq!(alias_calls.len(), 4);
 
-        // serve should have been called twice
         let serve_calls = registry.serve_calls.borrow();
         assert_eq!(serve_calls.len(), 2);
     }
@@ -1544,15 +1504,15 @@ mod tests {
         let consumed = u64::from(gas_before - gas_after);
         // At minimum, 2 alias resolutions were charged
         assert!(
-            consumed >= 2 * ALIAS_CACHE_HIT_MILLIGAS,
+            consumed >= 2 * ALIAS_LOOKUP_MILLIGAS,
             "Expected at least {} milligas consumed for 2 alias generations, got {}",
-            2 * ALIAS_CACHE_HIT_MILLIGAS,
+            2 * ALIAS_LOOKUP_MILLIGAS,
             consumed
         );
     }
 
     #[test]
-    fn test_alias_cache_hit_consumes_less_gas() {
+    fn test_alias_lookup_cost_caps_per_transfer() {
         let mut host = MockKernelHost::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
@@ -1567,7 +1527,6 @@ mod tests {
         let mut journal = TezosXJournal::default();
         let mut ctx = MockCtx::new(&mut host, source, amount);
 
-        // First call: aliases are generated (expensive)
         let result1 = dispatch_crac_call(
             &registry,
             &mut journal,
@@ -1577,7 +1536,9 @@ mod tests {
         assert!(result1.is_ok());
         let gas_after_first = ctx.operation_gas().remaining.milligas().unwrap();
 
-        // Second call: aliases are cached (cheaper)
+        // Second call: ensure_alias is invoked again but its idempotent
+        // Branch 1 returns gas_remaining unchanged. The fixed cost
+        // bounds the per-transfer overhead.
         let result2 = dispatch_crac_call(
             &registry,
             &mut journal,
@@ -1588,14 +1549,11 @@ mod tests {
         let gas_after_second = ctx.operation_gas().remaining.milligas().unwrap();
 
         let second_call_cost = u64::from(gas_after_first - gas_after_second);
-        // Second call should cost at most 2 * ALIAS_CACHE_HIT_MILLIGAS for
-        // aliases + VALUE_TRANSFER_SURCHARGE_MILLIGAS (amount > 0).
-        let expected_max =
-            2 * ALIAS_CACHE_HIT_MILLIGAS + VALUE_TRANSFER_SURCHARGE_MILLIGAS;
+        let expected_max = 2 * ALIAS_LOOKUP_MILLIGAS + VALUE_TRANSFER_SURCHARGE_MILLIGAS;
         assert!(
             second_call_cost <= expected_max,
             "Second call consumed {second_call_cost} milligas, expected at most \
-             {expected_max} (2x cache hit + value transfer surcharge)",
+             {expected_max} (two alias lookups plus value transfer surcharge)",
         );
     }
 

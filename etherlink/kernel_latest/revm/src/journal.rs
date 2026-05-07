@@ -28,7 +28,6 @@ use tezosx_journal::{LayeredStateError, TezosXJournal};
 
 use crate::database::EtherlinkVMDB;
 use crate::storage::world_state_handler::StorageAccount;
-use crate::tezosx::{get_alias, store_alias};
 use evm_types::{
     CustomPrecompileError, DatabaseCommitPrecompileStateChanges,
     DatabasePrecompileStateChanges, Error, FaDepositWithProxy, IntoWithRemainder,
@@ -672,11 +671,6 @@ where
                 native_address: source.to_string().to_lowercase().into_bytes(),
             },
         };
-        if let Some(alias) = get_alias(self.database.host, &source, target_runtime)
-            .map_err(|e| e.into_with_remainder(remaining))?
-        {
-            return Ok((alias, 0));
-        }
         // Convert remaining EVM gas to target runtime units to cap
         // the generation cost.
         let target_gas_budget = tezosx_interfaces::gas::convert(
@@ -708,8 +702,6 @@ where
                     remaining,
                 )
             })?;
-        store_alias(self.database.host, &source, target_runtime, &alias_str)
-            .map_err(|e| e.into_with_remainder(remaining))?;
         let consumed_target = target_gas_budget - target_gas_remaining;
         Ok((alias_str, consumed_target))
     }
@@ -731,11 +723,6 @@ where
             RoutingDecision::Transitive(info) => info.native_address,
             RoutingDecision::Native => source.to_string().to_lowercase().into_bytes(),
         };
-        if let Some(alias) = get_alias(self.database.host, &source, target_runtime)
-            .map_err(|e| e.into_with_remainder(remaining))?
-        {
-            return Ok(alias);
-        }
         // Deterministic fallback: reproduce the alias that the target
         // runtime's `ensure_alias` would compute (and persist on the
         // state-mutating path), but skip the storage writes.

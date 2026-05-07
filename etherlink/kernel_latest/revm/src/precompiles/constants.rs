@@ -219,7 +219,7 @@ pub(crate) const RUNTIME_GATEWAY_PER_WORD_COST: u64 = 3;
 
 // Alias lookup: charged upfront before each alias resolution (durable
 // storage read). Equivalent to a cold SLOAD (EIP-2929).
-pub(crate) const ALIAS_CACHE_HIT_COST: u64 = 2_100;
+pub(crate) const ALIAS_LOOKUP_COST: u64 = 2_100;
 
 // Surcharge when msg.value > 0 (precompile balance burn after cross-runtime
 // value transfer). Equivalent to SSTORE non-zero to zero (EIP-2929 + YP).

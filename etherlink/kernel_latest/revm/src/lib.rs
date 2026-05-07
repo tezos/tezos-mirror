@@ -45,7 +45,6 @@ pub mod inspectors;
 pub mod journal;
 pub mod precompiles;
 pub mod storage;
-pub mod tezosx;
 
 type EVMInnerContext<'a, Host, R> = Context<
     &'a BlockEnv,
@@ -578,7 +577,6 @@ mod test {
         createAndRevertCall, CreateAndRevertCalls,
     };
     use crate::test::utilities::{FABridge, ITable, RevertCreate};
-    use crate::tezosx::store_alias;
     use crate::GasData;
     use crate::{
         helpers::legacy::FaDepositWithProxy,
@@ -974,29 +972,6 @@ mod test {
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
         let destination =
             Address::from_hex("2222222222222222222222222222222222222222").unwrap();
-        let registry = Registry::new();
-        let mut journal = TezosXJournal::default();
-        let alias = registry
-            .ensure_alias(
-                &mut host,
-                &mut journal,
-                AliasInfo {
-                    runtime: tezosx_interfaces::RuntimeId::Ethereum,
-                    native_address: destination.to_string().into_bytes(),
-                },
-                None,
-                tezosx_interfaces::RuntimeId::Tezos,
-                test_alias_creation_context(),
-                1_000_000,
-            )
-            .unwrap();
-        store_alias(
-            &mut host,
-            &destination,
-            tezosx_interfaces::RuntimeId::Tezos,
-            &alias.0,
-        )
-        .unwrap();
 
         let value_sent = U256::from(5);
 
@@ -1078,13 +1053,6 @@ mod test {
                 1_000_000,
             )
             .unwrap();
-        store_alias(
-            &mut host,
-            &destination,
-            tezosx_interfaces::RuntimeId::Tezos,
-            &alias.0,
-        )
-        .unwrap();
         let value_sent = U256::from(5000000000000u64);
         let caller_info = AccountInfo {
             balance: U256::MAX,
