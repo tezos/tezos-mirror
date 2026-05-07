@@ -20,9 +20,9 @@ use crate::{
     journal::{CrossRuntimeCall, Journal},
     precompiles::{
         constants::{
-            ALIAS_CACHE_HIT_COST, HEADER_VALIDATION_PER_HEADER,
-            RUNTIME_GATEWAY_BASE_COST, RUNTIME_GATEWAY_PER_WORD_COST,
-            RUNTIME_GATEWAY_PRECOMPILE_ADDRESS, VALUE_TRANSFER_SURCHARGE,
+            ALIAS_LOOKUP_COST, HEADER_VALIDATION_PER_HEADER, RUNTIME_GATEWAY_BASE_COST,
+            RUNTIME_GATEWAY_PER_WORD_COST, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+            VALUE_TRANSFER_SURCHARGE,
         },
         guard::charge,
         runtime_gateway::RuntimeGateway::RuntimeGatewayCalls,
@@ -259,7 +259,7 @@ where
 ///
 /// When `sender == source` (an EOA directly calling the gateway, the
 /// common case), the resolution is performed once and the resulting
-/// alias is reused for both slots — a single `ALIAS_CACHE_HIT_COST` is
+/// alias is reused for both slots — a single `ALIAS_LOOKUP_COST` is
 /// billed instead of two.
 fn resolve_aliases<'j, CTX, Host, R>(
     context: &mut CTX,
@@ -274,7 +274,7 @@ where
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
     // --- sender alias ---
-    charge(gas, ALIAS_CACHE_HIT_COST)?;
+    charge(gas, ALIAS_LOOKUP_COST)?;
     let (sender_alias, sender_gen_gas) = context
         .journal_mut()
         .tezosx_resolve_source_alias(sender, target_runtime, gas.remaining())?;
@@ -292,7 +292,7 @@ where
         return Ok((sender_alias.clone(), sender_alias));
     }
 
-    charge(gas, ALIAS_CACHE_HIT_COST)?;
+    charge(gas, ALIAS_LOOKUP_COST)?;
     let (source_alias, source_gen_gas) = context
         .journal_mut()
         .tezosx_resolve_source_alias(source, target_runtime, gas.remaining())?;

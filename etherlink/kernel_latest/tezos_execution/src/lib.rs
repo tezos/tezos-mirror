@@ -154,7 +154,6 @@ pub const NULL_PKH: &str = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU";
 
 pub mod account_storage;
 mod address;
-mod alias;
 pub mod context;
 pub mod enshrined_contracts;
 mod gas;
