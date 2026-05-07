@@ -108,9 +108,19 @@ let qty_le_codec ~path : (Ethereum_types.quantity, rw) resolved =
       encode = (fun (Ethereum_types.Qty z) -> Z.to_bits z);
     }
 
+(** Smart constructors for read-capable [resolve] arms — wrap a [resolved]
+    in the corresponding [resolution] case, sparing each arm a level of
+    nesting. *)
+let static_read : type a cap. (a, cap) resolved -> (a, cap) resolution =
+ fun r -> Static r
+
+let versioned_read : type a cap.
+    (storage_version:int -> (a, cap) resolved) -> (a, cap) resolution =
+ fun f -> Versioned f
+
 let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
   | Raw_path key ->
-      Static
+      static_read
         (Read_write
            {
              path = key;
@@ -118,7 +128,7 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
              encode = Bytes.to_string;
            })
   | Chain_id ->
-      Static
+      static_read
         (Read_write
            {
              path = Durable_storage_path.chain_id;
@@ -126,7 +136,7 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
              encode = L2_types.Chain_id.encode_le;
            })
   | Michelson_runtime_chain_id ->
-      Static
+      static_read
         (Read_write
            {
              path = Durable_storage_path.michelson_runtime_chain_id;
@@ -134,8 +144,7 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
              encode = L2_types.Chain_id.encode_be;
            })
   | Kernel_version ->
-      Versioned
-        (fun ~storage_version ->
+      versioned_read (fun ~storage_version ->
           Read_write
             {
               path = Durable_storage_path.kernel_version ~storage_version;
@@ -143,8 +152,7 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
               encode = Fun.id;
             })
   | Kernel_root_hash ->
-      Versioned
-        (fun ~storage_version ->
+      versioned_read (fun ~storage_version ->
           Read_write
             {
               path = Durable_storage_path.kernel_root_hash ~storage_version;
@@ -155,11 +163,10 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
               encode = Ethereum_types.hex_to_string;
             })
   | Multichain_flag ->
-      Static
+      static_read
         (unit_flag_codec ~path:Durable_storage_path.Feature_flags.multichain)
   | Sequencer_key ->
-      Versioned
-        (fun ~storage_version ->
+      versioned_read (fun ~storage_version ->
           Read_write
             {
               path = Durable_storage_path.sequencer_key ~storage_version;
@@ -169,8 +176,7 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
               encode = (fun pk -> Signature.Public_key.to_b58check pk);
             })
   | Chain_config_family cid ->
-      Versioned
-        (fun ~storage_version ->
+      versioned_read (fun ~storage_version ->
           Read_write
             {
               path =
@@ -183,14 +189,13 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
                   L2_types.Chain_family.to_string cf);
             })
   | Tezosx_feature_flag runtime ->
-      Static (unit_flag_codec ~path:(Tezosx.feature_flag runtime))
+      static_read (unit_flag_codec ~path:(Tezosx.feature_flag runtime))
   | Michelson_runtime_sunrise_level ->
-      Static
-        (qty_le_codec
-           ~path:Durable_storage_path.michelson_runtime_sunrise_level)
+      static_read
+        (qty_le_codec ~path:Durable_storage_path.michelson_runtime_sunrise_level)
   | Current_block_number chain_family ->
       let root = Durable_storage_path.root_of_chain_family chain_family in
-      Static
+      static_read
         (qty_le_codec ~path:(Durable_storage_path.Block.current_number ~root))
 
 let storage_version state =
