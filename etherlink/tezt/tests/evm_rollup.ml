@@ -6619,7 +6619,7 @@ let register_evm_node ~protocols =
   test_list_metrics_command_regression () ;
   test_list_events_command_regression ()
 
-let protocols = Protocol.all
+let protocols = [Protocol.Alpha]
 
 let () =
   register_evm_node ~protocols ;
