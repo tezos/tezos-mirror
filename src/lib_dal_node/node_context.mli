@@ -69,6 +69,9 @@ val get_plugin_and_parameters_for_level :
     {!get_plugin_and_parameters_for_level}. *)
 val get_plugin_for_level : t -> level:int32 -> (module Dal_plugin.T) tzresult
 
+(** Returns the proto_level of the plugin registered for the given level. *)
+val get_proto_level_for_level : t -> level:int32 -> int tzresult
+
 (** Tries to add a new plugin for the protocol with level [proto_level] to be used
     starting with the given [block_level].
     Returns [true] if a plugin is added. [false] otherwise.

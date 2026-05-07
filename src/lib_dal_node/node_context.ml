@@ -187,6 +187,9 @@ let get_plugin_for_level ctxt ~level =
   let* plugin, _parameters = get_plugin_and_parameters_for_level ctxt ~level in
   return plugin
 
+let get_proto_level_for_level ctxt ~level =
+  Proto_plugins.get_proto_level_for_level ctxt.proto_plugins ~level
+
 let get_all_plugins ctxt = Proto_plugins.to_list ctxt.proto_plugins
 
 let set_proto_plugins ctxt proto_plugins = ctxt.proto_plugins <- proto_plugins

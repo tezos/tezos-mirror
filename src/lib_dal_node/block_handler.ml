@@ -730,26 +730,38 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
       return_unit
   in
   let* () =
-    Option.fold
-      ~none:return_unit
-      ~some:(fun Configuration_file.{frequency; slot_index; secret_key} ->
-        if Int32.rem block_level (Int32.of_int frequency) = Int32.zero then
-          Slot_production.Tests.publish_slot_using_client
-            ctxt
-            cctxt
-            block_level
-            slot_index
-            secret_key
-            (Format.asprintf
-               "%d:%d:%a"
-               (Int32.to_int block_level)
-               slot_index
-               P2p_peer.Id.pp
-               (Node_context.get_identity ctxt).peer_id)
-            (module Plugin : Dal_plugin.T)
-        else return_unit)
-      (Node_context.get_config ctxt).publish_slots_regularly
-    |> Errors.to_tzresult
+    let pred_proto =
+      Node_context.get_proto_level_for_level
+        ctxt
+        ~level:(Int32.pred block_level)
+    in
+    let current_proto =
+      Node_context.get_proto_level_for_level ctxt ~level:block_level
+    in
+    match (pred_proto, current_proto) with
+    | Ok pred_proto, Ok block_proto when pred_proto <> block_proto ->
+        return_unit
+    | _ ->
+        Option.fold
+          ~none:return_unit
+          ~some:(fun Configuration_file.{frequency; slot_index; secret_key} ->
+            if Int32.rem block_level (Int32.of_int frequency) = Int32.zero then
+              Slot_production.Tests.publish_slot_using_client
+                ctxt
+                cctxt
+                block_level
+                slot_index
+                secret_key
+                (Format.asprintf
+                   "%d:%d:%a"
+                   (Int32.to_int block_level)
+                   slot_index
+                   P2p_peer.Id.pp
+                   (Node_context.get_identity ctxt).peer_id)
+                (module Plugin : Dal_plugin.T)
+            else return_unit)
+          (Node_context.get_config ctxt).publish_slots_regularly
+        |> Errors.to_tzresult
   in
   (Accuser.inject_entrapment_evidences
      (module Plugin)
