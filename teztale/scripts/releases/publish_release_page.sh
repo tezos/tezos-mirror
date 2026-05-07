@@ -66,7 +66,7 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
 
     # Push checksums for x86_64 binaries
     echo "Generating checksums for x86_64 binaries"
-    for binary in ./teztale-binaries/arm64/*; do
+    for binary in ./teztale-binaries/x86_64/*; do
       filename=$(basename "$binary")
       [ -f "$binary" ] && sha256sum "$binary" | awk -v name="$filename" '{print $1, name}' >> "./x86_64_sha256sums.txt"
     done
@@ -93,7 +93,7 @@ else
 fi
 
 echo "Building release page"
-dune exec ./ci/bin_release_page/release_page.exe -- --component 'teztale' \
+dune exec ./ci/bin_release_page/src/release_page.exe -- --component 'teztale' \
   --title 'Teztale releases' --bucket "${S3_BUCKET}" --url "${URL:-${S3_BUCKET}}" --path \
   "${BUCKET_PATH:-}" binaries packages
 
