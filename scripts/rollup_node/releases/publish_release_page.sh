@@ -88,7 +88,7 @@ echo "Syncing $versions_list_filename to remote s3 bucket"
 aws s3 cp "./$versions_list_filename" "s3://${S3_BUCKET}${BUCKET_PATH}/octez-smart-rollup-node/" --region "${REGION}"
 
 echo "Building release page"
-dune exec ./ci/bin_release_page/release_page.exe -- --component 'octez-smart-rollup-node' \
+dune exec ./ci/bin_release_page/src/release_page.exe -- --component 'octez-smart-rollup-node' \
   --title 'Octez Smart Rollup node releases' --bucket "${S3_BUCKET}" --path \
   "${BUCKET_PATH:-}" binaries
 

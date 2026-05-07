@@ -93,7 +93,7 @@ else
 fi
 
 echo "Building release page"
-dune exec ./ci/bin_release_page/release_page.exe -- --component 'teztale' \
+dune exec ./ci/bin_release_page/src/release_page.exe -- --component 'teztale' \
   --title 'Teztale releases' --bucket "${S3_BUCKET}" --url "${URL:-${S3_BUCKET}}" --path \
   "${BUCKET_PATH:-}" binaries packages
 
