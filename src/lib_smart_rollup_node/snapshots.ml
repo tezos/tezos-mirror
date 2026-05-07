@@ -90,20 +90,96 @@ let check_head (head : Sc_rollup_block.t) context =
       in
       return head
 
-let check_commitment_published cctxt address commitment =
+let get_l1_head_level cctxt =
+  let open Lwt_result_syntax in
+  let+ {level; _} =
+    Tezos_shell_services.Shell_services.Blocks.Header.shell_header
+      cctxt
+      ~chain:`Main
+      ~block:(`Head 0)
+      ()
+  in
+  level
+
+let get_l1_savepoint_level cctxt =
+  let open Lwt_result_syntax in
+  let+ _, level =
+    Tezos_shell_services.Chain_services.Levels.savepoint cctxt ()
+  in
+  level
+
+let try_get_commitment_at cctxt address commitment level =
+  let open Lwt_result_syntax in
+  let block = `Level level in
+  let* {current_protocol; _} =
+    Tezos_shell_services.Shell_services.Blocks.protocols cctxt ~block ()
+  in
+  let*? (module Plugin) =
+    Protocol_plugins.proto_plugin_for_protocol current_protocol
+  in
+  Plugin.Layer1_helpers.get_commitment cctxt ~block address commitment
+
+(** [find_commitment_published_level cctxt ~hint_level address commitment]
+    returns an L1 level at which [commitment] for the rollup at [address] is
+    in L1 storage.
+
+    The search starts a [challenge_window]-wide step before [hint_level]
+    (commitments are typically published near the L2 head that produced them)
+    and walks forward in [challenge_window]-wide steps until the commitment
+    is found or the L1 head is reached.
+
+    Stepping by the challenge window guarantees that any L1 level interval
+    in which the commitment is in storage is hit: a published commitment is
+    guaranteed to remain in the rollup's pending storage for at least
+    [challenge_window_in_blocks] blocks (no cementing can happen earlier),
+    so any window of that width is reached by at least one of our probes.
+
+    Fails if the commitment cannot be located before reaching the L1 head. *)
+let find_commitment_published_level cctxt ~hint_level address commitment =
+  let open Lwt_result_syntax in
+  let* head_level = get_l1_head_level cctxt in
+  let* savepoint_level = get_l1_savepoint_level cctxt in
+  let clamped_hint =
+    Int32.min head_level (Int32.max savepoint_level hint_level)
+  in
+  let block = `Level clamped_hint in
+  let* {current_protocol; _} =
+    Tezos_shell_services.Shell_services.Blocks.protocols cctxt ~block ()
+  in
+  let*? (module Plugin) =
+    Protocol_plugins.proto_plugin_for_protocol current_protocol
+  in
+  let* {sc_rollup = {challenge_window_in_blocks; _}; _} =
+    Plugin.Layer1_helpers.retrieve_constants ~block cctxt
+  in
+  let step = Int32.of_int challenge_window_in_blocks in
+  let start_level = Int32.max savepoint_level (Int32.sub clamped_hint step) in
+  let rec loop ~level =
+    let*! result = try_get_commitment_at cctxt address commitment level in
+    match result with
+    | Ok _ -> return level
+    | Error _ when level >= head_level ->
+        failwith
+          "Could not locate commitment %a for rollup %a on L1 between levels \
+           %ld and %ld (step %ld)."
+          Commitment.Hash.pp
+          commitment
+          Address.pp
+          address
+          start_level
+          head_level
+          step
+    | Error _ ->
+        let next_level = Int32.min head_level (Int32.add level step) in
+        loop ~level:next_level
+  in
+  loop ~level:start_level
+
+let check_commitment_published ~hint_level cctxt address commitment =
   let open Lwt_result_syntax in
   Error.trace_lwt_result_with "Commitment of snapshot is not published on L1."
-  @@ let* {current_protocol; _} =
-       Tezos_shell_services.Shell_services.Blocks.protocols
-         cctxt
-         ~block:(`Head 0)
-         ()
-     in
-     let*? (module Plugin) =
-       Protocol_plugins.proto_plugin_for_protocol current_protocol
-     in
-     let* (_commitment : Commitment.t) =
-       Plugin.Layer1_helpers.get_commitment cctxt address commitment
+  @@ let* (_ : int32) =
+       find_commitment_published_level cctxt ~hint_level address commitment
      in
      return_unit
 
@@ -204,11 +280,18 @@ let pre_export_checks_and_get_snapshot_header cctxt ~no_checks ~data_dir ~level
     in
     (* Check if predecessor commitment exist on chain as a safety measure,
        because the very last one may not be included in a block yet. *)
-    let pred_last_commitment = last_commitment.predecessor in
+    let pred_last_commitment_hash = last_commitment.predecessor in
+    let* pred_last_commitment =
+      Store.Commitments.find store pred_last_commitment_hash
+    in
+    let pred_last_commitment =
+      WithExceptions.Option.get ~loc:__LOC__ pred_last_commitment
+    in
     check_commitment_published
+      ~hint_level:pred_last_commitment.inbox_level
       cctxt
       metadata.rollup_address
-      pred_last_commitment
+      pred_last_commitment_hash
   in
   (* Closing context and stores after checks *)
   let*! () = Context.close context in
@@ -708,10 +791,35 @@ let post_checks ?(apply_unsafe_patches = false)
   let* () =
     match action with
     | `Import cctxt when check_commitment_publication ->
-        let last_commitment =
+        let last_commitment_hash =
           Sc_rollup_block.most_recent_commitment head.header
         in
-        check_commitment_published cctxt metadata.rollup_address last_commitment
+        (* Use the recorded publication level from the imported store when
+           available — it gives a one-RPC direct lookup. Fall back to the
+           commitment's inbox level, which is a guaranteed lower bound on
+           the publication level. *)
+        let* recorded_publication =
+          Store.Commitments_published_at_levels.get_first_published_level
+            store
+            last_commitment_hash
+        in
+        let* hint_level =
+          match recorded_publication with
+          | Some level -> return level
+          | None ->
+              let* last_commitment =
+                Store.Commitments.find store last_commitment_hash
+              in
+              let last_commitment =
+                WithExceptions.Option.get ~loc:__LOC__ last_commitment
+              in
+              return last_commitment.inbox_level
+        in
+        check_commitment_published
+          ~hint_level
+          cctxt
+          metadata.rollup_address
+          last_commitment_hash
     | _ -> return_unit
   in
   let* check_block_data =
@@ -1076,7 +1184,18 @@ let pre_import_checks cctxt ~no_checks ~data_dir ?level
   in
   let* () =
     unless (no_checks || skip_commitment_check) @@ fun () ->
+    let* savepoint_level = get_l1_savepoint_level cctxt in
+    let*? () =
+      error_when (snapshot_header.head_level <= savepoint_level)
+      @@ error_of_fmt
+           "Cannot verify the commitment publication of the snapshot: the \
+            snapshot's head level %ld is at or below the L1 node's savepoint \
+            %ld. Use an archive L1 node, or skip the check with --no-checks."
+           snapshot_header.head_level
+           savepoint_level
+    in
     check_commitment_published
+      ~hint_level:snapshot_header.head_level
       cctxt
       snapshot_header.address
       snapshot_header.last_commitment

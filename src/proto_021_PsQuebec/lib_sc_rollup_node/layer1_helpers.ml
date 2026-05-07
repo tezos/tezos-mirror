@@ -276,12 +276,12 @@ let find_last_whitelist_update cctxt rollup_address =
     last_whitelist_update
   |> return
 
-let get_commitment cctxt rollup_address commitment_hash =
+let get_commitment cctxt ?(block = `Head 0) rollup_address commitment_hash =
   let open Lwt_result_syntax in
   let+ commitment =
     Plugin.RPC.Sc_rollup.commitment
       (new Protocol_client_context.wrap_full (cctxt :> Client_context.full))
-      (cctxt#chain, `Head 0)
+      (cctxt#chain, block)
       rollup_address
       commitment_hash
   in

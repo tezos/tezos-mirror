@@ -76,6 +76,12 @@ Smart Rollup node
 - Add a ``--dal-node`` option to ``snapshot import`` so reconstruction of
   compact snapshots can fetch DAL pages from a DAL node. (MR :gl:`!21810`)
 
+- Make ``snapshot import`` more robust when verifying that the snapshot's
+  commitment is published on L1: search around the snapshot's head level
+  rather than only at the L1 head, and report a clear error suggesting an
+  archive L1 node when the snapshot is older than the savepoint. (MR
+  :gl:`!21841`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
