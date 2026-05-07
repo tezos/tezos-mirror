@@ -206,6 +206,7 @@ type kernel_setup = {
   enable_michelson_gas_refund : bool option;
   evm_version : Evm_version.t option;
   with_runtimes : Tezosx_runtime.t list option;
+  tezosx_target_sunrise_levels : (Tezosx_runtime.t * int) list option;
   michelson_runtime_chain_id : string option;
 }
 
@@ -256,6 +257,7 @@ val make_kernel_setup :
   ?enable_michelson_gas_refund:bool ->
   ?evm_version:Evm_version.t ->
   ?with_runtimes:Tezosx_runtime.t list ->
+  ?tezosx_target_sunrise_levels:(Tezosx_runtime.t * int) list ->
   ?michelson_runtime_chain_id:string ->
   unit ->
   kernel_setup
