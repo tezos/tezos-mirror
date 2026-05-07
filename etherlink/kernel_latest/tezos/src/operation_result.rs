@@ -266,6 +266,8 @@ pub enum ApplyOperationError {
     InternalOperationNonceOverflow(String),
     #[error("Cannot pay storage fee: {0}")]
     CannotPayStorageFee(BalanceTooLow),
+    #[error("Operation quota exceeded")]
+    OperationQuotaExceeded,
     // This error variant is used to encapsulate errors that were generated in the past and encoded as bson.
     // It should not be used for new errors, which should be added as new variants to this enum.
     // This is a temporary solution while waiting for better error support.
