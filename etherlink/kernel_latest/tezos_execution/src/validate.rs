@@ -23,6 +23,7 @@ use crate::{
     account_storage::{Manager, TezlinkAccount, TezosImplicitAccount},
     context::Context,
     gas::TezlinkOperationGas,
+    storage_fees::HARD_STORAGE_LIMIT_PER_OPERATION,
     BalanceUpdate,
 };
 
@@ -169,14 +170,15 @@ fn validate_individual_operation(
 ) -> Result<ValidatedOperation, ValidityError> {
     gas.consume(crate::gas::Cost::manager_operation())?;
     check_and_increment_counter(account_counter, &content.counter)?;
-    // TODO: hard storage limit per operation is a Tezos constant, for now we took the one from ghostnet
-    let hard_storage_limit = 60000_u64;
-    check_storage_limit(&hard_storage_limit.into(), &content.storage_limit)?;
+    check_storage_limit(
+        &HARD_STORAGE_LIMIT_PER_OPERATION.into(),
+        &content.storage_limit,
+    )?;
     log!(
         Debug,
         "Validation: OK - the storage_limit {:?} does not exceed the {:?} threshold.",
         &content.storage_limit,
-        hard_storage_limit
+        HARD_STORAGE_LIMIT_PER_OPERATION
     );
 
     // The manager account must be solvent to pay the announced fees.
