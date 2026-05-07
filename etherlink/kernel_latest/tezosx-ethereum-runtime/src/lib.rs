@@ -313,11 +313,6 @@ impl RuntimeInterface for EthereumRuntime {
             TezosXRuntimeError::Custom(format!("Failed to read alias origin: {e}"))
         })? {
             Some(Origin::Alias(_)) => {
-                // TODO: once the forwarder forwards tez to the origin
-                // runtime, a cross-runtime call from this alias toward
-                // its origin should target the native address held in
-                // the Alias record instead of the alias address. The
-                // early return here drops that information.
                 return Ok((alias.to_string(), gas_remaining));
             }
             Some(Origin::Native) => {
