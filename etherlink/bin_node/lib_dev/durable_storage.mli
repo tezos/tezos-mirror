@@ -17,13 +17,16 @@
 
     A path carries two phantom parameters: the decoded value type ['a]
     and a capability row ['cap] made of the polymorphic-variant tags
-    [`Read] and [`Write]. The alias {!rw} (read+write) names the row
-    every current path uses. [Raw_path] is the escape hatch that
-    decodes to raw bytes; new code should add typed constructors with
-    the precise capability row instead. *)
+    [`Read] and [`Write]. The aliases {!rw} (read+write) and {!ro}
+    (read-only) name the two closed rows. [Raw_path] is the escape hatch
+    that decodes to raw bytes; new code should add typed constructors
+    with the precise capability row instead. *)
 
-(** Phantom capability marker for [path]: [rw] is read+write. *)
-type rw = [`Read | `Write]
+(** Phantom capability markers for [path]: [rw] is read+write+delete, [ro] is
+    read-only. *)
+type rw = [`Read | `Write | `Delete]
+
+type ro = [`Read]
 
 type ('a, 'cap) path =
   | Raw_path : string -> (bytes, rw) path
@@ -54,6 +57,19 @@ type ('a, 'cap) path =
   | Blueprint_generation : Z.t -> (Ethereum_types.quantity, rw) path
   | Single_tx_input : (Rlp.item, rw) path
   | Assemble_block_input : (Rlp.item, rw) path
+  | Current_block :
+      _ L2_types.chain_family
+      -> (Ethereum_types.legacy_transaction_object L2_types.block, ro) path
+  | Block_by_hash :
+      _ L2_types.chain_family * Ethereum_types.block_hash
+      -> ( Ethereum_types.legacy_transaction_object L2_types.block,
+           [`Read | `Delete] )
+         path
+  | Block_index :
+      _ L2_types.chain_family * Durable_storage_path.Block.number
+      -> (unit, [`Delete]) path
+  | Tezosx_tezos_current_block :
+      (Ethereum_types.legacy_transaction_object L2_types.block, ro) path
 
 (** {2 Typed operations} *)
 
@@ -73,7 +89,7 @@ val read_opt : ('a, [> `Read]) path -> Pvm.State.t -> 'a option tzresult Lwt.t
 val write : ('a, rw) path -> 'a -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t
 
 (** [delete p state] removes the value stored at [p]. *)
-val delete : ('a, rw) path -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t
+val delete : ('a, [> `Delete]) path -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t
 
 (** [exists p state] is [true] iff a value is stored at the exact leaf
     path [p]. For directory checks, use {!exists_dir} on a {!dir}. *)

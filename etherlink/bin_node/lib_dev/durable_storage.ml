@@ -52,8 +52,11 @@ let subkeys_durable evm_state key =
 
 (* Typed path GADT — see [.mli] for the capability semantics. *)
 
-(** Phantom capability marker for [path]: [rw] is read+write. *)
-type rw = [`Read | `Write]
+(** Phantom capability markers for [path]: [rw] is read+write+delete, [ro] is
+    read-only. *)
+type rw = [`Read | `Write | `Delete]
+
+type ro = [`Read]
 
 type ('a, 'cap) path =
   | Raw_path : string -> (bytes, rw) path
@@ -84,20 +87,53 @@ type ('a, 'cap) path =
   | Blueprint_generation : Z.t -> (Ethereum_types.quantity, rw) path
   | Single_tx_input : (Rlp.item, rw) path
   | Assemble_block_input : (Rlp.item, rw) path
+  | Current_block :
+      _ L2_types.chain_family
+      -> (Ethereum_types.legacy_transaction_object L2_types.block, ro) path
+  | Block_by_hash :
+      _ L2_types.chain_family * Ethereum_types.block_hash
+      -> ( Ethereum_types.legacy_transaction_object L2_types.block,
+           [`Read | `Delete] )
+         path
+  | Block_index :
+      _ L2_types.chain_family * Durable_storage_path.Block.number
+      -> (unit, [`Delete]) path
+  | Tezosx_tezos_current_block :
+      (Ethereum_types.legacy_transaction_object L2_types.block, ro) path
 
-(** How a typed path is resolved to a concrete storage access. Every
-    current path resolves to a [Read_write]; new variants will be
-    introduced alongside paths that need narrower capabilities. *)
-type ('a, 'cap) resolved =
+(** Read-capable resolution variants. [Delete_only] is intentionally absent
+    here — it lives directly in {!resolved}, so [path_and_decode] can
+    pattern-match exhaustively without an [assert false] on an impossible
+    case. *)
+type ('a, 'cap) read_resolved =
   | Read_write : {
       path : string;
       decode : bytes -> 'a tzresult;
       encode : 'a -> string;
     }
-      -> ('a, rw) resolved
+      -> ('a, rw) read_resolved
+  | Read_only : {
+      path : string;
+      decode : bytes -> 'a tzresult;
+    }
+      -> ('a, ro) read_resolved
+  | Read_delete : {
+      path : string;
+      decode : bytes -> 'a tzresult;
+    }
+      -> ('a, [`Read | `Delete]) read_resolved
+
+(** A resolved path: either read-capable (and optionally writable / deletable),
+    or delete-only. *)
+type ('a, 'cap) resolved =
+  | Readable : ('a, 'cap) read_resolved -> ('a, 'cap) resolved
+  | Delete_only : {path : string} -> (unit, [`Delete]) resolved
 
 let path_of : type a cap. (a, cap) resolved -> string = function
-  | Read_write {path; _} -> path
+  | Readable (Read_write {path; _}) -> path
+  | Readable (Read_only {path; _}) -> path
+  | Readable (Read_delete {path; _}) -> path
+  | Delete_only {path} -> path
 
 type ('a, 'cap) resolution =
   | Static of ('a, 'cap) resolved
@@ -107,11 +143,11 @@ let infallible_decode decode bytes = Ok (decode bytes)
 
 (** Empty-body presence flags: the value on disk is an (empty) marker; we only
     care about existence. *)
-let unit_flag_codec ~path : (unit, rw) resolved =
+let unit_flag_codec ~path : (unit, rw) read_resolved =
   Read_write {path; decode = (fun _bytes -> Ok ()); encode = (fun () -> "")}
 
 (** Little-endian [Z.t]-backed quantities stored via [Z.{to,of}_bits]. *)
-let qty_le_codec ~path : (Ethereum_types.quantity, rw) resolved =
+let qty_le_codec ~path : (Ethereum_types.quantity, rw) read_resolved =
   Read_write
     {
       path;
@@ -122,7 +158,7 @@ let qty_le_codec ~path : (Ethereum_types.quantity, rw) resolved =
     }
 
 (** RLP-encoded values stored as bytes. *)
-let rlp_codec ~path : (Rlp.item, rw) resolved =
+let rlp_codec ~path : (Rlp.item, rw) read_resolved =
   Read_write
     {
       path;
@@ -130,15 +166,26 @@ let rlp_codec ~path : (Rlp.item, rw) resolved =
       encode = (fun item -> Bytes.to_string (Rlp.encode item));
     }
 
-(** Smart constructors for read-capable [resolve] arms — wrap a [resolved]
-    in the corresponding [resolution] case, sparing each arm a level of
-    nesting. *)
-let static_read : type a cap. (a, cap) resolved -> (a, cap) resolution =
- fun r -> Static r
+(** Kernel-owned typed block stored under [path]; read-only, decoded via
+    [L2_types.block_from_bytes] for the given [chain_family]. *)
+let block_ro_codec (type f) ~path ~(chain_family : f L2_types.chain_family) :
+    (Ethereum_types.legacy_transaction_object L2_types.block, ro) read_resolved
+    =
+  Read_only
+    {
+      path;
+      decode = (fun bytes -> Ok (L2_types.block_from_bytes ~chain_family bytes));
+    }
+
+(** Smart constructors for [resolve] arms — wrap a [read_resolved]
+    into a [resolution], hiding the [Readable] layer that every read-side
+    arm would otherwise have to spell out. *)
+let static_read : type a cap. (a, cap) read_resolved -> (a, cap) resolution =
+ fun r -> Static (Readable r)
 
 let versioned_read : type a cap.
-    (storage_version:int -> (a, cap) resolved) -> (a, cap) resolution =
- fun f -> Versioned f
+    (storage_version:int -> (a, cap) read_resolved) -> (a, cap) resolution =
+ fun f -> Versioned (fun ~storage_version -> Readable (f ~storage_version))
 
 let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
   | Raw_path key ->
@@ -214,7 +261,8 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
       static_read (unit_flag_codec ~path:(Tezosx.feature_flag runtime))
   | Michelson_runtime_sunrise_level ->
       static_read
-        (qty_le_codec ~path:Durable_storage_path.michelson_runtime_sunrise_level)
+        (qty_le_codec
+           ~path:Durable_storage_path.michelson_runtime_sunrise_level)
   | Current_block_number chain_family ->
       let root = Durable_storage_path.root_of_chain_family chain_family in
       static_read
@@ -278,6 +326,36 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
       versioned_read (fun ~storage_version ->
           rlp_codec
             ~path:(Durable_storage_path.Assemble_block.input ~storage_version))
+  | Current_block chain_family ->
+      let root = Durable_storage_path.root_of_chain_family chain_family in
+      static_read
+        (block_ro_codec
+           ~path:(Durable_storage_path.Block.current_block ~root)
+           ~chain_family)
+  | Block_by_hash (chain_family, block_hash) ->
+      let root = Durable_storage_path.root_of_chain_family chain_family in
+      static_read
+        (Read_delete
+           {
+             path = Durable_storage_path.Block.by_hash ~root block_hash;
+             decode =
+               (fun bytes -> Ok (L2_types.block_from_bytes ~chain_family bytes));
+           })
+  | Block_index (chain_family, block_number) ->
+      let root = Durable_storage_path.root_of_chain_family chain_family in
+      Static
+        (Delete_only
+           {
+             path =
+               Durable_storage_path.Indexes.block_by_number ~root block_number;
+           })
+  | Tezosx_tezos_current_block ->
+      static_read
+        (block_ro_codec
+           ~path:
+             (Durable_storage_path.Block.current_block
+                ~root:Durable_storage_path.tezosx_tezos_blocks_root)
+           ~chain_family:Michelson)
 
 let storage_version state =
   let open Lwt_result_syntax in
@@ -308,10 +386,21 @@ let resolve_with_state : type a cap.
       in
       return (Some sv, f ~storage_version:sv)
 
-let read (type a cap) (p : (a, cap) path) (state : Pvm.State.t) :
+let path_and_decode : type a cap.
+    (a, cap) read_resolved -> string * (bytes -> a tzresult) = function
+  | Read_write {path; decode; _} -> (path, decode)
+  | Read_only {path; decode} -> (path, decode)
+  | Read_delete {path; decode} -> (path, decode)
+
+let read_path_and_decode : type a.
+    (a, [> `Read]) resolved -> string * (bytes -> a tzresult) = function
+  | Readable rr -> path_and_decode rr
+
+let read (type a) (p : (a, [> `Read]) path) (state : Pvm.State.t) :
     a tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let* _sv, Read_write {path; decode; _} = resolve_with_state p state in
+  let* _sv, r = resolve_with_state p state in
+  let path, decode = read_path_and_decode r in
   let*! bytes_opt = inspect_durable state path in
   match bytes_opt with
   | Some bytes ->
@@ -319,10 +408,11 @@ let read (type a cap) (p : (a, cap) path) (state : Pvm.State.t) :
       return v
   | None -> failwith "No value found under %s" path
 
-let read_opt (type a cap) (p : (a, cap) path) (state : Pvm.State.t) :
+let read_opt (type a) (p : (a, [> `Read]) path) (state : Pvm.State.t) :
     a option tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let* _sv, Read_write {path; decode; _} = resolve_with_state p state in
+  let* _sv, r = resolve_with_state p state in
+  let path, decode = read_path_and_decode r in
   let*! bytes_opt = inspect_durable state path in
   match bytes_opt with
   | Some bytes ->
@@ -331,16 +421,17 @@ let read_opt (type a cap) (p : (a, cap) path) (state : Pvm.State.t) :
   | None -> return_none
 
 let write : type a.
-    (a, rw) path -> a -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t =
+    (a, [> `Write]) path -> a -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t =
  fun p value state ->
   let open Lwt_result_syntax in
-  let* _sv, Read_write {path; encode; _} = resolve_with_state p state in
+  let* _sv, Readable (Read_write {path; encode; _}) =
+    resolve_with_state p state
+  in
   let*! state = modify_durable ~key:path ~value:(encode value) state in
   return state
 
-let delete : type a cap.
-    (a, cap) path -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t =
- fun p state ->
+let delete (type a) (p : (a, [> `Delete]) path) (state : Pvm.State.t) :
+    Pvm.State.t tzresult Lwt.t =
   let open Lwt_result_syntax in
   let* _sv, r = resolve_with_state p state in
   let*! state =
@@ -348,7 +439,7 @@ let delete : type a cap.
   in
   return state
 
-let exists : type a cap. (a, cap) path -> Pvm.State.t -> bool tzresult Lwt.t =
+let exists : ('a, 'cap) path -> Pvm.State.t -> bool tzresult Lwt.t =
  fun p state ->
   let open Lwt_result_syntax in
   let* _sv, r = resolve_with_state p state in
@@ -356,13 +447,14 @@ let exists : type a cap. (a, cap) path -> Pvm.State.t -> bool tzresult Lwt.t =
   return b
 
 let write_all : type a.
-    ((a, rw) path * a) list -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t =
+    ((a, [> `Write]) path * a) list -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t
+    =
  fun pairs state ->
   let open Lwt_result_syntax in
   let* _sv, state =
     List.fold_left_es
       (fun (sv, state) (p, value) ->
-        let* sv, Read_write {path; encode; _} =
+        let* sv, Readable (Read_write {path; encode; _}) =
           resolve_with_state ?sv p state
         in
         let*! state = modify_durable ~key:path ~value:(encode value) state in

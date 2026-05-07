@@ -1241,10 +1241,7 @@ module State = struct
         in
         if past_sunrise then
           let* tez_block =
-            Evm_state.retrieve_block_at_root
-              ~chain_family:Michelson
-              ~root:Durable_storage_path.tezosx_tezos_blocks_root
-              evm_state
+            Durable_storage.read_opt Tezosx_tezos_current_block evm_state
           in
           match tez_block with
           | Some (Tez block) -> return_some block

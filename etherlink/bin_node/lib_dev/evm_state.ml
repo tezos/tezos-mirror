@@ -419,24 +419,16 @@ let execute_entrypoint ~data_dir ~pool ~native_execution_policy ~config
   | [Some bytes] -> return bytes
   | _ -> failwith "No value found at the entrypoint output path %s" output_path
 
-let retrieve_block_at_root ~chain_family ~root evm_state =
+let retrieve_block_at_root ~chain_family evm_state =
   let open Lwt_result_syntax in
   let* storage_version = Durable_storage.storage_version evm_state in
   if not (Storage_version.legacy_storage_compatible ~storage_version) then
-    let* bytes =
-      Durable_storage.read_opt
-        (Raw_path (Durable_storage_path.Block.current_block ~root))
-        evm_state
-    in
-    return (Option.map (L2_types.block_from_bytes ~chain_family) bytes)
+    Durable_storage.read_opt (Current_block chain_family) evm_state
   else
     let* current_block_hash = current_block_hash ~chain_family evm_state in
-    let* bytes =
-      Durable_storage.read_opt
-        (Raw_path (Durable_storage_path.Block.by_hash ~root current_block_hash))
-        evm_state
-    in
-    return (Option.map (L2_types.block_from_bytes ~chain_family) bytes)
+    Durable_storage.read_opt
+      (Block_by_hash (chain_family, current_block_hash))
+      evm_state
 
 (** [retrieve_block ~chain_family evm_state] returns 0, 1, or 2 blocks
     as a (first_block * second_block option) option as follows:
@@ -457,13 +449,9 @@ let retrieve_block_at_root ~chain_family ~root evm_state =
 *)
 let retrieve_block ~chain_family evm_state =
   let open Lwt_result_syntax in
-  let root = Durable_storage_path.root_of_chain_family chain_family in
-  let* block_opt = retrieve_block_at_root ~chain_family ~root evm_state in
+  let* block_opt = retrieve_block_at_root ~chain_family evm_state in
   let* tezos_block_opt =
-    retrieve_block_at_root
-      ~chain_family:Michelson
-      ~root:Durable_storage_path.tezosx_tezos_blocks_root
-      evm_state
+    Durable_storage.read_opt Tezosx_tezos_current_block evm_state
   in
   let tezos_block =
     match tezos_block_opt with
@@ -628,17 +616,15 @@ let clear_block_storage chain_family block evm_state =
      necessary to produce the next block. Block production starts by reading
      the head to retrieve information such as parent block hash.
   *)
-    let root = Durable_storage_path.root_of_chain_family chain_family in
     let block_parent = L2_types.block_parent block in
     let block_number = L2_types.block_number block in
     let (Qty number) = block_number in
     (* Handles case (1.). *)
     let* evm_state =
       if number > Z.zero then
-        let pred_block_path =
-          Durable_storage_path.Block.by_hash ~root block_parent
-        in
-        Durable_storage.delete (Raw_path pred_block_path) evm_state
+        Durable_storage.delete
+          (Block_by_hash (chain_family, block_parent))
+          evm_state
       else return evm_state
     in
     (* Handles case (2.). *)
@@ -649,12 +635,9 @@ let clear_block_storage chain_family block evm_state =
        so we garbage collect only what's possible. *)
       let to_keep = Z.of_int 256 in
       if number >= to_keep then
-        let index_path =
-          Durable_storage_path.Indexes.block_by_number
-            ~root
-            (Nth (Z.sub number to_keep))
-        in
-        Durable_storage.delete (Raw_path index_path) evm_state
+        Durable_storage.delete
+          (Block_index (chain_family, Nth (Z.sub number to_keep)))
+          evm_state
       else return evm_state
     in
     (* Receipts are not necessary for the kernel, we can just remove
