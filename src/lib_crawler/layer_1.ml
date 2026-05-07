@@ -156,7 +156,7 @@ let backoff_delay ~base ~soft_cap count =
     +. Random.float (d *. 2. *. randomization_factor)
     -. (d *. randomization_factor)
 
-let rec do_connect ~count ~previous_status
+let rec do_connect ~count ~previous_status ~start_time
     ({name; protocols; reconnection_delay = delay; cctxt; chain; _} as l1_ctxt)
     =
   assert (match l1_ctxt.status with Connecting _ -> true | _ -> false) ;
@@ -192,10 +192,16 @@ let rec do_connect ~count ~previous_status
       in
       let conn = {heads; stopper; consumer} in
       l1_ctxt.status <- Connected conn ;
+      let* () =
+        if count > 0 then
+          let elapsed = Unix.gettimeofday () -. start_time in
+          Layer1_event.reconnected ~name ~count ~elapsed
+        else return_unit
+      in
       return conn
   | Error e ->
       let* () = Layer1_event.cannot_connect ~name ~count e in
-      do_connect ~count:(count + 1) ~previous_status l1_ctxt
+      do_connect ~count:(count + 1) ~previous_status ~start_time l1_ctxt
 
 let do_connect ?(count = 0) l1_ctxt =
   let open Lwt_syntax in
@@ -209,7 +215,8 @@ let do_connect ?(count = 0) l1_ctxt =
         Layer1_event.stopping_old_connection ~name:l1_ctxt.name
     | _ -> return_unit
   in
-  let* conn = do_connect ~count ~previous_status l1_ctxt in
+  let start_time = Unix.gettimeofday () in
+  let* conn = do_connect ~count ~previous_status ~start_time l1_ctxt in
   let* () = Layer1_event.connected ~name:l1_ctxt.name in
   Lwt_condition.broadcast cond conn ;
   return conn
@@ -623,6 +630,7 @@ class with_timeout timeout (obj : #Tezos_rpc.Context.generic) :
 
 let retry_on_connection_error ~name ~reconnection_delay f =
   let open Lwt_syntax in
+  let start_time = Unix.gettimeofday () in
   let rec loop count =
     let* () =
       if count = 0 then return_unit
@@ -635,7 +643,14 @@ let retry_on_connection_error ~name ~reconnection_delay f =
     in
     let* res = f () in
     match res with
-    | Ok _ -> Lwt.return res
+    | Ok _ ->
+        let* () =
+          if count > 0 then
+            let elapsed = Unix.gettimeofday () -. start_time in
+            Layer1_event.reconnected ~name ~count ~elapsed
+          else return_unit
+        in
+        Lwt.return res
     | Error trace when is_connection_error trace ->
         let* () = Layer1_event.cannot_connect ~name ~count trace in
         loop (count + 1)

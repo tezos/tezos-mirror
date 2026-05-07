@@ -114,6 +114,16 @@ module Simple = struct
   let connected =
     declare_0 ~name:"connected" ~msg:"Connected to L1 node" ~level:Debug ()
 
+  let reconnected =
+    declare_2
+      ~name:"reconnected"
+      ~msg:
+        "successfully reconnected to L1 node after {count} attempt(s) in \
+         {elapsed}s"
+      ~level:Notice
+      ("count", Data_encoding.int31)
+      ("elapsed", Data_encoding.float)
+
   let stopping_old_connection =
     declare_0
       ~name:"stopping_old_connection"
@@ -168,6 +178,9 @@ let switched_new_head ~name hash level =
   Simple.(emit switched_new_head) (name, hash, level)
 
 let connected ~name = Simple.(emit connected) name
+
+let reconnected ~name ~count ~elapsed =
+  Simple.(emit reconnected) (name, count, elapsed)
 
 let stopping_old_connection ~name = Simple.(emit stopping_old_connection) name
 
