@@ -136,6 +136,26 @@ let is_running c =
   | Disconnected -> false
   | Connected _ | Connecting _ -> true
 
+(* Randomized exponential backoff (soft capped): [base *. 1.5^(count-1) ± 50%].
+   Returns [0.] when [count = 0] so the first attempt is immediate. *)
+(* TODO: https://linear.app/tezos/issue/L2-1322
+   Move backoff_delay and retry_on_connection_error into a dedicated
+   octez-backoff library; the same pattern is duplicated in lib_dal_node and
+   etherlink/bin_outbox_monitor. *)
+let backoff_delay ~base ~soft_cap count =
+  if count = 0 then 0.
+  else
+    let fcount = float_of_int (count - 1) in
+    let d = base *. (1.5 ** fcount) in
+    let d = min d soft_cap in
+    let randomization_factor =
+      0.5
+      (* 50% *)
+    in
+    d
+    +. Random.float (d *. 2. *. randomization_factor)
+    -. (d *. randomization_factor)
+
 let rec do_connect ~count ~previous_status
     ({name; protocols; reconnection_delay = delay; cctxt; chain; _} as l1_ctxt)
     =
@@ -144,19 +164,7 @@ let rec do_connect ~count ~previous_status
   let* () =
     if count = 0 then return_unit
     else
-      let fcount = float_of_int (count - 1) in
-      (* Randomized exponential backoff capped to 1.5h: 1.5^count * delay ± 50% *)
-      let delay = delay *. (1.5 ** fcount) in
-      let delay = min delay 3600. in
-      let randomization_factor =
-        0.5
-        (* 50% *)
-      in
-      let delay =
-        delay
-        +. Random.float (delay *. 2. *. randomization_factor)
-        -. (delay *. randomization_factor)
-      in
+      let delay = backoff_delay ~base:delay ~soft_cap:3600. count in
       let* () = Layer1_event.wait_reconnect ~name delay in
       Lwt_unix.sleep delay
   in
@@ -613,11 +621,36 @@ class with_timeout timeout (obj : #Tezos_rpc.Context.generic) :
       Lwt.pick [obj#generic_media_type_call meth ?body uri; timeout_promise]
   end
 
-let client_context (obj : #Client_context.full) ~timeout :
+let retry_on_connection_error ~name ~reconnection_delay f =
+  let open Lwt_syntax in
+  let rec loop count =
+    let* () =
+      if count = 0 then return_unit
+      else
+        let delay =
+          backoff_delay ~base:reconnection_delay ~soft_cap:30. count
+        in
+        let* () = Layer1_event.wait_reconnect ~name delay in
+        Lwt_unix.sleep delay
+    in
+    let* res = f () in
+    match res with
+    | Ok _ -> Lwt.return res
+    | Error trace when is_connection_error trace ->
+        let* () = Layer1_event.cannot_connect ~name ~count trace in
+        loop (count + 1)
+    | Error _ -> Lwt.return res
+  in
+  loop 0
+
+let client_context (obj : #Client_context.full) ~reconnection_delay ~timeout :
     Client_context.full tzresult Lwt.t =
   let open Lwt_result_syntax in
   let+ chain_id =
-    Tezos_shell_services.Shell_services.Chain.chain_id obj ~chain:obj#chain ()
+    retry_on_connection_error
+      ~name:"l1_rpc_client"
+      ~reconnection_delay
+      (Tezos_shell_services.Shell_services.Chain.chain_id obj ~chain:obj#chain)
   in
   object
     inherit Client_context.proxy_context (obj :> Client_context.full)
