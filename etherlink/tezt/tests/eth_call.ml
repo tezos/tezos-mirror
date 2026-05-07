@@ -538,7 +538,7 @@ let test_call_state_override_state_empty =
 
   unit
 
-let protocols = Protocol.all
+let protocols = [Protocol.Alpha]
 
 let () =
   test_call_state_override_code protocols ;

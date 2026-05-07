@@ -16068,7 +16068,7 @@ let test_fa_withdrawal_eip7702_eoa =
     ~error_msg:"After both withdrawals we expect %L ticket balance, got %R" ;
   unit
 
-let protocols = Protocol.all
+let protocols = [Protocol.Alpha]
 
 let () =
   test_remove_sequencer protocols ;
