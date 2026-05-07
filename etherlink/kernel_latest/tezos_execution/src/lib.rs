@@ -525,9 +525,7 @@ where
                     })
                     .transpose()?;
                 let emit_err = |e: tezos_data_encoding::enc::BinError| {
-                    ApplyOperationError::UnSupportedEmit(format!(
-                        "Failed to encode emit data: {e}"
-                    ))
+                    ApplyOperationError::EmitMichelineSerializationError(e.to_string())
                 };
                 let payload = Some(
                     value

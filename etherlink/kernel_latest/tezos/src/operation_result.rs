@@ -229,6 +229,8 @@ pub enum ApplyOperationError {
     Origination(#[from] OriginationError),
     #[error("Smart-Contract emitted an event, which is unsupported: {0}")]
     UnSupportedEmit(String),
+    #[error("Failed to serialize emit event payload: {0}")]
+    EmitMichelineSerializationError(String),
     #[error("Set delegate operation is unsupported: {0}")]
     UnSupportedSetDelegate(String),
     #[error("Internal operation nonce overflow due to {0}")]
