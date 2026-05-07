@@ -12,7 +12,8 @@ let to_string = function Tezos -> "tezos"
 let feature_flag kernel = function
   | Tezos -> (
       match kernel with
-      | Kernel.Latest -> "/base/feature_flags/enable_tezos_runtime"
+      | Kernel.Latest | Kernel.Previewnet ->
+          "/base/feature_flags/enable_tezos_runtime"
       | Kernel.Mainnet | Kernel.Tezlink_shadownet ->
           "/evm/feature_flags/enable_tezos_runtime")
 

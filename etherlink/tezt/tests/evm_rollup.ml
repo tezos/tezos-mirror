@@ -6459,7 +6459,7 @@ let test_rpc_state_value_and_subkeys =
   let expected_subkeys =
     let keys = ["indexes"; "blocks"; "fees"; "eth_accounts"; "eth_codes"] in
     match kernel with
-    | Latest -> keys @ ["sequencer"]
+    | Latest | Previewnet -> keys @ ["sequencer"]
     | Mainnet | Tezlink_shadownet -> keys
   in
   Check.(
