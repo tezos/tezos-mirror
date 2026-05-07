@@ -19,6 +19,52 @@ use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_crypto_rs::{hash::OperationHash, public_key_hash::PublicKeyHash};
 use typed_arena::Arena;
 
+/// Errors that can surface from
+/// [`CtxTrait::lookup_view_storage_balance`]. "View does not exist on
+/// this contract" is **not** an error variant — that case is signalled
+/// by `Ok(None)`. Any `Err` here means the lookup itself could not be
+/// fulfilled (corruption, I/O failure, serialization failure, balance
+/// overflow), and the caller should surface it as a hard runtime
+/// failure rather than collapsing it back to `V::Option(None)`.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum LookupViewError {
+    /// Encoding the view's storage bytes failed. **Test-only in
+    /// practice**: only reachable from the in-memory [`Ctx`] (which
+    /// encodes a stored `Micheline` value on demand). The production
+    /// `Ctx` in `etherlink_tezos_execution::mir_ctx` reads
+    /// already-encoded bytes directly from durable storage and never
+    /// re-encodes, so this variant is unreachable on the hot path.
+    /// Kept on the trait so test contexts that synthesize Micheline
+    /// can surface zarith encode failures faithfully.
+    ///
+    /// `Rc` because [`tezos_data_encoding::enc::BinError`] is not
+    /// `Clone` (its `IOError` variant carries a non-`Clone`
+    /// `std::io::Error`).
+    #[error("encoding view storage failed: {0}")]
+    Encode(std::rc::Rc<tezos_data_encoding::enc::BinError>),
+    /// Decoding the contract's serialized code from durable storage
+    /// failed.
+    #[error("decoding contract code failed: {0}")]
+    Decode(#[from] crate::serializer::DecodeError),
+    /// The decoded code does not split into a valid script shape.
+    #[error("splitting contract script failed: {0}")]
+    SplitScript(#[from] crate::typechecker::TcError),
+    /// Host-layer error: durable storage read or path failure on
+    /// behalf of the originated contract being looked up. Stringified
+    /// at the trait boundary because MIR is host-agnostic.
+    #[error("host error during view lookup: {0}")]
+    HostError(String),
+    /// The contract's balance does not fit in `i64`.
+    #[error("contract balance overflows i64")]
+    BalanceOverflow,
+}
+
+impl From<tezos_data_encoding::enc::BinError> for LookupViewError {
+    fn from(err: tezos_data_encoding::enc::BinError) -> Self {
+        LookupViewError::Encode(std::rc::Rc::new(err))
+    }
+}
+
 #[allow(missing_docs)]
 pub trait TypecheckingCtx<'a> {
     fn gas(&mut self) -> &mut Gas;
@@ -102,12 +148,15 @@ pub trait CtxTrait<'a>: TypecheckingCtx<'a> {
     /// - the packed (serialized) storage,
     /// - the contract balance in mutez.
     ///
-    /// Returns [`Ok(None)`] if the contract is not originated or the named
-    /// view does not exist. Returns [`Err`] if the lookup itself fails —
-    /// host I/O error, corrupted contract code/storage, or a serialization
-    /// failure when producing the view's storage bytes. Implementations
-    /// must not collapse these latter cases into [`Ok(None)`], as that
-    /// would silently impersonate a missing view.
+    /// Returns [`Ok(None)`] iff the contract is not originated, or it
+    /// is originated but does not declare a view named `name`. Both
+    /// cases match L1 VIEW semantics, which pushes `V::Option(None)`
+    /// on the stack so the caller can `IF_NONE` over it. Every other
+    /// failure mode — host I/O, corrupted contract code/storage,
+    /// balance overflow, encoding failure — surfaces as a typed
+    /// [`LookupViewError`]; implementations must not collapse those
+    /// into [`Ok(None)`], as that would silently impersonate a
+    /// missing view.
     fn lookup_view_storage_balance(
         &self,
         contract: &ContractKt1Hash,
@@ -115,7 +164,7 @@ pub trait CtxTrait<'a>: TypecheckingCtx<'a> {
         arena: &'a Arena<Micheline<'a>>,
     ) -> Result<
         Option<(MichelineView<Micheline<'a>>, Micheline<'a>, Vec<u8>, i64)>,
-        tezos_data_encoding::enc::BinError,
+        LookupViewError,
     >;
 
     /// Override the execution context for a view call.
@@ -365,7 +414,7 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
         arena: &'a Arena<Micheline<'a>>,
     ) -> Result<
         Option<(MichelineView<Micheline<'a>>, Micheline<'a>, Vec<u8>, i64)>,
-        tezos_data_encoding::enc::BinError,
+        LookupViewError,
     > {
         let addr = AddressHash::Kt1(contract.clone());
         let Some(contract_view) = self.views.get(&addr).and_then(|m| m.get(view_name)) else {

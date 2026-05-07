@@ -264,37 +264,49 @@ impl<'a, Host: StorageV1, C: Context> CtxTrait<'a> for Ctx<'_, 'a, Host, C> {
             Vec<u8>,
             i64,
         )>,
-        tezos_data_encoding::enc::BinError,
+        mir::context::LookupViewError,
     > {
-        use tezos_data_encoding::enc::BinError;
-        // Contract not originated: legitimate "view does not exist on this
-        // contract" case → Ok(None), matching L1 VIEW semantics.
-        let Ok(account) = self.tc_ctx.context.originated_from_kt1(contract) else {
+        use mir::context::LookupViewError;
+        // `originated_from_kt1` only builds the contract's durable path
+        // from the index; it does not check existence. Failures here
+        // mean a path/index corruption (or some host-layer issue) and
+        // are surfaced as host errors.
+        let account = self
+            .tc_ctx
+            .context
+            .originated_from_kt1(contract)
+            .map_err(|e| LookupViewError::HostError(e.to_string()))?;
+        // L1 VIEW semantics push `None` when the target KT1 does not
+        // exist at all (cf. `script_interpreter.ml::iview`). Probe
+        // existence explicitly here — if we skipped this and went
+        // straight to `account.code(host)`, a never-originated KT1
+        // would error out on the missing `code` path and we would
+        // propagate that as a hard `HostError`, breaking parity with
+        // L1 for any contract doing
+        //   `VIEW addr "name"; IF_NONE { ... }`
+        // against a possibly-missing KT1.
+        if !account
+            .exists(self.tc_ctx.host)
+            .map_err(|e| LookupViewError::HostError(e.to_string()))?
+        {
             return Ok(None);
-        };
-        // The contract IS originated past this point; any further failure
-        // means a corrupted/unreadable durable state on a known contract,
-        // which must surface as an error rather than impersonate "view
-        // not found".
-        let serialized_script = account.code(self.tc_ctx.host).map_err(|e| {
-            BinError::custom(format!("view lookup: failed to read code: {e}"))
-        })?;
+        }
+        // The contract is originated past this point; any further
+        // failure (read, decode, balance overflow) means corruption or
+        // I/O on a known contract and must surface as an error rather
+        // than impersonate "view not found".
+        let serialized_script = account
+            .code(self.tc_ctx.host)
+            .map_err(|e| LookupViewError::HostError(e.to_string()))?;
         match serialized_script {
             Code::Code(serialized_script) => {
-                let decoded =
-                    Micheline::decode_raw(arena, &serialized_script).map_err(|e| {
-                        BinError::custom(format!(
-                            "view lookup: failed to decode contract code: {e}"
-                        ))
-                    })?;
+                let decoded = Micheline::decode_raw(arena, &serialized_script)?;
                 let MichelineContractScript {
                     code: _,
                     parameter_ty: _,
                     storage_ty,
                     views,
-                } = decoded.split_script().map_err(|e| {
-                    BinError::custom(format!("view lookup: failed to split script: {e}"))
-                })?;
+                } = decoded.split_script()?;
                 let Some(view) = views.get(view_name) else {
                     return Ok(None);
                 };
@@ -303,15 +315,16 @@ impl<'a, Host: StorageV1, C: Context> CtxTrait<'a> for Ctx<'_, 'a, Host, C> {
                     output_type: view.output_type.clone(),
                     code: view.code.clone(),
                 };
-                let storage = account.storage(self.tc_ctx.host).map_err(|e| {
-                    BinError::custom(format!("view lookup: failed to read storage: {e}"))
-                })?;
-                let balance = account.balance(self.tc_ctx.host).map_err(|e| {
-                    BinError::custom(format!("view lookup: failed to read balance: {e}"))
-                })?;
-                let balance: i64 = balance.0.try_into().map_err(|_| {
-                    BinError::custom("view lookup: balance overflows i64".to_string())
-                })?;
+                let storage = account
+                    .storage(self.tc_ctx.host)
+                    .map_err(|e| LookupViewError::HostError(e.to_string()))?;
+                let balance = account
+                    .balance(self.tc_ctx.host)
+                    .map_err(|e| LookupViewError::HostError(e.to_string()))?;
+                let balance: i64 = balance
+                    .0
+                    .try_into()
+                    .map_err(|_| LookupViewError::BalanceOverflow)?;
                 Ok(Some((owned_view, storage_ty.clone(), storage, balance)))
             }
             Code::Enshrined(_) => {
@@ -1162,6 +1175,83 @@ pub mod tests {
         });
         assert_eq!(diff_list, expected, "Receipt should be in reverse order");
     }
+
+    /// Regression test for the existence-probe in
+    /// [`Ctx::lookup_view_storage_balance`]. At L1, calling
+    /// `VIEW addr "name"` on a never-originated KT1 must push
+    /// `V::Option(None)` (cf. `script_interpreter.ml::iview`); the
+    /// trait contract is for `Ok(None)` to surface that case so the
+    /// interpreter then maps it to `V::Option(None)`. This test fires
+    /// the production impl directly against a fresh host and a KT1
+    /// that has never been written, asserting it does not surface the
+    /// missing-`code` durable read as a `LookupViewError::HostError`.
+    #[test]
+    fn lookup_view_storage_balance_returns_none_for_unoriginated_kt1() {
+        use crate::account_storage::{TezlinkImplicitAccount, TezlinkOriginatedAccount};
+        use crate::address::OriginationNonce;
+        use mir::ast::michelson_address::AddressHash;
+        use tezos_smart_rollup_host::path::RefPath;
+
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(tc_ctx, &mut host, &context);
+
+        // OperationCtx + ExecCtx are unread by `lookup_view_storage_balance`
+        // but the type system requires a fully constructed `Ctx`. Use
+        // placeholder backing values for everything that is not under test.
+        let bootstrap_pkh =
+            PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
+        let placeholder_kt1 = ContractKt1Hash::from([0u8; 20]);
+        let source = TezlinkImplicitAccount {
+            path: RefPath::assert_from(b"/mock_source").into(),
+            pkh: bootstrap_pkh.clone(),
+        };
+        let mut origination_nonce = OriginationNonce::default();
+        let mut counter = 0u128;
+        let level = BlockNumber { block_number: 0 };
+        let now = Timestamp::from(0);
+        let chain_id = ChainId::from([0, 0, 0, 0]);
+        let source_public_key: Vec<u8> = Vec::new();
+
+        let mut operation_ctx = OperationCtx {
+            source: &source,
+            origination_nonce: &mut origination_nonce,
+            counter: &mut counter,
+            level: &level,
+            now: &now,
+            chain_id: &chain_id,
+            source_public_key: &source_public_key,
+        };
+
+        let exec_ctx = ExecCtx {
+            sender: AddressHash::Implicit(bootstrap_pkh),
+            amount: 0,
+            self_address: AddressHash::Kt1(placeholder_kt1.clone()),
+            balance: 0,
+            contract_account: TezlinkOriginatedAccount {
+                path: RefPath::assert_from(b"/mock_self").into(),
+                kt1: placeholder_kt1,
+            },
+        };
+
+        let ctx = Ctx {
+            tc_ctx: &mut tc_ctx,
+            exec_ctx,
+            operation_ctx: &mut operation_ctx,
+        };
+
+        // A KT1 that the fresh `MockKernelHost` has never seen.
+        let unoriginated_kt1 =
+            ContractKt1Hash::from_base58_check("KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton")
+                .unwrap();
+        let arena = Arena::new();
+        let result =
+            ctx.lookup_view_storage_balance(&unoriginated_kt1, "anything", &arena);
+        assert!(
+            matches!(result, Ok(None)),
+            "expected Ok(None) for never-originated KT1, got {result:?}",
+        );
+    }
 }
 
 #[cfg(test)]
@@ -1337,7 +1427,7 @@ pub(crate) mod mock {
             _arena: &'a Arena<Micheline<'a>>,
         ) -> Result<
             Option<(MichelineView<Micheline<'a>>, Micheline<'a>, Vec<u8>, i64)>,
-            tezos_data_encoding::enc::BinError,
+            mir::context::LookupViewError,
         > {
             Ok(None)
         }

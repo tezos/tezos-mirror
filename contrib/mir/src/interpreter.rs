@@ -57,6 +57,14 @@ pub enum InterpretError<'a> {
     /// An error occurred when working with `big_map` storage.
     #[error("lazy storage error: {0}")]
     LazyStorageError(#[from] LazyStorageError),
+    /// Looking up a contract's view (for `VIEW`) failed because the
+    /// surrounding context could not produce the view's storage —
+    /// host I/O, decoded-code corruption, balance overflow, or an
+    /// in-memory encoding failure. Distinct from "view not found",
+    /// which is signalled by `Ok(None)` and pushed as `V::Option(None)`
+    /// without raising an error.
+    #[error("view lookup error: {0}")]
+    ViewLookupError(#[from] crate::context::LookupViewError),
     /// Error when encoding serialized data
     ///
     /// Wrapped in `Rc` because [`tezos_data_encoding::enc::BinError`]
