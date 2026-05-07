@@ -25,7 +25,6 @@
 
 type error +=
   | Merging_failed of string
-  | Missing_shards of {provided : int; required : int}
   | Illformed_pages
   | Invalid_slot_size of {provided : int; expected : int}
   | Invalid_commitment of {
@@ -47,23 +46,6 @@ let () =
     Data_encoding.(obj1 (req "msg" string))
     (function Merging_failed parameter -> Some parameter | _ -> None)
     (fun parameter -> Merging_failed parameter) ;
-  register_error_kind
-    `Permanent
-    ~id:"dal.node.missing_shards"
-    ~title:"Missing shards"
-    ~description:"Some shards are missing"
-    ~pp:(fun ppf (provided, required) ->
-      Format.fprintf
-        ppf
-        "Some shards are missing, expected at least %d, found %d. Store is \
-         invalid."
-        provided
-        required)
-    Data_encoding.(obj2 (req "provided" int31) (req "required" int31))
-    (function
-      | Missing_shards {provided; required} -> Some (provided, required)
-      | _ -> None)
-    (fun (provided, required) -> Missing_shards {provided; required}) ;
   register_error_kind
     `Permanent
     ~id:"dal.node.illformed_pages"
@@ -237,7 +219,15 @@ let read_minimal_shards_for_reconstruction ?from_bytes cryptobox store slot_id =
   in
   match res with
   | Ok (rev_shards, count_elts) ->
-      if needed > count_elts then return_none
+      if needed > count_elts then
+        let*! () =
+          Event.emit_not_enough_shards_for_reconstruction
+            ~published_level:slot_id.slot_level
+            ~slot_index:slot_id.slot_index
+            ~provided:count_elts
+            ~required:needed
+        in
+        return_none
       else List.take_n needed rev_shards |> List.to_seq |> return_some
   | Error _ -> return_none
 
