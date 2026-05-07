@@ -1,0 +1,6 @@
+# Octez documentation
+
+> This site contains the complete documentation of the Octez suite.
+
+You can find all the Octez documentation in a single text file: [octezdoc.txt](/docs/octezdoc.txt).
+Note that the file is in RST (reStructuredText) format, not Markdown.
