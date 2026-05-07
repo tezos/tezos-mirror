@@ -24,32 +24,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make_machine (S : Wasm_pvm_sig.STATE) :
+(** STATE-only PVM machine parameterised by a {!Wasm_vm_sig.S}.
+    Callers instantiate {!Wasm_vm.Make_vm} with their own
+    {!Wasm_pvm_config.t} (and any other required parameters) and pass
+    the result here. *)
+module Make_machine (Wasm_vm : Wasm_vm_sig.S) (S : Wasm_pvm_sig.STATE) :
   Wasm_pvm_sig.Machine with type state = S.state
 
-module Make_machine_with_vm (Wasm_vm : Wasm_vm_sig.S) :
-    module type of Make_machine
-
-module Make_pvm_machine (State : Wasm_pvm_sig.STATE_PROOF) :
-  Wasm_pvm_sig.S
-    with type context = State.context
-     and type proof = State.proof
-     and type state = State.state
-
-module Make_pvm_machine_with_vm (Wasm_vm : Wasm_vm_sig.S) :
-    module type of Make_pvm_machine
-
-(** Parameterised PVM machine that closes over a
-    {!Wasm_pvm_config.t}. The config is the internal typed mirror of
-    the env-sig; build one via {!Wasm_pvm_config.of_signals} at the
-    env boundary.
-
-    {!Make_pvm_machine} is the specialisation with the empty config. *)
-module Make_pvm_machine_with_config
-    (Config : sig
-      val config : Wasm_pvm_config.t
-    end)
-    (State : Wasm_pvm_sig.STATE_PROOF) :
+(** Proof-aware PVM machine parameterised by a {!Wasm_vm_sig.S}.
+    Same shape as {!Make_machine} but the [State] argument
+    must satisfy {!Wasm_pvm_sig.STATE_PROOF}. *)
+module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (State : Wasm_pvm_sig.STATE_PROOF) :
   Wasm_pvm_sig.S
     with type context = State.context
      and type proof = State.proof

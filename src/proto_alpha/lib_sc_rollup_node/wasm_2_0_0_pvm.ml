@@ -146,7 +146,7 @@ module Wasm_fast_pvm_machine :
     with type context = Wasm_2_0_0_proof_format.context
      and type state = Wasm_2_0_0_proof_format.state
      and type proof = Wasm_2_0_0_proof_format.proof =
-  Tezos_scoru_wasm_fast.Pvm.Make_pvm_machine (Wasm_2_0_0_proof_format)
+  Tezos_scoru_wasm_fast.Pvm.Make_pvm (Wasm_2_0_0_proof_format)
 
 module Wasm_pvm_on_disk :
   Sc_rollup.Wasm_2_0_0PVM.S
