@@ -872,6 +872,30 @@ impl BigMapKeys {
     }
 }
 
+/// Read the `total_bytes` counter persisted for a big-map.
+#[allow(dead_code)] // wired by the next commit
+fn total_bytes<C: Context>(
+    host: &impl StorageV1,
+    context: &C,
+    id: &BigMapId,
+) -> Result<Zarith, LazyStorageError> {
+    let path = total_bytes_path(context, id)?;
+    read_nom_value(host, &path).map_err(|e| LazyStorageError::NomReadError(e.to_string()))
+}
+
+/// Write the `total_bytes` counter persisted for a big-map.
+#[allow(dead_code)] // wired by the next commit
+fn set_total_bytes<C: Context>(
+    host: &mut impl StorageV1,
+    context: &C,
+    id: &BigMapId,
+    value: &Zarith,
+) -> Result<(), LazyStorageError> {
+    let path = total_bytes_path(context, id)?;
+    store_bin(value, host, &path).map_err(storage_error_to_lazy)?;
+    Ok(())
+}
+
 impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
     fn big_map_get(
         &mut self,
