@@ -851,12 +851,13 @@ let test_michelson_origination_and_call =
 
   (* Step 2: Call the contract with a string parameter and send XTZ *)
   let expected_storage = "Hello Tezos X" in
+  let storage_burn = String.length expected_storage * 250 in
   let call_amount = 1_234_567 in
   let* () =
     with_check_source_delta_balance
       ~source
       ~tez_client
-      ~expected_consumed:(1000 + call_amount)
+      ~expected_consumed:(1000 + call_amount + storage_burn)
       (fun () ->
         call_michelson_contract_via_delayed_inbox
           ~sc_rollup_address
