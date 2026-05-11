@@ -57,6 +57,21 @@ pub enum InterpretError<'a> {
     /// An error occurred when working with `big_map` storage.
     #[error("lazy storage error: {0}")]
     LazyStorageError(#[from] LazyStorageError),
+    /// Looking up a contract's view (for `VIEW`) failed because the
+    /// surrounding context could not produce the view's storage —
+    /// host I/O, decoded-code corruption, balance overflow, or an
+    /// in-memory encoding failure. Distinct from "view not found",
+    /// which is signalled by `Ok(None)` and pushed as `V::Option(None)`
+    /// without raising an error.
+    #[error("view lookup error: {0}")]
+    ViewLookupError(#[from] crate::context::LookupViewError),
+    /// Error when encoding serialized data
+    ///
+    /// Wrapped in `Rc` because [`tezos_data_encoding::enc::BinError`]
+    /// does not implement [`Clone`] (its `IOError` variant carries a
+    /// non-Clone `std::io::Error`), and this enum derives `Clone`.
+    #[error("encoding error: {0}")]
+    EncodeError(Rc<tezos_data_encoding::enc::BinError>),
     /// Error when decoding serialized data
     #[error(transparent)]
     DecodeError(#[from] DecodeError),
@@ -71,6 +86,12 @@ pub enum InterpretError<'a> {
 impl<'a> From<OutOfGas> for InterpretError<'a> {
     fn from(_: OutOfGas) -> Self {
         InterpretError::OutOfGas
+    }
+}
+
+impl<'a> From<tezos_data_encoding::enc::BinError> for InterpretError<'a> {
+    fn from(err: tezos_data_encoding::enc::BinError) -> Self {
+        InterpretError::EncodeError(Rc::new(err))
     }
 }
 
@@ -1502,7 +1523,8 @@ fn interpret_one<'a>(
             let mich = v.into_micheline_optimized_legacy(&arena);
             ctx.gas()
                 .consume(interpret_cost::micheline_encoding(&mich)?)?;
-            let encoded = mich.encode_for_pack();
+            let encoded = mich
+                .encode_for_pack()?;
             stack.push(V::Bytes(encoded));
         }
         I::Unpack(ty) => {
@@ -1898,8 +1920,8 @@ fn interpret_one<'a>(
                 }
             };
 
-            let Some((view, view_storage_ty, view_storage, view_balance)) =
-                ctx.lookup_view_storage_balance(&kt1, name, arena)
+            let Some((view, view_storage_ty, view_storage, view_balance)) = ctx
+                .lookup_view_storage_balance(&kt1, name, arena)?
             else {
                 stack.push(V::Option(None));
                 return Ok(());

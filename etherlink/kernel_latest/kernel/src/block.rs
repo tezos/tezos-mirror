@@ -1499,11 +1499,13 @@ mod tests {
             ",
             )
             .expect("Should have succeeded to parse the script")
-            .encode();
+            .encode()
+            .unwrap();
         let storage = parser
             .parse("Pair 0 0 0x00000000")
             .expect("Should have succeeded to parse the storage")
-            .encode();
+            .encode()
+            .unwrap();
 
         let boostrap1 = bootstrap1();
         let src = boostrap1.pkh.clone();

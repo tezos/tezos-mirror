@@ -257,39 +257,79 @@ impl<'a, Host: StorageV1, C: Context> CtxTrait<'a> for Ctx<'_, 'a, Host, C> {
         contract: &ContractKt1Hash,
         view_name: &str,
         arena: &'a Arena<Micheline<'a>>,
-    ) -> Option<(
-        mir::typechecker::MichelineView<Micheline<'a>>,
-        Micheline<'a>,
-        Vec<u8>,
-        i64,
-    )> {
-        let account = self.tc_ctx.context.originated_from_kt1(contract).ok()?;
-        let serialized_script = account.code(self.tc_ctx.host).ok()?;
+    ) -> Result<
+        Option<(
+            mir::typechecker::MichelineView<Micheline<'a>>,
+            Micheline<'a>,
+            Vec<u8>,
+            i64,
+        )>,
+        mir::context::LookupViewError,
+    > {
+        use mir::context::LookupViewError;
+        // `originated_from_kt1` only builds the contract's durable path
+        // from the index; it does not check existence. Failures here
+        // mean a path/index corruption (or some host-layer issue) and
+        // are surfaced as host errors.
+        let account = self
+            .tc_ctx
+            .context
+            .originated_from_kt1(contract)
+            .map_err(|e| LookupViewError::HostError(e.to_string()))?;
+        // L1 VIEW semantics push `None` when the target KT1 does not
+        // exist at all (cf. `script_interpreter.ml::iview`). Probe
+        // existence explicitly here — if we skipped this and went
+        // straight to `account.code(host)`, a never-originated KT1
+        // would error out on the missing `code` path and we would
+        // propagate that as a hard `HostError`, breaking parity with
+        // L1 for any contract doing
+        //   `VIEW addr "name"; IF_NONE { ... }`
+        // against a possibly-missing KT1.
+        if !account
+            .exists(self.tc_ctx.host)
+            .map_err(|e| LookupViewError::HostError(e.to_string()))?
+        {
+            return Ok(None);
+        }
+        // The contract is originated past this point; any further
+        // failure (read, decode, balance overflow) means corruption or
+        // I/O on a known contract and must surface as an error rather
+        // than impersonate "view not found".
+        let serialized_script = account
+            .code(self.tc_ctx.host)
+            .map_err(|e| LookupViewError::HostError(e.to_string()))?;
         match serialized_script {
             Code::Code(serialized_script) => {
+                let decoded = Micheline::decode_raw(arena, &serialized_script)?;
                 let MichelineContractScript {
                     code: _,
                     parameter_ty: _,
                     storage_ty,
                     views,
-                } = Micheline::decode_raw(arena, &serialized_script)
-                    .ok()?
-                    .split_script()
-                    .ok()?;
-                let view = views.get(view_name)?;
+                } = decoded.split_script()?;
+                let Some(view) = views.get(view_name) else {
+                    return Ok(None);
+                };
                 let owned_view = MichelineView {
                     input_type: view.input_type.clone(),
                     output_type: view.output_type.clone(),
                     code: view.code.clone(),
                 };
-                let storage = account.storage(self.tc_ctx.host).ok()?;
-                let balance = account.balance(self.tc_ctx.host).ok()?;
-                let balance = balance.0.try_into().ok()?;
-                Some((owned_view, storage_ty.clone(), storage, balance))
+                let storage = account
+                    .storage(self.tc_ctx.host)
+                    .map_err(|e| LookupViewError::HostError(e.to_string()))?;
+                let balance = account
+                    .balance(self.tc_ctx.host)
+                    .map_err(|e| LookupViewError::HostError(e.to_string()))?;
+                let balance: i64 = balance
+                    .0
+                    .try_into()
+                    .map_err(|_| LookupViewError::BalanceOverflow)?;
+                Ok(Some((owned_view, storage_ty.clone(), storage, balance)))
             }
             Code::Enshrined(_) => {
                 // Current enshrined contracts have no views
-                None
+                Ok(None)
             }
         }
     }
@@ -436,7 +476,7 @@ impl<Host: StorageV1, C: Context> TcCtx<'_, Host, C> {
             let id: BigMapId =
                 read_nom_value(self.host, &next_id_path).unwrap_or(0.into());
             store_bin(&id.succ(), self.host, &next_id_path)
-                .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
+                .map_err(storage_error_to_lazy)?;
             Ok(id)
         }
     }
@@ -478,13 +518,29 @@ pub fn clear_temporary_big_maps<Host: StorageV1, C: Context>(
 /// Hashes a Micheline expression using the packed format (with 0x05 prefix)
 /// to match L1's Script_expr_hash.
 /// See: https://gitlab.com/tezos/tezos/-/blob/master/src/proto_023_PtSeouLo/lib_protocol/script_ir_translator.ml#L159
-fn hash_micheline_expr(expr: &Micheline<'_>) -> ScriptExprHash {
-    digest_256(&expr.encode_for_pack()).into()
+fn hash_micheline_expr(
+    expr: &Micheline<'_>,
+) -> Result<ScriptExprHash, tezos_data_encoding::enc::BinError> {
+    Ok(digest_256(&expr.encode_for_pack()?).into())
+}
+
+/// Adapter for the legacy `tezos_storage::Error → LazyStorageError`
+/// stringification path. `tezos_storage::Error` is not a `BinError`, so
+/// the new `From<BinError>` impl on `LazyStorageError` does not apply
+/// here; keep the explicit conversion isolated in one helper instead of
+/// inlining `.map_err(|e| LazyStorageError::BinWriteError(...))` at
+/// each call site.
+fn storage_error_to_lazy(e: tezos_storage::error::Error) -> LazyStorageError {
+    LazyStorageError::BinWriteError(std::rc::Rc::new(
+        tezos_data_encoding::enc::BinError::custom(e.to_string()),
+    ))
 }
 
 /// Computes the hash of a big_map key (TypedValue), used for storage path
 /// See [hash_micheline_expr] for details on the hashing format.
-fn hash_key(key: TypedValue<'_>) -> ScriptExprHash {
+fn hash_key(
+    key: TypedValue<'_>,
+) -> Result<ScriptExprHash, tezos_data_encoding::enc::BinError> {
     let parser = Parser::new();
     let key_micheline = key.into_micheline_optimized_legacy(&parser.arena);
     hash_micheline_expr(&key_micheline)
@@ -544,8 +600,7 @@ impl BigMapKeys {
         let mut big_map_keys: Self = read_nom_value(host, &path)
             .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?;
         big_map_keys.keys.retain(|elt| elt != key);
-        store_bin(&big_map_keys, host, &path)
-            .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
+        store_bin(&big_map_keys, host, &path).map_err(storage_error_to_lazy)?;
         Ok(())
     }
 
@@ -604,8 +659,7 @@ impl BigMapKeys {
         }
 
         let dest_path = keys_of_big_map(context, dest)?;
-        store_bin(&big_map_keys, host, &dest_path)
-            .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
+        store_bin(&big_map_keys, host, &dest_path).map_err(storage_error_to_lazy)?;
 
         Ok(())
     }
@@ -618,7 +672,7 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         id: &BigMapId,
         key: &TypedValue,
     ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
-        let value_path = value_path(self.context, id, &hash_key(key.clone()))?;
+        let value_path = value_path(self.context, id, &hash_key(key.clone())?)?;
         if self.host.store_has(&value_path)?.is_none() {
             return Ok(None);
         }
@@ -637,7 +691,7 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         id: &BigMapId,
         key: &TypedValue,
     ) -> Result<bool, LazyStorageError> {
-        let path = value_path(self.context, id, &hash_key(key.clone()))?;
+        let path = value_path(self.context, id, &hash_key(key.clone())?)?;
         Ok(self.host.store_has(&path)?.is_some())
     }
 
@@ -650,10 +704,10 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         let parser = Parser::new();
         let micheline_expr = key.into_micheline_optimized_legacy(&parser.arena);
         // key_encoded: raw Micheline encoding (no 0x05 prefix), used in big_map_diff receipts
-        let key_encoded = micheline_expr.encode();
+        let key_encoded = micheline_expr.encode()?;
         // key_hashed: hash of packed encoding (with 0x05 prefix), used for storage path
         // See: https://gitlab.com/tezos/tezos/-/blob/master/src/proto_023_PtSeouLo/lib_protocol/script_ir_translator.ml#L5563
-        let key_hashed = hash_micheline_expr(&micheline_expr);
+        let key_hashed = hash_micheline_expr(&micheline_expr)?;
         let value_path = value_path(self.context, id, &key_hashed)?;
         match value {
             None => {
@@ -668,7 +722,7 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
             }
             Some(v) => {
                 let arena = Arena::new();
-                let encoded = v.into_micheline_optimized_legacy(&arena).encode();
+                let encoded = v.into_micheline_optimized_legacy(&arena).encode()?;
                 if self.host.store_has(&value_path)?.is_none() {
                     // We should write the key in the list only if it's an add in the big_map not an update
                     BigMapKeys::add_key(self.host, self.context, id, &key_hashed)?;
@@ -698,9 +752,11 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         let id = self.generate_id(temporary)?;
         let key_type_path = key_type_path(self.context, &id)?;
         let value_type_path = value_type_path(self.context, &id)?;
-        let key_type_encoded = key_type.into_micheline_optimized_legacy(&arena).encode();
-        let value_type_encoded =
-            value_type.into_micheline_optimized_legacy(&arena).encode();
+        let key_type_encoded =
+            key_type.into_micheline_optimized_legacy(&arena).encode()?;
+        let value_type_encoded = value_type
+            .into_micheline_optimized_legacy(&arena)
+            .encode()?;
         self.host
             .store_write_all(&value_type_path, &value_type_encoded)?;
         self.host
@@ -1016,7 +1072,7 @@ pub mod tests {
 
         // Ensure that the big_map has been removed
         let removed_keys = BigMapKeys {
-            keys: vec![hash_key(key)],
+            keys: vec![hash_key(key).unwrap()],
         };
         assert_big_map_removed(&storage, &map_id, &removed_keys);
 
@@ -1075,8 +1131,12 @@ pub mod tests {
     // except such an order.
     #[test]
     fn test_convert_big_map_diff_order() {
-        let key_type = mir::ast::Micheline::prim0(mir::lexer::Prim::nat).encode();
-        let value_type = mir::ast::Micheline::prim0(mir::lexer::Prim::unit).encode();
+        let key_type = mir::ast::Micheline::prim0(mir::lexer::Prim::nat)
+            .encode()
+            .unwrap();
+        let value_type = mir::ast::Micheline::prim0(mir::lexer::Prim::unit)
+            .encode()
+            .unwrap();
         let alloc_0 = StorageDiff::Alloc(Alloc {
             updates: vec![],
             key_type: key_type.clone(),
@@ -1114,6 +1174,83 @@ pub mod tests {
             ],
         });
         assert_eq!(diff_list, expected, "Receipt should be in reverse order");
+    }
+
+    /// Regression test for the existence-probe in
+    /// [`Ctx::lookup_view_storage_balance`]. At L1, calling
+    /// `VIEW addr "name"` on a never-originated KT1 must push
+    /// `V::Option(None)` (cf. `script_interpreter.ml::iview`); the
+    /// trait contract is for `Ok(None)` to surface that case so the
+    /// interpreter then maps it to `V::Option(None)`. This test fires
+    /// the production impl directly against a fresh host and a KT1
+    /// that has never been written, asserting it does not surface the
+    /// missing-`code` durable read as a `LookupViewError::HostError`.
+    #[test]
+    fn lookup_view_storage_balance_returns_none_for_unoriginated_kt1() {
+        use crate::account_storage::{TezlinkImplicitAccount, TezlinkOriginatedAccount};
+        use crate::address::OriginationNonce;
+        use mir::ast::michelson_address::AddressHash;
+        use tezos_smart_rollup_host::path::RefPath;
+
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(tc_ctx, &mut host, &context);
+
+        // OperationCtx + ExecCtx are unread by `lookup_view_storage_balance`
+        // but the type system requires a fully constructed `Ctx`. Use
+        // placeholder backing values for everything that is not under test.
+        let bootstrap_pkh =
+            PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
+        let placeholder_kt1 = ContractKt1Hash::from([0u8; 20]);
+        let source = TezlinkImplicitAccount {
+            path: RefPath::assert_from(b"/mock_source").into(),
+            pkh: bootstrap_pkh.clone(),
+        };
+        let mut origination_nonce = OriginationNonce::default();
+        let mut counter = 0u128;
+        let level = BlockNumber { block_number: 0 };
+        let now = Timestamp::from(0);
+        let chain_id = ChainId::from([0, 0, 0, 0]);
+        let source_public_key: Vec<u8> = Vec::new();
+
+        let mut operation_ctx = OperationCtx {
+            source: &source,
+            origination_nonce: &mut origination_nonce,
+            counter: &mut counter,
+            level: &level,
+            now: &now,
+            chain_id: &chain_id,
+            source_public_key: &source_public_key,
+        };
+
+        let exec_ctx = ExecCtx {
+            sender: AddressHash::Implicit(bootstrap_pkh),
+            amount: 0,
+            self_address: AddressHash::Kt1(placeholder_kt1.clone()),
+            balance: 0,
+            contract_account: TezlinkOriginatedAccount {
+                path: RefPath::assert_from(b"/mock_self").into(),
+                kt1: placeholder_kt1,
+            },
+        };
+
+        let ctx = Ctx {
+            tc_ctx: &mut tc_ctx,
+            exec_ctx,
+            operation_ctx: &mut operation_ctx,
+        };
+
+        // A KT1 that the fresh `MockKernelHost` has never seen.
+        let unoriginated_kt1 =
+            ContractKt1Hash::from_base58_check("KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton")
+                .unwrap();
+        let arena = Arena::new();
+        let result =
+            ctx.lookup_view_storage_balance(&unoriginated_kt1, "anything", &arena);
+        assert!(
+            matches!(result, Ok(None)),
+            "expected Ok(None) for never-originated KT1, got {result:?}",
+        );
     }
 }
 
@@ -1288,8 +1425,11 @@ pub(crate) mod mock {
             _contract: &ContractKt1Hash,
             _name: &str,
             _arena: &'a Arena<Micheline<'a>>,
-        ) -> Option<(MichelineView<Micheline<'a>>, Micheline<'a>, Vec<u8>, i64)> {
-            None
+        ) -> Result<
+            Option<(MichelineView<Micheline<'a>>, Micheline<'a>, Vec<u8>, i64)>,
+            mir::context::LookupViewError,
+        > {
+            Ok(None)
         }
 
         fn set_view_context(

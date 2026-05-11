@@ -107,7 +107,7 @@ mod tests {
             );
             // While we are at it, we also check that serializing the
             // primitives gives back the expected tag.
-            assert_eq!(micheline.encode(), serialized,)
+            assert_eq!(micheline.encode().unwrap(), serialized,)
         }
     }
 }

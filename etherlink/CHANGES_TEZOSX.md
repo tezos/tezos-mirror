@@ -10,6 +10,27 @@
 
 ### Internals
 
+- Make `Micheline::encode` and `encode_for_pack` return
+  `Result<Vec<u8>, BinError>` instead of panicking on zarith encoding
+  failures, removing a class of unrecoverable kernel panics from the
+  MIR Michelson encoder. (!21474)
+- Propagate encode errors through typed variants per call site
+  (`OriginationError::MichelineSerializationError`,
+  `TransferError::MichelineSerializationError`,
+  `ApplyOperationError::EmitMichelineSerializationError`,
+  `LazyStorageError::BinWriteError`, and `TezosXRuntimeError::Custom`
+  for the CRAC-receipt paths) so the originating operation surfaces a
+  typed failure rather than aborting on panic. (!21474)
+- Internal-operation encode failures still collapse onto their parent
+  transfer's error path; per-op `ContentResult::Failed` routing
+  matching L1's `apply.ml::apply_internal_operation_contents` is
+  tracked as a follow-up. (!21474)
+- Surface real failures from `lookup_view_storage_balance` (host I/O,
+  decoded-code corruption, balance overflow) via the typed
+  `LookupViewError` enum, instead of silently masquerading as "view
+  not found". (!21474)
+
+
 ## Version 0.3 (d2a6743ebef523c88c986c21311307a4251e67e4)
 
 ### Native atomic composability

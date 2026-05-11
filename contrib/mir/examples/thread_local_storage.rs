@@ -18,6 +18,12 @@ static SCRIPT: &str = r#"
     code { CDR; PUSH nat 1; ADD; NIL operation; PAIR }
     "#;
 
+/// Example driver, not production code. The `unwrap`s and the
+/// `unreachable!` below are deliberate — they keep the example
+/// concise and surface as panics if the example breaks. They are
+/// not subject to the panic-removal effort tracked elsewhere in
+/// MIR.
+#[allow(clippy::unwrap_used)]
 fn run_contract(parameter: Micheline) {
     thread_local! {
         // you could define a global static, too, but you would use RwLock
@@ -51,6 +57,7 @@ fn run_contract(parameter: Micheline) {
             new_storage
                 .into_micheline_optimized_legacy(&Arena::new())
                 .encode()
+                .unwrap()
         });
     });
 }

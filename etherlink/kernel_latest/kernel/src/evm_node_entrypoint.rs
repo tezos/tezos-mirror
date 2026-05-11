@@ -458,7 +458,17 @@ fn handle_query_entrypoints_to<Host, R>(
         };
     let entrypoints =
         tezos_execution::get_contract_entrypoint(&*host, &context, &address);
-    let result = encode_entrypoints_result(entrypoints);
+    let result = match encode_entrypoints_result(entrypoints) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            log!(
+                Error,
+                "Tezos X entrypoints: failed to encode result: {:?}",
+                err
+            );
+            return;
+        }
+    };
     if let Err(err) = host.store_write_all(result_path, &result) {
         log!(Error, "Error writing tezos entrypoints result: {:?}", err);
     }
@@ -485,27 +495,44 @@ fn handle_query_entrypoints_to<Host, R>(
 /// enforced structurally.
 fn encode_entrypoints_result(
     entrypoints_opt: Option<HashMap<Entrypoint, Type>>,
-) -> Vec<u8> {
+) -> Result<Vec<u8>, tezos_data_encoding::enc::BinError> {
     let parser = Parser::new();
+    // Pre-encode all entries up front so encoding errors can be surfaced
+    // to the caller (the RLP stream API does not let us return errors
+    // from inside the encode closure).
+    let mut encoded_entries: Option<Vec<(Vec<u8>, Vec<u8>)>> = entrypoints_opt
+        .map(|entrypoints| {
+            entrypoints
+                .into_iter()
+                .map(|(name, ty)| {
+                    let name_bytes = name.to_string().into_bytes();
+                    // NB: into_micheline_optimized_legacy linearizes right-comb pairs,
+                    // producing multi-arg pairs (equivalent to L1 normalize_types=true).
+                    let type_bytes =
+                        ty.into_micheline_optimized_legacy(&parser.arena).encode()?;
+                    Ok((name_bytes, type_bytes))
+                })
+                .collect::<Result<Vec<_>, tezos_data_encoding::enc::BinError>>()
+        })
+        .transpose()?;
+    // Sort entries by name before encoding: see the "Determinism
+    // warning" on the enclosing function. HashMap iteration order is
+    // not stable across runs (and differs between native and WASM),
+    // so the resulting bytes must be made canonical here.
+    if let Some(entries) = encoded_entries.as_mut() {
+        entries.sort_by(|(a, _), (b, _)| a.cmp(b));
+    }
     let mut stream = rlp::RlpStream::new();
-    append_option_canonical(&mut stream, &entrypoints_opt, |s, entrypoints| {
-        // Sort entries by name before encoding: see the "Determinism
-        // warning" on the enclosing function.
-        let mut sorted: Vec<(&Entrypoint, &Type)> = entrypoints.iter().collect();
-        sorted.sort_by(|(a, _), (b, _)| a.cmp(b));
-        s.begin_list(sorted.len());
-        for (name, ty) in sorted {
-            let name_bytes = name.to_string().into_bytes();
-            // NB: into_micheline_optimized_legacy linearizes right-comb pairs,
-            // producing multi-arg pairs (equivalent to L1 normalize_types=true).
-            let type_bytes = ty.into_micheline_optimized_legacy(&parser.arena).encode();
+    append_option_canonical(&mut stream, &encoded_entries, |s, entries| {
+        s.begin_list(entries.len());
+        for (name_bytes, type_bytes) in entries {
             s.begin_list(2);
-            s.append(&name_bytes);
-            s.append(&type_bytes);
+            s.append(name_bytes);
+            s.append(type_bytes);
         }
         s
     });
-    stream.out().to_vec()
+    Ok(stream.out().to_vec())
 }
 
 #[cfg(test)]
@@ -565,23 +592,23 @@ mod tests {
             .iter()
             .map(|(k, v)| (k.to_string(), v.clone()))
             .collect();
-        let encoded = encode_entrypoints_result(Some(map));
+        let encoded = encode_entrypoints_result(Some(map)).expect("encode ok");
         let decoded = decode_result(&encoded).expect("roundtrip should be Some");
         assert_eq!(decoded, expected);
     }
 
     #[test]
     fn test_encode_none() {
-        let result = encode_entrypoints_result(None);
+        let result = encode_entrypoints_result(None).expect("encode ok");
         // RLP empty list: 0xc0
         assert_eq!(result, vec![0xc0]);
     }
 
     #[test]
     fn test_encode_empty_map() {
-        let result = encode_entrypoints_result(Some(HashMap::new()));
+        let result = encode_entrypoints_result(Some(HashMap::new())).expect("encode ok");
         // Must be distinct from None
-        assert_ne!(result, encode_entrypoints_result(None));
+        assert_ne!(result, encode_entrypoints_result(None).expect("encode ok"));
         assert_roundtrip(HashMap::new());
     }
 
@@ -617,6 +644,66 @@ mod tests {
         );
         map.insert(Entrypoint::try_from("approve").expect("valid"), Type::Nat);
         assert_roundtrip(map);
+    }
+
+    /// Regression test for the determinism guarantee documented on
+    /// `encode_entrypoints_result`. The same logical input must produce
+    /// byte-identical output regardless of `HashMap` insertion order
+    /// (and, by extension, of any per-process hash-seed randomization),
+    /// because the bytes end up in the rollup PVM state.
+    #[test]
+    fn test_encode_is_deterministic_regardless_of_insertion_order() {
+        let entries = [
+            ("alpha", Type::String),
+            ("beta", Type::Nat),
+            ("gamma", Type::Bytes),
+            ("delta", Type::Int),
+        ];
+
+        let mut forward = HashMap::new();
+        for (name, ty) in entries.iter() {
+            forward.insert(Entrypoint::try_from(*name).expect("valid"), ty.clone());
+        }
+
+        let mut reversed = HashMap::new();
+        for (name, ty) in entries.iter().rev() {
+            reversed.insert(Entrypoint::try_from(*name).expect("valid"), ty.clone());
+        }
+
+        let encoded_forward =
+            encode_entrypoints_result(Some(forward)).expect("encode ok");
+        let encoded_reversed =
+            encode_entrypoints_result(Some(reversed)).expect("encode ok");
+        assert_eq!(encoded_forward, encoded_reversed);
+    }
+
+    /// Stronger guarantee: the encoded entries are emitted in
+    /// lexicographic byte order of their names. Pinning the actual
+    /// ordering catches any future change that might preserve
+    /// determinism while shifting the canonical key (e.g. a switch to a
+    /// non-byte-wise comparator that is invariant on ASCII but differs
+    /// on multi-byte UTF-8).
+    #[test]
+    fn test_encode_emits_entries_in_lexicographic_byte_order() {
+        let mut map = HashMap::new();
+        map.insert(Entrypoint::try_from("zulu").expect("valid"), Type::Unit);
+        map.insert(Entrypoint::try_from("alpha").expect("valid"), Type::Unit);
+        map.insert(Entrypoint::try_from("mike").expect("valid"), Type::Unit);
+
+        let encoded = encode_entrypoints_result(Some(map)).expect("encode ok");
+
+        let outer = rlp::Rlp::new(&encoded);
+        let inner = outer.at(0).expect("inner list");
+        let names: Vec<String> = (0..inner.item_count().expect("entry count"))
+            .map(|i| {
+                let pair = inner.at(i).expect("pair");
+                let bytes: Vec<u8> =
+                    pair.at(0).expect("name").as_val().expect("name val");
+                String::from_utf8(bytes).expect("utf8 name")
+            })
+            .collect();
+
+        assert_eq!(names, vec!["alpha", "mike", "zulu"]);
     }
 
     fn run_entrypoints_query(host: &mut MockHost, addr_hash: &[u8]) -> Vec<u8> {

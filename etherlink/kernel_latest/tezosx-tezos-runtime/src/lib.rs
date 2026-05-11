@@ -188,8 +188,18 @@ fn build_crac_receipt(
         use mir::{
             ast::annotations::NO_ANNS, ast::micheline::Micheline, ast::Entrypoint, lexer,
         };
-        let ty = Micheline::App(lexer::Prim::string, &[], NO_ANNS).encode();
-        let payload = Micheline::from(id.to_string()).encode();
+        let ty = Micheline::App(lexer::Prim::string, &[], NO_ANNS)
+            .encode()
+            .map_err(|e| {
+                TezosXRuntimeError::Custom(format!(
+                    "Failed to encode CRAC event type: {e}"
+                ))
+            })?;
+        let payload = Micheline::from(id.to_string()).encode().map_err(|e| {
+            TezosXRuntimeError::Custom(format!(
+                "Failed to encode CRAC event payload: {e}"
+            ))
+        })?;
         let event_nonce = next_nonce;
         next_nonce = next_nonce.saturating_add(1);
         all_internal.push(InternalOperationSum::Event(InternalContentWithMetadata {
@@ -304,8 +314,18 @@ fn build_failed_crac_receipt(
         use mir::{
             ast::annotations::NO_ANNS, ast::micheline::Micheline, ast::Entrypoint, lexer,
         };
-        let ty = Micheline::App(lexer::Prim::string, &[], NO_ANNS).encode();
-        let payload = Micheline::from(id.to_string()).encode();
+        let ty = Micheline::App(lexer::Prim::string, &[], NO_ANNS)
+            .encode()
+            .map_err(|e| {
+                TezosXRuntimeError::Custom(format!(
+                    "Failed to encode CRAC event type: {e}"
+                ))
+            })?;
+        let payload = Micheline::from(id.to_string()).encode().map_err(|e| {
+            TezosXRuntimeError::Custom(format!(
+                "Failed to encode CRAC event payload: {e}"
+            ))
+        })?;
         let event_nonce = next_nonce;
         next_nonce = next_nonce.saturating_add(1);
         all_internal.push(InternalOperationSum::Event(InternalContentWithMetadata {
@@ -468,7 +488,11 @@ where
     // This is required for implicit account transfers where the Michelson VM
     // checks that param == Unit.
     let value = if body.is_empty() {
-        mir::ast::micheline::Micheline::from(()).encode()
+        mir::ast::micheline::Micheline::from(())
+            .encode()
+            .map_err(|e| {
+                TezosXRuntimeError::Custom(format!("Failed to encode Unit: {e}"))
+            })?
     } else {
         body
     };
@@ -802,7 +826,12 @@ impl RuntimeInterface for TezosRuntime {
                 "Failed to decode forwarder code from hex: {e}"
             ))
         })?;
-        let storage = alias_forwarder::forwarder_storage(native_address);
+        let storage =
+            alias_forwarder::forwarder_storage(native_address).map_err(|e| {
+                TezosXRuntimeError::Custom(format!(
+                    "Failed to encode forwarder storage: {e}"
+                ))
+            })?;
         let payload_bytes = (code.len() as u64).saturating_add(storage.len() as u64);
 
         // Durable writes performed by `account.init`: code, storage,
@@ -1249,7 +1278,7 @@ mod tests {
         let account = context.originated_from_kt1(&kt1).unwrap();
 
         let storage = account.storage(&host).unwrap();
-        let expected = alias_forwarder::forwarder_storage(evm_address);
+        let expected = alias_forwarder::forwarder_storage(evm_address).unwrap();
         assert_eq!(storage, expected);
     }
 
@@ -1522,7 +1551,7 @@ mod tests {
         let amount = Narith(50_000_000u64.into()); // 50 tez in mutez
         let parameters = Parameters {
             entrypoint: mir::ast::Entrypoint::from_string_unchecked("swap".into()),
-            value: mir::ast::micheline::Micheline::from(()).encode(),
+            value: mir::ast::micheline::Micheline::from(()).encode().unwrap(),
         };
         let target = TransferTarget::from(TransferSuccess::default());
 
@@ -1640,7 +1669,7 @@ mod tests {
         let amount = Narith(100_000_000u64.into());
         let parameters = Parameters {
             entrypoint: mir::ast::Entrypoint::default(),
-            value: mir::ast::micheline::Micheline::from(()).encode(),
+            value: mir::ast::micheline::Micheline::from(()).encode().unwrap(),
         };
         let target = TransferTarget::from(TransferSuccess::default());
 
@@ -1731,7 +1760,7 @@ mod tests {
         let amount = Narith(50_000_000u64.into());
         let parameters = Parameters {
             entrypoint: mir::ast::Entrypoint::from_string_unchecked("swap".into()),
-            value: mir::ast::micheline::Micheline::from(()).encode(),
+            value: mir::ast::micheline::Micheline::from(()).encode().unwrap(),
         };
         let error =
             TransferError::FailedToExecuteInternalOperation("test failure".into());
