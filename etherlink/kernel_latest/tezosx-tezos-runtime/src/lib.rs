@@ -18,7 +18,7 @@ use tezos_data_encoding::{
 };
 use tezos_evm_logging::{log, Level::*};
 use tezos_execution::{
-    account_storage::{TezlinkAccount, TezosOriginatedAccount},
+    account_storage::{StorageSpace, TezlinkAccount, TezosOriginatedAccount},
     context::Context,
     cross_runtime_transfer,
     enshrined_contracts::CracError,
@@ -815,7 +815,10 @@ impl RuntimeInterface for TezosRuntime {
                     DURABLE_WRITE_PER_BYTE_MILLIGAS.saturating_mul(payload_bytes),
                 ),
         )?;
-        account.init(host, &code, &storage).map_err(|e| {
+        // TODO(L2-1294): charge alias-forwarder origination at the CRAC
+        // boundary; for now `StorageSpace.allocated_bytes` is dropped —
+        // the alias-forwarder origination is silently free.
+        let _: StorageSpace = account.init(host, &code, &storage).map_err(|e| {
             TezosXRuntimeError::Custom(format!(
                 "Failed to initialize alias forwarder contract: {e}"
             ))

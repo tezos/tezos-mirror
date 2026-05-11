@@ -95,6 +95,18 @@
   an oversized `X-Tezos-Gas-Limit` and be rejected by the Michelson
   runtime, surfacing as a misleading EVM out-of-gas. (!21791)
 
+### Michelson Runtime
+
+- Receipts of Michelson manager operations now surface non-zero
+  `storage_size` and `paid_storage_size_diff`. After each successful
+  operation the kernel bumps the contract's `paid_bytes` watermark
+  to its `used_bytes`, and writes the absolute post-op `used_bytes`
+  along with the newly-allocated delta into the receipt. Origination
+  receipts surface the contract's full initial size in both fields,
+  matching what L1 produces. Indexers and wallets reading these
+  fields will observe the actual storage footprint instead of zeros.
+  (!21798)
+
 ### Internals
 
 - Unify the revert scope of infrastructure-class `TransferError`

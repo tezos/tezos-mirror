@@ -18,7 +18,7 @@ use mir::{
 use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedMul;
 use num_traits::ops::checked::CheckedSub;
-use num_traits::ToPrimitive;
+use num_traits::{ToPrimitive, Zero};
 use primitive_types::U256;
 use std::collections::{BTreeMap, HashMap};
 use std::vec::IntoIter;
@@ -52,7 +52,9 @@ use tezos_tezlink::{
 use tezosx_interfaces::Registry;
 use tezosx_journal::TezosXJournal;
 
-use crate::account_storage::{TezosImplicitAccount, TezosOriginatedAccount};
+use crate::account_storage::{
+    StorageSpace, TezosImplicitAccount, TezosOriginatedAccount,
+};
 pub use crate::address::OriginationNonce;
 use crate::context::Context;
 use crate::gas::Cost;
@@ -698,6 +700,14 @@ where
                 .map_err(|_| TransferError::OutOfGas)?;
             let lazy_storage_diff =
                 convert_big_map_diff(std::mem::take(&mut ctx.tc_ctx.big_map_diff));
+
+            let StorageSpace {
+                used_bytes,
+                allocated_bytes: paid_storage_size_diff,
+            } = dest_account
+                .update_storage_space(ctx.host())
+                .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
+
             match execute_internal_operations(
                 ctx.tc_ctx,
                 ctx.operation_ctx,
@@ -733,6 +743,8 @@ where
                 },
                 lazy_storage_diff,
                 consumed_milligas,
+                storage_size: used_bytes,
+                paid_storage_size_diff,
                 ..receipt
             })
         }
@@ -1036,16 +1048,18 @@ where
         .originated_from_kt1(&contract)
         .map_err(|_| OriginationError::FailedToFetchOriginated)?;
 
-    let total_size = smart_contract
+    let StorageSpace {
+        used_bytes: total_size,
+        allocated_bytes: paid_storage_size_diff,
+    } = smart_contract
         .init(ctx.host, script_code, &new_storage)
         .map_err(|_| OriginationError::CantInitContract)?;
 
     // There's this line in the origination `assert (Compare.Z.(total_size >= Z.zero)) ;`
-    // This error is unreachable because of the simulation, but as we don't have simulation
-    // yet it's possible.
-    if total_size.eq(&0u64.into()) {
-        return Err(OriginationError::CantOriginateEmptyContract);
-    }
+    let total_size_unsigned: BigUint = match BigUint::try_from(total_size.0.clone()) {
+        Ok(b) if !b.is_zero() => b,
+        _ => return Err(OriginationError::CantOriginateEmptyContract),
+    };
 
     // Compute the initial_balance setup of the smart contract as a balance update for the origination.
     let mut balance_updates =
@@ -1054,7 +1068,7 @@ where
 
     // Balance updates for the impacts of origination on storage space.
     // storage_fees = total_size * COST_PER_BYTES
-    let storage_fees = BigUint::from(total_size.clone())
+    let storage_fees = total_size_unsigned
         .checked_mul(&BigUint::from(COST_PER_BYTES))
         .ok_or(OriginationError::FailedToComputeBalanceUpdate)?;
     let storage_fees_balance_updates =
@@ -1088,22 +1102,21 @@ where
         .record_native_origin(ctx.host, &contract)
         .map_err(|_| OriginationError::CantInitContract)?;
 
-    let dummy_origination_sucess = OriginationSuccess {
+    let origination_success = OriginationSuccess {
         balance_updates,
         originated_contracts: vec![Originated { contract }],
         consumed_milligas: ctx
             .operation_gas
             .get_and_reset_milligas_consumed()
             .map_err(|_| OriginationError::OutOfGas)?,
-        // TODO https://linear.app/tezos/issue/L2-325/fix-storage-size-and-paid-diff-at-origination
-        // These are probably not the right values for storage_size and
-        // paid_storage_size_diff, but having something different than 0
-        // participates in having the TzKT front-end not crash when originating.
-        storage_size: total_size.clone().into(),
-        paid_storage_size_diff: total_size.into(),
+        // TODO(L2-1281): `lazy_storage_size` stays at zero — the receipt
+        // undercharges originations with big-maps in their initial
+        // storage (remaining half of L2-325).
+        storage_size: total_size,
+        paid_storage_size_diff,
         lazy_storage_diff,
     };
-    Ok(dummy_origination_sucess)
+    Ok(origination_success)
 }
 
 /// Prepares balance updates in the format expected by the Tezos operation.
@@ -1910,7 +1923,7 @@ mod tests {
         ContractKt1Hash, HashTrait, OperationHash, SecretKeyEd25519,
     };
     use tezos_data_encoding::enc::BinWriter;
-    use tezos_data_encoding::types::Narith;
+    use tezos_data_encoding::types::{Narith, Zarith};
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
@@ -3110,8 +3123,8 @@ mod tests {
                             ticket_receipt: vec![],
                             originated_contracts: vec![],
                             consumed_milligas: 176061_u64.into(),
-                            storage_size: 0_u64.into(),
-                            paid_storage_size_diff: 0_u64.into(),
+                            storage_size: 69_u64.into(), // code (67) + unit (2)
+                            paid_storage_size_diff: 0_u64.into(), // unit unchanged
                             allocated_destination_contract: false,
                             address_registry_diff: vec![],
                         }
@@ -3358,8 +3371,8 @@ mod tests {
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
                         consumed_milligas: 171923_u64.into(),
-                        storage_size: 0_u64.into(),
-                        paid_storage_size_diff: 0_u64.into(),
+                        storage_size: 44_u64.into(), // code (33) + "Hello world" (11)
+                        paid_storage_size_diff: 4_u64.into(), // "Hello world" (11) − "initial" (7)
                         allocated_destination_contract: false,
                         address_registry_diff: vec![],
                     },
@@ -3386,6 +3399,68 @@ mod tests {
             storage_value,
             "Storage has not been updated"
         )
+    }
+
+    /// After a transfer that grew the destination's storage,
+    /// `paid_bytes` matches `used_bytes` and both equal the post-op
+    /// `code_size + storage_size`. The watermark moved forward inside
+    /// `set_storage` during execution.
+    #[test]
+    fn apply_transfer_bumps_paid_bytes_after_storage_growth() {
+        let mut host = MockKernelHost::default();
+
+        let src = bootstrap1();
+        let dest = ContractKt1Hash::from_base58_check(CONTRACT_1)
+            .expect("ContractKt1Hash b58 conversion should have succeeded");
+
+        let initial_storage = Micheline::from("initial");
+        init_account(&mut host, &src.pkh, 50);
+        reveal_account(&mut host, &src);
+        let destination =
+            init_contract(&mut host, &dest, SCRIPT, &initial_storage, &50_u64.into());
+
+        let storage_value = Micheline::from("Hello world").encode();
+        let new_storage_size = storage_value.len() as u64;
+        let operation = make_transfer_operation(
+            15,
+            1,
+            1040,
+            5,
+            src.clone(),
+            30_u64.into(),
+            Contract::Originated(dest),
+            Parameters {
+                entrypoint: mir::ast::Entrypoint::default(),
+                value: storage_value,
+            },
+        );
+
+        let _ = validate_and_apply_operation(
+            &mut host,
+            &MockRegistry,
+            &mut TezosXJournal::default(),
+            &context::TezlinkContext::init_context(),
+            OperationHash::default(),
+            operation,
+            &block_ctx!(),
+            false,
+            None,
+            None,
+            &test_safe_roots(),
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+
+        // SCRIPT replaces storage by the parameter; post-op `used_bytes`
+        // is `code_size + |encoded("Hello world")|`. Read `code_size`
+        // from durable storage — the invariant under test is exactly
+        // `used == code_size + storage_size`.
+        let code_size = destination.code_size(&host).unwrap();
+        let expected_used = Zarith(code_size.0 + new_storage_size);
+
+        assert_eq!(destination.used_bytes(&host).unwrap(), expected_used);
+        assert_eq!(destination.paid_bytes(&host).unwrap(), expected_used);
     }
 
     #[test]
