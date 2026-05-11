@@ -91,7 +91,9 @@ trait Log2i {
     /// &c
     ///
     /// `log2i(0)` is not well-defined, and likely is a logic error, hence the
-    /// function returns [OutOfGas] on `0`.
+    /// function returns [OutOfGas] on `0`. The same is true for inputs whose
+    /// next power of two would overflow the integer type (e.g. `usize::MAX`):
+    /// they also return [OutOfGas] rather than panic or wrap silently.
     fn log2i(self) -> Result<u32, OutOfGas>;
 }
 
@@ -100,7 +102,10 @@ impl Log2i for usize {
         if self == 0 {
             Err(OutOfGas)
         } else {
-            Ok(self.next_power_of_two().trailing_zeros())
+            Ok(self
+                .checked_next_power_of_two()
+                .ok_or(OutOfGas)?
+                .trailing_zeros())
         }
     }
 }
@@ -110,7 +115,10 @@ impl Log2i for u64 {
         if self == 0 {
             Err(OutOfGas)
         } else {
-            Ok(self.next_power_of_two().trailing_zeros())
+            Ok(self
+                .checked_next_power_of_two()
+                .ok_or(OutOfGas)?
+                .trailing_zeros())
         }
     }
 }
@@ -1043,5 +1051,24 @@ mod test {
     #[test]
     fn log2i_zero_u64() {
         assert_eq!(0u64.log2i(), Err(OutOfGas));
+    }
+
+    // Inputs whose next power of two would overflow must also return
+    // OutOfGas, not panic in debug and wrap in release.
+    #[test]
+    fn log2i_overflow_usize() {
+        assert_eq!(usize::MAX.log2i(), Err(OutOfGas));
+        // largest input whose next power of two still fits: 2^(BITS-1).
+        let high = 1usize << (usize::BITS - 1);
+        assert_eq!(high.log2i(), Ok(usize::BITS - 1));
+        assert_eq!((high + 1).log2i(), Err(OutOfGas));
+    }
+
+    #[test]
+    fn log2i_overflow_u64() {
+        assert_eq!(u64::MAX.log2i(), Err(OutOfGas));
+        let high = 1u64 << (u64::BITS - 1);
+        assert_eq!(high.log2i(), Ok(u64::BITS - 1));
+        assert_eq!((high + 1).log2i(), Err(OutOfGas));
     }
 }
