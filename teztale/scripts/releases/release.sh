@@ -21,6 +21,8 @@ release_major_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^(teztale|octez)-v(
 release_minor_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^(teztale|octez)-v([0-9]+)\.([0-9]+)((-rc[0-9]+)?|(-beta[0-9]+)?)$/\3/p')
 # Z
 release_rc_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^(teztale|octez)-v([0-9]+)\.([0-9]+)(-rc)?([0-9]+)?$/\5/p')
+# Beta
+release_beta_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^(teztale|octez)-v([0-9]+)\.([0-9]+)(-beta)?([0-9]+)?$/\5/p')
 
 release_name="Teztale version ${release_no_v}"
 
