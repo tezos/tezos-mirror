@@ -6,6 +6,13 @@
 
 ### Michelson Runtime
 
+- Deposits targeting a Tezos implicit account now emit a Michelson `deposit`
+  event of type `pair (nat %inbox_level) (nat %inbox_msg_id)` on the operation
+  receipt. This gives indexers the `(level, index)` coordinates of the
+  originating shared-inbox message. (!21877)
+- Deposits targeting a Tezos implicit account now emit balance updates.
+  (!21877)
+
 ### Native atomic composability
 
 ### Internals
