@@ -89,5 +89,10 @@ DAL node
   flag is not honored on mainnet, where the check is always enforced. (MR
   :gl:`!21934`)
 
+- Fixed the ``/monitor/synchronized`` RPC, which previously emitted no output
+  on a steady-state node already synchronized with L1 (the underlying watcher
+  only fires on status transitions). The current L1 crawler status is now
+  pushed as the first stream element on subscription. (MR :gl:`!21864`)
+
 Miscellaneous
 -------------
