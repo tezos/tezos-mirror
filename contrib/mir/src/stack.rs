@@ -154,25 +154,25 @@ impl<T> Stack<T> {
     /// Removes the specified number of elements from the top of the stack in
     /// bulk.
     ///
-    /// Panics if the `size` is larger than length of the stack.
-    pub fn drop_top(&mut self, size: usize) {
-        let len = self.len();
-        self.0
-            .truncate(len.checked_sub(size).expect("size too large in drop_top"));
+    /// Returns `Err(StackOob)` if `size` is larger than the stack length.
+    pub fn drop_top(&mut self, size: usize) -> Result<(), StackOob> {
+        let new_len = self.len().checked_sub(size).ok_or(StackOob)?;
+        self.0.truncate(new_len);
+        Ok(())
     }
 
     /// Removes the specified number of elements from the top of the stack and
     /// returns them as an iterator over the removed items, starting with the stack's top.
     ///
-    /// Panics if the `size` is larger than length of the stack.
+    /// Returns `Err(StackOob)` if `size` is larger than the stack length.
     ///
     /// If you do not need the items, use `drop_top` instead.
-    #[must_use]
-    pub fn drain_top(&mut self, size: usize) -> impl DoubleEndedIterator<Item = T> + '_ {
-        let len = self.len();
-        self.0
-            .drain(len.checked_sub(size).expect("size too large in drain_top")..)
-            .rev()
+    pub fn drain_top(
+        &mut self,
+        size: usize,
+    ) -> Result<impl DoubleEndedIterator<Item = T> + '_, StackOob> {
+        let split_at = self.len().checked_sub(size).ok_or(StackOob)?;
+        Ok(self.0.drain(split_at..).rev())
     }
 
     /// Reserve additional space on the stack for at least `additional`
@@ -459,14 +459,14 @@ mod tests {
     #[test]
     fn drop_top() {
         let mut stk: IntStack = stk![1, 2, 3, 4];
-        stk.drop_top(3);
+        assert_eq!(stk.drop_top(3), Ok(()));
         assert_eq!(stk, stk![1]);
     }
 
     #[test]
     fn drain_top() {
         let mut stk: IntStack = stk![1, 2, 3, 4];
-        let drained = stk.drain_top(3);
+        let drained = stk.drain_top(3).unwrap();
         assert_eq!(drained.collect::<Vec<_>>(), vec![4, 3, 2]);
         assert_eq!(stk, stk![1]);
     }
@@ -474,23 +474,23 @@ mod tests {
     #[test]
     fn drain_top_0() {
         let mut stk: IntStack = stk![1, 2, 3, 4];
-        let drained = stk.drain_top(0);
+        let drained = stk.drain_top(0).unwrap();
         assert!(drained.collect::<Vec<_>>().is_empty());
         assert_eq!(stk, stk![1, 2, 3, 4]);
     }
 
     #[test]
-    #[should_panic(expected = "size too large in drop_top")]
     fn drop_top_out_of_bounds() {
         let mut stk: IntStack = stk![1, 2, 3, 4];
-        stk.drop_top(42);
+        assert_eq!(stk.drop_top(42), Err(StackOob));
+        assert_eq!(stk, stk![1, 2, 3, 4], "stack must be unchanged on Err");
     }
 
     #[test]
-    #[should_panic(expected = "size too large in drain_top")]
     fn drain_top_out_of_bounds() {
         let mut stk: IntStack = stk![1, 2, 3, 4];
-        let _ = stk.drain_top(42);
+        assert!(stk.drain_top(42).is_err());
+        assert_eq!(stk, stk![1, 2, 3, 4], "stack must be unchanged on Err");
     }
 
     #[test]
