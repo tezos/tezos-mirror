@@ -618,7 +618,17 @@ module Synchronized = struct
       Node_context.get_l1_crawler_status_input ctxt
     in
     let stream, stopper = Lwt_watcher.create_stream l1_crawler_status_input in
-    let next () = Lwt_stream.get stream in
+    (* Emit the current status first so that subscribers immediately receive a
+       value, instead of waiting for the next status transition (which may
+       never happen on a steady-state node). *)
+    let first = ref (Some (Node_context.get_l1_crawler_status ctxt)) in
+    let next () =
+      match !first with
+      | Some s ->
+          first := None ;
+          Lwt.return_some s
+      | None -> Lwt_stream.get stream
+    in
     let shutdown () = Lwt_watcher.shutdown stopper in
     Tezos_rpc.Answer.return_stream {next; shutdown}
 end
