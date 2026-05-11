@@ -230,12 +230,12 @@ DAL node
 
 - Dal node exit with code 1 on configuration file handling error. (MR :gl:`!20584`)
 
-- ``octez-dal-node config init`` now fails if a configuration file exists. new
-  command ``octez-dal-node config reset`` should be used instead. (MR
-  :gl:`!20584`)
+- **Breaking change** ``octez-dal-node config init`` now fails if a configuration
+  file exists. new command ``octez-dal-node config reset`` should be used instead.
+  (MR :gl:`!20584`)
 
-- ``octez-dal-node config update`` now fails if no configuration file exists. (MR
-  :gl:`!20584`)
+- **Breaking change** ``octez-dal-node config update`` now fails if no
+  configuration file exists. (MR :gl:`!20584`)
 
 - The DAL node now refuses to publish a slot during the last ``attestation_lag = 8``
   levels before the migration to protocol U to avoid publishing a slot that cannot
