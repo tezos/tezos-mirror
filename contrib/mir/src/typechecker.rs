@@ -31,7 +31,6 @@ use crate::ast::*;
 use crate::bls;
 use crate::context::TypecheckingCtx;
 use crate::gas::{self, tc_cost, CompareError, CostOverflow, Gas, OutOfGas};
-use crate::irrefutable_match::irrefutable_match;
 use crate::lexer::Prim;
 use crate::stack::*;
 
@@ -701,8 +700,12 @@ fn parse_ty_with_entrypoints<'a>(
     };
 
     if let Option::Some(eps) = entrypoints {
-        // we just ensured it's an application of some type primitive
-        irrefutable_match!(ty; App, _prim, _args, anns);
+        // We just ensured it's an application of some type primitive.
+        let Micheline::App(_, _, anns) = ty else {
+            return Err(TcError::InternalError(format!(
+                "expected Micheline::App, got {ty:?}"
+            )));
+        };
         if let Option::Some(field_ann) = anns.get_single_field_ann()? {
             // NB: field annotations may be longer than entrypoints; however
             // it's not an error to have an overly-long field annotation, it
@@ -1710,12 +1713,15 @@ pub(crate) fn typecheck_instruction<'a>(
                 no_overload!(PAIR, len n as usize);
             }
             gas.consume(tc_cost::pair_n(n as usize)?)?;
-            // unwrap is fine, n is non-zero.
             let res = stack
                 .drain_top(n as usize)
                 .rev()
                 .reduce(|acc, e| Type::new_pair(e, acc))
-                .unwrap();
+                .ok_or_else(|| {
+                    TcError::InternalError(format!(
+                        "PAIR {n} unexpectedly produced no elements during typechecking"
+                    ))
+                })?;
             stack.push(res);
             I::PairN(n)
         }
@@ -2213,8 +2219,18 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(JOIN_TICKETS, [], _), [.., T::Pair(tickets)])
             if matches!(tickets.as_ref(), (Type::Ticket(_), Type::Ticket(_))) =>
         {
-            let lt = irrefutable_match!(&tickets.0; Type::Ticket);
-            let rt = irrefutable_match!(&tickets.1; Type::Ticket);
+            let Type::Ticket(lt) = &tickets.0 else {
+                return Err(TcError::InternalError(format!(
+                    "expected ticket type on the left, got {:?}",
+                    tickets.0
+                )));
+            };
+            let Type::Ticket(rt) = &tickets.1 else {
+                return Err(TcError::InternalError(format!(
+                    "expected ticket type on the right, got {:?}",
+                    tickets.1
+                )));
+            };
 
             ensure_ty_eq(gas, lt, rt)?;
             *stack_top_mut(stack)? = Type::new_option(tickets.0.clone());
@@ -2589,7 +2605,11 @@ pub fn typecheck_value<'a>(
             let typed_val = match prim {
                 Prim::Left => crate::ast::Or::Left(typecheck_value(val, ctx, tl)?),
                 Prim::Right => crate::ast::Or::Right(typecheck_value(val, ctx, tr)?),
-                _ => unreachable!(),
+                other => {
+                    return Err(TcError::InternalError(format!(
+                        "unexpected prim in Left/Right typed value: {other:?}"
+                    )))
+                }
             };
             TV::new_or(typed_val)
         }
@@ -2669,7 +2689,14 @@ pub fn typecheck_value<'a>(
             TV::Address(Address::from_bytes(bs).map_err(|e| TcError::ByteReprError(T::Address, e))?)
         }
         (T::Contract(ty), addr) => {
-            let t_addr = irrefutable_match!(typecheck_value(addr, ctx, &T::Address)?; TV::Address);
+            let t_addr = match typecheck_value(addr, ctx, &T::Address)? {
+                TV::Address(addr) => addr,
+                other => {
+                    return Err(TcError::InternalError(format!(
+                        "typecheck_value(Address) returned {other:?}"
+                    )))
+                }
+            };
             typecheck_contract_address(ctx, t_addr, Entrypoint::default(), ty)
                 .map(TypedValue::Contract)?
         }
@@ -2768,10 +2795,24 @@ pub fn typecheck_value<'a>(
             let content_type_bis = parse_ty(ctx.gas(), content_type_bis)?;
             ensure_ty_eq(ctx.gas(), content_type, &content_type_bis)?;
             let ticketer = typecheck_value(ticketer, ctx, &T::Address)?;
-            let ticketer = irrefutable_match!(ticketer; TV::Address);
+            let ticketer = match ticketer {
+                TV::Address(addr) => addr,
+                other => {
+                    return Err(TcError::InternalError(format!(
+                        "typecheck_value(Address) returned {other:?}"
+                    )))
+                }
+            };
             let content = typecheck_value(content, ctx, content_type)?;
             let amount = typecheck_value(amount, ctx, &T::Nat)?;
-            let amount = irrefutable_match!(amount; TV::Nat);
+            let amount = match amount {
+                TV::Nat(amount) => amount,
+                other => {
+                    return Err(TcError::InternalError(format!(
+                        "typecheck_value(Nat) returned {other:?}"
+                    )))
+                }
+            };
             TV::new_ticket(Ticket {
                 ticketer: ticketer.hash,
                 content_type: content_type.as_ref().clone(),
@@ -2790,13 +2831,35 @@ pub fn typecheck_value<'a>(
                 ),
             ) {
                 Ok(TV::Pair(left, right)) => {
-                    let address = irrefutable_match!(TypedValue::unwrap_rc(left); TV::Address);
-                    irrefutable_match!(TypedValue::unwrap_rc(right); TV::Pair, content, amount);
+                    let address = match TypedValue::unwrap_rc(left) {
+                        TV::Address(addr) => addr,
+                        other => {
+                            return Err(TcError::InternalError(format!(
+                                "typecheck_value(Address, ...) returned {other:?}"
+                            )))
+                        }
+                    };
+                    let (content, amount) = match TypedValue::unwrap_rc(right) {
+                        TV::Pair(content, amount) => (content, amount),
+                        other => {
+                            return Err(TcError::InternalError(format!(
+                                "expected nested Pair(content, amount) in ticket value, \
+                                 got {other:?}"
+                            )))
+                        }
+                    };
                     TV::new_ticket(Ticket {
                         ticketer: address.hash,
                         content_type: content_type.clone(),
                         content: TypedValue::unwrap_rc(content),
-                        amount: irrefutable_match!(TypedValue::unwrap_rc(amount); TV::Nat),
+                        amount: match TypedValue::unwrap_rc(amount) {
+                            TV::Nat(amount) => amount,
+                            other => {
+                                return Err(TcError::InternalError(format!(
+                                    "expected Nat for ticket amount, got {other:?}"
+                                )))
+                            }
+                        },
                     })
                 }
                 _ => return Err(invalid_value_for_type!()),
