@@ -9,7 +9,7 @@ use revm::{
 };
 use tezos_smart_rollup_host::storage::StorageV1;
 
-use evm_types::{custom, Error};
+use crate::error::EvmDbError;
 
 use crate::{
     precompiles::constants::{
@@ -26,7 +26,7 @@ use super::constants::PredeployedContract;
 pub fn init_precompile_bytecodes(
     host: &'_ mut impl StorageV1,
     tezosx_enabled: bool,
-) -> Result<(), Error> {
+) -> Result<(), EvmDbError> {
     init_precompile_bytecode(host, &Address::ZERO, &INTERNAL_FORWARDER_SOL_CONTRACT)?;
     init_precompile_bytecode(host, &XTZ_BRIDGE_SOL_ADDR, &XTZ_BRIDGE_SOL_CONTRACT)?;
     init_precompile_bytecode(host, &FA_BRIDGE_SOL_ADDR, &FA_BRIDGE_SOL_CONTRACT)?;
@@ -49,9 +49,9 @@ fn init_precompile_bytecode(
     host: &'_ mut impl StorageV1,
     addr: &Address,
     predeployed: &'static PredeployedContract,
-) -> Result<(), Error> {
+) -> Result<(), EvmDbError> {
     let mut created_account = StorageAccount::from_address(addr)?;
-    let mut account_info = created_account.info(host).map_err(custom)?;
+    let mut account_info = created_account.info(host)?;
 
     if account_info.code_hash == predeployed.code_hash {
         return Ok(());
@@ -63,9 +63,7 @@ fn init_precompile_bytecode(
 
     let code = Bytecode::new_legacy(Bytes::from_static(predeployed.code));
     account_info.code_hash = predeployed.code_hash;
-    created_account
-        .set_info(host, account_info)
-        .map_err(custom)?;
+    created_account.set_info(host, account_info)?;
     CodeStorage::add(
         host,
         code.original_byte_slice(),

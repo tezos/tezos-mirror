@@ -4,14 +4,13 @@
 //
 // SPDX-License-Identifier: MIT
 
-use revm::context::result::EVMError;
 use revm::primitives::{hardfork::SpecId, keccak256, Bytes};
 use revm::state::AccountInfo;
 use revm_etherlink::helpers::legacy::{h256_to_alloy, u256_to_alloy};
 use revm_etherlink::storage::code::CodeStorage;
 use revm_etherlink::storage::world_state_handler::StorageAccount;
 use revm_etherlink::{
-    run_transaction, Error, ExecutionOutcome, GasData, TransactionOrigin,
+    run_transaction, EvmRunError, ExecutionOutcome, GasData, TransactionOrigin,
 };
 use tezos_ethereum::access_list::AccessList;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
@@ -216,7 +215,7 @@ fn execute_transaction(
     test: &Test,
     data: bytes::Bytes,
     access_list: AccessList,
-) -> Result<ExecutionOutcome, EVMError<Error>> {
+) -> Result<ExecutionOutcome, EvmRunError> {
     let gas_limit = *unit.transaction.gas_limit.get(test.indexes.gas).unwrap();
     let gas_limit = u64::try_from(gas_limit).unwrap_or(u64::MAX);
     env.tx.gas_limit = gas_limit;
@@ -294,7 +293,7 @@ fn check_results(
     host: &EvalHost,
     name: &str,
     test: &Test,
-    exec_result: &Result<ExecutionOutcome, EVMError<Error>>,
+    exec_result: &Result<ExecutionOutcome, EvmRunError>,
 ) {
     match exec_result {
         Ok(execution_outcome) => {

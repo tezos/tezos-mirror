@@ -107,10 +107,10 @@ pub enum Error {
     NomReadError(String),
     #[error("Invalid parsing")]
     InvalidParsing,
-    #[error(transparent)]
-    InvalidRunTransaction(revm_etherlink::Error),
+    #[error("Invalid run transaction: {0}")]
+    InvalidRunTransaction(revm_etherlink::EvmRunError),
     #[error("Simulation failed: {0}")]
-    Simulation(revm_etherlink::Error),
+    Simulation(revm_etherlink::EvmRunError),
     #[error("Tezlink simulation failed: {0}")]
     TezlinkSimulation(TezlinkSimulationError),
     #[error(transparent)]
@@ -141,8 +141,20 @@ pub enum Error {
     BlockNumberOverflowError(BlockNumberOverflowError),
 }
 
-impl From<revm_etherlink::Error> for Error {
-    fn from(err: revm_etherlink::Error) -> Self {
+impl From<revm_etherlink::EvmKernelError> for Error {
+    fn from(err: revm_etherlink::EvmKernelError) -> Self {
+        Error::Simulation(err.into())
+    }
+}
+
+impl From<revm_etherlink::EvmDbError> for Error {
+    fn from(err: revm_etherlink::EvmDbError) -> Self {
+        Error::Simulation(err.into())
+    }
+}
+
+impl From<revm_etherlink::EvmRunError> for Error {
+    fn from(err: revm_etherlink::EvmRunError) -> Self {
         Error::Simulation(err)
     }
 }

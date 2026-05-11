@@ -33,7 +33,6 @@ use crate::{
     },
     storage::version::EVMVersion,
 };
-use evm_types::Error;
 
 #[derive(Debug, Clone)]
 pub struct EtherlinkPrecompiles {
@@ -144,7 +143,7 @@ where
     ) -> Result<Option<Self::Output>, String> {
         if let Some(custom_result) = self
             .run_custom_precompile(context, inputs)
-            .map_err(|e| Error::from(e).to_string())?
+            .map_err(|e| e.to_string())?
         {
             return Ok(Some(custom_result));
         }

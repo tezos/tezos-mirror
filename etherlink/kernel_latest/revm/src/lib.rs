@@ -8,8 +8,7 @@ use crate::{
     storage::world_state_handler::StorageAccount,
 };
 use database::EtherlinkVMDB;
-use evm_types::custom;
-pub use evm_types::Error;
+pub use error::{EvmDbError, EvmKernelError, EvmRunError};
 use helpers::storage::u256_to_le_bytes;
 use inspectors::{
     call_tracer::{CallTracer, CallTracerInput},
@@ -40,6 +39,7 @@ use tezosx_interfaces::Registry;
 use tezosx_journal::TezosXJournal;
 
 pub mod database;
+mod error;
 pub mod helpers;
 pub mod inspectors;
 pub mod journal;
@@ -102,18 +102,14 @@ impl GasData {
     }
 }
 
-fn block_env(block_constants: &BlockConstants) -> Result<BlockEnv, Error> {
+fn block_env(block_constants: &BlockConstants) -> Result<BlockEnv, EvmKernelError> {
     // TODO: Whenever the switch to REVM is completely made, readapt BlockConstants
     // structure to match alloy's type. The current structure is highly dependant
     // on what is needed for Sputnik.
-    let basefee: u64 = match block_constants.base_fee_per_gas().try_into() {
-        Ok(basefee) => basefee,
-        Err(err) => {
-            return Err(Error::Custom(format!(
-                "Invalid base fee per gas conversion: {err:?}"
-            )))
-        }
-    };
+    let basefee: u64 = block_constants
+        .base_fee_per_gas()
+        .try_into()
+        .map_err(|_| EvmKernelError::BaseFeePerGasOverflow)?;
     Ok(BlockEnv {
         number: U256::from_le_slice(&u256_to_le_bytes(block_constants.number)),
         beneficiary: Address::from(block_constants.coinbase.0),
@@ -149,7 +145,7 @@ fn tx_env(
     authorization_list: Option<Vec<SignedAuthorization>>,
     chain_id: u64,
     origin: &mut TransactionOrigin,
-) -> Result<TxEnv, Error> {
+) -> Result<TxEnv, EvmRunError> {
     let kind = match destination {
         Some(address) => TxKind::Call(address),
         None => TxKind::Create,
@@ -160,7 +156,8 @@ fn tx_env(
     let nonce = if let Some(account) = journal.evm.inner.state.get(&caller) {
         account.info.nonce
     } else {
-        let storage_account = StorageAccount::from_address(&caller)?;
+        let storage_account =
+            StorageAccount::from_address(&caller).map_err(EvmDbError::from)?;
         storage_account.info(host)?.nonce
     };
 
@@ -169,7 +166,7 @@ fn tx_env(
             journal
                 .evm
                 .set_access_list(std::mem::take(access_list))
-                .map_err(custom)?;
+                .map_err(|_| EvmKernelError::AccessListAlreadySet)?;
         }
         TransactionOrigin::CrossRuntime { .. } => (),
     };
@@ -191,20 +188,14 @@ fn tx_env(
     let tx_env_builder = match authorization_list {
         Some(authorization_list) => {
             if authorization_list.is_empty() {
-                return Err(Error::Custom(
-                    "Authorization list cannot be empty per EIP-7702.".to_string(),
-                ));
+                return Err(EvmKernelError::EmptyAuthorizationList.into());
             }
             tx_env_builder.authorization_list_signed(authorization_list)
         }
         None => tx_env_builder,
     };
 
-    let tx_env = tx_env_builder.build().map_err(|err| {
-        Error::Custom(format!(
-            "Building the transaction environment failed with: {err:?}"
-        ))
-    })?;
+    let tx_env = tx_env_builder.build().map_err(EvmKernelError::from)?;
 
     Ok(tx_env)
 }
@@ -330,7 +321,7 @@ fn execute_transaction<'a, Host, R: Registry>(
     evm_context: &mut EvmContext<'a, Host, R>,
     tx: &'a TxEnv,
     transaction_hash: Option<[u8; TRANSACTION_HASH_SIZE]>,
-) -> Result<ExecutionResult, EVMError<Error>>
+) -> Result<ExecutionResult, EVMError<EvmDbError>>
 where
     Host: StorageV1,
 {
@@ -374,7 +365,7 @@ pub fn run_transaction<'a, Host, R: Registry>(
     tracer_input: Option<TracerInput>,
     is_simulation: bool,
     mut origin: TransactionOrigin,
-) -> Result<ExecutionOutcome, EVMError<Error>>
+) -> Result<ExecutionOutcome, EvmRunError>
 where
     Host: StorageV1,
 {
@@ -430,9 +421,7 @@ where
         let result = evm_context.inspect_one_tx(&tx)?;
 
         if let Some(err) = evm_context.ctx.journaled_state.take_deferred_error() {
-            return Err(EVMError::Custom(format!(
-                "Michelson journal checkpoint error: {err}"
-            )));
+            return Err(EvmKernelError::Runtime(err).into());
         }
 
         if let Some(cp) = credit_checkpoint {
@@ -495,9 +484,7 @@ where
         let result = execute_transaction(&mut evm_context, &tx, transaction_hash)?;
 
         if let Some(err) = evm_context.ctx.journaled_state.take_deferred_error() {
-            return Err(EVMError::Custom(format!(
-                "Michelson journal checkpoint error: {err}"
-            )));
+            return Err(EvmKernelError::Runtime(err).into());
         }
 
         if let Some(cp) = credit_checkpoint {
@@ -514,10 +501,7 @@ where
             if !evm_context.db_mut().commit_status() {
                 // No need to revert the possible database changes because
                 // we are in a safe storage.
-                return Err(EVMError::Custom(
-                    "Comitting ended up in an incorrect state change: reverting."
-                        .to_owned(),
-                ));
+                return Err(EvmDbError::CommitMismatch.into());
             }
 
             evm_context.db_mut().take_withdrawals()
@@ -534,13 +518,13 @@ where
 
 #[cfg(test)]
 mod test {
+    use crate::EvmRunError;
     use alloy_sol_types::{
         sol, ContractError, Revert, RevertReason, SolEvent, SolInterface,
     };
     use alloy_sol_types::{SolCall, SolError};
     use nom::AsBytes;
     use primitive_types::H256;
-    use revm::context::result::EVMError;
     use revm::{
         context::{
             result::{ExecutionResult, Output},
@@ -564,7 +548,7 @@ mod test {
     use tezos_ethereum::block::BlockConstants;
     use utilities::{test_alias_creation_context, Registry, DEFAULT_SPEC_ID};
 
-    use super::{Error, TransactionOrigin};
+    use super::{EvmKernelError, TransactionOrigin};
     use crate::helpers::storage::bytes_hash;
     use crate::precompiles::constants::{
         FEED_DEPOSIT_ADDR, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
@@ -1940,12 +1924,10 @@ mod test {
             },
         );
 
-        assert_eq!(
+        assert!(matches!(
             result,
-            Err(EVMError::Database(Error::Custom(
-                "Authorization list cannot be empty per EIP-7702.".to_owned()
-            )))
-        );
+            Err(EvmRunError::Kernel(EvmKernelError::EmptyAuthorizationList))
+        ));
     }
 
     #[test]

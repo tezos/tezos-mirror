@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use evm_types::Error;
+use crate::error::EvmDbError;
 use num_bigint::{BigInt, Sign};
 use revm::primitives::{alloy_primitives::Keccak256, B256, U256};
 use tezos_smart_rollup_host::{path::Path, runtime::RuntimeError, storage::StorageV1};
@@ -19,21 +19,20 @@ pub fn read_u64_le_default(
     host: &impl StorageV1,
     path: &impl Path,
     default: u64,
-) -> Result<u64, Error> {
+) -> Result<u64, EvmDbError> {
     match host.store_read(path, 0, std::mem::size_of::<u64>()) {
         Ok(bytes) if bytes.len() == std::mem::size_of::<u64>() => {
-            let bytes_array: [u8; std::mem::size_of::<u64>()] = match bytes.try_into() {
-                Ok(bytes) => bytes,
-                Err(err) => {
-                    return Err(Error::Custom(format!(
-                        "Bytes array conversion failed with {err:?}",
-                    )))
-                }
-            };
+            let actual = bytes.len();
+            let bytes_array: [u8; std::mem::size_of::<u64>()] = bytes
+                .try_into()
+                .map_err(|_| EvmDbError::UnexpectedBytesLength {
+                    expected: std::mem::size_of::<u64>(),
+                    actual,
+                })?;
             Ok(u64::from_le_bytes(bytes_array))
         }
         Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
-        Err(err) => Err(Error::Runtime(err)),
+        Err(err) => Err(EvmDbError::Runtime(err)),
     }
 }
 

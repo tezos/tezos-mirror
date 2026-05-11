@@ -11,7 +11,6 @@ license = "MIT"
 [dependencies]
 # VM
 alloy-primitives.workspace = true
-revm-database-interface.workspace = true
 revm-interpreter.workspace = true
 
 # Types

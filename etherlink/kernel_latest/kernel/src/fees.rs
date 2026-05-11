@@ -22,7 +22,7 @@ use crate::transaction::TransactionContent;
 
 use primitive_types::{H160, H256, U256};
 use revm_etherlink::helpers::legacy::{h160_to_alloy, u256_to_alloy};
-use revm_etherlink::{storage::world_state_handler::StorageAccount, Error};
+use revm_etherlink::{storage::world_state_handler::StorageAccount, EvmKernelError};
 use tezos_ethereum::access_list::AccessListItem;
 use tezos_ethereum::block::BlockFees;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
@@ -229,7 +229,7 @@ pub fn simulation_add_gas_for_fees(
     mut outcome: SimulationOutcome,
     block_fees: &BlockFees,
     tx_data: &[u8],
-) -> Result<SimulationOutcome, Error> {
+) -> Result<SimulationOutcome, EvmKernelError> {
     // Simulation does not have an access list or authorization list
     let gas_for_fees = gas_for_fees(
         block_fees.da_fee_per_byte(),
@@ -257,7 +257,7 @@ pub fn tx_execution_gas_limit(
     tx: &EthereumTransactionCommon,
     fees: &BlockFees,
     delayed: bool,
-) -> Result<u64, Error> {
+) -> Result<u64, EvmKernelError> {
     if delayed {
         return Ok(tx.gas_limit_with_fees());
     }
@@ -270,9 +270,13 @@ pub fn tx_execution_gas_limit(
         tx.authorization_list.as_deref().unwrap_or_default().len(),
     )?;
 
-    tx.gas_limit_with_fees()
+    let gas_limit = tx.gas_limit_with_fees();
+    gas_limit
         .checked_sub(gas_for_fees)
-        .ok_or(Error::GasToFeesUnderflow)
+        .ok_or(EvmKernelError::GasToFeesUnderflow {
+            gas_limit,
+            gas_for_fees,
+        })
 }
 
 /// Calculate gas for fees
@@ -282,7 +286,7 @@ pub(crate) fn gas_for_fees(
     tx_data: &[u8],
     tx_access_list: &[AccessListItem],
     authorization_list_len: usize,
-) -> Result<u64, Error> {
+) -> Result<u64, EvmKernelError> {
     let fees = da_fee(
         da_fee_per_byte,
         tx_data,
@@ -331,10 +335,10 @@ fn cdiv(l: U256, r: U256) -> U256 {
     }
 }
 
-fn gas_as_u64(gas_for_fees: U256) -> Result<u64, Error> {
+fn gas_as_u64(gas_for_fees: U256) -> Result<u64, EvmKernelError> {
     gas_for_fees
         .try_into()
-        .map_err(|_e| Error::FeesToGasOverflow)
+        .map_err(|_| EvmKernelError::GasForFeesOverflow)
 }
 
 #[cfg(test)]

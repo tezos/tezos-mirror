@@ -454,9 +454,7 @@ where
                 tezos_crypto_rs::hash::UnknownSignature::nom_read_exact(&[0u8; 64])
                     .map_err(|_| crate::Error::InvalidConversion)?;
 
-            let result = match TezosRuntime::add_balance(host, pkh, U256::from(amount))
-                .map_err(|e| revm_etherlink::Error::Custom(e.to_string()))
-            {
+            let result = match TezosRuntime::add_balance(host, pkh, U256::from(amount)) {
                 Ok(()) => ContentResult::Applied(TransferTarget::ToContrat(
                     TransferSuccess::default(),
                 )),

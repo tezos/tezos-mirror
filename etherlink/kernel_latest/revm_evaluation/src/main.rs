@@ -7,10 +7,7 @@ use crate::{
     helpers::{extract_brackets, prepare_host, pretty, u256_to_u128},
 };
 use revm::{
-    context::{
-        result::{EVMError, ExecutionResult},
-        transaction::AccessList,
-    },
+    context::{result::ExecutionResult, transaction::AccessList},
     primitives::{Address, HashMap, U256},
     state::AccountInfo,
 };
@@ -317,7 +314,7 @@ fn get_block_constants(env: &Env, chain_id: primitive_types::U256) -> BlockConst
 }
 
 fn extract_gas_refunded(
-    execution_result: &Result<ExecutionOutcome, EVMError<revm_etherlink::Error>>,
+    execution_result: &Result<ExecutionOutcome, revm_etherlink::EvmRunError>,
 ) -> u64 {
     match execution_result {
         Ok(ExecutionOutcome {

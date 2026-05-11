@@ -3,8 +3,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::error::EvmKernelError;
 pub use evm_types::FaDepositWithProxy;
-use evm_types::{custom, Error};
 use num_bigint::BigInt;
 use primitive_types::{H160, H256, U256 as PU256};
 use revm::primitives::{alloy_primitives::Keccak256, Address, Log, B256, U256};
@@ -56,10 +56,9 @@ impl FaDeposit {
         routing_info: MichelsonBytes,
         inbox_level: u32,
         inbox_msg_id: u32,
-    ) -> Result<(Self, Option<PU256>), Error> {
-        let amount = bigint_to_u256(ticket.amount()).map_err(|e| {
-            Error::Custom(format!("failed to convert ticket amount: {e:?}"))
-        })?;
+    ) -> Result<(Self, Option<PU256>), EvmKernelError> {
+        let amount = bigint_to_u256(ticket.amount())
+            .map_err(|_| EvmKernelError::TicketAmountOverflow)?;
         let (receiver, proxy, chain_id) = parse_l2_routing_info(routing_info)?;
         let ticket_hash = ticket_hash(&ticket)?;
 
@@ -95,7 +94,7 @@ const RECEIVER_PROXY_AND_CHAIN_ID_LENGTH: usize =
 /// Split routing info (raw bytes passed along with the ticket) into receiver and optional proxy address and chain id.
 fn parse_l2_routing_info(
     routing_info: MichelsonBytes,
-) -> Result<(H160, Option<H160>, Option<PU256>), Error> {
+) -> Result<(H160, Option<H160>, Option<PU256>), EvmKernelError> {
     let routing_info_len = routing_info.0.len();
     if routing_info_len == RECEIVER_LENGTH {
         Ok((H160::from_slice(&routing_info.0), None, None))
@@ -116,7 +115,9 @@ fn parse_l2_routing_info(
             )),
         ))
     } else {
-        Err(Error::Custom("invalid routing info length".to_string()))
+        Err(EvmKernelError::InvalidRoutingInfoLength {
+            actual: routing_info_len,
+        })
     }
 }
 
@@ -130,10 +131,17 @@ const TICKET_PAYLOAD_SIZE_HINT: usize = 200;
 ///  * content: Micheline expression is in its forged form, legacy optimized mode
 ///
 /// Solidity equivalent: uint256(keccak256(abi.encodePacked(ticketer, content)));
-pub fn ticket_hash(ticket: &FA2_1Ticket) -> Result<H256, Error> {
+pub fn ticket_hash(ticket: &FA2_1Ticket) -> Result<H256, EvmKernelError> {
     let mut payload = Vec::with_capacity(TICKET_PAYLOAD_SIZE_HINT);
-    ticket.creator().0.bin_write(&mut payload).map_err(custom)?;
-    ticket.contents().bin_write(&mut payload).map_err(custom)?;
+    ticket
+        .creator()
+        .0
+        .bin_write(&mut payload)
+        .map_err(|_| EvmKernelError::TicketCreatorEncoding)?;
+    ticket
+        .contents()
+        .bin_write(&mut payload)
+        .map_err(|_| EvmKernelError::TicketContentsEncoding)?;
     let mut hasher = Keccak256::new();
     hasher.update(&payload);
     Ok(H256(hasher.finalize().into()))

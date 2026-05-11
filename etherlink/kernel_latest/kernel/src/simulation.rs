@@ -25,7 +25,7 @@ use primitive_types::{H160, U256};
 use revm::primitives::hardfork::SpecId;
 use revm::{context::result::ExecutionResult as VMResult, primitives::Address};
 use revm_etherlink::{
-    helpers::legacy::u256_to_alloy, inspectors::TracerInput, Error as RevmError,
+    helpers::legacy::u256_to_alloy, inspectors::TracerInput, EvmKernelError as RevmError,
     ExecutionOutcome, TransactionOrigin,
 };
 use rlp::{Decodable, DecoderError, Encodable, Rlp};
@@ -528,7 +528,7 @@ impl Evaluation {
                     &constants.block_fees,
                     &self.data,
                 )
-                .map_err(Error::Simulation)?;
+                .map_err(Error::from)?;
 
                 let result: SimulationResult<CallResult, String> =
                     Result::Ok(outcome).into();

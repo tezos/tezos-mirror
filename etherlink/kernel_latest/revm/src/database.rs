@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::error::EvmDbError;
 use crate::storage::{
     block::{get_block_hash, BLOCKS_STORED},
     code::CodeStorage,
@@ -13,7 +14,7 @@ use crate::storage::{
     },
 };
 use evm_types::{
-    DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges, Error,
+    DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges,
     FaDepositWithProxy, PrecompileStateChanges, PrecompileStateError,
 };
 use michelson_types::Withdrawal;
@@ -68,7 +69,7 @@ where
         host: &'a mut Host,
         registry: &'a R,
         block: &'a BlockConstants,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, EvmDbError> {
         let system = StorageAccount::from_address(&Address::ZERO)?;
         Ok(EtherlinkVMDB {
             host,
@@ -263,7 +264,7 @@ impl<Host, R: Registry> Database for EtherlinkVMDB<'_, Host, R>
 where
     Host: StorageV1,
 {
-    type Error = Error;
+    type Error = EvmDbError;
 
     fn basic(&mut self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
         let storage_account = StorageAccount::from_address(&address)?;

@@ -5,7 +5,6 @@
 
 mod custom_precompile_error;
 mod database;
-mod error;
 mod etherlink_entry;
 mod fa_deposit_with_proxy;
 mod precompile_state_changes;
@@ -18,7 +17,6 @@ pub use database::{
     DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges,
     PrecompileStateError,
 };
-pub use error::{custom, Error};
 pub use etherlink_entry::EtherlinkEntry;
 pub use fa_deposit_with_proxy::FaDepositWithProxy;
 pub use precompile_state_changes::{PrecompileStateChanges, TicketBalanceKey};

@@ -7,14 +7,14 @@ use rlp::Encodable;
 use tezos_evm_logging::{log, Level::Info};
 use tezos_smart_rollup_host::{path::OwnedPath, storage::StorageV1};
 
+use crate::error::EvmDbError;
 use crate::storage::world_state_handler::SEQUENCER_KEY_CHANGE_PATH;
-use evm_types::Error;
 pub use evm_types::SequencerKeyChange;
 
 pub fn store_sequencer_key_change<Host>(
     host: &mut Host,
     sequencer_key_change: SequencerKeyChange,
-) -> Result<(), Error>
+) -> Result<(), EvmDbError>
 where
     Host: StorageV1,
 {

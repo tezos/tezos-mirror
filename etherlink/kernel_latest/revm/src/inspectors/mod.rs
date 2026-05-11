@@ -2,9 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{precompiles::provider::EtherlinkPrecompiles, EVMInnerContext};
+use crate::{
+    error::EvmDbError, precompiles::provider::EtherlinkPrecompiles, EVMInnerContext,
+};
 use call_tracer::CallTracerInput;
-use evm_types::Error;
 use revm::{
     context::{
         result::{EVMError, ExecutionResult, HaltReason},
@@ -55,7 +56,7 @@ where
 {
     type ExecutionResult = ExecutionResult;
     type State = EvmState;
-    type Error = EVMError<Error>;
+    type Error = EVMError<EvmDbError>;
     type Tx = <EVMInnerContext<'a, Host, R> as ContextTr>::Tx;
     type Block = <EVMInnerContext<'a, Host, R> as ContextTr>::Block;
 
