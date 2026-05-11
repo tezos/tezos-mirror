@@ -202,6 +202,14 @@ pub enum TcError {
     InternalError(String),
 }
 
+// Empty-stack message produced by the `pop!` macro. Lifted to a module-level
+// `const` so the macro and its contract test share the string and a wording
+// drift can't go unnoticed — `pop!` is a local macro whose empty-stack arm is
+// unreachable through the public API, so it can't be tested by calling it.
+// (The `stack_get` / `stack_top_mut` helpers are plain functions and are
+// exercised directly by their tests, so they need no such const.)
+pub(crate) const MSG_EMPTY_TYPE_STACK_POP: &str = "attempted to pop from an empty type stack";
+
 impl From<TryFromBigIntError<()>> for TcError {
     fn from(error: TryFromBigIntError<()>) -> Self {
         TcError::NumericConversion(error)
@@ -823,9 +831,9 @@ pub(crate) fn typecheck_instruction<'a>(
     // a non-matching value returns TcError::InternalError via `?`.
     macro_rules! pop {
         () => {{
-            stack.pop().ok_or_else(|| {
-                TcError::InternalError("attempted to pop from an empty type stack".to_owned())
-            })?
+            stack
+                .pop()
+                .ok_or_else(|| TcError::InternalError(MSG_EMPTY_TYPE_STACK_POP.to_owned()))?
         }};
         ($p:path) => {{
             let v = pop!();
@@ -9326,6 +9334,68 @@ mod typecheck_tests {
         assert_eq!(
             check_view_name(name),
             Err(TcError::InvalidViewName(name.to_owned()))
+        );
+    }
+
+    // -- Macro error-message contract --
+    //
+    // The pop!, stack_get!, stack_top_mut! macros live inside
+    // typecheck_instruction and their error arms are unreachable for any
+    // valid Micheline (the outer match patterns guarantee the
+    // preconditions). The tests below lock in the exact InternalError
+    // wording each macro will produce if its arm is ever reached, so a
+    // future refactor that drifts the strings is caught here instead of
+    // shipping a silent diagnostic change.
+
+    #[test]
+    fn pop_empty_internal_error_message() {
+        // pop!() on an empty type stack produces this exact error.
+        let err: TcError = TcError::InternalError(MSG_EMPTY_TYPE_STACK_POP.to_owned());
+        assert_eq!(
+            format!("{err}"),
+            "internal typechecker error: attempted to pop from an empty type stack"
+        );
+    }
+
+    #[test]
+    fn stack_top_mut_empty_internal_error_message() {
+        // stack_top_mut() on an empty type stack returns this exact error.
+        // Unreachable for valid Micheline, so exercised directly here.
+        let mut stack = crate::stack::TypeStack::new();
+        let err = super::stack_top_mut(&mut stack).expect_err("empty stack must error");
+        assert_eq!(
+            format!("{err}"),
+            "internal typechecker error: type stack unexpectedly empty"
+        );
+    }
+
+    #[test]
+    fn pop_type_mismatch_internal_error_format() {
+        // pop!(T::Foo) on a value that isn't T::Foo produces an InternalError
+        // shaped like "type mismatch: expected <Pattern>, got <Debug>". Lock
+        // the format so the macro's stringify!/Debug interpolation is
+        // observable and stable.
+        let err: TcError = TcError::InternalError(format!(
+            "type mismatch: expected {}, got {:?}",
+            stringify!(Type::Nat(_)),
+            Type::Bool,
+        ));
+        assert_eq!(
+            format!("{err}"),
+            "internal typechecker error: type mismatch: expected Type::Nat(_), got Bool"
+        );
+    }
+
+    #[test]
+    fn stack_get_oob_internal_error_format() {
+        // stack_get(idx) out-of-bounds returns an InternalError shaped like
+        // "type stack too short: attempted to access index <idx>, len <len>".
+        // Unreachable for valid Micheline, so exercised directly here.
+        let stack = crate::stack::TypeStack::new();
+        let err = super::stack_get(&stack, 3).expect_err("out-of-range access must error");
+        assert_eq!(
+            format!("{err}"),
+            "internal typechecker error: type stack too short: attempted to access index 3, len 0"
         );
     }
 }
