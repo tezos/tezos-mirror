@@ -1034,4 +1034,37 @@ mod test_untypers {
         m.update(TypedValue::Nat(0u32.into()), None);
         TypedValue::BigMap(m).into_micheline_optimized_legacy(&arena);
     }
+
+    // Test that converting a deeply Rc-shared TypedValue (constant_dup-shape)
+    // to Micheline raises an OOM.
+    #[test]
+    fn test_constant_dup_shape_gas_bounded() {
+        let arena = Arena::new();
+
+        // Build a constant_dup-shape value: (list (list (list unit)))
+        // where each inner list is shared via Rc.
+        // With depth d and width w, this creates w^d virtual entries but only
+        // O(w*d) actual allocations due to Rc sharing.
+        let unit_list = Rc::new(TypedValue::List(MichelsonList::from(
+            vec![] as Vec<Rc<TypedValue>>
+        )));
+
+        // Build (list unit) with 1000 shared references to the same empty list
+        let inner_lists: Vec<Rc<TypedValue>> = (0..1000).map(|_| Rc::clone(&unit_list)).collect();
+        let inner_list = Rc::new(TypedValue::List(MichelsonList::from(inner_lists)));
+
+        // Build (list (list unit)) with 1000 shared references to the same (list unit)
+        let middle_lists: Vec<Rc<TypedValue>> = (0..1000).map(|_| Rc::clone(&inner_list)).collect();
+        let middle_list = Rc::new(TypedValue::List(MichelsonList::from(middle_lists)));
+
+        // Build (list (list (list unit))) with 1000 shared references
+        let outer_lists: Vec<Rc<TypedValue>> = (0..1000).map(|_| Rc::clone(&middle_list)).collect();
+        let outer_list = TypedValue::List(MichelsonList::from(outer_lists));
+
+        // This structure has 1000 * 1000 * 1000 = 1,000,000,000 virtual entries to traverse
+        // if unshared, but only 1000 + 1000 + 1000 = 3000 actual Rc nodes.
+
+        let _result = outer_list.into_micheline_optimized_legacy(&arena);
+        // `cargo test` gets `SIGKILL`ed
+    }
 }
