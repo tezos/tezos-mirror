@@ -8,7 +8,6 @@
 use chrono::prelude::DateTime;
 use num_bigint::{BigInt, BigUint, TryFromBigIntError};
 use num_traits::{Signed, Zero};
-use regex::Regex;
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
@@ -193,6 +192,14 @@ pub enum TcError {
     /// rather than flattened into a stringly error.
     #[error(transparent)]
     StackOob(#[from] StackOob),
+    /// Internal invariant violation surfaced by the `pop!` / `stack_get!` /
+    /// `stack_top_mut!` macros (empty-stack pop, out-of-range access, or a
+    /// popped value of an unexpected type). Unreachable for valid Micheline
+    /// — the typechecker establishes the stack shape and element types
+    /// before these run. Carries a descriptive message until !21872 turns
+    /// it into a structured `InternalErrorKind`.
+    #[error("internal typechecker error: {0}")]
+    InternalError(String),
 }
 
 impl From<TryFromBigIntError<()>> for TcError {
@@ -279,8 +286,19 @@ pub struct TypesNotEqual(Type, Type);
 
 /// Check that name is a valid view name
 pub fn check_view_name(name: &str) -> Result<(), TcError> {
-    let re = Regex::new(r"^[a-zA-Z0-9_.%@]*$").expect("view name regex should be valid");
-    if name.len() > 31 || !re.is_match(name) {
+    let is_valid = name.bytes().all(|b| {
+        matches!(
+            b,
+            b'a'..=b'z'
+                | b'A'..=b'Z'
+                | b'0'..=b'9'
+                | b'_'
+                | b'.'
+                | b'%'
+                | b'@'
+        )
+    });
+    if name.len() > 31 || !is_valid {
         return Err(TcError::InvalidViewName(name.to_owned()));
     };
     Ok(())
@@ -765,6 +783,26 @@ macro_rules! nothing_to_none {
 ///
 /// Entrypoint map is carried as an argument, not as part of context, because it
 /// has to be locally overridden during typechecking.
+/// Element at `idx` from the top of the type stack. Maps an out-of-range
+/// access to a descriptive [`TcError::InternalError`] — unreachable for valid
+/// Micheline, since the typechecker establishes the stack shape before access.
+fn stack_get(stack: &TypeStack, idx: usize) -> Result<&Type, TcError> {
+    stack.get(idx).map_err(|_| {
+        TcError::InternalError(format!(
+            "type stack too short: attempted to access index {idx}, len {}",
+            stack.len()
+        ))
+    })
+}
+
+/// Mutable reference to the top of the type stack. Maps an empty stack to
+/// [`TcError::InternalError`] — unreachable for valid Micheline.
+fn stack_top_mut(stack: &mut TypeStack) -> Result<&mut Type, TcError> {
+    stack
+        .get_mut(0)
+        .map_err(|_| TcError::InternalError("type stack unexpectedly empty".to_owned()))
+}
+
 pub(crate) fn typecheck_instruction<'a>(
     i: &Micheline<'a>,
     gas: &mut Gas,
@@ -779,25 +817,29 @@ pub(crate) fn typecheck_instruction<'a>(
     let stack = opt_stack.access_mut(TcError::FailNotInTail)?;
 
     // helper to reduce boilerplate. Usage:
-    // `pop!()` force-pops the top elements from the stack (panics if nothing to
-    // pop), returning it
-    // `let x = pop!()` is roughly equivalent to `let x = stack.pop().unwrap()`
-    // but with a clear error message
-    // `pop!(T::Foo)` force-pops the stack and unwraps `T::Foo(x)`, returning
-    // `x`
-    // `let x = pop!(T::Foo)` is roughly equivalent to `let T::Foo(x) = pop!()
-    // else {panic!()}` but with a clear error message
-    // `pop!(T::Bar, x, y, z)` force-pops the stack, unwraps `T::Bar(x, y, z)`
-    // and binds those to `x, y, z` in the surrounding scope
-    // `pop!(T::Bar, x, y, z)` is roughly equivalent to `let T::Bar(x, y, z) =
-    // pop!() else {panic!()}` but with a clear error message.
+    // `pop!()` pops the top of the stack and returns it; if the stack is
+    // empty, returns TcError::InternalError via `?`.
+    // `pop!(T::Foo)` pops the stack, expects a `T::Foo(x)`, and returns `x`;
+    // a non-matching value returns TcError::InternalError via `?`.
     macro_rules! pop {
-        ($($args:tt)*) => {
-            irrefutable_match!(
-                stack.pop().expect("pop from empty stack!");
-                $($args)*
-                )
-        };
+        () => {{
+            stack.pop().ok_or_else(|| {
+                TcError::InternalError("attempted to pop from an empty type stack".to_owned())
+            })?
+        }};
+        ($p:path) => {{
+            let v = pop!();
+            match v {
+                #[allow(unused_parens)]
+                $p(i) => i,
+                other => {
+                    return Err(TcError::InternalError(format!(
+                        "type mismatch: expected {}, got {other:?}",
+                        stringify!($p(_))
+                    )))
+                }
+            }
+        }};
     }
 
     // Error handling when stack isn't matched for an instruction. Two forms:
@@ -9234,5 +9276,55 @@ mod typecheck_tests {
     fn cost_overflow_converts_to_cost_overflow_variant() {
         let ovf: TcError = CostOverflow.into();
         assert_eq!(ovf, TcError::CostOverflow(CostOverflow));
+    }
+
+    // -- View-name validation: lock in byte-loop replacement of the regex --
+
+    #[test]
+    fn check_view_name_accepts_empty() {
+        assert_eq!(check_view_name(""), Ok(()));
+    }
+
+    #[test]
+    fn check_view_name_accepts_all_allowed_chars() {
+        assert_eq!(
+            check_view_name("aZ0_.%@"),
+            Ok(()),
+            "all allowed character classes must be accepted"
+        );
+    }
+
+    #[test]
+    fn check_view_name_accepts_31_chars() {
+        let name = "a".repeat(31);
+        assert_eq!(check_view_name(&name), Ok(()));
+    }
+
+    #[test]
+    fn check_view_name_rejects_32_chars() {
+        let name = "a".repeat(32);
+        assert_eq!(check_view_name(&name), Err(TcError::InvalidViewName(name)));
+    }
+
+    #[test]
+    fn check_view_name_rejects_disallowed_ascii() {
+        for c in ['?', '!', '-', '+', '/', ' ', '\n', '*', '#'] {
+            let name = format!("name{c}");
+            assert_eq!(
+                check_view_name(&name),
+                Err(TcError::InvalidViewName(name.clone())),
+                "expected {c:?} to be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn check_view_name_rejects_non_ascii() {
+        // Multibyte UTF-8 must be rejected at the byte level.
+        let name = "café";
+        assert_eq!(
+            check_view_name(name),
+            Err(TcError::InvalidViewName(name.to_owned()))
+        );
     }
 }
