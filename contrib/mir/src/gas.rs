@@ -5,7 +5,7 @@
 //! Gas accounting and costs.
 
 use num_bigint::{BigInt, BigUint};
-use tezos_data_encoding::enc::{BinWriter, BinError};
+use tezos_data_encoding::enc::{BinError, BinWriter};
 
 /// Structure carrying the remaining gas amount.
 #[derive(Debug)]
@@ -992,6 +992,44 @@ pub mod interpret_cost {
     pub fn update_n(size: usize) -> Result<u32, OutOfGas> {
         let size = Checked::from(size);
         (30 + ((size >> 5) + ((size >> 2) + size))).as_gas_cost()
+    }
+}
+
+/// Costs related to conversion from AST to Micheline. They are meant
+/// to cover the cost of allocating the Micheline tree (the memory but
+/// also the time spent to allocate).
+pub mod unparsing_cost {
+    use super::{AsGasCost, BigInt, BigIntByteSize, OutOfGas};
+    use crate::ast::annotations::Annotation;
+    use checked::Checked;
+
+    /// Cost for allocating a Micheline node: 100mg.
+    pub const NODE: u32 = 100;
+
+    /// Cost for allocating a Micheline Int node: 100 mg + 25 mg/byte.
+    pub fn int(i: &BigInt) -> Result<u32, OutOfGas> {
+        let size = Checked::from(i.byte_size());
+        (100 + size * 25).as_gas_cost()
+    }
+
+    /// Cost for allocating a Micheline String node: 100 mg + 10 mg/byte
+    pub fn string(string: &str) -> Result<u32, OutOfGas> {
+        let size = Checked::from(string.len());
+        (100 + size * 10).as_gas_cost()
+    }
+
+    /// Cost for allocating a Micheline Bytes node: 100mg + 10 mg/byte
+    pub fn bytes(bytes: &[u8]) -> Result<u32, OutOfGas> {
+        let size = Checked::from(bytes.len());
+        (100 + size * 10).as_gas_cost()
+    }
+
+    /// Cost for allocating a Micheline annotation: 10 mg/byte. No
+    /// cost for allocating a Micheline node in this case because
+    /// annotations are not Micheline nodes.
+    pub fn annotation(annot: &Annotation) -> Result<u32, OutOfGas> {
+        let size = Checked::from(annot.len());
+        (size * 10).as_gas_cost()
     }
 }
 

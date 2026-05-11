@@ -13,6 +13,7 @@ mod test_typed_encode {
 
     use crate::ast::{byte_repr_trait::*, IntoMicheline, Micheline};
     use crate::ast::{Address, TypedValue};
+    use crate::gas::Gas;
     use tezos_crypto_rs::public_key_hash::PublicKeyHash;
 
     // Expected bytes to be produced with
@@ -30,7 +31,8 @@ mod test_typed_encode {
         let bytes = &hex::decode(hex_bytes).expect("Bad hex string in `expected` argument");
 
         let arena = Arena::new();
-        let micheline = v.into_micheline_optimized_legacy(&arena);
+        let mut gas = Gas::default();
+        let micheline = v.into_micheline_optimized_legacy(&arena, &mut gas).unwrap();
         assert_eq!(&micheline.encode_for_pack().unwrap(), bytes);
         assert_eq!(Micheline::decode_packed(&arena, bytes), Ok(micheline),);
     }

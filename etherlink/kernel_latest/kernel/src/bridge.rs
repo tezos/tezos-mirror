@@ -418,11 +418,13 @@ fn build_deposit_event(
 
     let arena = Arena::new();
 
-    let payload = Micheline::prim2(
-        &arena,
+    let payload = Micheline::App(
         Prim::Pair,
-        Micheline::from(i128::from(inbox_level)),
-        Micheline::from(i128::from(inbox_msg_id)),
+        arena.alloc_extend([
+            Micheline::from(i128::from(inbox_level)),
+            Micheline::from(i128::from(inbox_msg_id)),
+        ]),
+        NO_ANNS,
     )
     .encode()
     .map_err(|e| {

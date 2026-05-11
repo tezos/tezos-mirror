@@ -376,7 +376,8 @@ where
                     },
                 )?);
                 let dest_contract = contract_from_address(destination_address.hash)?;
-                let value = param.into_micheline_optimized_legacy(&parser.arena);
+                let value =
+                    param.into_micheline_optimized_legacy(&parser.arena, tc_ctx.gas())?;
                 let encoded_value = value.encode().map_err(|e| {
                     TransferError::MichelineSerializationError(e.to_string())
                 })?;
@@ -463,7 +464,7 @@ where
                     code: micheline_code.encode().map_err(encode_err)?,
                     storage: storage
                         .clone()
-                        .into_micheline_optimized_legacy(&parser.arena)
+                        .into_micheline_optimized_legacy(&parser.arena, tc_ctx.gas())?
                         .encode()
                         .map_err(encode_err)?,
                 };
@@ -530,14 +531,14 @@ where
                 };
                 let payload = Some(
                     value
-                        .into_micheline_optimized_legacy(&parser.arena)
+                        .into_micheline_optimized_legacy(&parser.arena, tc_ctx.gas())?
                         .encode()
                         .map_err(emit_err)?
                         .into(),
                 );
                 let ty = match arg_ty {
                     mir::ast::Or::Left(typ) => typ
-                        .into_micheline_optimized_legacy(&parser.arena)
+                        .into_micheline_optimized_legacy(&parser.arena, tc_ctx.gas())?
                         .encode()
                         .map_err(emit_err)?,
                     mir::ast::Or::Right(mic) => mic.encode().map_err(emit_err)?,
@@ -1038,7 +1039,7 @@ fn handle_storage_with_big_maps<'a, Host: StorageV1, C: Context>(
     // next operation in the same batch inherits stale entries.
     let lazy_storage_diff = convert_big_map_diff(std::mem::take(&mut ctx.big_map_diff));
     let storage = storage
-        .into_micheline_optimized_legacy(&parser.arena)
+        .into_micheline_optimized_legacy(&parser.arena, ctx.gas())?
         .encode()
         .map_err(|e| OriginationError::MichelineSerializationError(e.to_string()))?;
     Ok((storage, lazy_storage_diff))
@@ -1219,7 +1220,7 @@ fn execute_smart_contract_originated<'a>(
 
     // Encode the new storage
     let new_storage = new_storage
-        .into_micheline_optimized_legacy(&parser.arena)
+        .into_micheline_optimized_legacy(&parser.arena, ctx.gas())?
         .encode()
         .map_err(|e| TransferError::MichelineSerializationError(e.to_string()))?;
 
@@ -1818,7 +1819,7 @@ mod tests {
     use mir::ast::big_map::BigMapId;
     use mir::ast::{Address, Entrypoint, IntoMicheline, Micheline, Type, TypedValue};
     use mir::context::TypecheckingCtx;
-    use mir::gas;
+    use mir::gas::{self, Gas};
     use mir::parser::Parser;
     use mir::typechecker::typecheck_value;
     use num_traits::ops::checked::CheckedSub;
@@ -3036,7 +3037,7 @@ mod tests {
                             balance_updates: vec![],
                             ticket_receipt: vec![],
                             originated_contracts: vec![],
-                            consumed_milligas: 176061_u64.into(),
+                            consumed_milligas: 176161_u64.into(),
                             storage_size: 69_u64.into(), // code (67) + unit (2)
                             paid_storage_size_diff: 0_u64.into(), // unit unchanged
                             allocated_destination_contract: false,
@@ -3077,7 +3078,7 @@ mod tests {
                                     ],
                                     ticket_receipt: vec![],
                                     originated_contracts: vec![],
-                                    consumed_milligas: 2_100_000_u64.into(),
+                                    consumed_milligas: 2_100_100_u64.into(),
                                     storage_size: 0_u64.into(),
                                     paid_storage_size_diff: 0_u64.into(),
                                     allocated_destination_contract: false,
@@ -3301,7 +3302,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 171923_u64.into(),
+                        consumed_milligas: 172133_u64.into(),
                         storage_size: 44_u64.into(), // code (33) + "Hello world" (11)
                         paid_storage_size_diff: 4_u64.into(), // "Hello world" (11) − "initial" (7)
                         allocated_destination_contract: false,
@@ -3494,7 +3495,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 171923_u64.into(),
+                        consumed_milligas: 172133_u64.into(),
                         storage_size: 44_u64.into(), // code (33) + "Hello world" (11)
                         paid_storage_size_diff: 4_u64.into(), // "Hello world" (11) − "initial" (7)
                         allocated_destination_contract: false,
@@ -4526,7 +4527,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_kt1.clone(),
                     }],
-                    consumed_milligas: 171777u64.into(),
+                    consumed_milligas: 171927u64.into(),
                     storage_size: 38u64.into(),
                     paid_storage_size_diff: 38u64.into(),
                     lazy_storage_diff: None,
@@ -5131,7 +5132,7 @@ mod tests {
                         originated_contracts: vec![Originated {
                             contract: expected_kt1.clone(),
                         }],
-                        consumed_milligas: 171_777_u64.into(),
+                        consumed_milligas: 171_927_u64.into(),
                         storage_size: 38_u64.into(),
                         paid_storage_size_diff: 38_u64.into(),
                         lazy_storage_diff: None,
@@ -5180,6 +5181,7 @@ mod tests {
         init_account(&mut host, &src.pkh, 100000);
         reveal_account(&mut host, &src);
         let context = context::TezlinkContext::init_context();
+        let mut gas = Gas::default();
 
         let originated_code = "CDR;
                         NIL operation;
@@ -5198,7 +5200,7 @@ mod tests {
             &mut host,
             &contract_chapo_hash,
             &init_script,
-            &Micheline::prim0(mir::lexer::Prim::None),
+            &Micheline::prim0(mir::lexer::Prim::None, &mut gas).unwrap(),
             &1000000_u64.into(),
         );
 
@@ -5319,7 +5321,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_address.clone(),
                     }],
-                    consumed_milligas: 100000_u64.into(),
+                    consumed_milligas: 100200_u64.into(),
                     storage_size: 30_u64.into(),
                     paid_storage_size_diff: 30_u64.into(),
                     lazy_storage_diff: None,
@@ -5372,6 +5374,7 @@ mod tests {
     #[test]
     fn test_internal_originations_generated_addresses() {
         let mut host = MockKernelHost::default();
+        let mut gas = Gas::default();
         let parser = mir::parser::Parser::new();
         let src = bootstrap1();
         init_account(&mut host, &src.pkh, 1000000);
@@ -5406,7 +5409,7 @@ mod tests {
             &mut host,
             &contract_chapo_hash,
             &init_script,
-            &Micheline::prim0(mir::lexer::Prim::None),
+            &Micheline::prim0(mir::lexer::Prim::None, &mut gas).unwrap(),
             &0.into(),
         );
 
@@ -5515,7 +5518,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_address_3,
                     },],
-                    consumed_milligas: 100000_u64.into(),
+                    consumed_milligas: 100200_u64.into(),
                     storage_size: 33_u64.into(),
                     paid_storage_size_diff: 33_u64.into(),
                     lazy_storage_diff: None,
@@ -5569,7 +5572,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_address_2,
                     }],
-                    consumed_milligas: 100000_u64.into(),
+                    consumed_milligas: 100250_u64.into(),
                     storage_size: 30_u64.into(),
                     paid_storage_size_diff: 30_u64.into(),
                     lazy_storage_diff: None,
@@ -5774,7 +5777,7 @@ mod tests {
                             originated_contracts: vec![Originated {
                                 contract: expected_kt1_1.clone(),
                             }],
-                            consumed_milligas: 102400_u64.into(),
+                            consumed_milligas: 102500_u64.into(),
                             storage_size: 30.into(),
                             paid_storage_size_diff: 30.into(),
                             lazy_storage_diff: None,
@@ -5842,7 +5845,7 @@ mod tests {
                             originated_contracts: vec![Originated {
                                 contract: expected_kt1_2.clone(),
                             }],
-                            consumed_milligas: 102400u64.into(),
+                            consumed_milligas: 102500u64.into(),
                             storage_size: 30.into(),
                             paid_storage_size_diff: 30.into(),
                             lazy_storage_diff: None,
@@ -6233,6 +6236,7 @@ mod tests {
     #[test]
     fn test_view_instruction() {
         let mut host = MockKernelHost::default();
+        let mut gas = Gas::default();
         let context = context::TezlinkContext::init_context();
         let src = bootstrap1();
         let mut orignation_nonce = OriginationNonce::initial(OperationHash::default());
@@ -6258,7 +6262,8 @@ mod tests {
             hash: mir::ast::AddressHash::Kt1(view_addr),
             entrypoint: Entrypoint::default(),
         })
-        .into_micheline_optimized_legacy(&arena);
+        .into_micheline_optimized_legacy(&arena, &mut gas)
+        .unwrap();
 
         let (code_caller, storage_caller) = (
             r#"
@@ -6331,6 +6336,7 @@ mod tests {
     #[test]
     fn test_view_balance() {
         let mut host = MockKernelHost::default();
+        let mut gas = Gas::default();
         let context = context::TezlinkContext::init_context();
         let src = bootstrap1();
         let mut orignation_nonce = OriginationNonce::initial(OperationHash::default());
@@ -6361,7 +6367,8 @@ mod tests {
             hash: mir::ast::AddressHash::Kt1(view_addr),
             entrypoint: Entrypoint::default(),
         })
-        .into_micheline_optimized_legacy(&arena);
+        .into_micheline_optimized_legacy(&arena, &mut gas)
+        .unwrap();
 
         // Caller invokes the view and asserts the result equals 500
         init_contract(
@@ -7472,6 +7479,7 @@ mod tests {
     #[test]
     fn gateway_contract_call_receipt_storage_is_none() {
         let mut host = MockKernelHost::default();
+        let mut gas = Gas::default();
         let src = bootstrap1();
         let gateway_kt1 =
             ContractKt1Hash::from_base58_check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
@@ -7493,10 +7501,16 @@ mod tests {
                     &arena,
                     mir::lexer::Prim::Pair,
                     Micheline::Bytes(vec![0u8; 32]),
-                    Micheline::prim0(mir::lexer::Prim::None),
-                ),
-            ),
-        );
+                    Micheline::prim0(mir::lexer::Prim::None, &mut gas).unwrap(),
+                    &mut gas,
+                )
+                .unwrap(),
+                &mut gas,
+            )
+            .unwrap(),
+            &mut gas,
+        )
+        .unwrap();
 
         let operation = make_transfer_operation(
             15,

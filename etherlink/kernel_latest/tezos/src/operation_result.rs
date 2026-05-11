@@ -1029,6 +1029,7 @@ mod tests {
     use mir::ast::annotations::{Annotation, Annotations, NO_ANNS};
     use mir::ast::micheline::Micheline;
     use mir::ast::Entrypoint;
+    use mir::gas::Gas;
     use mir::lexer::Prim;
     use pretty_assertions::assert_eq;
     use std::borrow::Cow;
@@ -1397,6 +1398,7 @@ mod tests {
     #[test]
     fn tezos_compatibility_for_internal_event_with_metadata() {
         let arena = Arena::new();
+        let mut gas = Gas::default();
 
         let source_bytes =
             hex::decode("00005b9a5d6ff9b553b9fae37b844d7a907d8d59593e").unwrap();
@@ -1406,7 +1408,9 @@ mod tests {
             Prim::Pair,
             Micheline::from(10_i128),
             Micheline::from(source_bytes),
+            &mut gas,
         )
+        .unwrap()
         .encode()
         .unwrap();
 

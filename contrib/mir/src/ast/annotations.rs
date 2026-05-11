@@ -37,6 +37,16 @@ impl Annotation<'_> {
             Annotation::Type(s) => Annotation::Type(Cow::Owned(s.into_owned())),
         }
     }
+
+    /// Length of an annotation, including the leading '%', '@', or ':' symbol
+    pub fn len(&self) -> usize {
+        match self {
+            Annotation::Special(s) => s.as_ref().len(),
+            Annotation::Field(s) => 1 + s.as_ref().len(),
+            Annotation::Variable(s) => 1 + s.as_ref().len(),
+            Annotation::Type(s) => 1 + s.as_ref().len(),
+        }
+    }
 }
 
 impl std::fmt::Display for Annotation<'_> {
@@ -174,6 +184,11 @@ impl<'a> Annotations<'a> {
             }
         }
         Ok(res)
+    }
+
+    /// Add an annotation to the list of annotations.
+    pub fn push(&mut self, annotation: Annotation<'a>) -> () {
+        self.0.push(annotation)
     }
 }
 

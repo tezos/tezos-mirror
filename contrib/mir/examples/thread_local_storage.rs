@@ -6,6 +6,7 @@
 
 use mir::ast::*;
 use mir::context::{Ctx, TypecheckingCtx};
+use mir::gas::Gas;
 use mir::parser::Parser;
 use std::cell::RefCell;
 
@@ -55,7 +56,8 @@ fn run_contract(parameter: Micheline) {
             };
             println!("{storage_nat}");
             new_storage
-                .into_micheline_optimized_legacy(&Arena::new())
+                .into_micheline_optimized_legacy(&Arena::new(), &mut Gas::default())
+                .unwrap()
                 .encode()
                 .unwrap()
         });

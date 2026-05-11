@@ -1470,6 +1470,7 @@ pub(crate) fn get_enshrined_contract_entrypoint(
 #[cfg(test)]
 mod tests {
     use mir::ast::{AddressHash, Micheline};
+    use mir::gas::Gas;
     use mir::lexer::Prim;
     use num_bigint::BigInt;
     use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
@@ -1745,6 +1746,7 @@ mod tests {
         body: &[u8],
         method: i64,
     ) -> Micheline<'a> {
+        let mut gas = Gas::default();
         let header_pairs: Vec<Micheline<'a>> = headers
             .iter()
             .map(|(name, value)| {
@@ -1753,7 +1755,9 @@ mod tests {
                     Prim::Pair,
                     name.to_string().into(),
                     value.to_string().into(),
+                    &mut gas,
                 )
+                .unwrap()
             })
             .collect();
         let headers_seq = Micheline::Seq(arena.alloc_extend(header_pairs));
@@ -1761,13 +1765,34 @@ mod tests {
             arena,
             Prim::Pair,
             num_bigint::BigInt::from(method).into(),
-            Micheline::prim0(Prim::None),
-        );
-        let body_method_callback =
-            Micheline::prim2(arena, Prim::Pair, body.to_vec().into(), method_callback);
-        let inner_pair =
-            Micheline::prim2(arena, Prim::Pair, headers_seq, body_method_callback);
-        Micheline::prim2(arena, Prim::Pair, url.to_string().into(), inner_pair)
+            Micheline::prim0(Prim::None, &mut gas).unwrap(),
+            &mut gas,
+        )
+        .unwrap();
+        let body_method_callback = Micheline::prim2(
+            arena,
+            Prim::Pair,
+            body.to_vec().into(),
+            method_callback,
+            &mut gas,
+        )
+        .unwrap();
+        let inner_pair = Micheline::prim2(
+            arena,
+            Prim::Pair,
+            headers_seq,
+            body_method_callback,
+            &mut gas,
+        )
+        .unwrap();
+        Micheline::prim2(
+            arena,
+            Prim::Pair,
+            url.to_string().into(),
+            inner_pair,
+            &mut gas,
+        )
+        .unwrap()
     }
 
     /// Typecheck a Micheline call value into a TypedValue.
@@ -2059,6 +2084,7 @@ mod tests {
 
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
+        let mut gas = Gas::default();
 
         let arena = typed_arena::Arena::new();
         let dest = "0x1234567890123456789012345678901234567890";
@@ -2077,10 +2103,16 @@ mod tests {
                     &arena,
                     Prim::Pair,
                     Micheline::Bytes(abi_params),
-                    Micheline::prim0(Prim::None),
-                ),
-            ),
-        );
+                    Micheline::prim0(Prim::None, &mut gas).unwrap(),
+                    &mut gas,
+                )
+                .unwrap(),
+                &mut gas,
+            )
+            .unwrap(),
+            &mut gas,
+        )
+        .unwrap();
 
         let entrypoint = Entrypoint::try_from("call_evm").unwrap();
         let result = execute_enshrined_contract(

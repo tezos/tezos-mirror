@@ -7,8 +7,11 @@
 use num_bigint::{BigInt, BigUint};
 use typed_arena::Arena;
 
-use super::annotations::{Annotations, NO_ANNS};
-use crate::lexer::Prim;
+use super::annotations::{Annotation, Annotations, NO_ANNS};
+use crate::{
+    gas::{unparsing_cost, Gas, OutOfGas},
+    lexer::Prim,
+};
 
 /// Representation of a Micheline node. The representation is non-owning by
 /// design, so something has to own the child nodes. Generally used with an
@@ -46,10 +49,10 @@ impl<'a> Micheline<'a> {
         arena.alloc_extend(args)
     }
 
-    pub(crate) fn alloc_iter(
+    pub(crate) fn alloc_iter<Err>(
         arena: &'a Arena<Self>,
-        mut iter: impl ExactSizeIterator<Item = Self>,
-    ) -> &'a [Micheline<'a>] {
+        mut iter: impl ExactSizeIterator<Item = Result<Self, Err>>,
+    ) -> Result<&'a [Micheline<'a>], Err> {
         // preallocate the slice, filling it with Micheline::Seq(&[]), which is
         // the simplest Micheline variant. We control the iterator here, it
         // doesn't allocate in the arena, the call is safe.
@@ -58,28 +61,85 @@ impl<'a> Micheline<'a> {
         let buf = arena.alloc_extend(std::iter::repeat_n(Micheline::Seq(&[]), iter.len()));
         let mut actual_len: usize = 0;
         for (dest, item) in buf.iter_mut().zip(&mut iter) {
-            *dest = item;
+            *dest = item?;
             actual_len += 1;
         }
         assert!(iter.next().is_none());
         assert!(buf.len() == actual_len);
-        buf
+        Ok(buf)
+    }
+
+    /// Construct the Int case.
+    pub fn int(i: BigInt, gas: &mut Gas) -> Result<Micheline<'a>, OutOfGas> {
+        gas.consume(unparsing_cost::int(&i)?)?;
+        Ok(Self::Int(i))
+    }
+
+    /// Construct the String case.
+    pub fn string(s: String, gas: &mut Gas) -> Result<Micheline<'a>, OutOfGas> {
+        gas.consume(unparsing_cost::string(&s)?)?;
+        Ok(Self::String(s))
+    }
+
+    /// Construct the Bytes case.
+    pub fn bytes(s: Vec<u8>, gas: &mut Gas) -> Result<Micheline<'a>, OutOfGas> {
+        gas.consume(unparsing_cost::bytes(&s)?)?;
+        Ok(Self::Bytes(s))
     }
 
     /// Construct a primitive application with zero arguments.
-    pub fn prim0(prim: Prim) -> Self {
+    pub fn prim0(prim: Prim, gas: &mut Gas) -> Result<Self, OutOfGas> {
+        gas.consume(unparsing_cost::NODE)?;
+        Ok(Self::prim0_uncarbonated(prim))
+    }
+
+    /// Same as [prim0] but does not consume any gas. Use this only in
+    /// places which cannot be called from the kernel such as the text
+    /// parser, macro expansion, and tests
+    pub(crate) fn prim0_uncarbonated(prim: Prim) -> Self {
         Micheline::App(prim, &[], NO_ANNS)
     }
 
     /// Construct a primitive application with one argument, allocating the
     /// argument in the [Arena].
-    pub fn prim1(arena: &'a Arena<Micheline<'a>>, prim: Prim, arg: Micheline<'a>) -> Self {
+    pub fn prim1(
+        arena: &'a Arena<Micheline<'a>>,
+        prim: Prim,
+        arg: Micheline<'a>,
+        gas: &mut Gas,
+    ) -> Result<Self, OutOfGas> {
+        gas.consume(unparsing_cost::NODE)?;
+        Ok(Self::prim1_uncarbonated(arena, prim, arg))
+    }
+
+    /// Same as [prim1] but does not consume any gas. Use this only in
+    /// places which cannot be called from the kernel such as the text
+    /// parser, macro expansion, and tests
+    pub(crate) fn prim1_uncarbonated(
+        arena: &'a Arena<Micheline<'a>>,
+        prim: Prim,
+        arg: Micheline<'a>,
+    ) -> Self {
         Micheline::App(prim, Self::alloc_seq(arena, [arg]), NO_ANNS)
     }
 
     /// Construct a primitive application with two arguments, allocating the
     /// arguments in the [Arena].
     pub fn prim2(
+        arena: &'a Arena<Micheline<'a>>,
+        prim: Prim,
+        arg1: Micheline<'a>,
+        arg2: Micheline<'a>,
+        gas: &mut Gas,
+    ) -> Result<Self, OutOfGas> {
+        gas.consume(unparsing_cost::NODE)?;
+        Ok(Self::prim2_uncarbonated(arena, prim, arg1, arg2))
+    }
+
+    /// Same as [prim2] but does not consume any gas. Use this only in
+    /// places which cannot be called from the kernel such as the text
+    /// parser, macro expansion, and tests
+    pub(crate) fn prim2_uncarbonated(
         arena: &'a Arena<Micheline<'a>>,
         prim: Prim,
         arg1: Micheline<'a>,
@@ -96,13 +156,76 @@ impl<'a> Micheline<'a> {
         arg1: Micheline<'a>,
         arg2: Micheline<'a>,
         arg3: Micheline<'a>,
+        gas: &mut Gas,
+    ) -> Result<Self, OutOfGas> {
+        gas.consume(unparsing_cost::NODE)?;
+        Ok(Self::prim3_uncarbonated(arena, prim, arg1, arg2, arg3))
+    }
+
+    /// Same as [prim3] but does not consume any gas. Use this only in
+    /// places which cannot be called from the kernel such as the text
+    /// parser, macro expansion, and tests
+    pub(crate) fn prim3_uncarbonated(
+        arena: &'a Arena<Micheline<'a>>,
+        prim: Prim,
+        arg1: Micheline<'a>,
+        arg2: Micheline<'a>,
+        arg3: Micheline<'a>,
     ) -> Self {
         Micheline::App(prim, Self::alloc_seq(arena, [arg1, arg2, arg3]), NO_ANNS)
     }
 
-    /// Construct a Micheline sequence, allocating the elements in the [Arena].
-    pub fn seq<const N: usize>(arena: &'a Arena<Micheline<'a>>, args: [Micheline<'a>; N]) -> Self {
-        Micheline::Seq(Self::alloc_seq(arena, args))
+    /// Construct a primitive application from already-allocated arguments.
+    pub fn prim_n(prim: Prim, args: &'a [Micheline<'a>], gas: &mut Gas) -> Result<Self, OutOfGas> {
+        gas.consume(unparsing_cost::NODE)?;
+        Ok(Self::App(prim, args, NO_ANNS))
+    }
+
+    /// Same as [prim_n] but [args] are allocated in the given arena.
+    pub fn prim_n_arr<const N: usize>(
+        arena: &'a Arena<Micheline<'a>>,
+        prim: Prim,
+        args: [Micheline<'a>; N],
+        gas: &mut Gas,
+    ) -> Result<Self, OutOfGas> {
+        Self::prim_n(prim, Self::alloc_seq(arena, args), gas)
+    }
+
+    /// Construct a Micheline sequence of already-allocated args
+    pub fn seq(args: &'a [Micheline<'a>], gas: &mut Gas) -> Result<Self, OutOfGas> {
+        gas.consume(unparsing_cost::NODE)?;
+        Ok(Self::Seq(args))
+    }
+
+    /// Same as [seq] but [args] are allocated in the given arena.
+    pub fn seq_arr<const N: usize>(
+        arena: &'a Arena<Micheline<'a>>,
+        args: [Micheline<'a>; N],
+        gas: &mut Gas,
+    ) -> Result<Self, OutOfGas> {
+        Self::seq(Self::alloc_seq(arena, args), gas)
+    }
+
+    /// Same as [seq_arr] but does not consume any gas. Use this only in
+    /// places which cannot be called from the kernel such as the text
+    /// parser, macro expansion, and tests
+    pub(crate) fn seq_arr_uncarbonated<const N: usize>(
+        arena: &'a Arena<Micheline<'a>>,
+        args: [Micheline<'a>; N],
+    ) -> Self {
+        Self::Seq(Self::alloc_seq(arena, args))
+    }
+
+    /// Add an annotation on a Micheline node.
+    pub fn annotate(&mut self, annotation: Annotation<'a>, gas: &mut Gas) -> Result<(), OutOfGas> {
+        match self {
+            Self::App(_prim, _args, ref mut annots) => {
+                gas.consume(unparsing_cost::annotation(&annotation)?)?;
+                annots.push(annotation);
+                Ok(())
+            }
+            _ => Ok(()),
+        }
     }
 }
 
@@ -144,7 +267,7 @@ impl From<()> for Micheline<'_> {
 
 impl From<bool> for Micheline<'_> {
     fn from(x: bool) -> Self {
-        Micheline::prim0(if x { Prim::True } else { Prim::False })
+        Micheline::App(if x { Prim::True } else { Prim::False }, &[], NO_ANNS)
     }
 }
 
@@ -167,7 +290,8 @@ pub trait IntoMicheline<'a> {
     fn into_micheline_optimized_legacy(
         self,
         arena: &'a typed_arena::Arena<Micheline<'a>>,
-    ) -> Micheline<'a>;
+        gas: &mut Gas,
+    ) -> Result<Micheline<'a>, OutOfGas>;
 }
 
 /// Pattern synonym matching all types which are not yet

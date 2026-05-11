@@ -6,9 +6,12 @@
 
 use std::rc::Rc;
 
-use crate::lexer::Prim;
+use crate::{
+    gas::{Gas, OutOfGas},
+    lexer::Prim,
+};
 
-use super::{annotations::NO_ANNS, Instruction, IntoMicheline, Micheline, Type, TypedValue};
+use super::{Instruction, IntoMicheline, Micheline, Type, TypedValue};
 
 /// Michelson lambda. Can be either non-recursive or recursive. Michelson
 /// lambdas carry their own raw [Micheline] representation to ensure consistent
@@ -67,11 +70,12 @@ impl<'a> IntoMicheline<'a> for Closure<'a> {
     fn into_micheline_optimized_legacy(
         self,
         arena: &'a typed_arena::Arena<Micheline<'a>>,
-    ) -> Micheline<'a> {
-        match self {
+        gas: &mut Gas,
+    ) -> Result<Micheline<'a>, OutOfGas> {
+        Ok(match self {
             Closure::Lambda(Lambda::Lambda { micheline_code, .. }) => micheline_code,
             Closure::Lambda(Lambda::LambdaRec { micheline_code, .. }) => {
-                Micheline::prim1(arena, Prim::Lambda_rec, micheline_code)
+                Micheline::prim1(arena, Prim::Lambda_rec, micheline_code, gas)?
             }
             Closure::Apply {
                 arg_ty,
@@ -83,42 +87,49 @@ impl<'a> IntoMicheline<'a> for Closure<'a> {
                     out_ty,
                     micheline_code,
                     ..
-                }) => Micheline::seq(
+                }) => Micheline::seq_arr(
                     arena,
                     [
                         Micheline::prim2(
                             arena,
                             Prim::PUSH,
-                            arg_ty.into_micheline_optimized_legacy(arena),
-                            arg_val.into_micheline_optimized_legacy(arena),
-                        ),
-                        Micheline::prim0(Prim::PAIR),
+                            arg_ty.into_micheline_optimized_legacy(arena, gas)?,
+                            arg_val.into_micheline_optimized_legacy(arena, gas)?,
+                            gas,
+                        )?,
+                        Micheline::prim0(Prim::PAIR, gas)?,
                         Micheline::prim3(
                             arena,
                             Prim::LAMBDA_REC,
-                            in_ty.into_micheline_optimized_legacy(arena),
-                            out_ty.into_micheline_optimized_legacy(arena),
+                            in_ty.into_micheline_optimized_legacy(arena, gas)?,
+                            out_ty.into_micheline_optimized_legacy(arena, gas)?,
                             micheline_code,
-                        ),
-                        Micheline::App(Prim::SWAP, &[], NO_ANNS),
-                        Micheline::App(Prim::EXEC, &[], NO_ANNS),
+                            gas,
+                        )?,
+                        Micheline::prim0(Prim::SWAP, gas)?,
+                        Micheline::prim0(Prim::EXEC, gas)?,
                     ],
-                ),
-                Closure::Apply { .. } | Closure::Lambda(Lambda::Lambda { .. }) => Micheline::seq(
-                    arena,
-                    [
-                        Micheline::prim2(
-                            arena,
-                            Prim::PUSH,
-                            arg_ty.into_micheline_optimized_legacy(arena),
-                            arg_val.into_micheline_optimized_legacy(arena),
-                        ),
-                        Micheline::App(Prim::PAIR, &[], NO_ANNS),
-                        closure.into_micheline_optimized_legacy(arena),
-                    ],
-                ),
+                    gas,
+                )?,
+                Closure::Apply { .. } | Closure::Lambda(Lambda::Lambda { .. }) => {
+                    Micheline::seq_arr(
+                        arena,
+                        [
+                            Micheline::prim2(
+                                arena,
+                                Prim::PUSH,
+                                arg_ty.into_micheline_optimized_legacy(arena, gas)?,
+                                arg_val.into_micheline_optimized_legacy(arena, gas)?,
+                                gas,
+                            )?,
+                            Micheline::prim0(Prim::PAIR, gas)?,
+                            closure.into_micheline_optimized_legacy(arena, gas)?,
+                        ],
+                        gas,
+                    )?
+                }
             },
-        }
+        })
     }
 }
 
@@ -157,8 +168,11 @@ mod tests {
             TypedValue::Lambda
         );
         let arena = Arena::new();
+        let mut gas = Gas::default();
         assert_eq!(
-            closure.into_micheline_optimized_legacy(&arena),
+            closure
+                .into_micheline_optimized_legacy(&arena, &mut gas)
+                .unwrap(),
             // checked against octez-client
             // { PUSH nat 2 ; PAIR ; { PUSH int 1 ; PAIR ; { DROP ; UNIT } } }
             seq! {
@@ -192,8 +206,11 @@ mod tests {
             TypedValue::Lambda
         );
         let arena = Arena::new();
+        let mut gas = Gas::default();
         assert_eq!(
-            closure.into_micheline_optimized_legacy(&arena),
+            closure
+                .into_micheline_optimized_legacy(&arena, &mut gas)
+                .unwrap(),
             // checked against octez-client
             //   { PUSH nat 2 ;
             //     PAIR ;
@@ -248,8 +265,11 @@ mod tests {
             TypedValue::Lambda
         );
         let arena = Arena::new();
+        let mut gas = Gas::default();
         assert_eq!(
-            closure.into_micheline_optimized_legacy(&arena),
+            closure
+                .into_micheline_optimized_legacy(&arena, &mut gas)
+                .unwrap(),
             // checked against octez-client's PACK behaviour.
             // the partially-applied lambda above packs into
             // 0x020000002507430965000000060362036203620000000007070001070700010001034202000000020317

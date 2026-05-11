@@ -74,6 +74,7 @@
 //!
 //! ```
 //! use mir::ast::*;
+//! use mir::gas::Gas;
 //! use mir::context::{Ctx, TypecheckingCtx};
 //! use mir::parser::Parser;
 //! use typed_arena::Arena;
@@ -118,7 +119,8 @@
 //! // not concerned about memory consumption, it may be faster to reuse the
 //! // same arena everywhere.
 //! let packed_new_storage = new_storage
-//!     .into_micheline_optimized_legacy(&Arena::new())
+//!     .into_micheline_optimized_legacy(&Arena::new(), &mut Gas::default())
+//!     .unwrap()
 //!     .encode()
 //!     .unwrap();
 //! assert_eq!(
@@ -380,12 +382,12 @@ mod tests {
                 &arena,
                 "foo".into(),
                 &Entrypoint::default(),
-                &M::seq(
+                &M::seq_arr_uncarbonated(
                     &arena,
                     [
-                        M::prim2(&arena, Prim::Elt, "bar".into(), 0.into()),
-                        M::prim2(&arena, Prim::Elt, "baz".into(), 0.into()),
-                        M::prim2(&arena, Prim::Elt, "foo".into(), 0.into()),
+                        M::prim2_uncarbonated(&arena, Prim::Elt, "bar".into(), 0.into()),
+                        M::prim2_uncarbonated(&arena, Prim::Elt, "baz".into(), 0.into()),
+                        M::prim2_uncarbonated(&arena, Prim::Elt, "foo".into(), 0.into()),
                     ],
                 ),
             );
@@ -1197,19 +1199,19 @@ mod multisig_tests {
         x: impl Into<Micheline<'static>>,
         y: impl Into<Micheline<'static>>,
     ) -> Micheline<'static> {
-        Micheline::prim2(arena(), Prim::Pair, x.into(), y.into())
+        Micheline::prim2_uncarbonated(arena(), Prim::Pair, x.into(), y.into())
     }
     fn right(x: impl Into<Micheline<'static>>) -> Micheline<'static> {
-        Micheline::prim1(arena(), Prim::Right, x.into())
+        Micheline::prim1_uncarbonated(arena(), Prim::Right, x.into())
     }
     fn left(x: impl Into<Micheline<'static>>) -> Micheline<'static> {
-        Micheline::prim1(arena(), Prim::Left, x.into())
+        Micheline::prim1_uncarbonated(arena(), Prim::Left, x.into())
     }
     fn some(x: impl Into<Micheline<'static>>) -> Micheline<'static> {
-        Micheline::prim1(arena(), Prim::Some, x.into())
+        Micheline::prim1_uncarbonated(arena(), Prim::Some, x.into())
     }
     fn seq<const N: usize>(xs: [Micheline<'static>; N]) -> Micheline<'static> {
-        Micheline::seq(arena(), xs)
+        Micheline::seq_arr_uncarbonated(arena(), xs)
     }
 
     #[test]

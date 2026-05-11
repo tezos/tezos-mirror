@@ -323,7 +323,8 @@ where
         let result = Rc::try_unwrap(result_rc).unwrap_or_else(|rc| (*rc).clone());
 
         result
-            .into_micheline_optimized_legacy(&parser.arena)
+            .into_micheline_optimized_legacy(&parser.arena, mir_ctx.gas())
+            .map_err(|_| TezosXRuntimeError::OutOfGas)?
             .encode()
             .map_err(|e| {
                 TezosXRuntimeError::Custom(format!("failed to encode view result: {e}"))

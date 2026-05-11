@@ -102,7 +102,7 @@ mod tests {
                 .unwrap_or_else(|err| panic!("tag {tag} should be decodable as primitive: {err}"));
             assert_eq!(
                 micheline,
-                Micheline::prim0(prim),
+                Micheline::prim0_uncarbonated(prim),
                 "tag {tag} is associated to primitive {prim} but we deserialized it as {micheline:?}"
             );
             // While we are at it, we also check that serializing the
