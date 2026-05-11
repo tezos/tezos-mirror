@@ -24,6 +24,17 @@ impl BinWriter for OutOfGas {
     }
 }
 
+/// Error when computing comparison cost.
+#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
+pub enum CompareError {
+    /// Ran out of gas while computing the cost.
+    #[error(transparent)]
+    Cost(#[from] OutOfGas),
+    /// Attempted to compare incomparable values.
+    #[error("comparison of incomparable values")]
+    Incomparable,
+}
+
 /// Default gas limit per transaction, according to
 /// <https://opentezos.com/tezos-basics/economics-and-rewards/#transaction-cost>
 pub const DEFAULT_GAS_AMOUNT: u32 = 1_040_000;
@@ -296,7 +307,7 @@ pub mod interpret_cost {
     use tezos_crypto_rs::CryptoError;
     use thiserror::Error;
 
-    use super::{AsGasCost, BigIntByteSize, Log2i, OutOfGas};
+    use super::{AsGasCost, BigIntByteSize, CompareError, Log2i, OutOfGas};
     use crate::ast::{Micheline, Or, Ticket, TypedValue};
 
     pub const DIP: u32 = 10;
@@ -406,9 +417,9 @@ pub mod interpret_cost {
     pub const CREATE_CONTRACT: u32 = 60;
     pub const VIEW: u32 = 1460; // corresponds to cost_N_IView_synthesized in the Tezos protocol
 
-    pub fn join_tickets(t1: &Ticket, t2: &Ticket) -> Result<u32, OutOfGas> {
+    pub fn join_tickets(t1: &Ticket, t2: &Ticket) -> Result<u32, CompareError> {
         compare(&t1.content, &t2.content)?;
-        add_num(&t1.amount, &t2.amount)
+        Ok(add_num(&t1.amount, &t2.amount)?)
     }
 
     pub fn split_ticket(amount1: &BigUint, amount2: &BigUint) -> Result<u32, OutOfGas> {
@@ -590,25 +601,23 @@ pub mod interpret_cost {
             .as_gas_cost()
     }
 
-    pub fn compare(v1: &TypedValue, v2: &TypedValue) -> Result<u32, OutOfGas> {
+    pub fn compare(v1: &TypedValue, v2: &TypedValue) -> Result<u32, CompareError> {
         use TypedValue as V;
-        let incomparable = || -> Result<u32, OutOfGas> {
-            debug_assert!(false, "comparison of incomparable values");
-            Err(OutOfGas)
-        };
-        let cmp_bytes = |s1: u64, s2: u64| -> Result<u32, OutOfGas> {
+        let cmp_bytes = |s1: u64, s2: u64| -> Result<u32, CompareError> {
             // Approximating 35 + 0.024413 x term
             let v = Checked::from(std::cmp::min(s1, s2));
-            (35 + (v >> 6) + (v >> 7)).as_gas_cost()
+            Ok((35 + (v >> 6) + (v >> 7)).as_gas_cost()?)
         };
         let cmp_pair = |l1: &Rc<TypedValue>,
                         l2: &Rc<TypedValue>,
                         r1: &Rc<TypedValue>,
                         r2: &Rc<TypedValue>|
-         -> Result<u32, OutOfGas> {
+         -> Result<u32, CompareError> {
             let c = Checked::from(10u32);
-            (c + compare(l1.as_ref(), r1.as_ref())? + compare(l2.as_ref(), r2.as_ref())?)
-                .as_gas_cost()
+            Ok(
+                (c + compare(l1.as_ref(), r1.as_ref())? + compare(l2.as_ref(), r2.as_ref())?)
+                    .as_gas_cost()?,
+            )
         };
         let cmp_option = Checked::from(10u32);
         const ADDRESS_SIZE: u64 = 20 + 31; // hash size + max entrypoint size
@@ -616,30 +625,30 @@ pub mod interpret_cost {
         const CMP_KEY: u32 = 92; // hard-coded in the protocol
         const CMP_SIGNATURE: u32 = 92; // hard-coded in the protocol
         let cmp_or = Checked::from(10u32);
-        match (v1, v2) {
-            (V::Nat(l), V::Nat(r)) => cmp_bytes(l.byte_size(), r.byte_size()),
-            (V::Nat(_), _) => incomparable(),
+        Ok(match (v1, v2) {
+            (V::Nat(l), V::Nat(r)) => cmp_bytes(l.byte_size(), r.byte_size())?,
+            (V::Nat(_), _) => return Err(CompareError::Incomparable),
 
-            (V::Int(l), V::Int(r)) => cmp_bytes(l.byte_size(), r.byte_size()),
-            (V::Int(_), _) => incomparable(),
+            (V::Int(l), V::Int(r)) => cmp_bytes(l.byte_size(), r.byte_size())?,
+            (V::Int(_), _) => return Err(CompareError::Incomparable),
 
-            (V::Timestamp(l), V::Timestamp(r)) => cmp_bytes(l.byte_size(), r.byte_size()),
-            (V::Timestamp(_), _) => incomparable(),
+            (V::Timestamp(l), V::Timestamp(r)) => cmp_bytes(l.byte_size(), r.byte_size())?,
+            (V::Timestamp(_), _) => return Err(CompareError::Incomparable),
 
-            (V::Bool(_), V::Bool(_)) => cmp_bytes(1, 1),
-            (V::Bool(_), _) => incomparable(),
+            (V::Bool(_), V::Bool(_)) => cmp_bytes(1, 1)?,
+            (V::Bool(_), _) => return Err(CompareError::Incomparable),
 
-            (V::Mutez(_), V::Mutez(_)) => cmp_bytes(8, 8),
-            (V::Mutez(_), _) => incomparable(),
+            (V::Mutez(_), V::Mutez(_)) => cmp_bytes(8, 8)?,
+            (V::Mutez(_), _) => return Err(CompareError::Incomparable),
 
-            (V::String(l), V::String(r)) => cmp_bytes(l.len() as u64, r.len() as u64),
-            (V::String(_), _) => incomparable(),
+            (V::String(l), V::String(r)) => cmp_bytes(l.len() as u64, r.len() as u64)?,
+            (V::String(_), _) => return Err(CompareError::Incomparable),
 
-            (V::Unit, V::Unit) => Ok(10),
-            (V::Unit, _) => incomparable(),
+            (V::Unit, V::Unit) => 10,
+            (V::Unit, _) => return Err(CompareError::Incomparable),
 
-            (V::Pair(l1, l2), V::Pair(r1, r2)) => cmp_pair(l1, l2, r1, r2),
-            (V::Pair(..), _) => incomparable(),
+            (V::Pair(l1, l2), V::Pair(r1, r2)) => cmp_pair(l1, l2, r1, r2)?,
+            (V::Pair(..), _) => return Err(CompareError::Incomparable),
 
             (V::Option(l), V::Option(r)) => {
                 let cost = match (l, r) {
@@ -648,27 +657,27 @@ pub mod interpret_cost {
                     (Some(_), None) => cmp_option,
                     (Some(l), Some(r)) => cmp_option + compare(l.as_ref(), r.as_ref())?,
                 };
-                cost.as_gas_cost()
+                cost.as_gas_cost()?
             }
-            (V::Option(_), _) => incomparable(),
+            (V::Option(_), _) => return Err(CompareError::Incomparable),
 
-            (V::Address(..), V::Address(..)) => cmp_bytes(ADDRESS_SIZE, ADDRESS_SIZE),
-            (V::Address(_), _) => incomparable(),
+            (V::Address(..), V::Address(..)) => cmp_bytes(ADDRESS_SIZE, ADDRESS_SIZE)?,
+            (V::Address(_), _) => return Err(CompareError::Incomparable),
 
-            (V::ChainId(..), V::ChainId(..)) => Ok(CMP_CHAIN_ID),
-            (V::ChainId(_), _) => incomparable(),
+            (V::ChainId(..), V::ChainId(..)) => CMP_CHAIN_ID,
+            (V::ChainId(_), _) => return Err(CompareError::Incomparable),
 
-            (V::Bytes(l), V::Bytes(r)) => cmp_bytes(l.len() as u64, r.len() as u64),
-            (V::Bytes(_), _) => incomparable(),
+            (V::Bytes(l), V::Bytes(r)) => cmp_bytes(l.len() as u64, r.len() as u64)?,
+            (V::Bytes(_), _) => return Err(CompareError::Incomparable),
 
-            (V::Key(_), V::Key(_)) => Ok(CMP_KEY),
-            (V::Key(_), _) => incomparable(),
+            (V::Key(_), V::Key(_)) => CMP_KEY,
+            (V::Key(_), _) => return Err(CompareError::Incomparable),
 
-            (V::Signature(_), V::Signature(_)) => Ok(CMP_SIGNATURE),
-            (V::Signature(_), _) => incomparable(),
+            (V::Signature(_), V::Signature(_)) => CMP_SIGNATURE,
+            (V::Signature(_), _) => return Err(CompareError::Incomparable),
 
-            (V::KeyHash(_), V::KeyHash(_)) => cmp_bytes(20u64, 20u64),
-            (V::KeyHash(_), _) => incomparable(),
+            (V::KeyHash(_), V::KeyHash(_)) => cmp_bytes(20u64, 20u64)?,
+            (V::KeyHash(_), _) => return Err(CompareError::Incomparable),
 
             (V::Or(l), V::Or(r)) => {
                 let cost = match (l, r) {
@@ -677,12 +686,14 @@ pub mod interpret_cost {
                     (Or::Left(_), Or::Right(_)) => cmp_or,
                     (Or::Right(_), Or::Left(_)) => cmp_or,
                 };
-                cost.as_gas_cost()
+                cost.as_gas_cost()?
             }
-            (V::Or(..), _) => incomparable(),
+            (V::Or(..), _) => return Err(CompareError::Incomparable),
 
             #[cfg(feature = "bls")]
-            (V::Bls12381Fr(_) | V::Bls12381G1(_) | V::Bls12381G2(_), _) => incomparable(),
+            (V::Bls12381Fr(_) | V::Bls12381G1(_) | V::Bls12381G2(_), _) => {
+                return Err(CompareError::Incomparable)
+            }
 
             (
                 V::List(..)
@@ -694,8 +705,8 @@ pub mod interpret_cost {
                 | V::Ticket(_)
                 | V::Lambda(_),
                 _,
-            ) => incomparable(),
-        }
+            ) => return Err(CompareError::Incomparable),
+        })
     }
 
     /// Cost charged for computing total entries size (needed for the subsequent
@@ -724,11 +735,11 @@ pub mod interpret_cost {
         ((Checked::from(len1) + Checked::from(len2)) / 2 + 45).as_gas_cost()
     }
 
-    pub fn map_mem(k: &TypedValue, map_size: usize) -> Result<u32, OutOfGas> {
+    pub fn map_mem(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
         map_get(k, map_size)
     }
 
-    pub fn map_get(k: &TypedValue, map_size: usize) -> Result<u32, OutOfGas> {
+    pub fn map_get(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
         // NB: this doesn't copy the tezos model exactly; tezos model uses
         //
         // 80 + sizeof(key)*log2(map.size)
@@ -744,18 +755,18 @@ pub mod interpret_cost {
         let compare_cost = compare(k, k)?;
         let size_log = (map_size + 1).ok_or(OutOfGas)?.log2i()?;
         let lookup_cost = Checked::from(compare_cost) * size_log;
-        (80 + lookup_cost).as_gas_cost()
+        Ok((80 + lookup_cost).as_gas_cost()?)
     }
 
-    pub fn set_mem(k: &TypedValue, map_size: usize) -> Result<u32, OutOfGas> {
+    pub fn set_mem(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
         // NB: same considerations as for map_get
         let compare_cost = compare(k, k)?;
         let size_log = (Checked::from(map_size) + 1).ok_or(OutOfGas)?.log2i()?;
         let lookup_cost = Checked::from(compare_cost) * size_log;
-        (115 + lookup_cost).as_gas_cost()
+        Ok((115 + lookup_cost).as_gas_cost()?)
     }
 
-    pub fn map_update(k: &TypedValue, map_size: usize) -> Result<u32, OutOfGas> {
+    pub fn map_update(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
         // NB: same considerations as for map_get
         let map_size = Checked::from(map_size);
         let compare_cost = compare(k, k)?;
@@ -763,20 +774,20 @@ pub mod interpret_cost {
         let lookup_cost = Checked::from(compare_cost) * size_log;
         // NB: 2 factor copied from Tezos protocol, in principle it should
         // reflect update vs get overhead.
-        (80 + 2 * lookup_cost).as_gas_cost()
+        Ok((80 + 2 * lookup_cost).as_gas_cost()?)
     }
 
-    pub fn set_update(k: &TypedValue, map_size: usize) -> Result<u32, OutOfGas> {
+    pub fn set_update(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
         // NB: same considerations as for map_update
         let compare_cost = compare(k, k)?;
         let size_log = (Checked::from(map_size) + 1).ok_or(OutOfGas)?.log2i()?;
         let lookup_cost = Checked::from(compare_cost) * size_log;
         // coefficient larger than in case of Map looks suspicious, something
         // to benchmark later
-        (130 + 2 * lookup_cost).as_gas_cost()
+        Ok((130 + 2 * lookup_cost).as_gas_cost()?)
     }
 
-    pub fn map_get_and_update(k: &TypedValue, map_size: usize) -> Result<u32, OutOfGas> {
+    pub fn map_get_and_update(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
         // NB: same considerations as for map_get
         let compare_cost = compare(k, k)?;
         let size_log = (Checked::from(map_size) + 1).ok_or(OutOfGas)?.log2i()?;
@@ -789,7 +800,7 @@ pub mod interpret_cost {
         // However, note that this function is also reused for big_map version
         // of GET_AND_UPDATE, wherein it's more justified. That is to say, take
         // care when updating this.
-        (80 + 3 * lookup_cost).as_gas_cost()
+        Ok((80 + 3 * lookup_cost).as_gas_cost()?)
     }
 
     /// Measures size of Michelson using several metrics.

@@ -57,7 +57,7 @@ use crate::{headers, url, NULL_PKH, TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH};
 /// [`TezosXRuntimeError::BadRequest`] (→ 400).
 fn classify_tc_error(e: TcError) -> TezosXRuntimeError {
     match e {
-        TcError::OutOfGas => TezosXRuntimeError::OutOfGas,
+        TcError::OutOfGas(_) => TezosXRuntimeError::OutOfGas,
         other => TezosXRuntimeError::BadRequest(format!("{other:?}")),
     }
 }
@@ -75,9 +75,13 @@ fn classify_tc_error(e: TcError) -> TezosXRuntimeError {
 /// [`TezosXRuntimeError::OutOfGas`]; everything else defaults to
 /// [`TezosXRuntimeError::BadRequest`].
 fn classify_interpret_error(e: InterpretError) -> TezosXRuntimeError {
+    use mir::gas::CompareError;
     match e {
         InterpretError::OutOfGas => TezosXRuntimeError::OutOfGas,
-        InterpretError::TcError(TcError::OutOfGas) => TezosXRuntimeError::OutOfGas,
+        InterpretError::TcError(TcError::OutOfGas(_)) => TezosXRuntimeError::OutOfGas,
+        InterpretError::CompareError(CompareError::Cost(_)) => {
+            TezosXRuntimeError::OutOfGas
+        }
         InterpretError::EnshrinedViewDispatch(
             err @ EnshrinedViewDispatchError::InvalidDestination { .. },
         ) => TezosXRuntimeError::BadRequest(err.to_string()),
@@ -363,7 +367,7 @@ mod tests {
     #[test]
     fn classify_tc_error_out_of_gas() {
         assert!(matches!(
-            classify_tc_error(TcError::OutOfGas),
+            classify_tc_error(TcError::OutOfGas(mir::gas::OutOfGas)),
             TezosXRuntimeError::OutOfGas
         ));
     }
@@ -387,7 +391,9 @@ mod tests {
     #[test]
     fn classify_interpret_error_nested_tc_out_of_gas() {
         assert!(matches!(
-            classify_interpret_error(InterpretError::TcError(TcError::OutOfGas)),
+            classify_interpret_error(InterpretError::TcError(TcError::OutOfGas(
+                mir::gas::OutOfGas
+            ))),
             TezosXRuntimeError::OutOfGas
         ));
     }

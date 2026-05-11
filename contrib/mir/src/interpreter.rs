@@ -25,7 +25,7 @@ use crate::ast::*;
 #[cfg(feature = "bls")]
 use crate::bls;
 use crate::context::{CtxTrait, TypecheckingCtx};
-use crate::gas::{interpret_cost, OutOfGas};
+use crate::gas::{interpret_cost, CompareError, OutOfGas};
 use crate::interpreter::interpret_cost::SigCostError;
 use crate::irrefutable_match::irrefutable_match;
 use crate::lexer::Prim;
@@ -78,9 +78,14 @@ pub enum InterpretError<'a> {
     /// Error when typechecking unserialized data
     #[error(transparent)]
     TcError(#[from] TcError),
-    /// Stack index was out of bounds when it shouldn't have been.
+    /// Comparison-cost failure (out-of-gas while computing the cost, or an
+    /// attempt to compare incomparable values). Kept distinct from
+    /// [`InterpretError::OutOfGas`] so callers can tell apart "the
+    /// interpreter ran out of its budget" from "I couldn't compute the cost
+    /// of this comparison because the budget didn't cover it (or the types
+    /// can't be compared)".
     #[error(transparent)]
-    StackOob(#[from] StackOob),
+    CompareError(#[from] CompareError),
     #[allow(missing_docs)]
     #[error(transparent)]
     EnshrinedViewDispatch(#[from] EnshrinedViewDispatchError),
@@ -718,19 +723,19 @@ fn interpret_one<'a>(
             #[cfg(feature = "bls")]
             overloads::Neg::Bls12381G1 => {
                 ctx.gas().consume(interpret_cost::NEG_G1)?;
-                let v = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bls12381G1).as_mut();
+                let v = irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::Bls12381G1).as_mut();
                 *v = -(v as &bls::G1);
             }
             #[cfg(feature = "bls")]
             overloads::Neg::Bls12381G2 => {
                 ctx.gas().consume(interpret_cost::NEG_G2)?;
-                let v = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bls12381G2).as_mut();
+                let v = irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::Bls12381G2).as_mut();
                 *v = -(v as &bls::G2);
             }
             #[cfg(feature = "bls")]
             overloads::Neg::Bls12381Fr => {
                 ctx.gas().consume(interpret_cost::NEG_FR)?;
-                let v = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bls12381Fr);
+                let v = irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::Bls12381Fr);
                 *v = -(v as &bls::Fr);
             }
         },
@@ -835,13 +840,13 @@ fn interpret_one<'a>(
         I::And(overload) => match overload {
             overloads::And::Bool => {
                 let o1 = pop!(V::Bool);
-                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bool);
+                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::Bool);
                 ctx.gas().consume(interpret_cost::AND_BOOL)?;
                 *o2 &= o1;
             }
             overloads::And::NatNat => {
                 let o1 = pop!(V::Nat);
-                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Nat);
+                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::Nat);
                 ctx.gas().consume(interpret_cost::and_num(&o1, o2)?)?;
                 *o2 &= o1;
             }
@@ -856,7 +861,7 @@ fn interpret_one<'a>(
             }
             overloads::And::Bytes => {
                 let mut o1 = pop!(V::Bytes);
-                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bytes);
+                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::Bytes);
                 ctx.gas().consume(interpret_cost::and_bytes(&o1, o2)?)?;
 
                 // The resulting vector length is the smallest length among the
@@ -873,19 +878,19 @@ fn interpret_one<'a>(
         I::Or(overload) => match overload {
             overloads::Or::Bool => {
                 let o1 = pop!(V::Bool);
-                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bool);
+                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::Bool);
                 ctx.gas().consume(interpret_cost::OR_BOOL)?;
                 *o2 |= o1;
             }
             overloads::Or::Nat => {
                 let o1 = pop!(V::Nat);
-                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Nat);
+                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::Nat);
                 ctx.gas().consume(interpret_cost::or_num(&o1, o2)?)?;
                 *o2 |= o1;
             }
             overloads::Or::Bytes => {
                 let mut o1 = pop!(V::Bytes);
-                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bytes);
+                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::Bytes);
                 ctx.gas().consume(interpret_cost::or_bytes(&o1, o2)?)?;
 
                 // The resulting vector length is the largest length among the
@@ -902,19 +907,19 @@ fn interpret_one<'a>(
         I::Xor(overloads) => match overloads {
             overloads::Xor::Bool => {
                 let o1 = pop!(V::Bool);
-                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bool);
+                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::Bool);
                 ctx.gas().consume(interpret_cost::XOR_BOOL)?;
                 *o2 ^= o1;
             }
             overloads::Xor::Nat => {
                 let o1 = pop!(V::Nat);
-                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Nat);
+                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::Nat);
                 ctx.gas().consume(interpret_cost::xor_nat(&o1, o2)?)?;
                 *o2 ^= o1;
             }
             overloads::Xor::Bytes => {
                 let mut o1 = pop!(V::Bytes);
-                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bytes);
+                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::Bytes);
 
                 // The resulting vector length is the largest length among the
                 // operands, so to reuse memory we put the largest vector to
@@ -929,7 +934,7 @@ fn interpret_one<'a>(
         },
         I::Not(overload) => match overload {
             overloads::Not::Bool => {
-                let o = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bool);
+                let o = irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::Bool);
                 ctx.gas().consume(interpret_cost::NOT_BOOL)?;
                 *o = !*o;
             }
@@ -944,7 +949,7 @@ fn interpret_one<'a>(
                 stack.push(V::Int(!BigInt::from(o)))
             }
             overloads::Not::Bytes => {
-                let o = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bytes);
+                let o = irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::Bytes);
                 ctx.gas().consume(interpret_cost::not_bytes(o)?)?;
                 for b in o.iter_mut() {
                     *b = !*b
@@ -968,12 +973,12 @@ fn interpret_one<'a>(
         I::Dup(opt_height) => {
             ctx.gas().consume(interpret_cost::dup(*opt_height)?)?;
             let dup_height: usize = opt_height.unwrap_or(1) as usize;
-            stack.push(stack.get(dup_height - 1)?.clone());
+            stack.push(stack.get(dup_height - 1).map_err(TcError::from)?.clone());
         }
         I::Dig(dig_height) => {
             ctx.gas().consume(interpret_cost::dig(*dig_height)?)?;
             if *dig_height > 0 {
-                let e = stack.remove(*dig_height as usize)?;
+                let e = stack.remove(*dig_height as usize).map_err(TcError::from)?;
                 stack.push(e);
             }
         }
@@ -981,7 +986,9 @@ fn interpret_one<'a>(
             ctx.gas().consume(interpret_cost::dug(*dug_height)?)?;
             if *dug_height > 0 {
                 let e = pop_rc!();
-                stack.insert(*dug_height as usize, e)?;
+                stack
+                    .insert(*dug_height as usize, e)
+                    .map_err(TcError::from)?;
             }
         }
         I::Gt => {
@@ -1034,7 +1041,8 @@ fn interpret_one<'a>(
         }
         I::IfCons(when_cons, when_nil) => {
             ctx.gas().consume(interpret_cost::IF_CONS)?;
-            let lst = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::List);
+            let lst =
+                irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::List);
             match lst.uncons() {
                 Some(x) => {
                     stack.push(x);
@@ -1219,7 +1227,7 @@ fn interpret_one<'a>(
         }
         I::Swap => {
             ctx.gas().consume(interpret_cost::SWAP)?;
-            stack.swap(0, 1)?;
+            stack.swap(0, 1).map_err(TcError::from)?;
         }
         I::Failwith(ty) => {
             let x = pop!();
@@ -1457,7 +1465,7 @@ fn interpret_one<'a>(
             overloads::Update::Set => {
                 let key_rc = pop_rc!();
                 let new_present = pop!(V::Bool);
-                let set = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Set);
+                let set = irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::Set);
                 ctx.gas()
                     .consume(interpret_cost::set_update(&key_rc, set.len())?)?;
                 if new_present {
@@ -1469,7 +1477,7 @@ fn interpret_one<'a>(
             overloads::Update::Map => {
                 let key_rc = pop_rc!();
                 let opt_new_val = pop!(V::Option);
-                let map = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Map);
+                let map = irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::Map);
                 ctx.gas()
                     .consume(interpret_cost::map_update(&key_rc, map.len())?)?;
                 match opt_new_val {
@@ -1480,7 +1488,7 @@ fn interpret_one<'a>(
             overloads::Update::BigMap => {
                 let key = pop!();
                 let opt_new_val = pop!(V::Option).map(TypedValue::unwrap_rc);
-                let map = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::BigMap);
+                let map = irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::BigMap);
                 let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
                 ctx.gas().consume(interpret_cost::map_update(&key, len)?)?;
@@ -1491,7 +1499,7 @@ fn interpret_one<'a>(
             overloads::GetAndUpdate::Map => {
                 let key_rc = pop_rc!();
                 let opt_new_val = pop!(V::Option);
-                let map = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Map);
+                let map = irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::Map);
                 ctx.gas()
                     .consume(interpret_cost::map_get_and_update(&key_rc, map.len())?)?;
                 let opt_old_val = match opt_new_val {
@@ -1503,7 +1511,7 @@ fn interpret_one<'a>(
             overloads::GetAndUpdate::BigMap => {
                 let key = pop!();
                 let opt_new_val = pop!(V::Option).map(TypedValue::unwrap_rc);
-                let map = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::BigMap);
+                let map = irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::BigMap);
                 let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
                 ctx.gas()
@@ -1533,7 +1541,8 @@ fn interpret_one<'a>(
         I::UpdateN(n) => {
             ctx.gas().consume(interpret_cost::update_n(*n as usize)?)?;
             let new_val = pop!();
-            let field = get_nth_field_ref(*n, Rc::make_mut(stack.get_mut(0)?));
+            let field =
+                get_nth_field_ref(*n, Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?));
             *field = new_val;
         }
         I::ChainId => {
@@ -1736,7 +1745,8 @@ fn interpret_one<'a>(
         }
         I::ReadTicket => {
             ctx.gas().consume(interpret_cost::READ_TICKET)?;
-            let ticket = irrefutable_match!(stack.get(0)?.as_ref(); V::Ticket);
+            let ticket =
+                irrefutable_match!(stack.get(0).map_err(TcError::from)?.as_ref(); V::Ticket);
             stack.push(unwrap_ticket(ticket.as_ref().clone()));
         }
         I::SplitTicket => {
@@ -1781,27 +1791,27 @@ fn interpret_one<'a>(
             }
         }
         I::Blake2b => {
-            let msg = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bytes);
+            let msg = irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::Bytes);
             ctx.gas().consume(interpret_cost::blake2b(msg)?)?;
             *msg = blake2b_256(msg).to_vec();
         }
         I::Keccak => {
-            let msg = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bytes);
+            let msg = irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::Bytes);
             ctx.gas().consume(interpret_cost::keccak(msg)?)?;
             *msg = keccak256(msg).to_vec();
         }
         I::Sha256 => {
-            let msg = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bytes);
+            let msg = irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::Bytes);
             ctx.gas().consume(interpret_cost::sha256(msg)?)?;
             *msg = sha256(msg).to_vec();
         }
         I::Sha3 => {
-            let msg = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bytes);
+            let msg = irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::Bytes);
             ctx.gas().consume(interpret_cost::sha3(msg)?)?;
             *msg = sha3_256(msg).to_vec();
         }
         I::Sha512 => {
-            let msg = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bytes);
+            let msg = irrefutable_match!(Rc::make_mut(stack.get_mut(0).map_err(TcError::from)?); V::Bytes);
             ctx.gas().consume(interpret_cost::sha512(msg)?)?;
             *msg = sha512(msg).to_vec();
         }
@@ -7512,6 +7522,31 @@ mod interpreter_tests {
                 0
             ),
             ContractKt1Hash::try_from("KT1UvfyLytrt71jh63YV4Yex5SmbNXpWHxtg").unwrap(),
+        );
+    }
+
+    // -- Conversion impls for the formerly-panicking error paths --
+
+    #[test]
+    fn stack_oob_converts_to_internal_tc_error_via_tc_error() {
+        // StackOob does not convert to InterpretError directly. The
+        // idiomatic path is StackOob → TcError → InterpretError; callers
+        // do this with `.map_err(TcError::from)?`.
+        let err: InterpretError = TcError::from(StackOob).into();
+        assert_eq!(
+            err,
+            InterpretError::TcError(TcError::InternalError(
+                "stack index out of bounds".to_owned()
+            ))
+        );
+    }
+
+    #[test]
+    fn compare_error_incomparable_converts_to_compare_error_variant() {
+        let err: InterpretError = CompareError::Incomparable.into();
+        assert_eq!(
+            err,
+            InterpretError::CompareError(CompareError::Incomparable)
         );
     }
 }

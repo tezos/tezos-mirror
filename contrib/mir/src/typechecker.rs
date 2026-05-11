@@ -31,7 +31,7 @@ use crate::ast::*;
 #[cfg(feature = "bls")]
 use crate::bls;
 use crate::context::TypecheckingCtx;
-use crate::gas::{self, tc_cost, Gas, OutOfGas};
+use crate::gas::{self, tc_cost, CompareError, Gas, OutOfGas};
 use crate::irrefutable_match::irrefutable_match;
 use crate::lexer::Prim;
 use crate::stack::*;
@@ -43,8 +43,8 @@ pub enum TcError {
     #[error("type stacks not equal: {0:?} != {1:?}")]
     StacksNotEqual(TypeStack, TypeStack, StacksNotEqualReason),
     /// Ran out of gas during typechecking.
-    #[error("Gas_exhaustion")]
-    OutOfGas,
+    #[error(transparent)]
+    OutOfGas(#[from] OutOfGas),
     /// The type didn't satisfy a given [TypeProperty].
     #[error("type is not {0}: {1:?}")]
     InvalidTypeProperty(TypeProperty, Type),
@@ -176,9 +176,9 @@ pub enum TcError {
     /// See https://octez.tezos.com/docs/active/views.html
     #[error("{0} is forbidden in view context")]
     ForbiddenInView(Prim),
-    /// Stack index was out of bounds when it shouldn't have been.
-    #[error(transparent)]
-    StackOob(#[from] StackOob),
+    /// Internal invariant violation. This should be unreachable for valid Micheline.
+    #[error("internal typechecker error: {0}")]
+    InternalError(String),
 }
 
 impl From<TryFromBigIntError<()>> for TcError {
@@ -193,9 +193,20 @@ impl From<ByteReprError> for TcError {
     }
 }
 
-impl From<OutOfGas> for TcError {
-    fn from(_: OutOfGas) -> Self {
-        TcError::OutOfGas
+impl From<StackOob> for TcError {
+    fn from(_: StackOob) -> Self {
+        TcError::InternalError("stack index out of bounds".to_owned())
+    }
+}
+
+impl From<CompareError> for TcError {
+    fn from(e: CompareError) -> Self {
+        match e {
+            CompareError::Cost(err) => err.into(),
+            CompareError::Incomparable => {
+                TcError::InternalError("comparison of incomparable values".to_owned())
+            }
+        }
     }
 }
 
@@ -6106,7 +6117,7 @@ mod typecheck_tests {
                 gas,
                 &mut tc_stk![Type::Unit, Type::Unit]
             ),
-            Err(TcError::OutOfGas)
+            Err(TcError::OutOfGas(OutOfGas))
         );
     }
 
@@ -9205,4 +9216,25 @@ mod typecheck_tests {
         )
         .is_ok());
     }
+
+    // -- Conversion impls for the formerly-panicking error paths --
+
+    #[test]
+    fn stack_oob_converts_to_internal_error() {
+        let err: TcError = StackOob.into();
+        assert_eq!(
+            err,
+            TcError::InternalError("stack index out of bounds".to_owned())
+        );
+    }
+
+    #[test]
+    fn compare_error_incomparable_converts_to_internal_error() {
+        let err: TcError = CompareError::Incomparable.into();
+        assert_eq!(
+            err,
+            TcError::InternalError("comparison of incomparable values".to_owned())
+        );
+    }
+
 }
