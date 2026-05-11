@@ -84,6 +84,11 @@ Data Availability Layer
   correct parameters when validating pages across protocol boundaries.
   (MRs :gl:`!19674`, :gl:`!20567`, :gl:`!20569`)
 
+- Introduced a new RPC ``GET
+  /chains/<chain>/blocks/<block>/context/dal/past_parameters/<block_level>``
+  which returns the DAL parameters that were active at the given level.
+  (MR :gl:`!19674`)
+
 - Slot attestation history storage has been optimized. (MR :gl:`!20814`)
 
 - Introduced a new optional field ``lag_index`` to DAL entrapment evidence
