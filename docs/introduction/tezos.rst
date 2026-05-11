@@ -23,7 +23,7 @@ This website contains technical documentation about both Octez and the Tezos pro
 The current latest release of Octez is :doc:`../releases/version-24`.
 See that page for minimal hardware requirements for running Octez in a typical setup.
 
-A beta version for :doc:`../releases/version-25` is also available.
+A release candidate for :doc:`../releases/version-25` is also available.
 
 The current Tezos protocol is :doc:`Tallinn <../protocols/024_tallinn>`.
 
