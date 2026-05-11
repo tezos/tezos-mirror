@@ -50,6 +50,44 @@ let subkeys_durable evm_state key =
   let durable = Tezos_scoru_wasm.Durable.of_storage_exn durable in
   Tezos_scoru_wasm.Durable.list durable key
 
+(** Decoded form of the [/evm/world_state/accounts/<addr>/info] record:
+    balance, nonce, and code hash for an EVM account. *)
+module EVM_account_info = struct
+  type t = {
+    balance : Ethereum_types.quantity;
+    nonce : Ethereum_types.quantity;
+    code_hash : Ethereum_types.hash;
+  }
+
+  let encode {balance; nonce; code_hash} =
+    let open Rlp in
+    Rlp.encode
+      (List
+         [
+           Value (Ethereum_types.encode_u256_le balance);
+           Value (Ethereum_types.encode_u64_le nonce);
+           Value (Ethereum_types.encode_hash code_hash);
+         ])
+
+  let decode_opt b =
+    match Rlp.decode b with
+    | Ok (List [Value balance; Value nonce; Value code_hash]) ->
+        let balance = Ethereum_types.decode_number_le balance in
+        let nonce = Ethereum_types.decode_number_le nonce in
+        let code_hash = Ethereum_types.decode_hash code_hash in
+        Some {balance; nonce; code_hash}
+    | _ -> None
+
+  let decode_exn b =
+    match decode_opt b with
+    | Some x -> x
+    | None ->
+        Format.ksprintf
+          Stdlib.failwith
+          "Invalid account info format: %s"
+          Hex.(show @@ of_bytes b)
+end
+
 (* Typed path GADT — see [.mli] for the capability semantics. *)
 
 (** Phantom capability markers for [path]: [rw] is read+write+delete, [ro] is
@@ -107,6 +145,27 @@ type ('a, 'cap) path =
   | Maximum_gas_per_transaction : (Ethereum_types.quantity, ro) path
   | Michelson_to_evm_gas_multiplier : (int64, ro) path
   | Sequencer_pool_address : (Ethereum_types.address, ro) path
+  | Evm_legacy_account_balance :
+      Ethereum_types.address
+      -> (Ethereum_types.quantity, rw) path
+  | Evm_legacy_account_nonce :
+      Ethereum_types.address
+      -> (Ethereum_types.quantity, rw) path
+  | Evm_legacy_account_code :
+      Ethereum_types.address
+      -> (Ethereum_types.hex, rw) path
+  | Evm_legacy_account_code_hash :
+      Ethereum_types.address
+      -> (Ethereum_types.hash, ro) path
+  | Evm_code_by_hash : Ethereum_types.hash -> (Ethereum_types.hex, rw) path
+  | Evm_account_storage :
+      Durable_storage_path.Accounts.fixed_address
+      * Durable_storage_path.Accounts.fixed_index
+      -> (Ethereum_types.hex, rw) path
+  | Evm_account_info : Ethereum_types.address -> (EVM_account_info.t, rw) path
+  | Tezos_account_info :
+      Tezosx.Tezos_runtime.address
+      -> (Tezosx.Tezos_runtime.account_info, ro) path
 
 (** Read-capable resolution variants. [Delete_only] is intentionally absent
     here — it lives directly in {!resolved}, so [path_and_decode] can
@@ -425,6 +484,83 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
              path = Durable_storage_path.sequencer_pool_address;
              decode = infallible_decode Ethereum_types.decode_address;
            })
+  | Evm_legacy_account_balance address ->
+      static_read
+        (Read_write
+           {
+             path = Durable_storage_path.Accounts.balance address;
+             decode = infallible_decode Ethereum_types.decode_number_le;
+             encode =
+               (fun q -> Bytes.to_string (Ethereum_types.encode_u256_le q));
+           })
+  | Evm_legacy_account_nonce address ->
+      static_read
+        (Read_write
+           {
+             path = Durable_storage_path.Accounts.nonce address;
+             decode = infallible_decode Ethereum_types.decode_number_le;
+             encode =
+               (fun q -> Bytes.to_string (Ethereum_types.encode_u64_le q));
+           })
+  | Evm_legacy_account_code address ->
+      static_read
+        (Read_write
+           {
+             path = Durable_storage_path.Accounts.code address;
+             decode =
+               infallible_decode (fun bytes ->
+                   Hex.of_bytes bytes |> Hex.show
+                   |> Ethereum_types.hex_of_string);
+             encode = Ethereum_types.hex_to_bytes;
+           })
+  | Evm_legacy_account_code_hash address ->
+      static_read
+        (Read_only
+           {
+             path = Durable_storage_path.Accounts.code_hash address;
+             decode =
+               infallible_decode (fun bytes ->
+                   Hex.of_bytes bytes |> Hex.show
+                   |> Ethereum_types.hash_of_string);
+           })
+  | Evm_code_by_hash hash ->
+      static_read
+        (Read_write
+           {
+             path = Durable_storage_path.Code.code hash;
+             decode =
+               infallible_decode (fun bytes ->
+                   Hex.of_bytes bytes |> Hex.show
+                   |> Ethereum_types.hex_of_string);
+             encode = Ethereum_types.hex_to_bytes;
+           })
+  | Evm_account_storage (addr, idx) ->
+      static_read
+        (Read_write
+           {
+             path = Durable_storage_path.Accounts.storage addr idx;
+             decode =
+               infallible_decode (fun bytes ->
+                   Bytes.to_string bytes |> Hex.of_string |> Hex.show
+                   |> Ethereum_types.hex_of_string);
+             encode = Ethereum_types.hex_to_bytes;
+           })
+  | Evm_account_info address ->
+      static_read
+        (Read_write
+           {
+             path = Durable_storage_path.Accounts.info address;
+             decode = infallible_decode EVM_account_info.decode_exn;
+             encode =
+               (fun info -> Bytes.to_string (EVM_account_info.encode info));
+           })
+  | Tezos_account_info pkh ->
+      static_read
+        (Read_only
+           {
+             path = Tezosx.Durable_storage_path.Accounts.Tezos.info pkh;
+             decode = Tezosx.Tezos_runtime.decode_account_info;
+           })
 
 let storage_version state =
   let open Lwt_result_syntax in
@@ -488,6 +624,12 @@ let read_opt (type a) (p : (a, [> `Read]) path) (state : Pvm.State.t) :
       let*? v = decode bytes in
       return_some v
   | None -> return_none
+
+let read_or_default (type a) ~(default : a) (p : (a, [> `Read]) path)
+    (state : Pvm.State.t) : a tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let+ v_opt = read_opt p state in
+  Option.value v_opt ~default
 
 let write : type a.
     (a, [> `Write]) path -> a -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t =
@@ -611,6 +753,7 @@ type dir =
   | Transaction_objects
   | Michelson_runtime_contracts_index
   | Michelson_runtime_ledger
+  | Evm_account_storage_dir of Durable_storage_path.Accounts.fixed_address
 
 type resolved_dir =
   | Static_dir of string
@@ -630,6 +773,8 @@ let resolve_dir : dir -> resolved_dir = function
       Static_dir Durable_storage_path.michelson_contracts_index
   | Michelson_runtime_ledger ->
       Static_dir Durable_storage_path.michelson_ledger_root
+  | Evm_account_storage_dir addr ->
+      Static_dir (Durable_storage_path.Accounts.storage_dir addr)
 
 let resolve_dir_with_state (p : dir) (state : Pvm.State.t) :
     string tzresult Lwt.t =

@@ -226,8 +226,6 @@ module Accounts = struct
 
   let code_hash address = account address ^ code_hash
 
-  let storage address index = account address ^ storage_path ^ "/" ^ index
-
   type error += Invalid_address of string | Invalid_key of string
 
   let () =
@@ -252,22 +250,26 @@ module Accounts = struct
       (function Invalid_key path -> Some path | _ -> None)
       (fun path -> Invalid_key path)
 
-  let account_e (Address (Hex s)) =
+  (* Validated wrappers: their values are only constructed through
+     [fixed_address] / [fixed_index], which check the length of the
+     underlying hex strings. The representations are abstract via
+     [.mli] so callers cannot bypass the validators. *)
+  type fixed_address = path
+
+  type fixed_index = path
+
+  let fixed_address (Address (Hex s)) =
     let open Result_syntax in
     if String.length s = 40 then return (accounts_path ^ "/" ^ s)
     else tzfail (Invalid_address s)
 
-  let concat_e address path =
+  let fixed_index s =
     let open Result_syntax in
-    let* address_path = account_e address in
-    return (address_path ^ path)
+    if String.length s = 64 then return s else tzfail (Invalid_key s)
 
-  let storage_e address index =
-    if String.length index = 64 then
-      concat_e address (storage_path ^ "/" ^ index)
-    else Result_syntax.tzfail (Invalid_key index)
+  let storage addr idx = String.concat "" [addr; storage_path; "/"; idx]
 
-  let storage_dir_e address = concat_e address storage_path
+  let storage_dir addr = addr ^ storage_path
 end
 
 module Code = struct

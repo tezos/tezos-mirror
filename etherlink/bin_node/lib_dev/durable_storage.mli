@@ -13,6 +13,22 @@
     modeled in the GADT. New code should add typed constructors
     instead of using [Raw_path]. *)
 
+(** Decoded form of the [/evm/world_state/accounts/<addr>/info] record:
+    balance, nonce, and code hash for an EVM account. *)
+module EVM_account_info : sig
+  type t = {
+    balance : Ethereum_types.quantity;
+    nonce : Ethereum_types.quantity;
+    code_hash : Ethereum_types.hash;
+  }
+
+  val encode : t -> bytes
+
+  val decode_opt : bytes -> t option
+
+  val decode_exn : bytes -> t
+end
+
 (** {2 Typed path GADT}
 
     A path carries two phantom parameters: the decoded value type ['a]
@@ -77,6 +93,27 @@ type ('a, 'cap) path =
   | Maximum_gas_per_transaction : (Ethereum_types.quantity, ro) path
   | Michelson_to_evm_gas_multiplier : (int64, ro) path
   | Sequencer_pool_address : (Ethereum_types.address, ro) path
+  | Evm_legacy_account_balance :
+      Ethereum_types.address
+      -> (Ethereum_types.quantity, rw) path
+  | Evm_legacy_account_nonce :
+      Ethereum_types.address
+      -> (Ethereum_types.quantity, rw) path
+  | Evm_legacy_account_code :
+      Ethereum_types.address
+      -> (Ethereum_types.hex, rw) path
+  | Evm_legacy_account_code_hash :
+      Ethereum_types.address
+      -> (Ethereum_types.hash, ro) path
+  | Evm_code_by_hash : Ethereum_types.hash -> (Ethereum_types.hex, rw) path
+  | Evm_account_storage :
+      Durable_storage_path.Accounts.fixed_address
+      * Durable_storage_path.Accounts.fixed_index
+      -> (Ethereum_types.hex, rw) path
+  | Evm_account_info : Ethereum_types.address -> (EVM_account_info.t, rw) path
+  | Tezos_account_info :
+      Tezosx.Tezos_runtime.address
+      -> (Tezosx.Tezos_runtime.account_info, ro) path
 
 (** {2 Typed operations} *)
 
@@ -91,6 +128,12 @@ val read : ('a, [> `Read]) path -> Pvm.State.t -> 'a tzresult Lwt.t
 (** [read_opt p state] is [Some v] when a value is present at [p], and [None]
     otherwise. *)
 val read_opt : ('a, [> `Read]) path -> Pvm.State.t -> 'a option tzresult Lwt.t
+
+(** [read_or_default ~default p state] is the value at [p], or [default] if
+    none is present. Equivalent to [Option.value ~default] composed with
+    [read_opt]. *)
+val read_or_default :
+  default:'a -> ('a, [> `Read]) path -> Pvm.State.t -> 'a tzresult Lwt.t
 
 (** [write p value state] encodes [value] and stores it at [p]. *)
 val write : ('a, rw) path -> 'a -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t
@@ -127,6 +170,7 @@ type dir =
   | Transaction_objects
   | Michelson_runtime_contracts_index
   | Michelson_runtime_ledger
+  | Evm_account_storage_dir of Durable_storage_path.Accounts.fixed_address
 
 (** [delete_dir d state] recursively removes the subtree rooted at [d]. *)
 val delete_dir : dir -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t

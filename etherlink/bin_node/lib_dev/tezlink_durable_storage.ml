@@ -92,16 +92,12 @@ let balance state ~data_model (c : Contract.t) =
                     e)
           | None -> return Tez.zero)
       | Implicit pkh -> (
-          let* bytes_opt =
-            Durable_storage.read_opt
-              (Raw_path (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh))
-              state
+          let* info_opt =
+            Durable_storage.read_opt (Tezos_account_info pkh) state
           in
-          match bytes_opt with
+          match info_opt with
           | None -> return Tez.zero
-          | Some bytes ->
-              let*? info = Tezosx.Tezos_runtime.decode_account_info bytes in
-              return info.balance))
+          | Some info -> return info.balance))
   | Path ->
       Durable_storage.inspect_durable_and_decode_default
         ~default:Tezos_types.Tez.zero
@@ -121,15 +117,12 @@ let manager state ~data_model (c : Contract.t) =
       match c with
       | Originated _ -> return_none
       | Implicit pkh -> (
-          let* bytes_opt =
-            Durable_storage.read_opt
-              (Raw_path (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh))
-              state
+          let* info_opt =
+            Durable_storage.read_opt (Tezos_account_info pkh) state
           in
-          match bytes_opt with
+          match info_opt with
           | None -> return_none
-          | Some bytes -> (
-              let*? info = Tezosx.Tezos_runtime.decode_account_info bytes in
+          | Some info -> (
               match info.public_key with
               | None -> return_none
               | Some public_key -> return_some (Manager.Public_key public_key)))
@@ -147,16 +140,12 @@ let counter state ~data_model (c : Contract.t) =
       match c with
       | Originated _ -> return_none
       | Implicit pkh -> (
-          let* bytes_opt =
-            Durable_storage.read_opt
-              (Raw_path (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh))
-              state
+          let* info_opt =
+            Durable_storage.read_opt (Tezos_account_info pkh) state
           in
-          match bytes_opt with
+          match info_opt with
           | None -> return_none
-          | Some bytes ->
-              let*? info = Tezosx.Tezos_runtime.decode_account_info bytes in
-              return_some (Z.of_int64 info.nonce)))
+          | Some info -> return_some (Z.of_int64 info.nonce)))
   | Path ->
       Durable_storage.inspect_durable_and_decode_opt
         state

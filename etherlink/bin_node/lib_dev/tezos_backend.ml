@@ -146,15 +146,11 @@ let make (ctxt : Evm_ro_context.t) =
       let* state = Evm_ro_context.get_state ctxt ~block () in
       match (contract : Tezos_types.Contract.t) with
       | Implicit pkh -> (
-          let* read_result =
-            Evm_ro_context.read_state
-              state
-              (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh)
+          let* info_opt =
+            Durable_storage.read_opt (Tezos_account_info pkh) state
           in
-          match read_result with
-          | Some bytes ->
-              let*? info = Tezosx.Tezos_runtime.decode_account_info bytes in
-              return info.balance
+          match info_opt with
+          | Some info -> return info.balance
           | None -> return Tezos_types.Tez.zero)
       | Originated _ -> (
           let path = contract_path contract "/balance" in
@@ -274,15 +270,9 @@ let make (ctxt : Evm_ro_context.t) =
       let* block = shell_block_param_to_eth_block_param block in
       let* state = Evm_ro_context.get_state ctxt ~block () in
       on_implicit_account contract @@ fun pkh ->
-      let* read_result =
-        Evm_ro_context.read_state
-          state
-          (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh)
-      in
-      match read_result with
-      | Some bytes ->
-          let*? info = Tezosx.Tezos_runtime.decode_account_info bytes in
-          return info.public_key
+      let* info_opt = Durable_storage.read_opt (Tezos_account_info pkh) state in
+      match info_opt with
+      | Some info -> return info.public_key
       | None ->
           (* An implicit account absent from durable storage is treated
              as unrevealed, matching L1's `manager_key` RPC which returns
@@ -296,15 +286,11 @@ let make (ctxt : Evm_ro_context.t) =
       match contract with
       | Originated _ -> return_none
       | Implicit pkh -> (
-          let* read_result =
-            Evm_ro_context.read_state
-              state
-              (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh)
+          let* info_opt =
+            Durable_storage.read_opt (Tezos_account_info pkh) state
           in
-          match read_result with
-          | Some bytes ->
-              let*? info = Tezosx.Tezos_runtime.decode_account_info bytes in
-              return_some (Z.of_int64 info.nonce)
+          match info_opt with
+          | Some info -> return_some (Z.of_int64 info.nonce)
           | None -> return_none)
 
     let big_map_get chain block id key_hash =
