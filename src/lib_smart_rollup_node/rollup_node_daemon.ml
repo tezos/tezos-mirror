@@ -975,7 +975,10 @@ let run ~data_dir ~irmin_cache_size (configuration : Configuration.t)
       ~daily_logs_path:Filename.Infix.(data_dir // "daily_logs")
   in
   let* cctxt =
-    Layer_1.client_context cctxt ~timeout:configuration.l1_rpc_timeout
+    Layer_1.client_context
+      cctxt
+      ~reconnection_delay:configuration.reconnection_delay
+      ~timeout:configuration.l1_rpc_timeout
   in
   Random.self_init () (* Initialize random state (for reconnection delays) *) ;
   let*! () = Event.starting_node () in

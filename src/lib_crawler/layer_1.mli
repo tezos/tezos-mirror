@@ -137,16 +137,34 @@ val get_tezos_reorg_for_new_head :
   Block_hash.t * int32 ->
   (Block_hash.t * int32) Reorg.t tzresult Lwt.t
 
-(** [client_context ctxt ~timeout] creates a client context where
-    RPCs will be made with timeout [timeout] seconds. Calls that timeout will
-    resolve with an error [RPC_timeout] which will trigger a reconnection in
-    {!iter_heads}. It also replaces the [chain] method with one that always
-    returns the hash in order to limit RPCs. *)
+(** [client_context ctxt ~reconnection_delay ~timeout] creates a client context
+    where RPCs will be made with timeout [timeout] seconds. Calls that timeout
+    will resolve with an error [RPC_timeout] which will trigger a reconnection
+    in {!iter_heads}. It also replaces the [chain] method with one that always
+    returns the hash in order to limit RPCs. The initial [chain_id] RPC used to
+    fix the chain hash is retried with exponential backoff (base
+    [reconnection_delay]) on connection errors, so the call does not fail
+    if the L1 node is temporarily unreachable at startup. *)
 val client_context :
-  #Client_context.full -> timeout:float -> Client_context.full tzresult Lwt.t
+  #Client_context.full ->
+  reconnection_delay:float ->
+  timeout:float ->
+  Client_context.full tzresult Lwt.t
 
 (** Returns true iff a connection error is present in the given error trace. *)
 val is_connection_error : error trace -> bool
+
+(** [retry_on_connection_error ~name ~reconnection_delay f] runs [f ()] and, if
+    it returns an error trace recognized by {!is_connection_error}, retries
+    indefinitely with randomized exponential backoff (base [reconnection_delay],
+    capped at 1.5h). Other errors are propagated to the caller without retry.
+    The first attempt is immediate; subsequent attempts emit [wait_reconnect]
+    and [cannot_connect] events tagged with [name]. *)
+val retry_on_connection_error :
+  name:string ->
+  reconnection_delay:float ->
+  (unit -> 'a tzresult Lwt.t) ->
+  'a tzresult Lwt.t
 
 (**/**)
 

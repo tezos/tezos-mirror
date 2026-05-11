@@ -769,6 +769,57 @@ let test_rollup_node_l1_behind ~kind =
     Test.fail "No reorg should have been emitted (L1 is on the same chain)" ;
   unit
 
+let test_rollup_node_l1_unavailable_at_startup ~kind =
+  test_full_scenario
+    {
+      variant = None;
+      tags = ["startup"; "l1_unavailable"];
+      description =
+        "rollup node retries when L1 RPC is unreachable at startup, then \
+         connects when L1 comes back";
+    }
+    ~kind
+  @@ fun _protocol sc_rollup_node sc_rollup node client ->
+  let level_before = Node.get_last_seen_level node in
+  Log.info
+    "Stopping L1 node (last seen level %d) before starting rollup node"
+    level_before ;
+  let* () = Node.terminate node in
+  Log.info "Starting rollup node while L1 is down" ;
+  (* Lower the reconnection delay so the test does not need to wait the
+     default backoff and observe at least one cannot_connect event. *)
+  let* () =
+    Sc_rollup_node.run
+      ~event_level:`Debug
+      ~wait_ready:false
+      sc_rollup_node
+      sc_rollup
+      []
+  in
+  let cannot_connect =
+    Sc_rollup_node.wait_for sc_rollup_node "l1_crawler_cannot_connect.v0"
+    @@ fun _json -> Some ()
+  in
+  let failure =
+    let* () =
+      Sc_rollup_node.process sc_rollup_node
+      |> Option.get
+      |> Process.check ~expect_failure:true
+    in
+    Test.fail "Rollup node exited while L1 was unreachable"
+  in
+  let* () = Lwt.pick [failure; cannot_connect] in
+  Log.info "Rollup node observed at least one connection failure as expected" ;
+  Log.info "Rollup node still alive; restarting L1" ;
+  let* () = Node.run node Node.[Connections 0; Synchronisation_threshold 0] in
+  let* () = Node.wait_for_ready node in
+  let* () = Sc_rollup_node.wait_for_ready sc_rollup_node in
+  Log.info "Rollup node became ready after L1 came back" ;
+  let* () = Client.bake_for_and_wait client in
+  let* _ = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
+  Log.info "Rollup node synced after recovery" ;
+  unit
+
 let setup_reorg node client =
   let nodes_args =
     Node.[Synchronisation_threshold 0; History_mode Archive; No_bootstrap_peers]
@@ -8659,6 +8710,7 @@ let register_protocol_independent () =
     sc_rollup_node_disconnects_scenario
     protocols ;
   test_rollup_node_l1_behind ~kind protocols ;
+  test_rollup_node_l1_unavailable_at_startup ~kind protocols ;
   test_rollup_node_inbox
     ~kind
     ~variant:"handles_chain_reorg"
