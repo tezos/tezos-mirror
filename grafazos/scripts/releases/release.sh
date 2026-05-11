@@ -17,6 +17,7 @@ release_major_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^(grafazos|octez)-v
 release_minor_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^(grafazos|octez)-v([0-9]+)\.([0-9]+)((-rc[0-9]+)?|(-beta[0-9]+)?)$/\3/p')
 # Z
 release_rc_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^(grafazos|octez)-v([0-9]+)\.([0-9]+)(-rc)?([0-9]+)?$/\5/p')
+release_beta_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^(grafazos|octez)-v([0-9]+)\.([0-9]+)(-beta)?([0-9]+)?$/\5/p')
 
 release_name="Grafazos version ${release_no_v}"
 
