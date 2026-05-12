@@ -69,6 +69,7 @@ proptest = { workspace = true, optional = true }
 tracing = { workspace = true, optional = true }
 
 mir.workspace = true
+typed-arena.workspace = true
 
 [dev-dependencies]
 tezos-smart-rollup-mock.workspace = true

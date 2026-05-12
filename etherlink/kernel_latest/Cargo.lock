@@ -1245,6 +1245,7 @@ dependencies = [
  "tezosx-tezos-runtime",
  "thiserror 1.0.69",
  "tracing",
+ "typed-arena",
 ]
 
 [[package]]

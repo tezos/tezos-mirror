@@ -19,6 +19,7 @@ use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::hash::{BlockHash, HashTrait};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom::NomReader;
+use tezos_data_encoding::types::Narith;
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::rlp_helpers::{decode_field_u256_le, decode_option_explicit};
 use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
@@ -38,7 +39,8 @@ use tezos_tezlink::operation::{
     ManagerOperation, ManagerOperationContent, Parameters, TransferContent,
 };
 use tezos_tezlink::operation_result::{
-    ApplyOperationErrors, BalanceUpdate, ContentResult, OperationBatchWithMetadata,
+    ApplyOperationErrors, BalanceUpdate, ContentResult, EventContent, EventSuccess,
+    InternalContentWithMetadata, InternalOperationSum, OperationBatchWithMetadata,
     OperationDataAndMetadata, OperationResult, OperationResultSum, OperationWithMetadata,
     TransferError, TransferSuccess, TransferTarget,
 };
@@ -396,6 +398,69 @@ pub struct DepositResult<Outcome> {
     pub runtime: RuntimeId,
 }
 
+/// Builds a Michelson `deposit` event carrying the inbox level and message
+/// id of the originating shared-inbox message, so indexers can correlate a
+/// Tezos-address deposit with the L1 inbox slot that produced it.
+///
+/// Type:    `pair (nat %inbox_level) (nat %inbox_msg_id)`
+/// Payload: `Pair <inbox_level> <inbox_msg_id>`
+fn build_deposit_event(
+    sender: Contract,
+    inbox_level: u32,
+    inbox_msg_id: u32,
+) -> Result<InternalOperationSum, crate::Error> {
+    use mir::ast::annotations::{Annotation, Annotations, NO_ANNS};
+    use mir::ast::micheline::Micheline;
+    use mir::ast::Entrypoint;
+    use mir::lexer::Prim;
+    use std::borrow::Cow;
+    use typed_arena::Arena;
+
+    let arena = Arena::new();
+
+    let payload = Micheline::prim2(
+        &arena,
+        Prim::Pair,
+        Micheline::from(i128::from(inbox_level)),
+        Micheline::from(i128::from(inbox_msg_id)),
+    )
+    .encode()
+    .map_err(|e| {
+        crate::Error::BridgeError(format!("Failed to encode deposit event payload: {e}"))
+    })?;
+
+    let level_annots: Annotations =
+        Annotations::from([Annotation::Field(Cow::Borrowed("inbox_level"))]);
+    let msg_id_annots: Annotations =
+        Annotations::from([Annotation::Field(Cow::Borrowed("inbox_msg_id"))]);
+
+    let ty = Micheline::App(
+        Prim::pair,
+        arena.alloc_extend([
+            Micheline::App(Prim::nat, &[], level_annots),
+            Micheline::App(Prim::nat, &[], msg_id_annots),
+        ]),
+        NO_ANNS,
+    )
+    .encode()
+    .map_err(|e| {
+        crate::Error::BridgeError(format!("Failed to encode deposit event type: {e}"))
+    })?;
+
+    Ok(InternalOperationSum::Event(InternalContentWithMetadata {
+        content: EventContent {
+            tag: Some(Entrypoint::from_string_unchecked("deposit".into())),
+            payload: Some(payload.into()),
+            ty: ty.into(),
+        },
+        sender,
+        nonce: 0,
+        result: ContentResult::Applied(EventSuccess {
+            consumed_milligas: Narith(0u64.into()),
+        }),
+    }))
+}
+
 #[allow(clippy::too_many_arguments)]
 #[trace_kernel]
 pub fn apply_tezosx_xtz_deposit<Host>(
@@ -439,10 +504,10 @@ where
             let amount = mutez_from_wei(deposit.amount)
                 .map_err(|_| crate::Error::InvalidConversion)?;
 
-            let receiver_contract = Contract::Implicit(pkh.clone());
+            let receiver = Contract::Implicit(pkh.clone());
             let content = TransferContent {
                 amount: amount.into(),
-                destination: receiver_contract,
+                destination: receiver.clone(),
                 parameters: Parameters::default(),
             };
 
@@ -454,15 +519,37 @@ where
                 tezos_crypto_rs::hash::UnknownSignature::nom_read_exact(&[0u8; 64])
                     .map_err(|_| crate::Error::InvalidConversion)?;
 
-            let result = match TezosRuntime::add_balance(host, pkh, U256::from(amount)) {
-                Ok(()) => ContentResult::Applied(TransferTarget::ToContrat(
-                    TransferSuccess::default(),
-                )),
-                Err(err) => {
-                    log!(Info, "Deposit failed because of {err}");
-                    ContentResult::Failed(ApplyOperationErrors { errors: vec![] })
-                }
-            };
+            let depositor = Contract::Implicit(source.clone());
+
+            let (result, internal_operation_results) =
+                match TezosRuntime::add_balance(host, pkh, U256::from(amount)) {
+                    Ok(()) => {
+                        let event = build_deposit_event(
+                            depositor.clone(),
+                            deposit.inbox_level,
+                            deposit.inbox_msg_id,
+                        )?;
+                        let success = TransferSuccess {
+                            balance_updates: BalanceUpdate::transfer(
+                                depositor, receiver, amount,
+                            ),
+                            ..TransferSuccess::default()
+                        };
+                        (
+                            ContentResult::Applied(TransferTarget::ToContrat(success)),
+                            vec![event],
+                        )
+                    }
+                    Err(err) => {
+                        log!(Info, "Deposit failed because of {err}");
+                        (
+                            ContentResult::Failed(ApplyOperationErrors {
+                                errors: vec![],
+                            }),
+                            vec![],
+                        )
+                    }
+                };
 
             let applied_operation = AppliedOperation {
                 hash: transaction_hash.into(),
@@ -483,7 +570,7 @@ where
                             receipt: OperationResultSum::Transfer(OperationResult {
                                 balance_updates: vec![],
                                 result,
-                                internal_operation_results: vec![],
+                                internal_operation_results,
                             }),
                         }],
                         signature: dummy_signature,
