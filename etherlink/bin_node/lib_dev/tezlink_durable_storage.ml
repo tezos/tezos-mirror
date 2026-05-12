@@ -39,30 +39,17 @@ module Path = struct
   let account contract =
     accounts_index ^ "/" ^ to_path Contract.encoding contract
 
+  (* [balance]/[manager]/[counter] are kept as path helpers because
+     [sequencer.ml] uses them as raw keys to seed bootstrap accounts via
+     [Evm_context.patch_state] (which takes a raw [key]). They are no
+     longer used as read paths inside this module; reads go through the
+     typed constructors [Durable_storage.Tezlink_balance / _manager /
+     _counter]. *)
   let balance contract = account contract ^ "/balance"
 
   let manager contract = account contract ^ "/manager"
 
   let counter contract = account contract ^ "/counter"
-
-  (** Path to a specific big_map: /tez/tez_accounts/big_map/{id} *)
-  let big_map_id id =
-    big_map ^ "/"
-    ^ Z.to_string (Tezlink_imports.Imported_context.Big_map.Id.unparse_to_z id)
-
-  (** Path to a big_map value:
-      /tez/tez_accounts/big_map/{id}/{key_hash_hex} where
-      key_hash_hex is the hex encoding of the raw Script_expr_hash bytes *)
-  let big_map_value id key_hash =
-    let raw_hash =
-      Tezlink_imports.Imported_protocol.Script_expr_hash.to_bytes key_hash
-    in
-    let (`Hex key_hex) = Hex.of_bytes raw_hash in
-    big_map_id id ^ "/" ^ key_hex
-
-  let big_map_key_type id = big_map_id id ^ "/key_type"
-
-  let big_map_value_type id = big_map_id id ^ "/value_type"
 end
 
 let contract_of_path = Contract.of_hex
@@ -72,21 +59,11 @@ let balance state ~data_model (c : Contract.t) =
   match data_model with
   | Rlp -> (
       match c with
-      | Originated _ -> (
-          let path = Path.balance c in
-          let* bytes_opt = Durable_storage.read_opt (Raw_path path) state in
-          match bytes_opt with
-          | Some bytes -> (
-              match
-                Data_encoding.Binary.of_bytes Tezos_types.Tez.encoding bytes
-              with
-              | Ok balance -> return balance
-              | Error e ->
-                  failwith
-                    "Cannot decode KT1 balance: %a"
-                    Data_encoding.Binary.pp_read_error
-                    e)
-          | None -> return Tez.zero)
+      | Originated _ ->
+          Durable_storage.read_or_default
+            ~default:Tez.zero
+            (Tezlink_balance c)
+            state
       | Implicit pkh -> (
           let* info_opt =
             Durable_storage.read_opt (Tezos_account_info pkh) state
@@ -95,11 +72,10 @@ let balance state ~data_model (c : Contract.t) =
           | None -> return Tez.zero
           | Some info -> return info.balance))
   | Path ->
-      Durable_storage.inspect_durable_and_decode_default
+      Durable_storage.read_or_default
         ~default:Tezos_types.Tez.zero
+        (Tezlink_balance c)
         state
-        (Path.balance c)
-        (Data_encoding.Binary.of_bytes_exn Tez.encoding)
 
 let balance_z state ~data_model c =
   let open Lwt_result_syntax in
@@ -123,11 +99,7 @@ let manager state ~data_model (c : Contract.t) =
               | None -> return_none
               | Some public_key -> return_some (Manager.Public_key public_key)))
       )
-  | Path ->
-      Durable_storage.inspect_durable_and_decode_opt
-        state
-        (Path.manager c)
-        (Data_encoding.Binary.of_bytes_exn Manager.encoding)
+  | Path -> Durable_storage.read_opt (Tezlink_manager c) state
 
 let counter state ~data_model (c : Contract.t) =
   let open Lwt_result_syntax in
@@ -142,47 +114,16 @@ let counter state ~data_model (c : Contract.t) =
           match info_opt with
           | None -> return_none
           | Some info -> return_some (Z.of_int64 info.nonce)))
-  | Path ->
-      Durable_storage.inspect_durable_and_decode_opt
-        state
-        (Path.counter c)
-        (Data_encoding.Binary.of_bytes_exn Data_encoding.n)
+  | Path -> Durable_storage.read_opt (Tezlink_counter c) state
 
 let big_map_get state id key_hash =
-  let open Lwt_result_syntax in
-  let path = Path.big_map_value id key_hash in
-  let decode =
-    Data_encoding.Binary.of_bytes_opt
-      Tezlink_imports.Imported_context.Script.expr_encoding
-  in
-  let+ result =
-    Durable_storage.inspect_durable_and_decode_opt state path decode
-  in
-  Option.join result
+  Durable_storage.read_opt (Tezos_big_map_value (id, key_hash)) state
 
 let big_map_key_type state id =
-  let open Lwt_result_syntax in
-  let path = Path.big_map_key_type id in
-  let decode =
-    Data_encoding.Binary.of_bytes_opt
-      Tezlink_imports.Imported_context.Script.expr_encoding
-  in
-  let+ result =
-    Durable_storage.inspect_durable_and_decode_opt state path decode
-  in
-  Option.join result
+  Durable_storage.read_opt (Tezos_big_map_key_type id) state
 
 let big_map_value_type state id =
-  let open Lwt_result_syntax in
-  let path = Path.big_map_value_type id in
-  let decode =
-    Data_encoding.Binary.of_bytes_opt
-      Tezlink_imports.Imported_context.Script.expr_encoding
-  in
-  let+ result =
-    Durable_storage.inspect_durable_and_decode_opt state path decode
-  in
-  Option.join result
+  Durable_storage.read_opt (Tezos_big_map_value_type id) state
 
 let nth_block state n =
   let open Lwt_result_syntax in
@@ -201,10 +142,7 @@ let nth_block state n =
   | None -> failwith "Block %a not found" Z.pp_print level
   | Some block_hash -> (
       let* block_opt =
-        Durable_storage.inspect_durable_and_decode_opt
-          state
-          (Durable_storage_path.Block.by_hash ~root block_hash)
-          L2_types.Tezos_block.block_from_kernel
+        Durable_storage.read_opt (Tezlink_block_by_hash block_hash) state
       in
       match block_opt with
       | None ->

@@ -147,6 +147,12 @@ type ('a, 'cap) path =
   | Tezos_big_map_value_type :
       Tezlink_imports.Imported_context.Big_map.Id.t
       -> (Tezlink_imports.Imported_context.Script.expr, ro) path
+  | Tezlink_balance : Tezos_types.Contract.t -> (Tezos_types.Tez.t, ro) path
+  | Tezlink_manager : Tezos_types.Contract.t -> (Tezos_types.Manager.t, ro) path
+  | Tezlink_counter : Tezos_types.Contract.t -> (Z.t, ro) path
+  | Tezlink_block_by_hash :
+      Ethereum_types.block_hash
+      -> (L2_types.Tezos_block.t, ro) path
 
 (** {2 Typed operations} *)
 

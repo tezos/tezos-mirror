@@ -200,6 +200,12 @@ type ('a, 'cap) path =
   | Tezos_big_map_value_type :
       Tezlink_imports.Imported_context.Big_map.Id.t
       -> (Tezlink_imports.Imported_context.Script.expr, ro) path
+  | Tezlink_balance : Tezos_types.Contract.t -> (Tezos_types.Tez.t, ro) path
+  | Tezlink_manager : Tezos_types.Contract.t -> (Tezos_types.Manager.t, ro) path
+  | Tezlink_counter : Tezos_types.Contract.t -> (Z.t, ro) path
+  | Tezlink_block_by_hash :
+      Ethereum_types.block_hash
+      -> (L2_types.Tezos_block.t, ro) path
 
 type 'a ro_resolved = {path : string; decode : bytes -> 'a tzresult}
 
@@ -692,6 +698,39 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
           decode =
             safe_binary_decode
               Tezlink_imports.Imported_context.Script.expr_encoding;
+        }
+  | Tezlink_balance contract ->
+      static_ro
+        {
+          path = Durable_storage_path.michelson_contract_balance contract;
+          decode =
+            infallible_decode
+              (Data_encoding.Binary.of_bytes_exn Tezos_types.Tez.encoding);
+        }
+  | Tezlink_manager contract ->
+      static_ro
+        {
+          path = Durable_storage_path.michelson_contract_manager contract;
+          decode =
+            infallible_decode
+              (Data_encoding.Binary.of_bytes_exn Tezos_types.Manager.encoding);
+        }
+  | Tezlink_counter contract ->
+      static_ro
+        {
+          path = Durable_storage_path.michelson_contract_counter contract;
+          decode =
+            infallible_decode
+              (Data_encoding.Binary.of_bytes_exn Data_encoding.n);
+        }
+  | Tezlink_block_by_hash block_hash ->
+      static_ro
+        {
+          path =
+            Durable_storage_path.Block.by_hash
+              ~root:Durable_storage_path.tezosx_tezos_blocks_root
+              block_hash;
+          decode = infallible_decode L2_types.Tezos_block.block_from_kernel;
         }
 
 let storage_version state =
