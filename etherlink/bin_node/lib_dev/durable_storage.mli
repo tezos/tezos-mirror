@@ -26,7 +26,7 @@ module EVM_account_info : sig
 
   val decode_opt : bytes -> t option
 
-  val decode_exn : bytes -> t
+  val decode : bytes -> t tzresult
 end
 
 (** {2 Typed path GADT}
@@ -131,6 +131,22 @@ type ('a, 'cap) path =
   | Evm_current_block_transactions_objects :
       Ethereum_types.block_hash
       -> (Ethereum_types.legacy_transaction_object list, ro) path
+  | Tezos_contract_storage :
+      Tezos_types.Contract.t
+      -> (Tezlink_imports.Imported_context.Script.expr, ro) path
+  | Tezos_contract_code :
+      Tezos_types.Contract.t
+      -> (Tezlink_imports.Imported_context.Script.expr, ro) path
+  | Tezos_big_map_value :
+      Tezlink_imports.Imported_context.Big_map.Id.t
+      * Tezlink_imports.Imported_protocol.Script_expr_hash.t
+      -> (Tezlink_imports.Imported_context.Script.expr, ro) path
+  | Tezos_big_map_key_type :
+      Tezlink_imports.Imported_context.Big_map.Id.t
+      -> (Tezlink_imports.Imported_context.Script.expr, ro) path
+  | Tezos_big_map_value_type :
+      Tezlink_imports.Imported_context.Big_map.Id.t
+      -> (Tezlink_imports.Imported_context.Script.expr, ro) path
 
 (** {2 Typed operations} *)
 

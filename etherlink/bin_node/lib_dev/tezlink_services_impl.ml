@@ -119,12 +119,7 @@ let make (ctxt : Evm_ro_context.t) =
          Support unparsing_mode argument. *)
       let `Main = chain in
       let* state = get_state ~block in
-      Lwt_result.map (Option.value ~default:None)
-      @@ Durable_storage.inspect_durable_and_decode_opt
-           state
-           (Tezlink_durable_storage.Path.storage c)
-           (Data_encoding.Binary.of_bytes_opt
-              Tezlink_imports.Imported_context.Script.expr_encoding)
+      Durable_storage.read_opt (Tezos_contract_storage c) state
 
     let get_code chain block c =
       let open Lwt_result_syntax in
@@ -132,12 +127,7 @@ let make (ctxt : Evm_ro_context.t) =
          Support unparsing_mode argument. *)
       let `Main = chain in
       let* state = get_state ~block in
-      Lwt_result.map (Option.value ~default:None)
-      @@ Durable_storage.inspect_durable_and_decode_opt
-           state
-           (Tezlink_durable_storage.Path.code c)
-           (Data_encoding.Binary.of_bytes_opt
-              Tezlink_imports.Imported_context.Script.expr_encoding)
+      Durable_storage.read_opt (Tezos_contract_code c) state
 
     let get_script chain block c =
       let open Lwt_result_syntax in

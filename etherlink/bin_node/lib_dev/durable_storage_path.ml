@@ -103,6 +103,27 @@ let etherlink_safe_root = "/tmp" ^ World_state.make ""
 
 let michelson_contracts_index = "/tez/tez_accounts/contracts/index"
 
+(** [/tez/tez_accounts/big_map] — root of the Michelson big_map subtree
+    that the kernel ([etherlink/kernel_latest/tezos_execution/src/context.rs])
+    writes under the Tezlink context root. *)
+let tezos_big_map_root = "/tez/tez_accounts/big_map"
+
+let contract_hex contract =
+  let raw_key =
+    Data_encoding.Binary.to_bytes_exn Tezos_types.Contract.encoding contract
+  in
+  let (`Hex s) = Hex.of_bytes raw_key in
+  s
+
+let michelson_contract_dir contract =
+  michelson_contracts_index ^ "/" ^ contract_hex contract
+
+let michelson_contract_storage contract =
+  michelson_contract_dir contract ^ "/data/storage"
+
+let michelson_contract_code contract =
+  michelson_contract_dir contract ^ "/data/code"
+
 let michelson_ledger_root = "/tez/tez_accounts/tezosx"
 
 let tez_world_state_root = TEZ.World_state.root

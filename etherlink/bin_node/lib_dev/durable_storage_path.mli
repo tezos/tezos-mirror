@@ -21,6 +21,20 @@ val etherlink_safe_root : path
     originations both write here. *)
 val michelson_contracts_index : path
 
+(** [/tez/tez_accounts/big_map] — root of the Michelson big_map subtree
+    that the kernel writes under the Tezlink context root. *)
+val tezos_big_map_root : path
+
+(** [michelson_contract_storage contract] is the durable storage path of
+    [contract]'s Michelson storage script
+    ([/tez/tez_accounts/contracts/index/<hex>/data/storage]). *)
+val michelson_contract_storage : Tezos_types.Contract.t -> path
+
+(** [michelson_contract_code contract] is the durable storage path of
+    [contract]'s Michelson code script
+    ([/tez/tez_accounts/contracts/index/<hex>/data/code]). *)
+val michelson_contract_code : Tezos_types.Contract.t -> path
+
 (** [/tez/tez_accounts/tezosx] — root of the TezosX projected accounts
     and cross-runtime alias subtree. *)
 val michelson_ledger_root : path

@@ -45,10 +45,6 @@ module Path = struct
 
   let counter contract = account contract ^ "/counter"
 
-  let storage contract = account contract ^ "/data/storage"
-
-  let code contract = account contract ^ "/data/code"
-
   (** Path to a specific big_map: /tez/tez_accounts/big_map/{id} *)
   let big_map_id id =
     big_map ^ "/"
