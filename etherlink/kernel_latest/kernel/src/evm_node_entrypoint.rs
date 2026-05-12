@@ -508,7 +508,7 @@ fn handle_query_entrypoints_to<Host, R>(
 /// enforced structurally.
 fn encode_entrypoints_result(
     entrypoints_opt: Option<HashMap<Entrypoint, Type>>,
-) -> Result<Vec<u8>, tezos_data_encoding::enc::BinError> {
+) -> anyhow::Result<Vec<u8>> {
     let parser = Parser::new();
     // Pre-encode all entries up front so encoding errors can be surfaced
     // to the caller (the RLP stream API does not let us return errors
@@ -525,7 +525,7 @@ fn encode_entrypoints_result(
                         ty.into_micheline_optimized_legacy(&parser.arena).encode()?;
                     Ok((name_bytes, type_bytes))
                 })
-                .collect::<Result<Vec<_>, tezos_data_encoding::enc::BinError>>()
+                .collect::<anyhow::Result<Vec<_>>>()
         })
         .transpose()?;
     // Sort entries by name before encoding: see the "Determinism
