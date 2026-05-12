@@ -35,7 +35,6 @@ use evm_types::{
     SequencerKeyChange,
 };
 use michelson_types::Withdrawal;
-use tezos_crypto_rs::{blake2b, hash::ContractKt1Hash};
 use tezos_ethereum::block::BlockConstants;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -735,16 +734,18 @@ where
         // canonical implementation — and must stay in sync with it.
         // If either formula changes, this read-only path must change
         // too.
-        match target_runtime {
-            RuntimeId::Tezos => {
-                let kt1 = ContractKt1Hash::from(blake2b::digest_160(&native_bytes));
-                Ok(kt1.to_base58_check())
-            }
-            RuntimeId::Ethereum => {
-                let hash = revm::primitives::keccak256(&native_bytes);
-                Ok(Address::from_slice(&hash.0[..20]).to_string())
-            }
-        }
+        self.database
+            .registry
+            .compute_alias(AliasInfo {
+                runtime: target_runtime,
+                native_address: native_bytes,
+            })
+            .map_err(|e| {
+                CustomPrecompileError::Revert(
+                    format!("Failed to compute alias for source address: {e:?}"),
+                    remaining,
+                )
+            })
     }
 
     fn tezosx_call_http(

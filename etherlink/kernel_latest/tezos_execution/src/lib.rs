@@ -1823,6 +1823,13 @@ pub(crate) mod test_utils {
             Ok((self.generated_alias.clone(), gas_remaining))
         }
 
+        fn compute_alias(
+            &self,
+            _alias_info: AliasInfo,
+        ) -> Result<String, TezosXRuntimeError> {
+            Ok(self.generated_alias.clone())
+        }
+
         fn address_from_string(
             &self,
             address_str: &str,
@@ -1889,6 +1896,13 @@ pub(crate) mod test_utils {
             Host: StorageV1,
         {
             Ok((self.generated_alias.clone(), gas_remaining))
+        }
+
+        fn compute_alias(
+            &self,
+            _alias_info: AliasInfo,
+        ) -> Result<String, TezosXRuntimeError> {
+            Ok(self.generated_alias.clone())
         }
 
         fn address_from_string(
@@ -2005,6 +2019,13 @@ mod tests {
             Host: StorageV1,
         {
             Err(TezosXRuntimeError::RuntimeNotFound(target_runtime))
+        }
+
+        fn compute_alias(
+            &self,
+            alias_info: AliasInfo,
+        ) -> Result<String, TezosXRuntimeError> {
+            Err(TezosXRuntimeError::RuntimeNotFound(alias_info.runtime))
         }
 
         fn address_from_string(
@@ -7148,6 +7169,13 @@ mod tests {
                 Host: StorageV1,
             {
                 Ok(("KT1_mock_revert".to_string(), gas_remaining))
+            }
+
+            fn compute_alias(
+                &self,
+                _alias_info: AliasInfo,
+            ) -> Result<String, TezosXRuntimeError> {
+                Ok("KT1_mock_revert".to_string())
             }
 
             fn address_from_string(

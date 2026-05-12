@@ -62,6 +62,20 @@ impl Registry for RegistryImpl {
         }
     }
 
+    fn compute_alias(
+        &self,
+        alias_info: tezosx_interfaces::AliasInfo,
+    ) -> Result<String, tezosx_interfaces::TezosXRuntimeError> {
+        match alias_info.runtime {
+            tezosx_interfaces::RuntimeId::Tezos => {
+                self.tezos.compute_alias(&alias_info.native_address)
+            }
+            tezosx_interfaces::RuntimeId::Ethereum => {
+                self.ethereum.compute_alias(&alias_info.native_address)
+            }
+        }
+    }
+
     fn address_from_string(
         &self,
         address_str: &str,

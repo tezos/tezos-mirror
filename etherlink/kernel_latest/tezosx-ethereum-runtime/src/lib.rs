@@ -570,6 +570,14 @@ impl RuntimeInterface for EthereumRuntime {
         }
     }
 
+    fn compute_alias(&self, native_address: &[u8]) -> Result<String, TezosXRuntimeError> {
+        let mut hasher = Keccak256::new();
+        hasher.update(native_address);
+        let hash = hasher.finalize();
+        let alias = Address::from_slice(&hash[0..20]);
+        Ok(alias.to_string())
+    }
+
     fn serve<Host>(
         &self,
         registry: &impl Registry,
@@ -652,6 +660,13 @@ mod tests {
         where
             Host: StorageV1,
         {
+            unimplemented!("not needed for this test")
+        }
+
+        fn compute_alias(
+            &self,
+            _alias_info: AliasInfo,
+        ) -> Result<String, TezosXRuntimeError> {
             unimplemented!("not needed for this test")
         }
 

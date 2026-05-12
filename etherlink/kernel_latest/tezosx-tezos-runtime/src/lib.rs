@@ -872,6 +872,11 @@ impl RuntimeInterface for TezosRuntime {
         Ok((kt1_str, remaining))
     }
 
+    fn compute_alias(&self, native_address: &[u8]) -> Result<String, TezosXRuntimeError> {
+        let kt1 = ContractKt1Hash::from(blake2b::digest_160(native_address));
+        Ok(kt1.to_base58_check())
+    }
+
     /// Execute a cross-runtime call where the sender's balance was already
     /// debited by the calling runtime (e.g. EVM gateway). This handles both
     /// implicit and originated destinations, including Michelson code execution
@@ -1143,6 +1148,13 @@ mod tests {
             Host: StorageV1,
         {
             Err(TezosXRuntimeError::RuntimeNotFound(target_runtime))
+        }
+
+        fn compute_alias(
+            &self,
+            alias_info: AliasInfo,
+        ) -> Result<String, TezosXRuntimeError> {
+            Err(TezosXRuntimeError::RuntimeNotFound(alias_info.runtime))
         }
 
         fn address_from_string(
