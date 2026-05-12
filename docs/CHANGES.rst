@@ -3,6 +3,35 @@
 Changelog
 '''''''''
 
+Version 25.0~rc1
+================
+
+Smart Rollup node
+-----------------
+
+- Registered the missing handler for the ``/global/last_cemented_commitment``
+  RPC, which previously returned 404 even though the service was declared. (MR
+  :gl:`!21757`)
+
+- Skip context reconstruction during ``snapshot import`` when the head's commit
+  is already present in the imported context, so non-compact snapshots no longer
+  pay for unnecessary PVM replay. Fixes a regression. (MR :gl:`!21810`)
+
+- Add a ``--dal-node`` option to ``snapshot import`` so reconstruction of
+  compact snapshots can fetch DAL pages from a DAL node. (MR :gl:`!21810`)
+
+- Make ``snapshot import`` more robust when verifying that the snapshot's
+  commitment is published on L1: search around the snapshot's head level
+  rather than only at the L1 head, and report a clear error suggesting an
+  archive L1 node when the snapshot is older than the savepoint. (MR
+  :gl:`!21841`)
+
+- The rollup node no longer exits when the L1 RPC is unreachable at startup;
+  the initial connection is retried with the configured
+  ``--reconnection-delay`` exponential backoff, matching the existing behaviour
+  for runtime disconnections. A ``reconnected`` notice is emitted once the
+  connection is re-established. (MR :gl:`!21854`)
+
 Version 25.0~beta1
 ==================
 
@@ -201,12 +230,12 @@ DAL node
 
 - Dal node exit with code 1 on configuration file handling error. (MR :gl:`!20584`)
 
-- ``octez-dal-node config init`` now fails if a configuration file exists. new
-  command ``octez-dal-node config reset`` should be used instead. (MR
-  :gl:`!20584`)
+- **Breaking change** ``octez-dal-node config init`` now fails if a configuration
+  file exists. new command ``octez-dal-node config reset`` should be used instead.
+  (MR :gl:`!20584`)
 
-- ``octez-dal-node config update`` now fails if no configuration file exists. (MR
-  :gl:`!20584`)
+- **Breaking change** ``octez-dal-node config update`` now fails if no
+  configuration file exists. (MR :gl:`!20584`)
 
 - The DAL node now refuses to publish a slot during the last ``attestation_lag = 8``
   levels before the migration to protocol U to avoid publishing a slot that cannot
