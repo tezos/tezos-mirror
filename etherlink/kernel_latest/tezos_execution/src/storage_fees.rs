@@ -32,9 +32,13 @@ fn burn_storage_fee<Host: StorageV1>(
     nb_consumed_bytes: &Zarith,
 ) -> Result<Vec<BalanceUpdate>, ApplyOperationError> {
     let to_burn = BigUint::from(COST_PER_BYTES)
-        * BigUint::try_from(&nb_consumed_bytes.0).map_err(|_| {
-            ApplyOperationError::Transfer(TransferError::FailedToComputeBalanceUpdate)
-        })?;
+        * BigUint::try_from(&nb_consumed_bytes.0).map_err(
+            |e: num_bigint::TryFromBigIntError<()>| {
+                ApplyOperationError::Transfer(
+                    TransferError::FailedToComputeBalanceUpdate(e.to_string()),
+                )
+            },
+        )?;
     if to_burn.is_zero() {
         return Ok(vec![]);
     }
@@ -44,8 +48,10 @@ fn burn_storage_fee<Host: StorageV1>(
         }
         other => ApplyOperationError::Transfer(other),
     })?;
-    compute_storage_balance_updates(payer.contract(), to_burn).map_err(|_| {
-        ApplyOperationError::Transfer(TransferError::FailedToComputeBalanceUpdate)
+    compute_storage_balance_updates(payer.contract(), to_burn).map_err(|e| {
+        ApplyOperationError::Transfer(TransferError::FailedToComputeBalanceUpdate(
+            e.to_string(),
+        ))
     })
 }
 

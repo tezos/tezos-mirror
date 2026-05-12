@@ -137,8 +137,8 @@ pub enum TransferError {
     MirTypecheckingError(String),
     #[error("Failed to allocate destination")]
     FailedToAllocateDestination,
-    #[error("Failed to compute balance update due to new balance overflow")]
-    FailedToComputeBalanceUpdate,
+    #[error("Failed to compute balance update: {0}")]
+    FailedToComputeBalanceUpdate(String),
     #[error("Failed to apply balance changes")]
     FailedToApplyBalanceChanges,
     #[error("Failed to fetch destination account")]
@@ -183,8 +183,8 @@ pub enum OriginationError {
     FailedToFetchSourceAccount,
     #[error("Failed to fetch originated smart contract")]
     FailedToFetchOriginated,
-    #[error("Failed to compute balance update")]
-    FailedToComputeBalanceUpdate,
+    #[error("Failed to compute balance update: {0}")]
+    FailedToComputeBalanceUpdate(String),
     #[error("Failed to applied balance update")]
     FailedToApplyBalanceUpdate,
     #[error("Can't initialize smart contract")]

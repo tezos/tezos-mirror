@@ -226,7 +226,7 @@ where
 {
     let balance_updates =
         compute_balance_updates(giver_account, receiver_account, amount)
-            .map_err(|_| TransferError::FailedToComputeBalanceUpdate)?;
+            .map_err(|e| TransferError::FailedToComputeBalanceUpdate(e.to_string()))?;
 
     apply_balance_changes(host, giver_account, receiver_account, &amount.0)?;
     Ok(TransferSuccess {
@@ -283,9 +283,11 @@ fn credit_destination_without_debiting_sender(
         // TODO: L2-882 design CRAC receipts
         balance_updates: vec![BalanceUpdate {
             balance: Balance::Account(receiver_account.contract()),
-            changes: receiver_delta
-                .try_into()
-                .map_err(|_| TransferError::FailedToComputeBalanceUpdate)?,
+            changes: receiver_delta.try_into().map_err(
+                |e: num_bigint::TryFromBigIntError<num_bigint::BigInt>| {
+                    TransferError::FailedToComputeBalanceUpdate(e.to_string())
+                },
+            )?,
             update_origin: UpdateOrigin::BlockApplication,
         }],
         ticket_receipt: vec![],
@@ -1074,7 +1076,7 @@ where
     // Compute the initial_balance setup of the smart contract as a balance update for the origination.
     let balance_updates =
         compute_balance_updates(sender_account, &smart_contract, initial_balance)
-            .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
+            .map_err(|e| OriginationError::FailedToComputeBalanceUpdate(e.to_string()))?;
 
     // Apply the initial-balance transfer (sender → smart_contract).
     apply_balance_changes(
