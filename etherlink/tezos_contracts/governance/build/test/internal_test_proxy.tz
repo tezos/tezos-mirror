@@ -4,7 +4,8 @@
   view "get_kernel_upgrade_payload"
        (pair (bytes %kernel_root_hash) (timestamp %activation_timestamp))
        bytes
-       { LAMBDA
+       { CAR ;
+         LAMBDA
            (pair nat nat)
            bytes
            { UNPAIR ;
@@ -30,7 +31,6 @@
                   BYTES ;
                   CONCAT } } ;
          SWAP ;
-         CAR ;
          UNPAIR ;
          PUSH nat 33 ;
          DUP 2 ;
@@ -47,61 +47,61 @@
          IF_NONE { FAILWITH } { SWAP ; DROP } ;
          BYTES ;
          PUSH bytes 0x ;
-         PUSH int 1 ;
+         PUSH int 0 ;
          PUSH int 1 ;
          DUP 4 ;
          SIZE ;
          SUB ;
-         PUSH int 0 ;
-         DUP 2 ;
          DUP 2 ;
          COMPARE ;
          LE ;
          LOOP { DUP ;
-                DUG 3 ;
-                DIP 3
-                    { ISNAT ;
-                      PUSH string "INDEX_NOT_NAT" ;
-                      SWAP ;
-                      IF_NONE { FAILWITH } { SWAP ; DROP } ;
-                      SWAP ;
-                      DUP 3 ;
-                      PUSH nat 1 ;
-                      DIG 3 ;
-                      SLICE ;
-                      IF_NONE { PUSH string "SLICE" ; FAILWITH } {} ;
-                      CONCAT } ;
-                DUP 3 ;
+                ISNAT ;
+                PUSH string "INDEX_NOT_NAT" ;
+                SWAP ;
+                IF_NONE { FAILWITH } { SWAP ; DROP } ;
+                DIG 2 ;
+                DUP 4 ;
+                PUSH nat 1 ;
+                DIG 3 ;
+                SLICE ;
+                IF_NONE { PUSH string "SLICE" ; FAILWITH } {} ;
+                CONCAT ;
+                SWAP ;
+                PUSH int 1 ;
                 ADD ;
-                DUP 2 ;
+                PUSH int 1 ;
+                DUP 4 ;
+                SIZE ;
+                SUB ;
                 DUP 2 ;
                 COMPARE ;
                 LE } ;
-         DROP 3 ;
+         DROP ;
          SWAP ;
          DROP ;
          DUP ;
          SIZE ;
          INT ;
          PUSH int 1 ;
-         PUSH int 1 ;
          PUSH nat 8 ;
          SUB ;
-         DIG 2 ;
-         DUP 2 ;
          DUP 2 ;
          COMPARE ;
          LE ;
-         LOOP { DUP ;
-                DUG 3 ;
-                DIP 3 { DROP ; PUSH bytes 0x00 ; SWAP ; CONCAT } ;
-                DUP 3 ;
+         LOOP { PUSH bytes 0x00 ;
+                DIG 2 ;
+                CONCAT ;
+                SWAP ;
+                PUSH int 1 ;
                 ADD ;
-                DUP 2 ;
+                PUSH int 1 ;
+                PUSH nat 8 ;
+                SUB ;
                 DUP 2 ;
                 COMPARE ;
                 LE } ;
-         DROP 3 ;
+         DROP ;
          NIL bytes ;
          SWAP ;
          CONS ;
@@ -132,10 +132,10 @@
          CONCAT } ;
   view "get_sequencer_upgrade_payload"
        (pair (string %sequencer_pk)
-             (bytes %pool_address)
-             (timestamp %activation_timestamp))
+             (pair (bytes %pool_address) (timestamp %activation_timestamp)))
        bytes
-       { LAMBDA
+       { CAR ;
+         LAMBDA
            (pair nat nat)
            bytes
            { UNPAIR ;
@@ -161,7 +161,6 @@
                   BYTES ;
                   CONCAT } } ;
          SWAP ;
-         CAR ;
          UNPAIR 3 ;
          DUP ;
          SIZE ;
@@ -197,61 +196,61 @@
          IF_NONE { FAILWITH } { SWAP ; DROP } ;
          BYTES ;
          PUSH bytes 0x ;
-         PUSH int 1 ;
+         PUSH int 0 ;
          PUSH int 1 ;
          DUP 4 ;
          SIZE ;
          SUB ;
-         PUSH int 0 ;
-         DUP 2 ;
          DUP 2 ;
          COMPARE ;
          LE ;
          LOOP { DUP ;
-                DUG 3 ;
-                DIP 3
-                    { ISNAT ;
-                      PUSH string "INDEX_NOT_NAT" ;
-                      SWAP ;
-                      IF_NONE { FAILWITH } { SWAP ; DROP } ;
-                      SWAP ;
-                      DUP 3 ;
-                      PUSH nat 1 ;
-                      DIG 3 ;
-                      SLICE ;
-                      IF_NONE { PUSH string "SLICE" ; FAILWITH } {} ;
-                      CONCAT } ;
-                DUP 3 ;
+                ISNAT ;
+                PUSH string "INDEX_NOT_NAT" ;
+                SWAP ;
+                IF_NONE { FAILWITH } { SWAP ; DROP } ;
+                DIG 2 ;
+                DUP 4 ;
+                PUSH nat 1 ;
+                DIG 3 ;
+                SLICE ;
+                IF_NONE { PUSH string "SLICE" ; FAILWITH } {} ;
+                CONCAT ;
+                SWAP ;
+                PUSH int 1 ;
                 ADD ;
-                DUP 2 ;
+                PUSH int 1 ;
+                DUP 4 ;
+                SIZE ;
+                SUB ;
                 DUP 2 ;
                 COMPARE ;
                 LE } ;
-         DROP 3 ;
+         DROP ;
          SWAP ;
          DROP ;
          DUP ;
          SIZE ;
          INT ;
          PUSH int 1 ;
-         PUSH int 1 ;
          PUSH nat 8 ;
          SUB ;
-         DIG 2 ;
-         DUP 2 ;
          DUP 2 ;
          COMPARE ;
          LE ;
-         LOOP { DUP ;
-                DUG 3 ;
-                DIP 3 { DROP ; PUSH bytes 0x00 ; SWAP ; CONCAT } ;
-                DUP 3 ;
+         LOOP { PUSH bytes 0x00 ;
+                DIG 2 ;
+                CONCAT ;
+                SWAP ;
+                PUSH int 1 ;
                 ADD ;
-                DUP 2 ;
+                PUSH int 1 ;
+                PUSH nat 8 ;
+                SUB ;
                 DUP 2 ;
                 COMPARE ;
                 LE } ;
-         DROP 3 ;
+         DROP ;
          NIL bytes ;
          SWAP ;
          CONS ;
