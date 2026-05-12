@@ -108,9 +108,10 @@ module Error : sig
         (** NDS-only: the registry has fewer databases than the [db_index]
             requested. Distinct from {!Store_not_a_node}, which refers to
             the classic tree storage. Has code `-14`. *)
-    | Nds_resize_too_large
-        (** NDS-only: the registry can only be resized by one database at
-            a time. Has code `-15`. *)
+    | Nds_resize_invalid
+        (** NDS-only: the requested registry resize is invalid — either
+            the requested delta is larger than one database, it
+            would shrink the registry below zero, or would overflow the maximum number of databases (2^31). Has code `-15`. *)
     | Nds_not_enabled
         (** NDS-only: an NDS host function was invoked while the
             [nds_host_functions_enabled] runtime flag is off. Lets the
