@@ -46,23 +46,23 @@ type ro = [`Read]
 
 type ('a, 'cap) path =
   | Raw_path : string -> (bytes, rw) path
-  | Chain_id : (L2_types.chain_id, rw) path
-  | Michelson_runtime_chain_id : (L2_types.chain_id, rw) path
-  | Kernel_version : (string, rw) path
-  | Kernel_root_hash : (Ethereum_types.hex, rw) path
-  | Multichain_flag : (unit, rw) path
-  | Sequencer_key : (Signature.Public_key.t, rw) path
+  | Chain_id : (L2_types.chain_id, ro) path
+  | Michelson_runtime_chain_id : (L2_types.chain_id, ro) path
+  | Kernel_version : (string, ro) path
+  | Kernel_root_hash : (Ethereum_types.hex, ro) path
+  | Multichain_flag : (unit, ro) path
+  | Sequencer_key : (Signature.Public_key.t, ro) path
   | Chain_config_family :
       L2_types.chain_id
-      -> (L2_types.ex_chain_family, rw) path
-  | Tezosx_feature_flag : Tezosx.runtime -> (unit, rw) path
-  | Michelson_runtime_sunrise_level : (Ethereum_types.quantity, rw) path
+      -> (L2_types.ex_chain_family, ro) path
+  | Tezosx_feature_flag : Tezosx.runtime -> (unit, ro) path
+  | Michelson_runtime_sunrise_level : (Ethereum_types.quantity, ro) path
   | Current_block_number :
       _ L2_types.chain_family
-      -> (Ethereum_types.quantity, rw) path
+      -> (Ethereum_types.quantity, ro) path
   | Current_block_hash :
       _ L2_types.chain_family
-      -> (Ethereum_types.block_hash, rw) path
+      -> (Ethereum_types.block_hash, ro) path
   | Evm_node_flag : (unit, rw) path
   | Blueprint_chunk : {
       blueprint_number : Z.t;
