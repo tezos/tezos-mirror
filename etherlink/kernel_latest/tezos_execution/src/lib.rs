@@ -64,6 +64,7 @@ use crate::mir_ctx::{
     HasContractAccount, HasHost, HasOperationGas, HasOriginLookup, HasSourcePublicKey,
     OperationCtx, TcCtx,
 };
+use crate::storage_fees::{compute_storage_balance_updates, COST_PER_BYTES};
 
 /// Result of applying a single operation within a batch.
 ///
@@ -160,6 +161,7 @@ pub mod context;
 pub mod enshrined_contracts;
 mod gas;
 pub mod mir_ctx;
+mod storage_fees;
 mod validate;
 
 fn reveal<Host, C: Context>(
@@ -1036,7 +1038,6 @@ fn handle_storage_with_big_maps<'a, Host: StorageV1, C: Context>(
 
 // Values from src/proto_023_PtSeouLo/lib_parameters/default_parameters.ml.
 const ORIGINATION_SIZE: u64 = 257;
-const COST_PER_BYTES: u64 = 250;
 const ORIGINATION_COST: u64 = ORIGINATION_SIZE * COST_PER_BYTES;
 
 /// Originate a contract deployed by the public key hash given in parameter. For now
@@ -1162,32 +1163,6 @@ fn compute_balance_updates(
     };
 
     Ok(vec![giver_update, receiver_update])
-}
-
-/// Prepares balance updates when accounting storage fees in the format expected by the Tezos operation.
-fn compute_storage_balance_updates(
-    source_contract: Contract,
-    fee: BigUint,
-) -> Result<Vec<BalanceUpdate>, num_bigint::TryFromBigIntError<num_bigint::BigInt>> {
-    if fee.eq(&0_u64.into()) {
-        return Ok(vec![]);
-    };
-    let source_delta = BigInt::from_biguint(num_bigint::Sign::Minus, fee.clone());
-    let block_fees = BigInt::from_biguint(num_bigint::Sign::Plus, fee);
-
-    let source_update = BalanceUpdate {
-        balance: Balance::Account(source_contract),
-        changes: source_delta.try_into()?,
-        update_origin: UpdateOrigin::BlockApplication,
-    };
-
-    let block_fees = BalanceUpdate {
-        balance: Balance::StorageFees,
-        changes: block_fees.try_into()?,
-        update_origin: UpdateOrigin::BlockApplication,
-    };
-
-    Ok(vec![source_update, block_fees])
 }
 
 /// Applies balance changes by updating both source and destination accounts.
@@ -1980,6 +1955,8 @@ mod tests {
     use typed_arena::Arena;
 
     use crate::gas::TezlinkOperationGas;
+    use crate::make_default_ctx;
+    use crate::storage_fees::COST_PER_BYTES;
     use crate::ORIGINATION_COST;
     use crate::{
         account_storage::{Manager, TezlinkAccount},
@@ -1995,7 +1972,6 @@ mod tests {
         vec![OwnedPath::from(&RefPath::assert_from(b"/tez/tez_accounts"))]
     }
     use crate::{get_required_da_fees, TcCtx};
-    use crate::{make_default_ctx, COST_PER_BYTES};
     use primitive_types::U256;
     use tezosx_interfaces::{
         AliasInfo, CrossRuntimeContext, Registry, RuntimeId, TezosXRuntimeError,
