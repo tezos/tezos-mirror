@@ -79,6 +79,8 @@
   decoded-code corruption, balance overflow) via the typed
   `LookupViewError` enum, instead of silently masquerading as "view
   not found". (!21474)
+- MIR: harden the Michelson runtime — internal aborts now surface as
+  structured errors. (!21866)
 
 ## Version 0.3 (d2a6743ebef523c88c986c21311307a4251e67e4)
 
