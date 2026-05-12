@@ -3505,6 +3505,106 @@ let test_v57_michelson_runtime_paths_migration =
        got %L" ;
   unit
 
+(* Previewnet counterpart of [test_kernel_storage_version_matches_constant] in
+   [evm_sequencer.ml]: assert the previewnet kernel's baked STORAGE_VERSION
+   matches what [Kernel.storage_version Previewnet] reports. Lives here (not
+   alongside the latest+mainnet check) because the default [register_all]
+   fixture cannot boot the previewnet kernel — a fresh install writes V56
+   verbatim, skipping the V50–V56 migrations that move [/evm/sequencer] to
+   [/evm/world_state/sequencer], so the sequencer EVM node aborts. Pre-seeding
+   [/evm/storage_version] with V49 (same workaround as [test_v57_*] above)
+   forces the migration ladder to run; once it has, the kernel writes its
+   STORAGE_VERSION (V56) to [/base/storage_version], where we read it back. *)
+let test_previewnet_storage_version_matches_constant =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:
+      [
+        "evm";
+        "durable_storage";
+        "storage_version";
+        "kernel_constant";
+        "previewnet";
+      ]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.previewnet_kernel;
+      ])
+    ~title:
+      "Kernel.storage_version matches the previewnet kernel's baked \
+       STORAGE_VERSION"
+  @@ fun protocol ->
+  let admin = Constant.bootstrap1 in
+  (* Same V49 little-endian u64 hex as [test_v57_michelson_runtime_paths_migration]. *)
+  let storage_version_v49_le_u64_hex = "3100000000000000" in
+  let additional_config =
+    Sc_rollup_helpers.Installer_kernel_config.
+      [
+        Set
+          {value = storage_version_v49_le_u64_hex; to_ = "/evm/storage_version"};
+      ]
+  in
+  let* common_setup, mode =
+    setup_evm_kernel
+      ~kernel:Kernel.Previewnet
+      ~additional_config
+      ~setup_mode:
+        (Setup_sequencer
+           {
+             return_sequencer = true;
+             time_between_blocks = Some Nothing;
+             sequencer = admin;
+             max_blueprints_ahead = None;
+             genesis_timestamp = None;
+           })
+      ~admin:(Some admin)
+      protocol
+  in
+  let {client; sc_rollup_node; _} : common_setup = common_setup in
+  let evm_node =
+    match mode with Sequencer {evm_node} -> evm_node | Proxy -> assert false
+  in
+  (* Ensure the rollup has processed the genesis kernel boot so the V49→V56
+     migration ladder has run and the kernel has written its STORAGE_VERSION
+     to /base/storage_version. *)
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node () in
+  let kernel = Kernel.Previewnet in
+  let key = Durable_storage_path.storage_version kernel in
+  let* raw_opt =
+    Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks:Tezos_regression.rpc_hooks
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind
+         ~operation:Sc_rollup_rpc.Value
+         ~key
+         ()
+  in
+  let actual =
+    match raw_opt with
+    | None ->
+        Test.fail
+          ~__LOC__
+          "No value found in durable storage at path %S — the kernel did not \
+           initialize its storage version"
+          key
+    | Some hex ->
+        let bytes = Hex.to_bytes (`Hex hex) in
+        Bytes.get_int64_le bytes 0 |> Int64.to_int
+  in
+  let expected = Kernel.storage_version kernel in
+  Check.(
+    (actual = expected)
+      int
+      ~error_msg:
+        (Printf.sprintf
+           "Previewnet kernel wrote V%%L to %s but Kernel.storage_version \
+            reports V%%R — update [storage_version] in \
+            etherlink/tezt/lib/kernel.ml to match the rebaked kernel."
+           key)) ;
+  unit
+
 let test_sequencer_and_kernel_upgrade_via_kernel_admin =
   Protocol.register_test
     ~__FILE__
@@ -6738,6 +6838,7 @@ let register_evm_node ~protocols =
   test_kernel_upgrade_via_kernel_security_governance protocols ;
   test_kernel_upgrade_activates_michelson_runtime protocols ;
   test_v57_michelson_runtime_paths_migration protocols ;
+  test_previewnet_storage_version_matches_constant protocols ;
   test_sequencer_and_kernel_upgrade_via_kernel_admin protocols ;
   test_rpc_sendRawTransaction protocols ;
   test_cannot_prepayed_with_delay_leads_to_no_injection protocols ;
