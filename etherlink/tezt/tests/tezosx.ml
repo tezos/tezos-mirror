@@ -501,6 +501,83 @@ let deposit ~(l1_contracts : Tezt_etherlink.Setup.l1_contracts)
   in
   unit
 
+(** Structured view of a Michelson internal [event] receipt, as decoded from
+    the Tezlink RPC. There is no canonical helper for this in
+    [tezt/lib_tezos] — [tezt/tests/events.ml] navigates the JSON by hand. *)
+type event_receipt = {
+  kind : string;
+  tag : string;
+  source : string;
+  result_status : string;
+  type_prim : string;
+  (* For a [pair] type: each immediate type arg, as [(prim, annots)]. *)
+  type_args : (string * string list) list;
+  payload_prim : string;
+  (* The flat list of integer leaves of the payload, parsed as OCaml ints. *)
+  payload_int_args : int list;
+}
+
+(** Structured view of a tez deposit operation receipt, as decoded from the
+    Tezlink RPC. *)
+type deposit_receipt = {
+  source : string;
+  op_status : string;
+  balance_updates : Operation_receipt.Balance_updates.t list;
+  internal_ops : event_receipt list;
+}
+
+(** [parse_head_deposit_receipt ~sequencer ()] fetches the head Tezos block's
+    first manager operation through the Tezlink RPC and decomposes it into a
+    [deposit_receipt]. Reuses [Operation_receipt.Balance_updates] for the
+    balance_updates list; structural validation is left to the caller. *)
+let parse_head_deposit_receipt ~sequencer () =
+  let tezlink_endpoint =
+    Endpoint.{(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"}
+  in
+  let* operation =
+    RPC_core.call tezlink_endpoint
+    @@ RPC.get_chain_block_operations_validation_pass
+         ~validation_pass:3
+         ~operation_offset:0
+         ()
+  in
+  let open JSON in
+  let content = operation |-> "contents" |=> 0 in
+  let metadata = content |-> "metadata" in
+  let op_result = metadata |-> "operation_result" in
+  let* balance_updates =
+    Operation_receipt.Balance_updates.from_result [op_result]
+  in
+  let parse_type_arg ty_arg =
+    ( ty_arg |-> "prim" |> as_string,
+      ty_arg |-> "annots" |> as_list |> List.map as_string )
+  in
+  let parse_event event =
+    let ty = event |-> "type" in
+    let payload = event |-> "payload" in
+    {
+      kind = event |-> "kind" |> as_string;
+      tag = event |-> "tag" |> as_string;
+      source = event |-> "source" |> as_string;
+      result_status = event |-> "result" |-> "status" |> as_string;
+      type_prim = ty |-> "prim" |> as_string;
+      type_args = ty |-> "args" |> as_list |> List.map parse_type_arg;
+      payload_prim = payload |-> "prim" |> as_string;
+      payload_int_args =
+        payload |-> "args" |> as_list
+        |> List.map (fun a -> a |-> "int" |> as_string |> int_of_string);
+    }
+  in
+  return
+    {
+      source = content |-> "source" |> as_string;
+      op_status = op_result |-> "status" |> as_string;
+      balance_updates;
+      internal_ops =
+        metadata |-> "internal_operation_results" |> as_list
+        |> List.map parse_event;
+    }
+
 let test_reveal =
   Setup.register_fullstack_test
     ~time_between_blocks:Nothing
@@ -612,6 +689,7 @@ let test_deposit =
       _protocol
     ->
   let amount = Tez.of_int 1000 in
+  let amount_mutez = Tez.to_mutez amount in
   let depositor = Constant.bootstrap5 in
   let* receiver_account = Client.gen_and_show_keys client in
 
@@ -627,14 +705,89 @@ let test_deposit =
       ~amount
   in
   let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
-  let* client = tezos_client sequencer in
+  let* tez_client = tezos_client sequencer in
   let* balance =
-    Client.get_balance_for ~account:receiver_account.public_key_hash client
+    Client.get_balance_for ~account:receiver_account.public_key_hash tez_client
   in
   Check.(
-    (Tez.to_mutez balance = 1_000_000_000)
+    (Tez.to_mutez balance = amount_mutez)
       int
       ~error_msg:"Expected %R mutez but got %L") ;
+
+  (* Inspect the deposit operation's receipt:
+     - [TransferSuccess.balance_updates] should debit the synthetic
+       [TEZLINK_DEPOSITOR] and credit the receiver.
+     - [internal_operation_results] should carry a single Michelson
+       [deposit] event of type [pair (nat %inbox_level) (nat %inbox_msg_id)]
+       whose payload exposes the originating shared-inbox coordinates,
+       so indexers can correlate a deposit credit with its inbox slot. *)
+  let* receipt = parse_head_deposit_receipt ~sequencer () in
+  Check.(
+    (receipt.op_status = "applied")
+      string
+      ~error_msg:"Expected deposit operation_result.status to be %R, got %L") ;
+  let bu_summary (bu : Operation_receipt.Balance_updates.t) =
+    (bu.contract, bu.change)
+  in
+  Check.(
+    (List.map bu_summary receipt.balance_updates
+    = [
+        (Some receipt.source, -amount_mutez);
+        (Some receiver_account.public_key_hash, amount_mutez);
+      ])
+      (list (tuple2 (option string) int))
+      ~error_msg:
+        "Expected TransferSuccess.balance_updates (contract, change) to be %R, \
+         got %L") ;
+  (match receipt.internal_ops with
+  | [event] -> (
+      Check.(
+        (event.kind = "event")
+          string
+          ~error_msg:"Expected internal op kind to be %R, got %L") ;
+      Check.(
+        (event.tag = "deposit")
+          string
+          ~error_msg:"Expected event tag to be %R, got %L") ;
+      Check.(
+        (event.source = receipt.source)
+          string
+          ~error_msg:"Expected event source to be %R, got %L") ;
+      Check.(
+        (event.result_status = "applied")
+          string
+          ~error_msg:"Expected event result.status to be %R, got %L") ;
+      Check.(
+        (event.type_prim = "pair")
+          string
+          ~error_msg:"Expected event type prim to be %R, got %L") ;
+      Check.(
+        (event.type_args
+        = [("nat", ["%inbox_level"]); ("nat", ["%inbox_msg_id"])])
+          (list (tuple2 string (list string)))
+          ~error_msg:"Expected event type args to be %R, got %L") ;
+      Check.(
+        (event.payload_prim = "Pair")
+          string
+          ~error_msg:"Expected event payload prim to be %R, got %L") ;
+      match event.payload_int_args with
+      | [inbox_level; inbox_msg_id] ->
+          Check.(
+            (inbox_level > 0)
+              int
+              ~error_msg:"Expected inbox_level to be positive, got %L") ;
+          Check.(
+            (inbox_msg_id >= 0)
+              int
+              ~error_msg:"Expected inbox_msg_id to be non-negative, got %L")
+      | args ->
+          Test.fail
+            "Expected event payload to carry 2 int leaves, got %d"
+            (List.length args))
+  | ops ->
+      Test.fail
+        "Expected exactly 1 internal operation (the deposit event), got %d"
+        (List.length ops)) ;
 
   (* We expect the deposit to be in the latest blueprint, but the latest
        block should be empty from the POV of Etherlink *)
