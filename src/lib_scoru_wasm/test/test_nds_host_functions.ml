@@ -624,31 +624,6 @@ let test_nds_registry_clear () =
   assert (result = Values.[Num (I32 0l)]) ;
   Lwt.return_ok ()
 
-let test_nds_registry_get_hash () =
-  let open Lwt.Syntax in
-  let dst = 500l in
-  let max_bytes = 32l in
-  let module_reg, module_key, host_funcs_registry, nds =
-    make_nds_module_inst [] 100l
-  in
-  let* result =
-    invoke_nds
-      ~module_reg
-      ~module_key
-      ~host_funcs_registry
-      ~nds
-      Host_funcs.Internal_for_tests.nds_registry_get_hash
-      Values.[Num (I32 dst); Num (I32 max_bytes)]
-  in
-  assert (result = Values.[Num (I32 32l)]) ;
-  (* Read the 32 bytes and check they are not all zero *)
-  let* hash_bytes = read_memory ~module_reg dst 32 in
-  let all_zero =
-    String.to_seq hash_bytes |> Seq.for_all (fun c -> Char.equal c '\000')
-  in
-  assert (not all_zero) ;
-  Lwt.return_ok ()
-
 let test_nds_database_get_hash () =
   let open Lwt.Syntax in
   let dst = 500l in
@@ -842,31 +817,6 @@ let test_nds_registry_clear_oob () =
   assert (result = Values.[Num (I32 (-14l))]) ;
   Lwt.return_ok ()
 
-let test_nds_registry_get_hash_small_buffer () =
-  let open Lwt.Syntax in
-  let dst = 500l in
-  let max_bytes = 16l in
-  (* smaller than the 32-byte hash — caller gets a truncated prefix *)
-  let module_reg, module_key, host_funcs_registry, nds =
-    make_nds_module_inst [] 100l
-  in
-  let* result =
-    invoke_nds
-      ~module_reg
-      ~module_key
-      ~host_funcs_registry
-      ~nds
-      Host_funcs.Internal_for_tests.nds_registry_get_hash
-      Values.[Num (I32 dst); Num (I32 max_bytes)]
-  in
-  assert (result = Values.[Num (I32 max_bytes)]) ;
-  let* prefix = read_memory ~module_reg dst 16 in
-  let all_zero =
-    String.to_seq prefix |> Seq.for_all (fun c -> Char.equal c '\000')
-  in
-  assert (not all_zero) ;
-  Lwt.return_ok ()
-
 let test_nds_database_get_hash_small_buffer () =
   let open Lwt.Syntax in
   let dst = 500l in
@@ -910,31 +860,6 @@ let test_nds_store_delete_missing_key () =
       Values.[Num (I64 0L); Num (I32 key_offset); Num (I32 key_len)]
   in
   assert (result = Values.[Num (I32 0l)]) ;
-  Lwt.return_ok ()
-
-(* Memory layout used by [make_module_inst]: 20 WASM pages of 64 KiB =
-   1_310_720 bytes. Picking [dst] in the last few bytes triggers an
-   out-of-bounds write that exercises the [Aux.store_bytes] guard. *)
-let test_nds_registry_get_hash_oob_dst () =
-  let open Lwt.Syntax in
-  let module_reg, module_key, host_funcs_registry, nds =
-    make_nds_module_inst [] 100l
-  in
-  (* dst = mem_size - 10, so writing 32 bytes overflows by 22. *)
-  let dst = 1_310_710l in
-  let max_bytes = 64l in
-  (* >= 32, so we pass the early gate *)
-  let* result =
-    invoke_nds
-      ~module_reg
-      ~module_key
-      ~host_funcs_registry
-      ~nds
-      Host_funcs.Internal_for_tests.nds_registry_get_hash
-      Values.[Num (I32 dst); Num (I32 max_bytes)]
-  in
-  (* -6 = Memory_invalid_access (raised by Memory.Bounds, caught by Aux) *)
-  assert (result = Values.[Num (I32 (-6l))]) ;
   Lwt.return_ok ()
 
 let test_nds_database_get_hash_oob_dst () =
@@ -1054,7 +979,6 @@ let nds_function_names =
     "nds_registry_copy";
     "nds_registry_move";
     "nds_registry_clear";
-    "nds_registry_get_hash";
     "nds_store_exists";
     "nds_store_read";
     "nds_store_write";
@@ -1349,7 +1273,6 @@ let tests =
     tztest "nds_registry_copy" `Quick test_nds_registry_copy;
     tztest "nds_registry_move" `Quick test_nds_registry_move;
     tztest "nds_registry_clear" `Quick test_nds_registry_clear;
-    tztest "nds_registry_get_hash" `Quick test_nds_registry_get_hash;
     tztest "nds_database_get_hash" `Quick test_nds_database_get_hash;
     (* P3 — Error paths *)
     tztest
@@ -1375,10 +1298,6 @@ let tests =
     tztest "nds_registry_copy oob -> -14" `Quick test_nds_registry_copy_oob;
     tztest "nds_registry_clear oob -> -14" `Quick test_nds_registry_clear_oob;
     tztest
-      "nds_registry_get_hash small buffer -> truncated prefix"
-      `Quick
-      test_nds_registry_get_hash_small_buffer;
-    tztest
       "nds_database_get_hash small buffer -> truncated prefix"
       `Quick
       test_nds_database_get_hash_small_buffer;
@@ -1386,10 +1305,6 @@ let tests =
       "nds_store_delete missing key -> 0 (no-op)"
       `Quick
       test_nds_store_delete_missing_key;
-    tztest
-      "nds_registry_get_hash dst near memory end -> -6 (OOB write)"
-      `Quick
-      test_nds_registry_get_hash_oob_dst;
     tztest
       "nds_database_get_hash dst near memory end -> -6 (OOB write)"
       `Quick

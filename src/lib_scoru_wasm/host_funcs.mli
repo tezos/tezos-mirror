@@ -481,8 +481,6 @@ module Internal_for_tests : sig
 
   val nds_registry_clear : Tezos_webassembly_interpreter.Instance.func_inst
 
-  val nds_registry_get_hash : Tezos_webassembly_interpreter.Instance.func_inst
-
   val nds_store_exists : Tezos_webassembly_interpreter.Instance.func_inst
 
   val nds_store_read : Tezos_webassembly_interpreter.Instance.func_inst
