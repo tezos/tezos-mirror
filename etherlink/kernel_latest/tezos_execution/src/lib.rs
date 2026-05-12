@@ -16,7 +16,6 @@ use mir::{
     parser::Parser,
 };
 use num_bigint::{BigInt, BigUint};
-use num_traits::ops::checked::CheckedMul;
 use num_traits::ops::checked::CheckedSub;
 use num_traits::{ToPrimitive, Zero};
 use primitive_types::U256;
@@ -65,7 +64,6 @@ use crate::mir_ctx::{
     HasContractAccount, HasHost, HasOperationGas, HasOriginLookup, HasSourcePublicKey,
     OperationCtx, TcCtx,
 };
-use crate::storage_fees::{compute_storage_balance_updates, COST_PER_BYTES};
 
 /// Result of applying a single operation within a batch.
 ///
@@ -484,7 +482,6 @@ where
                     let receipt = originate_contract(
                         tc_ctx,
                         address,
-                        operation_ctx.source,
                         sender_account,
                         &amount,
                         &script.code,
@@ -1037,16 +1034,15 @@ fn handle_storage_with_big_maps<'a, Host: StorageV1, C: Context>(
     Ok((storage, lazy_storage_diff))
 }
 
-// Values from src/proto_023_PtSeouLo/lib_parameters/default_parameters.ml.
-const ORIGINATION_SIZE: u64 = 257;
-const ORIGINATION_COST: u64 = ORIGINATION_SIZE * COST_PER_BYTES;
-
-/// Originate a contract deployed by the public key hash given in parameter. For now
-/// the origination is not correctly implemented.
+/// Originate a contract: install its code and initial storage, run
+/// the initial-balance transfer from the sender, and return the
+/// success body that the post-execution burn pass will charge.
+///
+/// TODO(L2-1294): the alias-forwarder origination bypasses this
+/// function and is currently unbilled.
 fn originate_contract<'a, Host, C: Context>(
     ctx: &mut TcCtx<'a, Host, C>,
     contract: ContractKt1Hash,
-    source_account: &C::ImplicitAccountType,
     sender_account: &impl TezlinkAccount,
     initial_balance: &Narith,
     script_code: &[u8],
@@ -1075,35 +1071,17 @@ where
         .map_err(|_| OriginationError::CantInitContract)?;
 
     // There's this line in the origination `assert (Compare.Z.(total_size >= Z.zero)) ;`
-    let total_size_unsigned: BigUint = match BigUint::try_from(total_size.0.clone()) {
+    match BigUint::try_from(total_size.0.clone()) {
         Ok(b) if !b.is_zero() => b,
         _ => return Err(OriginationError::CantOriginateEmptyContract),
     };
 
     // Compute the initial_balance setup of the smart contract as a balance update for the origination.
-    let mut balance_updates =
+    let balance_updates =
         compute_balance_updates(sender_account, &smart_contract, initial_balance)
             .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
 
-    // Balance updates for the impacts of origination on storage space.
-    // storage_fees = total_size * COST_PER_BYTES
-    let storage_fees = total_size_unsigned
-        .checked_mul(&BigUint::from(COST_PER_BYTES))
-        .ok_or(OriginationError::FailedToComputeBalanceUpdate)?;
-    let storage_fees_balance_updates =
-        compute_storage_balance_updates(source_account.contract(), storage_fees.clone())
-            .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
-    balance_updates.extend(storage_fees_balance_updates);
-
-    // Balance updates for the base origination cost.
-    let origination_fees_balance_updates = compute_storage_balance_updates(
-        source_account.contract(),
-        ORIGINATION_COST.into(),
-    )
-    .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
-    balance_updates.extend(origination_fees_balance_updates);
-
-    // Apply the balance change, accordingly to the balance updates computed
+    // Apply the initial-balance transfer (sender → smart_contract).
     apply_balance_changes(
         ctx.host,
         sender_account,
@@ -1111,9 +1089,6 @@ where
         &initial_balance.0,
     )
     .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
-
-    let _ = burn_tez(ctx.host, source_account, &(ORIGINATION_COST + storage_fees))
-        .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
 
     // Record the new contract as native. Default trait impl is a
     // no-op for runtimes without classification storage.
@@ -1720,7 +1695,6 @@ where
                     &mut tc_ctx,
                     address,
                     source_account,
-                    source_account,
                     balance,
                     &script.code,
                     storage,
@@ -1965,8 +1939,7 @@ mod tests {
 
     use crate::gas::TezlinkOperationGas;
     use crate::make_default_ctx;
-    use crate::storage_fees::COST_PER_BYTES;
-    use crate::ORIGINATION_COST;
+    use crate::storage_fees::{COST_PER_BYTES, ORIGINATION_SIZE};
     use crate::{
         account_storage::{Manager, TezlinkAccount},
         context, validate_and_apply_operation, FeeRefundConfig, OperationError,
@@ -4366,20 +4339,7 @@ mod tests {
                 ],
                 result: ContentResult::Applied(OriginationSuccess {
                     balance_updates: vec![
-                        BalanceUpdate {
-                            balance: Balance::Account(Contract::Implicit(
-                                src.pkh.clone(),
-                            )),
-                            changes: -30,
-                            update_origin: UpdateOrigin::BlockApplication,
-                        },
-                        BalanceUpdate {
-                            balance: Balance::Account(Contract::Originated(
-                                expected_kt1.clone(),
-                            )),
-                            changes: 30,
-                            update_origin: UpdateOrigin::BlockApplication,
-                        },
+                        // Variable burn pair (storage_bus).
                         BalanceUpdate {
                             balance: Balance::Account(Contract::Implicit(
                                 src.pkh.clone(),
@@ -4392,6 +4352,7 @@ mod tests {
                             changes: 9500,
                             update_origin: UpdateOrigin::BlockApplication,
                         },
+                        // Slot burn pair (origination_bus).
                         BalanceUpdate {
                             balance: Balance::Account(Contract::Implicit(
                                 src.pkh.clone(),
@@ -4402,6 +4363,21 @@ mod tests {
                         BalanceUpdate {
                             balance: Balance::StorageFees,
                             changes: 64250,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        // Prior: initial-balance transfer (sender → contract).
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone(),
+                            )),
+                            changes: -30,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Originated(
+                                expected_kt1.clone(),
+                            )),
+                            changes: 30,
                             update_origin: UpdateOrigin::BlockApplication,
                         },
                     ],
@@ -4432,7 +4408,7 @@ mod tests {
             .expect("Should have been able to debit the fees")
             .checked_sub(&smart_contract_balance.into())
             .expect("Should have been able to debit the smart contract balance")
-            .checked_sub(&ORIGINATION_COST.into())
+            .checked_sub(&(ORIGINATION_SIZE * COST_PER_BYTES).into())
             .expect("Should have been able to debit the origination cost")
             .checked_sub(&origination_storage_fee.into())
             .expect("Should have been able to debit the storage fees");
@@ -4908,6 +4884,151 @@ mod tests {
     }
 
     #[test]
+    fn test_apply_origination_slot_burn_failure_backtracks() {
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+
+        // 9_800 = 15 fee + 30 initial balance + 9_500 variable burn
+        // (code 28 bytes + storage 10 bytes = 38 bytes × 250) + 255
+        // leftover, insufficient for the 64_250 slot burn that follows.
+        let funded = 9_800_u64;
+        init_account(&mut host, &src.pkh, funded);
+        reveal_account(&mut host, &src);
+
+        let fee = 15u64;
+        let smart_contract_balance = 30u64;
+        /*
+        octez-client convert script "
+                  parameter string;
+                  storage string;
+                  code { CAR; NIL operation; PAIR }
+                " from Michelson to binary
+         */
+        let code =
+            hex::decode("02000000170500036805010368050202000000080316053d036d0342")
+                .unwrap();
+
+        // octez-client -E https://rpc.tzkt.io/mainnet convert data  '"hello"' from Michelson to binary
+        let storage = hex::decode("010000000568656c6c6f").unwrap();
+        let operation = make_origination_operation(
+            fee,
+            1,
+            1040,
+            5,
+            src.clone(),
+            smart_contract_balance,
+            Script { code, storage },
+        );
+
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &MockRegistry,
+                &mut TezosXJournal::default(),
+                &context::TezlinkContext::init_context(),
+                OperationHash::default(),
+                operation.clone(),
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect(
+                "kernel error not expected — burn failure routes through Backtracked",
+            ),
+        );
+
+        let mut origination_nonce = OriginationNonce::default();
+        let expected_kt1 = origination_nonce.generate_kt1();
+
+        let expected_receipts = vec![OperationWithMetadata {
+            content: operation.content[0].clone(),
+            receipt: OperationResultSum::Origination(OperationResult {
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
+                        changes: -(fee as i64),
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::BlockFees,
+                        changes: fee as i64,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                result: ContentResult::BackTracked(BacktrackedResult {
+                    errors: Some(ApplyOperationErrors {
+                        errors: vec![ApplyOperationError::CannotPayStorageFee(
+                            BalanceTooLow {
+                                contract: Contract::Implicit(src.pkh.clone()),
+                                // 9_800 - 15 fee - 30 transfer - 9_500 variable burn = 255
+                                balance: 255_u64.into(),
+                                // ORIGINATION_SIZE × COST_PER_BYTES
+                                amount: 64_250_u64.into(),
+                            },
+                        )],
+                    }),
+                    result: OriginationSuccess {
+                        balance_updates: vec![
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Implicit(
+                                    src.pkh.clone(),
+                                )),
+                                changes: -(smart_contract_balance as i64),
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Originated(
+                                    expected_kt1.clone(),
+                                )),
+                                changes: smart_contract_balance as i64,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                        ],
+                        originated_contracts: vec![Originated {
+                            contract: expected_kt1.clone(),
+                        }],
+                        consumed_milligas: 171_777_u64.into(),
+                        storage_size: 38_u64.into(),
+                        paid_storage_size_diff: 38_u64.into(),
+                        lazy_storage_diff: None,
+                    },
+                }),
+                internal_operation_results: vec![],
+            }),
+        }];
+
+        assert_eq!(receipts, expected_receipts);
+
+        // Source paid only the fee; SafeStorage rolled back the
+        // initial-balance transfer, the variable burn, and the
+        // pre-burn smart-contract setup.
+        let context = context::TezlinkContext::init_context();
+        let src_account = context
+            .implicit_from_public_key_hash(&src.pkh)
+            .expect("source account");
+        assert_eq!(src_account.balance(&host).unwrap(), (funded - fee).into());
+
+        // SafeStorage rolled back the origination: the smart contract is
+        // nowhere to be found in durable storage.
+        let originated_account = context
+            .originated_from_kt1(&expected_kt1)
+            .expect("originated account handle");
+        assert!(
+            !originated_account.exists(&host).unwrap(),
+            "originated contract must be rolled back"
+        );
+
+        // Initial-balance transfer rolled back too.
+        assert_eq!(
+            originated_account.balance(&host).unwrap(),
+            0_u64.into(),
+            "originated contract balance must be 0 (initial transfer rolled back)"
+        );
+    }
+
+    #[test]
     fn test_internal_origination_of_a_smart_contract() {
         let mut host = MockKernelHost::default();
         let parser = mir::parser::Parser::new();
@@ -5011,20 +5132,7 @@ mod tests {
                 },
                 result: ContentResult::Applied(OriginationSuccess {
                     balance_updates: vec![
-                        BalanceUpdate {
-                            balance: Balance::Account(Contract::Originated(
-                                contract_chapo_hash.clone()
-                            )),
-                            changes: -1000,
-                            update_origin: UpdateOrigin::BlockApplication,
-                        },
-                        BalanceUpdate {
-                            balance: Balance::Account(Contract::Originated(
-                                expected_address.clone()
-                            )),
-                            changes: 1000,
-                            update_origin: UpdateOrigin::BlockApplication,
-                        },
+                        // Variable burn pair (storage_bus).
                         BalanceUpdate {
                             balance: Balance::Account(Contract::Implicit(
                                 src.pkh.clone()
@@ -5037,6 +5145,7 @@ mod tests {
                             changes: 7500,
                             update_origin: UpdateOrigin::BlockApplication,
                         },
+                        // Slot burn pair (origination_bus).
                         BalanceUpdate {
                             balance: Balance::Account(Contract::Implicit(
                                 src.pkh.clone()
@@ -5047,6 +5156,21 @@ mod tests {
                         BalanceUpdate {
                             balance: Balance::StorageFees,
                             changes: 64250,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        // Prior: initial-balance transfer (parent → child).
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Originated(
+                                contract_chapo_hash.clone()
+                            )),
+                            changes: -1000,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Originated(
+                                expected_address.clone()
+                            )),
+                            changes: 1000,
                             update_origin: UpdateOrigin::BlockApplication,
                         },
                     ],
@@ -5470,20 +5594,6 @@ mod tests {
                                     balance: Balance::Account(Contract::Implicit(
                                         src.pkh.clone(),
                                     )),
-                                    changes: -15,
-                                    update_origin: UpdateOrigin::BlockApplication,
-                                },
-                                BalanceUpdate {
-                                    balance: Balance::Account(Contract::Originated(
-                                        expected_kt1_1.clone(),
-                                    )),
-                                    changes: 15,
-                                    update_origin: UpdateOrigin::BlockApplication,
-                                },
-                                BalanceUpdate {
-                                    balance: Balance::Account(Contract::Implicit(
-                                        src.pkh.clone(),
-                                    )),
                                     changes: -7500,
                                     update_origin: UpdateOrigin::BlockApplication,
                                 },
@@ -5502,6 +5612,20 @@ mod tests {
                                 BalanceUpdate {
                                     balance: Balance::StorageFees,
                                     changes: 64250,
+                                    update_origin: UpdateOrigin::BlockApplication,
+                                },
+                                BalanceUpdate {
+                                    balance: Balance::Account(Contract::Implicit(
+                                        src.pkh.clone(),
+                                    )),
+                                    changes: -15,
+                                    update_origin: UpdateOrigin::BlockApplication,
+                                },
+                                BalanceUpdate {
+                                    balance: Balance::Account(Contract::Originated(
+                                        expected_kt1_1.clone(),
+                                    )),
+                                    changes: 15,
                                     update_origin: UpdateOrigin::BlockApplication,
                                 },
                             ],
@@ -5538,20 +5662,6 @@ mod tests {
                                     balance: Balance::Account(Contract::Implicit(
                                         src.pkh.clone(),
                                     )),
-                                    changes: -20,
-                                    update_origin: UpdateOrigin::BlockApplication,
-                                },
-                                BalanceUpdate {
-                                    balance: Balance::Account(Contract::Originated(
-                                        expected_kt1_2.clone(),
-                                    )),
-                                    changes: 20,
-                                    update_origin: UpdateOrigin::BlockApplication,
-                                },
-                                BalanceUpdate {
-                                    balance: Balance::Account(Contract::Implicit(
-                                        src.pkh.clone(),
-                                    )),
                                     changes: -7500,
                                     update_origin: UpdateOrigin::BlockApplication,
                                 },
@@ -5570,6 +5680,20 @@ mod tests {
                                 BalanceUpdate {
                                     balance: Balance::StorageFees,
                                     changes: 64250,
+                                    update_origin: UpdateOrigin::BlockApplication,
+                                },
+                                BalanceUpdate {
+                                    balance: Balance::Account(Contract::Implicit(
+                                        src.pkh.clone(),
+                                    )),
+                                    changes: -20,
+                                    update_origin: UpdateOrigin::BlockApplication,
+                                },
+                                BalanceUpdate {
+                                    balance: Balance::Account(Contract::Originated(
+                                        expected_kt1_2.clone(),
+                                    )),
+                                    changes: 20,
                                     update_origin: UpdateOrigin::BlockApplication,
                                 },
                             ],
