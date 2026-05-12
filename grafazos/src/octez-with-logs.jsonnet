@@ -47,7 +47,7 @@ local logs_y = 131;
 //###
 // Grafana main stuffs
 //##
-dashboard.new('Octez with logs dashboard' + if !uid then ' (' + std.strReplace(uid_ext, '-', '') + ')' else '')
+dashboard.new('Octez with logs dashboard' + if !uid && uid_ext != '' then ' (' + std.strReplace(uid_ext, '-', '') + ')' else '')
 + (if !uid then dashboard.withUid('octez-with-logs' + uid_ext) else {})
 + dashboard.withDescription('A dashboard for Octez including logs' + base.build_options)
 + dashboard.withTags(['tezos', 'octez', 'logs', 'grafazos'])

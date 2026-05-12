@@ -43,7 +43,7 @@ local misc_y = 114;
 //###
 // Grafana main stuffs
 //##
-dashboard.new('Octez basic dashboard' + if !uid then ' (' + std.strReplace(uid_ext, '-', '') + ')' else '')
+dashboard.new('Octez basic dashboard' + if !uid && uid_ext != '' then ' (' + std.strReplace(uid_ext, '-', '') + ')' else '')
 + (if !uid then dashboard.withUid('octez-basic' + uid_ext) else {})
 + dashboard.withDescription('A basic dashboard for Octez' + base.build_options)
 + dashboard.withTags(['tezos', 'octez', 'grafazos'])
