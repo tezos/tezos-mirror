@@ -925,6 +925,37 @@ where
     Ok(request)
 }
 
+#[allow(unused)]
+fn tezosx_resolve_source_alias_readonly(
+    ctx: &impl HasOriginLookup,
+    registry: &impl Registry,
+    source: &AddressHash,
+    target_runtime: RuntimeId,
+) -> Result<String, TransferError> {
+    let native_bytes = match read_and_resolve_routing(ctx, source, target_runtime)? {
+        RoutingDecision::RoundTrip(target) => return Ok(target),
+        RoutingDecision::Transitive(info) => info.native_address,
+        RoutingDecision::Native => source.to_base58_check().into_bytes(),
+    };
+    // Deterministic fallback: reproduce the alias that the target
+    // runtime's `ensure_alias` would compute (and persist on the
+    // state-mutating path), but skip the storage writes.
+    //
+    // Each branch duplicates the deterministic name-derivation
+    // step from the corresponding runtime's `ensure_alias` — the
+    // canonical implementation — and must stay in sync with it.
+    // If either formula changes, this read-only path must change
+    // too.
+    registry
+        .compute_alias(AliasInfo {
+            runtime: target_runtime,
+            native_address: native_bytes,
+        })
+        .map_err(|e| {
+            TransferError::GatewayError(format!("Alias computation failed: {e}"))
+        })
+}
+
 /// Extract (evm_contract, address_bytes, value) from a typed
 /// Pair(String, Pair(Bytes, Int)) value.
 fn extract_erc20_address_uint256_params(
@@ -3117,5 +3148,27 @@ mod tests {
                 std::mem::discriminant(&other)
             ),
         }
+    }
+
+    #[test]
+    fn test_tezosx_resolve_source_alias_readonly() {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+        let ctx = MockCtx::new(&mut host, source.clone(), 10_000_000);
+        let result = tezosx_resolve_source_alias_readonly(
+            &ctx,
+            &registry,
+            &source,
+            RuntimeId::Tezos,
+        );
+        assert!(result.is_ok());
+        // The registry is read from but not written to: the handler only
+        // needs to query the alias for routing resolution.
+        assert!(registry.serve_calls.borrow().is_empty());
     }
 }

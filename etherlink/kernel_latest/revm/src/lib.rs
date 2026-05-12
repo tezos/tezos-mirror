@@ -712,6 +712,20 @@ mod test {
                 }
             }
 
+            fn compute_alias(
+                &self,
+                alias_info: AliasInfo,
+            ) -> Result<String, TezosXRuntimeError> {
+                match alias_info.runtime {
+                    RuntimeId::Tezos => {
+                        self.mock_tezos.compute_alias(&alias_info.native_address)
+                    }
+                    RuntimeId::Ethereum => {
+                        self.ethereum.compute_alias(&alias_info.native_address)
+                    }
+                }
+            }
+
             fn address_from_string(
                 &self,
                 address_str: &str,
@@ -788,6 +802,16 @@ mod test {
                     &alias_info.native_address,
                 ));
                 Ok((kt1.to_base58_check(), gas_remaining))
+            }
+
+            fn compute_alias(
+                &self,
+                native_address: &[u8],
+            ) -> Result<String, TezosXRuntimeError> {
+                // Deterministic mock: compute a KT1 from native_address bytes
+                use tezos_crypto_rs::{blake2b, hash::ContractKt1Hash};
+                let kt1 = ContractKt1Hash::from(blake2b::digest_160(native_address));
+                Ok(kt1.to_base58_check())
             }
 
             fn serve<Host>(

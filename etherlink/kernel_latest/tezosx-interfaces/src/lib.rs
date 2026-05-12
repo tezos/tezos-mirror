@@ -112,6 +112,8 @@ pub trait Registry {
     where
         Host: StorageV1;
 
+    fn compute_alias(&self, alias_info: AliasInfo) -> Result<String, TezosXRuntimeError>;
+
     fn address_from_string(
         &self,
         address_str: &str,
@@ -162,6 +164,8 @@ pub trait RuntimeInterface {
     ) -> Result<(String, u64), TezosXRuntimeError>
     where
         Host: StorageV1;
+
+    fn compute_alias(&self, native_address: &[u8]) -> Result<String, TezosXRuntimeError>;
 
     /// Handle an incoming cross-runtime HTTP request.
     ///
