@@ -44,6 +44,8 @@ type rw = [`Read | `Write | `Delete]
 
 type ro = [`Read]
 
+type read_delete = [`Read | `Delete]
+
 type ('a, 'cap) path =
   | Raw_path : string -> (bytes, rw) path
   | Chain_id : (L2_types.chain_id, ro) path
@@ -79,7 +81,7 @@ type ('a, 'cap) path =
   | Block_by_hash :
       _ L2_types.chain_family * Ethereum_types.block_hash
       -> ( Ethereum_types.legacy_transaction_object L2_types.block,
-           [`Read | `Delete] )
+           read_delete )
          path
   | Block_index :
       _ L2_types.chain_family * Durable_storage_path.Block.number
