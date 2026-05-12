@@ -37,16 +37,17 @@ use tezos_tezlink::operation::{
     OriginationContent, Script,
 };
 use tezos_tezlink::operation_result::{
-    produce_skipped_receipt, ApplyOperationError, BacktrackedResult, ContentResult,
+    produce_skipped_receipt, BacktrackedResult, ContentResult,
     InternalContentWithMetadata, InternalOperationSum, OperationWithMetadata, Originated,
     OriginationSuccess, TransferTarget,
 };
 use tezos_tezlink::{
     operation::{OperationContent, Parameters, RevealContent, TransferContent},
     operation_result::{
-        produce_operation_result, Balance, BalanceTooLow, BalanceUpdate, EventContent,
-        EventSuccess, OperationError, OperationResultSum, OriginationError, RevealError,
-        RevealSuccess, TransferError, TransferSuccess, UpdateOrigin,
+        produce_operation_result, ApplyOperationError, Balance, BalanceTooLow,
+        BalanceUpdate, EventContent, EventSuccess, OperationError, OperationResultSum,
+        OriginationError, RevealError, RevealSuccess, TransferError, TransferSuccess,
+        UpdateOrigin,
     },
 };
 use tezosx_interfaces::Registry;
@@ -1650,7 +1651,7 @@ where
     };
     let parser = Parser::new();
     let mut counter = 0u128;
-    let receipt = match &validated_operation.content.operation {
+    let mut receipt = match &validated_operation.content.operation {
         OperationContent::Reveal(RevealContent { pk, .. }) => {
             let reveal_result = reveal(&mut tc_ctx, source_account, pk);
             log_on_operation_failure("Reveal", &reveal_result);
@@ -1734,6 +1735,14 @@ where
             ))
         }
     };
+
+    if let Err(errors) =
+        storage_fees::burn_manager_storage_fees(tc_ctx.host, source_account, &mut receipt)
+    {
+        log!(Debug, "Storage burn failed: {errors:?}");
+        receipt.transform_applied_into_backtracked_with_errors(errors.into());
+    }
+
     // Read the total gas consumed since the start of the operation, immune
     // to baseline resets performed by per-segment measurements (e.g. via
     // `get_and_reset_milligas_consumed` while attributing gas to internal
@@ -3310,7 +3319,9 @@ mod tests {
 
         let initial_storage = Micheline::from("initial");
 
-        let source = init_account(&mut host, &src.pkh, 50);
+        // Source funded with 1050 mutez: 15 fee + 30 transfer + 1000
+        // storage burn (4 × COST_PER_BYTES) + 5 remaining balance.
+        let source = init_account(&mut host, &src.pkh, 1050);
         reveal_account(&mut host, &src);
         let destination =
             init_contract(&mut host, &dest, SCRIPT, &initial_storage, &50_u64.into());
@@ -3371,7 +3382,22 @@ mod tests {
                         lazy_storage_diff: None,
                         balance_updates: vec![
                             BalanceUpdate {
-                                balance: Balance::Account(Contract::Implicit(src.pkh)),
+                                balance: Balance::Account(Contract::Implicit(
+                                    src.pkh.clone(),
+                                )),
+                                changes: -(4 * COST_PER_BYTES as i64),
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                            BalanceUpdate {
+                                balance: Balance::StorageFees,
+                                changes: (4 * COST_PER_BYTES as i64),
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                            // Transfer payload (sender → destination).
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Implicit(
+                                    src.pkh.clone(),
+                                )),
                                 changes: -30,
                                 update_origin: UpdateOrigin::BlockApplication,
                             },
@@ -3396,8 +3422,8 @@ mod tests {
             }),
         }];
 
-        // Verify that source and destination balances changed
-        // 30 for transfer + 15 for fees, 5 should be left
+        // Verify that source and destination balances changed:
+        // 1050 - 15 fee - 30 transfer - 1000 burn (4 × COST_PER_BYTES) = 5.
         assert_eq!(source.balance(&host).unwrap(), 5_u64.into());
         assert_eq!(destination.balance(&host).unwrap(), 80_u64.into());
 
@@ -3429,7 +3455,9 @@ mod tests {
             .expect("ContractKt1Hash b58 conversion should have succeeded");
 
         let initial_storage = Micheline::from("initial");
-        init_account(&mut host, &src.pkh, 50);
+        // Source funded with 1050 mutez: 15 fee + 30 transfer + 1000
+        // storage burn (4 × COST_PER_BYTES) + 5 remaining balance.
+        init_account(&mut host, &src.pkh, 1050);
         reveal_account(&mut host, &src);
         let destination =
             init_contract(&mut host, &dest, SCRIPT, &initial_storage, &50_u64.into());
@@ -3476,6 +3504,127 @@ mod tests {
 
         assert_eq!(destination.used_bytes(&host).unwrap(), expected_used);
         assert_eq!(destination.paid_bytes(&host).unwrap(), expected_used);
+    }
+
+    #[test]
+    fn apply_transfer_burn_failure_backtracks_with_error() {
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+        let dest = ContractKt1Hash::from_base58_check(CONTRACT_1)
+            .expect("ContractKt1Hash b58 conversion should have succeeded");
+
+        let initial_storage = Micheline::from("initial");
+        // Fund the source with 50 mutez: 15 fee + 30 transfer + 5
+        // left.  The storage burn (4 × COST_PER_BYTES = 1000 mutez)
+        // does not fit; the operation must Backtrack.
+        let source = init_account(&mut host, &src.pkh, 50);
+        reveal_account(&mut host, &src);
+        let destination = init_contract(
+            &mut host,
+            &dest,
+            SCRIPT,
+            &initial_storage.clone(),
+            &50_u64.into(),
+        );
+
+        let storage_value = Micheline::from("Hello world").encode().unwrap();
+        let operation = make_transfer_operation(
+            15,
+            1,
+            1040,
+            5,
+            src.clone(),
+            30_u64.into(),
+            Contract::Originated(dest),
+            Parameters {
+                entrypoint: mir::ast::Entrypoint::default(),
+                value: storage_value.clone(),
+            },
+        );
+
+        let processed = validate_and_apply_operation(
+            &mut host,
+            &MockRegistry,
+            &mut TezosXJournal::default(),
+            &context::TezlinkContext::init_context(),
+            OperationHash::default(),
+            operation.clone(),
+            &block_ctx!(),
+            false,
+            None,
+            None,
+            &test_safe_roots(),
+        )
+        .expect("kernel error not expected — burn failure routes through Backtracked");
+        let receipts = ProcessedOperation::into_receipts(processed);
+
+        let expected_receipts = vec![OperationWithMetadata {
+            content: operation.content[0].clone(),
+            receipt: OperationResultSum::Transfer(OperationResult {
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
+                        changes: -15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::BlockFees,
+                        changes: 15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                result: ContentResult::BackTracked(BacktrackedResult {
+                    errors: Some(ApplyOperationErrors {
+                        errors: vec![ApplyOperationError::CannotPayStorageFee(
+                            BalanceTooLow {
+                                contract: source.contract(),
+                                balance: 5_u64.into(), // 50 - 15 fee - 30 transfer
+                                amount: (4 * COST_PER_BYTES).into(), // 1000
+                            },
+                        )],
+                    }),
+                    result: TransferTarget::ToContrat(TransferSuccess {
+                        storage: Some(storage_value.into()),
+                        lazy_storage_diff: None,
+                        balance_updates: vec![
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Implicit(
+                                    src.pkh.clone(),
+                                )),
+                                changes: -30,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                            BalanceUpdate {
+                                balance: Balance::Account(
+                                    Contract::from_b58check(CONTRACT_1).unwrap(),
+                                ),
+                                changes: 30,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                        ],
+                        ticket_receipt: vec![],
+                        originated_contracts: vec![],
+                        consumed_milligas: 171923_u64.into(),
+                        storage_size: 44_u64.into(), // code (33) + "Hello world" (11)
+                        paid_storage_size_diff: 4_u64.into(), // "Hello world" (11) − "initial" (7)
+                        allocated_destination_contract: false,
+                        address_registry_diff: vec![],
+                    }),
+                }),
+                internal_operation_results: vec![],
+            }),
+        }];
+
+        assert_eq!(receipts, expected_receipts);
+
+        // SafeStorage rollback: source paid the fee but neither the
+        // transfer amount nor the burn. Destination storage untouched.
+        assert_eq!(source.balance(&host).unwrap(), (50_u64 - 15).into());
+        assert_eq!(
+            destination.storage(&host).unwrap(),
+            initial_storage.encode().unwrap(),
+            "destination storage must roll back to pre-op value",
+        );
     }
 
     #[test]
@@ -4000,7 +4149,11 @@ mod tests {
         let mut host = MockKernelHost::default();
 
         let src = bootstrap1();
-        let src_acc = init_account(&mut host, &src.pkh, 50);
+        // Funded for: 3 fees of 10 (= 30) + 2 transfer amounts of 1
+        // (= 2) + storage burn for the second op (4 × COST_PER_BYTES = 1000) +
+        // 18 mutez change. The batch reverts via FAILWITH; only the
+        // fees survive, so final balance is 1050 - 30 = 1020.
+        let src_acc = init_account(&mut host, &src.pkh, 1050);
 
         let fail_dest = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
         let succ_dest = ContractKt1Hash::from_base58_check(CONTRACT_2).unwrap();
@@ -4116,10 +4269,11 @@ mod tests {
             "Counter should have been incremented three times."
         );
 
-        // Initial balance: 50 tez, paid in fees: (3*10)tez, transfer reverted
+        // Initial balance: 1050 tez, paid in fees: (3*10) tez,
+        // transfer + storage burn reverted via SafeStorage.
         assert_eq!(
             src_acc.balance(&host).unwrap(),
-            20.into(),
+            1020.into(),
             "Fees should have been paid for failed operation"
         );
     }
@@ -4612,7 +4766,9 @@ mod tests {
         ";
         let mut host = MockKernelHost::default();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 50);
+        // Fund source for fee + transfer + storage burn for
+        // recording the contract balance into its storage.
+        init_account(&mut host, &src.pkh, 5_000);
         reveal_account(&mut host, &src);
 
         let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_3)
@@ -4922,6 +5078,8 @@ mod tests {
             - 10 // fee for the operation
             - 7500 // origination cost paid by the contract
             - 64250 // storage cost paid by the source
+            - 6750 // post-execution storage burn for the transfer-to-chapo
+                   // (paid_storage_size_diff = 27 bytes × COST_PER_BYTES)
             - 1000; // amount sent to the originated contract
         assert_eq!(
             src_account.balance(&host).unwrap(),

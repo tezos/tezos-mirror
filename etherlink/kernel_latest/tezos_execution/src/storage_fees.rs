@@ -12,7 +12,8 @@ use tezos_data_encoding::types::Zarith;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::operation_result::{
-    ApplyOperationError, Balance, BalanceUpdate, TransferError, UpdateOrigin,
+    ApplyOperationError, Balance, BalanceUpdate, ContentResult, InternalOperationSum,
+    OperationResultSum, TransferError, TransferSuccess, TransferTarget, UpdateOrigin,
 };
 
 use crate::account_storage::TezlinkAccount;
@@ -23,7 +24,6 @@ pub const COST_PER_BYTES: u64 = 250;
 
 /// Burns the cost of `nb_consumed_bytes` bytes from the payer and
 /// returns the associated balance updates.
-#[allow(dead_code)]
 fn burn_storage_fee<Host: StorageV1>(
     host: &mut Host,
     payer: &impl TezlinkAccount,
@@ -73,12 +73,96 @@ pub fn compute_storage_balance_updates(
     Ok(vec![source_update, block_fees])
 }
 
+/// Charge the source of a manager operation for the storage
+/// allocated by the operation and its successful internal
+/// operations.
+pub fn burn_manager_storage_fees<Host: StorageV1>(
+    host: &mut Host,
+    payer: &impl TezlinkAccount,
+    receipt: &mut OperationResultSum,
+) -> Result<(), ApplyOperationError> {
+    match receipt {
+        OperationResultSum::Reveal(op) => {
+            if matches!(op.result, ContentResult::Applied(_)) {
+                burn_internals(host, payer, &mut op.internal_operation_results)?;
+            }
+            Ok(())
+        }
+        OperationResultSum::Transfer(op) => {
+            if let ContentResult::Applied(TransferTarget::ToContrat(success)) =
+                &mut op.result
+            {
+                let updates = burn_for_transfer(host, payer, success)?;
+                success.balance_updates = updates;
+                burn_internals(host, payer, &mut op.internal_operation_results)?;
+            }
+            Ok(())
+        }
+        OperationResultSum::Origination(op) => {
+            if matches!(op.result, ContentResult::Applied(_)) {
+                // TODO: burn for origination.
+                burn_internals(host, payer, &mut op.internal_operation_results)?;
+            }
+            Ok(())
+        }
+    }
+}
+
+/// Charge the source of a manager operation for the storage that
+/// each of its successful internal operations allocated.
+fn burn_internals<Host: StorageV1>(
+    host: &mut Host,
+    payer: &impl TezlinkAccount,
+    internals: &mut Vec<InternalOperationSum>,
+) -> Result<(), ApplyOperationError> {
+    let burned: Result<Vec<InternalOperationSum>, ApplyOperationError> = internals
+        .iter()
+        .cloned()
+        .map(|mut internal| {
+            match &mut internal {
+                InternalOperationSum::Transfer(inner) => {
+                    if let ContentResult::Applied(TransferTarget::ToContrat(success)) =
+                        &mut inner.result
+                    {
+                        let updates = burn_for_transfer(host, payer, success)?;
+                        success.balance_updates = updates;
+                    }
+                }
+                // TODO: burn for internal origination.
+                InternalOperationSum::Origination(_) => {}
+                InternalOperationSum::Event(_) => {}
+            }
+            Ok(internal)
+        })
+        .collect();
+    *internals = burned?;
+    Ok(())
+}
+
+/// Charge the source for the storage allocated by a successful
+/// transfer to a contract. If the charging fails, the receipt is
+/// not modified.
+fn burn_for_transfer<Host: StorageV1>(
+    host: &mut Host,
+    payer: &impl TezlinkAccount,
+    success: &TransferSuccess,
+) -> Result<Vec<BalanceUpdate>, ApplyOperationError> {
+    let mut updates = burn_storage_fee(host, payer, &success.paid_storage_size_diff)?;
+    updates.extend(success.balance_updates.iter().cloned());
+    Ok(updates)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup::types::PublicKeyHash;
-    use tezos_tezlink::operation_result::Balance;
+    use tezos_tezlink::operation::{Parameters, TransferContent};
+    use tezos_tezlink::operation_result::{
+        ApplyOperationErrors, Balance, BalanceTooLow, BalanceUpdate,
+        InternalContentWithMetadata, OperationResult, RevealSuccess, TransferSuccess,
+        UpdateOrigin,
+    };
 
     use crate::account_storage::{TezlinkImplicitAccount, TezosImplicitAccount};
     use crate::context::{self, Context};
@@ -161,5 +245,200 @@ mod tests {
             }
             other => panic!("expected CannotPayStorageFee(_), got {other:?}"),
         }
+    }
+
+    fn applied_transfer(success: TransferSuccess) -> OperationResultSum {
+        OperationResultSum::Transfer(OperationResult {
+            balance_updates: vec![],
+            result: ContentResult::Applied(TransferTarget::ToContrat(success)),
+            internal_operation_results: vec![],
+        })
+    }
+
+    /// A Reveal receipt with no internals leaves the payer balance
+    /// untouched.
+    #[test]
+    fn reveal_with_no_internals_is_a_noop() {
+        let mut host = MockKernelHost::default();
+        let payer = init_payer(&mut host, 1_000);
+        let mut receipt = OperationResultSum::Reveal(OperationResult {
+            balance_updates: vec![],
+            result: ContentResult::Applied(RevealSuccess {
+                consumed_milligas: 0_u64.into(),
+            }),
+            internal_operation_results: vec![],
+        });
+        burn_manager_storage_fees(&mut host, &payer, &mut receipt).unwrap();
+        assert_eq!(payer.balance(&host).unwrap(), 1_000_u64.into());
+    }
+
+    /// A Transfer with `paid_storage_size_diff > 0` debits the payer
+    /// `bytes × COST_PER_BYTES` mutez and appends the
+    /// `Debited(payer) / Credited(StorageFees)` pair to the
+    /// receipt's inner `balance_updates`.
+    #[test]
+    fn transfer_with_storage_growth_fires_variable_burn() {
+        let mut host = MockKernelHost::default();
+        let payer = init_payer(&mut host, 100_000);
+        let mut receipt = applied_transfer(TransferSuccess {
+            paid_storage_size_diff: 10_u64.into(),
+            ..Default::default()
+        });
+
+        burn_manager_storage_fees(&mut host, &payer, &mut receipt).unwrap();
+
+        let burn = 10 * COST_PER_BYTES;
+        assert_eq!(
+            payer.balance(&host).unwrap(),
+            (100_000 - burn).into(),
+            "payer must drop by the burn amount"
+        );
+        let OperationResultSum::Transfer(op) = &receipt else {
+            panic!("expected Transfer receipt");
+        };
+        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &op.result
+        else {
+            panic!("expected Applied target");
+        };
+
+        assert_eq!(
+            success.balance_updates,
+            vec![
+                BalanceUpdate {
+                    balance: Balance::Account(payer.contract()),
+                    changes: -(burn as i64),
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+                BalanceUpdate {
+                    balance: Balance::StorageFees,
+                    changes: (burn as i64),
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+            ]
+        );
+    }
+
+    /// A Transfer with `paid_storage_size_diff == 0` short-circuits:
+    /// no balance update is added and the payer is not touched.
+    #[test]
+    fn transfer_with_no_storage_growth_is_a_noop() {
+        let mut host = MockKernelHost::default();
+        let payer = init_payer(&mut host, 1_000);
+        let mut receipt = applied_transfer(TransferSuccess::default());
+        burn_manager_storage_fees(&mut host, &payer, &mut receipt).unwrap();
+        assert_eq!(payer.balance(&host).unwrap(), 1_000_u64.into());
+        let OperationResultSum::Transfer(op) = &receipt else {
+            panic!("expected Transfer receipt");
+        };
+        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &op.result
+        else {
+            panic!("expected Applied target");
+        };
+        assert!(success.balance_updates.is_empty());
+    }
+
+    /// A non-Applied top-level (here Failed) does not trigger any
+    /// burn — the body is not a successful operation.
+    #[test]
+    fn failed_top_level_does_not_burn() {
+        let mut host = MockKernelHost::default();
+        let payer = init_payer(&mut host, 1_000);
+        let mut receipt = OperationResultSum::Transfer(OperationResult {
+            balance_updates: vec![],
+            result: ContentResult::Failed(ApplyOperationErrors { errors: vec![] }),
+            internal_operation_results: vec![],
+        });
+        burn_manager_storage_fees(&mut host, &payer, &mut receipt).unwrap();
+        assert_eq!(payer.balance(&host).unwrap(), 1_000_u64.into());
+    }
+
+    /// Insolvent payer for the top-level burn: returns a single
+    /// [`ApplyOperationError::CannotPayStorageFee`] carrying the
+    /// underlying `BalanceTooLow`.
+    #[test]
+    fn insolvent_payer_returns_cannot_pay() {
+        let mut host = MockKernelHost::default();
+        let payer = init_payer(&mut host, 100);
+        let mut receipt = applied_transfer(TransferSuccess {
+            paid_storage_size_diff: 10_u64.into(),
+            ..Default::default()
+        });
+        let err = burn_manager_storage_fees(&mut host, &payer, &mut receipt)
+            .expect_err("burn must fail when payer is insolvent");
+
+        assert_eq!(
+            err,
+            ApplyOperationError::CannotPayStorageFee(BalanceTooLow {
+                contract: payer.contract(),
+                balance: 100_u64.into(),
+                amount: (10 * COST_PER_BYTES).into(),
+            }),
+        );
+    }
+
+    /// An `Applied` internal Transfer with storage growth fires its
+    /// own burn against the same payer; the burn pair lands on the
+    /// internal op's success body, not the top-level.
+    #[test]
+    fn applied_internal_transfer_fires_its_own_burn() {
+        let mut host = MockKernelHost::default();
+        let payer = init_payer(&mut host, 100_000);
+        let internal = InternalOperationSum::Transfer(InternalContentWithMetadata {
+            sender: payer.contract(),
+            nonce: 0,
+            content: TransferContent {
+                amount: 0_u64.into(),
+                destination: payer.contract(),
+                parameters: Parameters::default(),
+            },
+            result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+                paid_storage_size_diff: 4_u64.into(),
+                ..Default::default()
+            })),
+        });
+        let mut receipt = OperationResultSum::Transfer(OperationResult {
+            balance_updates: vec![],
+            result: ContentResult::Applied(TransferTarget::ToContrat(
+                TransferSuccess::default(),
+            )),
+            internal_operation_results: vec![internal],
+        });
+
+        burn_manager_storage_fees(&mut host, &payer, &mut receipt).unwrap();
+
+        let burn = 4 * COST_PER_BYTES;
+        assert_eq!(payer.balance(&host).unwrap(), (100_000 - burn).into());
+        let OperationResultSum::Transfer(op) = &receipt else {
+            panic!("expected Transfer receipt");
+        };
+        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &op.result
+        else {
+            panic!("expected Applied target");
+        };
+        assert!(success.balance_updates.is_empty());
+
+        let InternalOperationSum::Transfer(inner) = &op.internal_operation_results[0]
+        else {
+            panic!("expected internal Transfer");
+        };
+        let ContentResult::Applied(TransferTarget::ToContrat(s)) = &inner.result else {
+            panic!("expected Applied internal target");
+        };
+
+        assert_eq!(
+            s.balance_updates,
+            vec![
+                BalanceUpdate {
+                    balance: Balance::Account(payer.contract()),
+                    changes: -(burn as i64),
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+                BalanceUpdate {
+                    balance: Balance::StorageFees,
+                    changes: (burn as i64),
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+            ]
+        );
     }
 }
