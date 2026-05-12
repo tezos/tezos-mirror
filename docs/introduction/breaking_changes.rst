@@ -69,6 +69,17 @@ meant to decide the activation of the Adaptive Issuance feature, and
 has had no effects since the Paris protocol has been voted in.
 
 
+DAL node configuration commands
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``octez-dal-node config init`` now fails if a configuration file already
+exists. The new command ``octez-dal-node config reset`` should be used
+instead to overwrite an existing configuration file.
+
+``octez-dal-node config update`` now fails if no configuration file
+exists. Run ``octez-dal-node config init`` first.
+
+
 .. _v24_breaking_changes:
 
 Octez Version 24
