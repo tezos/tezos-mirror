@@ -290,9 +290,11 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
   | Tezosx_feature_flag runtime ->
       static_read (unit_flag_codec ~path:(Tezosx.feature_flag runtime))
   | Michelson_runtime_sunrise_level ->
-      static_read
-        (qty_le_codec
-           ~path:Durable_storage_path.michelson_runtime_sunrise_level)
+      versioned_read (fun ~storage_version ->
+          qty_le_codec
+            ~path:
+              (Durable_storage_path.michelson_runtime_sunrise_level
+                 ~storage_version))
   | Current_block_number chain_family ->
       let root = Durable_storage_path.root_of_chain_family chain_family in
       static_read

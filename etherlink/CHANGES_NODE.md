@@ -16,6 +16,12 @@
 
 ### Storage changes
 
+- Resolve `/michelson_runtime/{,target_}sunrise_level` from
+  `/tez/world_state/` on kernels at storage version 57 or higher,
+  falling back to the legacy `/evm/` paths otherwise. Operators must
+  upgrade to this release before running a V57+ TezosX kernel; the
+  release stays backward-compatible with pre-V57 kernels. (!21851)
+
 ### Documentation changes
 
 ### Experimental features changes

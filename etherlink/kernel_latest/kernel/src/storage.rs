@@ -93,6 +93,7 @@ pub enum StorageVersion {
     V54,
     V55,
     V56,
+    V57,
 }
 
 impl From<StorageVersion> for u64 {
@@ -107,7 +108,7 @@ impl StorageVersion {
     }
 }
 
-pub const STORAGE_VERSION: StorageVersion = StorageVersion::V56;
+pub const STORAGE_VERSION: StorageVersion = StorageVersion::V57;
 
 pub const PRIVATE_FLAG_PATH: RefPath = RefPath::assert_from(b"/base/remove_whitelist");
 
@@ -160,12 +161,12 @@ pub const ENABLE_TEZOS_RUNTIME: RefPath =
 // Target EVM block number for the Michelson runtime sunrise. Written by the
 // installer when scheduling a future activation.
 const MICHELSON_RUNTIME_TARGET_SUNRISE_LEVEL: RefPath =
-    RefPath::assert_from(b"/evm/michelson_runtime/target_sunrise_level");
+    RefPath::assert_from(b"/tez/world_state/michelson_runtime/target_sunrise_level");
 
 // EVM block number where the Michelson runtime first started producing
 // Tezos blocks. Written once by the kernel at the sunrise block.
 const MICHELSON_RUNTIME_SUNRISE_LEVEL: RefPath =
-    RefPath::assert_from(b"/evm/michelson_runtime/sunrise_level");
+    RefPath::assert_from(b"/tez/world_state/michelson_runtime/sunrise_level");
 
 pub const ENABLE_MICHELSON_GAS_REFUND: RefPath =
     RefPath::assert_from(b"/base/feature_flags/enable_michelson_gas_refund");

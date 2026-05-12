@@ -456,6 +456,10 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
     in
     make_instr ?convert ~path_prefix arg
   in
+  (* V57 moved /evm/michelson_runtime/{,target_}sunrise_level under
+     /tez/world_state/. V57 ships in the [Latest] kernel — i.e. on any
+     kernel_compat strictly newer than [FarfadetR2]. *)
+  let michelson_runtime_paths_in_world_state = newer_than_farfadet_r2 in
   let with_runtimes =
     List.concat_map
       (fun (runtime, target_sunrise_level) ->
@@ -468,6 +472,14 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
           | Tezosx.Tezos ->
               String.concat "/" (("" :: prefix) @ ["enable_tezos_runtime"])
         in
+        let target_sunrise_level_path = function
+          | Tezosx.Tezos ->
+              let storage_version =
+                if michelson_runtime_paths_in_world_state then 57 else 56
+              in
+              Durable_storage_path.michelson_runtime_target_sunrise_level
+                ~storage_version
+        in
         Installer_config.make ~key:flag_path ~value:""
         ::
         (match target_sunrise_level with
@@ -475,7 +487,7 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
         | Some level ->
             [
               Installer_config.make
-                ~key:(Tezosx.target_sunrise_level_path runtime)
+                ~key:(target_sunrise_level_path runtime)
                 ~value:(Tezosx.encode_target_sunrise_level level);
             ]))
       with_runtimes

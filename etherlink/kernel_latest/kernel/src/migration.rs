@@ -1088,6 +1088,43 @@ where
                 Ok(MigrationStatus::None)
             }
         }
+        StorageVersion::V57 => {
+            // Phase 5.5 of the durable storage reorganization: move the
+            // two Michelson-runtime activation slots that slipped past
+            // the Phase 1–6 keyspace reorg under /tez/world_state/.
+            //
+            // TezosX-only paths: target_sunrise_level is written by the
+            // installer when scheduling a Michelson activation, and
+            // sunrise_level is written by the kernel at the sunrise
+            // block. Mainnet has neither path. Gate on
+            // [enable_tezos_runtime] so we skip cleanly there.
+            if crate::storage::enable_tezos_runtime(host) {
+                let moves: &[(&[u8], &[u8])] = &[
+                    (
+                        b"/evm/michelson_runtime/target_sunrise_level",
+                        b"/tez/world_state/michelson_runtime/target_sunrise_level",
+                    ),
+                    (
+                        b"/evm/michelson_runtime/sunrise_level",
+                        b"/tez/world_state/michelson_runtime/sunrise_level",
+                    ),
+                ];
+                for (old, new) in moves {
+                    allow_path_not_found(host.store_move(
+                        &RefPath::assert_from(old),
+                        &RefPath::assert_from(new),
+                    ))?;
+                }
+                // Drop the now-empty /evm/michelson_runtime parent so
+                // /evm/ doesn't keep a stale subtree.
+                allow_path_not_found(
+                    host.store_delete(&RefPath::assert_from(b"/evm/michelson_runtime")),
+                )?;
+                Ok(MigrationStatus::Done)
+            } else {
+                Ok(MigrationStatus::None)
+            }
+        }
     }
 }
 
@@ -1236,5 +1273,84 @@ mod tests {
         // by `StorageAccount::delete_info`, and the legacy `/balance`
         // delete is wrapped in `allow_path_not_found`.
         assert!(account.info_without_migration(&host).unwrap().is_none());
+    }
+
+    /// Phase 5.5: V57 must move both Michelson-runtime activation
+    /// paths from `/evm/michelson_runtime/...` to
+    /// `/tez/world_state/michelson_runtime/...` on TezosX networks.
+    #[test]
+    fn v57_migration_moves_michelson_runtime_paths_on_tezosx_networks() {
+        let mut host = MockKernelHost::default();
+        host.store_write_all(&crate::storage::ENABLE_TEZOS_RUNTIME, &[1u8])
+            .unwrap();
+
+        let legacy_target =
+            RefPath::assert_from(b"/evm/michelson_runtime/target_sunrise_level");
+        let legacy_sunrise =
+            RefPath::assert_from(b"/evm/michelson_runtime/sunrise_level");
+        let new_target = RefPath::assert_from(
+            b"/tez/world_state/michelson_runtime/target_sunrise_level",
+        );
+        let new_sunrise =
+            RefPath::assert_from(b"/tez/world_state/michelson_runtime/sunrise_level");
+
+        // Sentinel bytes so we can verify the values survive the move.
+        let target_bytes = [0xAA; 32];
+        let sunrise_bytes = [0xBB; 32];
+        host.store_write_all(&legacy_target, &target_bytes).unwrap();
+        host.store_write_all(&legacy_sunrise, &sunrise_bytes)
+            .unwrap();
+
+        let status = migrate_to(&mut host, StorageVersion::V57).unwrap();
+        assert!(matches!(status, MigrationStatus::Done));
+
+        // Legacy paths are gone.
+        assert!(matches!(
+            host.store_read_all(&legacy_target),
+            Err(RuntimeError::PathNotFound)
+        ));
+        assert!(matches!(
+            host.store_read_all(&legacy_sunrise),
+            Err(RuntimeError::PathNotFound)
+        ));
+        // The legacy parent is dropped too.
+        assert!(host
+            .store_has(&RefPath::assert_from(b"/evm/michelson_runtime"))
+            .unwrap()
+            .is_none());
+
+        // New paths hold the original bytes.
+        assert_eq!(host.store_read_all(&new_target).unwrap(), target_bytes);
+        assert_eq!(host.store_read_all(&new_sunrise).unwrap(), sunrise_bytes);
+    }
+
+    /// Phase 5.5: V57 is a no-op on non-TezosX networks (mainnet has
+    /// never written these paths).
+    #[test]
+    fn v57_migration_is_a_no_op_on_non_tezosx_networks() {
+        let mut host = MockKernelHost::default();
+        // Do NOT set ENABLE_TEZOS_RUNTIME.
+
+        let status = migrate_to(&mut host, StorageVersion::V57).unwrap();
+        assert!(matches!(status, MigrationStatus::None));
+    }
+
+    /// Phase 5.5: V57 is safe on a fresh TezosX network where neither
+    /// path was ever written (covers the `allow_path_not_found`
+    /// idempotency contract).
+    #[test]
+    fn v57_migration_is_safe_when_paths_are_absent() {
+        let mut host = MockKernelHost::default();
+        host.store_write_all(&crate::storage::ENABLE_TEZOS_RUNTIME, &[1u8])
+            .unwrap();
+
+        let status = migrate_to(&mut host, StorageVersion::V57).unwrap();
+        assert!(matches!(status, MigrationStatus::Done));
+
+        // No paths created as a side effect of the no-op moves.
+        assert!(host
+            .store_has(&RefPath::assert_from(b"/tez/world_state/michelson_runtime"))
+            .unwrap()
+            .is_none());
     }
 }

@@ -325,7 +325,8 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     ?(force_install_kernel = true) ?whitelist ?maximum_allowed_ticks
     ?maximum_gas_per_transaction ?restricted_rpcs ?(enable_dal = false)
     ?dal_slots ?websockets ?(enable_fa_bridge = false)
-    ?(enable_fast_withdrawal = false) protocol =
+    ?(enable_fast_withdrawal = false) ?with_runtimes
+    ?tezosx_target_sunrise_levels protocol =
   let _, kernel_installee = Kernel.to_uses_and_tags kernel in
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
@@ -402,6 +403,8 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
         ?dal_slots
         ?evm_version
         ?kernel_compat:(Kernel.name_of kernel)
+        ?with_runtimes
+        ?tezosx_target_sunrise_levels
         ()
     in
     let*! () =
@@ -3140,7 +3143,10 @@ let test_kernel_upgrade_activates_michelson_runtime =
         Set
           {
             value = activation_target;
-            to_ = Tezosx_runtime.target_sunrise_level Tezosx_runtime.Tezos;
+            to_ =
+              Tezosx_runtime.target_sunrise_level
+                Kernel.Latest
+                Tezosx_runtime.Tezos;
           };
       ]
   in
@@ -3199,7 +3205,10 @@ let test_kernel_upgrade_activates_michelson_runtime =
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
          ~pvm_kind
          ~operation:Sc_rollup_rpc.Value
-         ~key:(Tezosx_runtime.target_sunrise_level Tezosx_runtime.Tezos)
+         ~key:
+           (Tezosx_runtime.target_sunrise_level
+              Kernel.Latest
+              Tezosx_runtime.Tezos)
          ()
   in
   Check.((target_sunrise_value = Some activation_target) (option string))
@@ -3211,7 +3220,7 @@ let test_kernel_upgrade_activates_michelson_runtime =
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
          ~pvm_kind
          ~operation:Sc_rollup_rpc.Value
-         ~key:(Tezosx_runtime.sunrise_level Tezosx_runtime.Tezos)
+         ~key:(Tezosx_runtime.sunrise_level Kernel.Latest Tezosx_runtime.Tezos)
          ()
   in
   Check.((sunrise_value = None) (option string))
@@ -3268,7 +3277,7 @@ let test_kernel_upgrade_activates_michelson_runtime =
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
          ~pvm_kind
          ~operation:Sc_rollup_rpc.Value
-         ~key:(Tezosx_runtime.sunrise_level Tezosx_runtime.Tezos)
+         ~key:(Tezosx_runtime.sunrise_level Kernel.Latest Tezosx_runtime.Tezos)
          ()
   in
   Check.((sunrise_value = Some activation_target) (option string))
@@ -3327,6 +3336,273 @@ let test_kernel_upgrade_activates_michelson_runtime =
   let*@ activation_level = Rpc.tez_getMichelsonActivationLevel observer in
   Check.((activation_level = Some 6L) (option int64))
     ~error_msg:"Expected tez_getMichelsonActivationLevel to return %R, got %L" ;
+  unit
+
+(* Phase 5.5 (V57): the two Michelson-runtime activation slots
+   /evm/michelson_runtime/{,target_}sunrise_level move under
+   /tez/world_state/michelson_runtime/. The previewnet kernel still
+   writes them at the legacy /evm/ paths; the V57 migration
+   relocates them on first boot of the new kernel.
+
+   This test seeds both legacy paths (via the previewnet installer
+   for [target_sunrise_level], and by letting the previewnet kernel
+   reach the sunrise block for [sunrise_level]), upgrades to the
+   latest kernel, and asserts that V57 moved both values
+   byte-for-byte. *)
+let test_v57_michelson_runtime_paths_migration =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:
+      ["evm"; "migration"; "upgrade"; "previewnet"; "v57"; "michelson_runtime"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.previewnet_kernel;
+        Constant.WASM.evm_kernel;
+      ])
+    ~title:
+      "Phase 5.5 (V57) moves /evm/michelson_runtime/{,target_}sunrise_level \
+       under /tez/world_state/ (previewnet -> latest)"
+  @@ fun protocol ->
+  let admin = Constant.bootstrap1 in
+  (* 32-byte little-endian U256 encoding of 6 — the format expected
+     at both [target_sunrise_level] (installer-written) and
+     [sunrise_level] (kernel-written via [write_u256_le]). *)
+  let activation_target =
+    "0600000000000000000000000000000000000000000000000000000000000000"
+  in
+  (* The previewnet kernel's hard-coded [STORAGE_VERSION] is V56, and
+     [init_storage_versioning] writes that value verbatim on a fresh
+     install when no [storage_version] path exists — so V50–V56 internal
+     migrations would never run, leaving e.g. [/evm/sequencer] stranded
+     at its legacy path while the kernel reads from
+     [/evm/world_state/sequencer]. Pre-seed the legacy
+     [/evm/storage_version] path with V49 (little-endian u64, hex
+     encoded as expected by the installer) so the previewnet kernel
+     runs its full V50→V56 ladder on first boot, landing in the exact
+     state the V57 upgrade expects. *)
+  let storage_version_v49_le_u64_hex = "3100000000000000" in
+  (* Seed only what [make kernel installer config] cannot produce on its
+     own: a legacy [/evm/storage_version] pre-set to V49 (see comment
+     above on why that's needed). The Tezos feature flag and the target
+     sunrise level are wired through the EVM node's standard
+     [--with-runtime tezos:LEVEL] CLI plumbing below — which knows to pick
+     the right legacy-vs-new path layout from the kernel_compat tag. *)
+  let additional_config =
+    Sc_rollup_helpers.Installer_kernel_config.
+      [
+        Set
+          {value = storage_version_v49_le_u64_hex; to_ = "/evm/storage_version"};
+      ]
+  in
+  let* common_setup, mode =
+    setup_evm_kernel
+      ~kernel:Kernel.Previewnet
+      ~additional_config
+      ~with_runtimes:[Tezosx_runtime.Tezos]
+      ~tezosx_target_sunrise_levels:[(Tezosx_runtime.Tezos, 6)]
+      ~setup_mode:
+        (Setup_sequencer
+           {
+             return_sequencer = true;
+             time_between_blocks = Some Nothing;
+             sequencer = admin;
+             max_blueprints_ahead = None;
+             genesis_timestamp = None;
+           })
+      ~admin:(Some admin)
+      protocol
+  in
+  let {client; sc_rollup_node; produce_block; _} : common_setup =
+    common_setup
+  in
+  let evm_node =
+    match mode with Sequencer {evm_node} -> evm_node | Proxy -> assert false
+  in
+  (* Drive the kernel past the sunrise block (target = 6) so the
+     previewnet kernel writes [/evm/michelson_runtime/sunrise_level]
+     itself. *)
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node () in
+  let* () =
+    repeat 7 (fun () ->
+        let*@ _ = produce_block () in
+        unit)
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node () in
+  let read_value path =
+    let*@ v = Rpc.state_value evm_node path in
+    return v
+  in
+  let read_subkeys path =
+    let*@ v = Rpc.state_subkeys evm_node path in
+    (* [None] (path absent) and [Some []] (path present but empty) both
+       mean "no subkeys"; collapse them so the caller can compare against
+       the empty list directly. *)
+    return (Option.value ~default:[] v)
+  in
+  let legacy_target = "/evm/michelson_runtime/target_sunrise_level" in
+  let legacy_sunrise = "/evm/michelson_runtime/sunrise_level" in
+  let new_target = "/tez/world_state/michelson_runtime/target_sunrise_level" in
+  let new_sunrise = "/tez/world_state/michelson_runtime/sunrise_level" in
+  (* ---- Pre-upgrade: legacy paths populated, new paths absent. ---- *)
+  let* pre_target = read_value legacy_target in
+  Check.((pre_target = Some activation_target) (option string))
+    ~error_msg:
+      "Pre-upgrade: legacy target_sunrise_level should hold the installer \
+       value %R, got %L" ;
+  let* pre_sunrise = read_value legacy_sunrise in
+  Check.((pre_sunrise = Some activation_target) (option string))
+    ~error_msg:
+      "Pre-upgrade: legacy sunrise_level should be set by the previewnet \
+       kernel at the sunrise block; expected %R, got %L" ;
+  let* pre_new_target = read_value new_target in
+  Check.((pre_new_target = None) (option string))
+    ~error_msg:
+      "Pre-upgrade: new target_sunrise_level path should be absent, got %L" ;
+  let* pre_new_sunrise = read_value new_sunrise in
+  Check.((pre_new_sunrise = None) (option string))
+    ~error_msg:"Pre-upgrade: new sunrise_level path should be absent, got %L" ;
+  (* ---- Trigger the upgrade to the latest kernel (V57). ---- *)
+  let* _ =
+    gen_test_kernel_upgrade
+      ~evm_setup:(common_setup, mode)
+      ~installee:Constant.WASM.evm_kernel
+      ~admin
+      protocol
+  in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  let*@ _ = produce_block () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node () in
+  (* ---- Post-upgrade: legacy paths gone, new paths carry the same bytes. ---- *)
+  let* post_legacy_target = read_value legacy_target in
+  Check.((post_legacy_target = None) (option string))
+    ~error_msg:
+      "Post-upgrade: legacy target_sunrise_level must be empty after V57, got \
+       %L" ;
+  let* post_legacy_sunrise = read_value legacy_sunrise in
+  Check.((post_legacy_sunrise = None) (option string))
+    ~error_msg:
+      "Post-upgrade: legacy sunrise_level must be empty after V57, got %L" ;
+  let* post_new_target = read_value new_target in
+  Check.((post_new_target = pre_target) (option string))
+    ~error_msg:
+      "Post-upgrade: new target_sunrise_level should carry the original bytes; \
+       expected %R, got %L" ;
+  let* post_new_sunrise = read_value new_sunrise in
+  Check.((post_new_sunrise = pre_sunrise) (option string))
+    ~error_msg:
+      "Post-upgrade: new sunrise_level should carry the original bytes; \
+       expected %R, got %L" ;
+  (* The legacy /evm/michelson_runtime parent must be gone — V57
+     explicitly deletes the empty parent so /evm/ doesn't keep a
+     stale subtree. *)
+  let* legacy_parent_subkeys = read_subkeys "/evm/michelson_runtime" in
+  Check.((legacy_parent_subkeys = []) (list string))
+    ~error_msg:
+      "Post-upgrade: /evm/michelson_runtime must have no subkeys after V57, \
+       got %L" ;
+  unit
+
+(* Previewnet counterpart of [test_kernel_storage_version_matches_constant] in
+   [evm_sequencer.ml]: assert the previewnet kernel's baked STORAGE_VERSION
+   matches what [Kernel.storage_version Previewnet] reports. Lives here (not
+   alongside the latest+mainnet check) because the default [register_all]
+   fixture cannot boot the previewnet kernel — a fresh install writes V56
+   verbatim, skipping the V50–V56 migrations that move [/evm/sequencer] to
+   [/evm/world_state/sequencer], so the sequencer EVM node aborts. Pre-seeding
+   [/evm/storage_version] with V49 (same workaround as [test_v57_*] above)
+   forces the migration ladder to run; once it has, the kernel writes its
+   STORAGE_VERSION (V56) to [/base/storage_version], where we read it back. *)
+let test_previewnet_storage_version_matches_constant =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:
+      [
+        "evm";
+        "durable_storage";
+        "storage_version";
+        "kernel_constant";
+        "previewnet";
+      ]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.previewnet_kernel;
+      ])
+    ~title:
+      "Kernel.storage_version matches the previewnet kernel's baked \
+       STORAGE_VERSION"
+  @@ fun protocol ->
+  let admin = Constant.bootstrap1 in
+  (* Same V49 little-endian u64 hex as [test_v57_michelson_runtime_paths_migration]. *)
+  let storage_version_v49_le_u64_hex = "3100000000000000" in
+  let additional_config =
+    Sc_rollup_helpers.Installer_kernel_config.
+      [
+        Set
+          {value = storage_version_v49_le_u64_hex; to_ = "/evm/storage_version"};
+      ]
+  in
+  let* common_setup, mode =
+    setup_evm_kernel
+      ~kernel:Kernel.Previewnet
+      ~additional_config
+      ~setup_mode:
+        (Setup_sequencer
+           {
+             return_sequencer = true;
+             time_between_blocks = Some Nothing;
+             sequencer = admin;
+             max_blueprints_ahead = None;
+             genesis_timestamp = None;
+           })
+      ~admin:(Some admin)
+      protocol
+  in
+  let {client; sc_rollup_node; _} : common_setup = common_setup in
+  let evm_node =
+    match mode with Sequencer {evm_node} -> evm_node | Proxy -> assert false
+  in
+  (* Ensure the rollup has processed the genesis kernel boot so the V49→V56
+     migration ladder has run and the kernel has written its STORAGE_VERSION
+     to /base/storage_version. *)
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node () in
+  let kernel = Kernel.Previewnet in
+  let key = Durable_storage_path.storage_version kernel in
+  let* raw_opt =
+    Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks:Tezos_regression.rpc_hooks
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind
+         ~operation:Sc_rollup_rpc.Value
+         ~key
+         ()
+  in
+  let actual =
+    match raw_opt with
+    | None ->
+        Test.fail
+          ~__LOC__
+          "No value found in durable storage at path %S — the kernel did not \
+           initialize its storage version"
+          key
+    | Some hex ->
+        let bytes = Hex.to_bytes (`Hex hex) in
+        Bytes.get_int64_le bytes 0 |> Int64.to_int
+  in
+  let expected = Kernel.storage_version kernel in
+  Check.(
+    (actual = expected)
+      int
+      ~error_msg:
+        (Printf.sprintf
+           "Previewnet kernel wrote V%%L to %s but Kernel.storage_version \
+            reports V%%R — update [storage_version] in \
+            etherlink/tezt/lib/kernel.ml to match the rebaked kernel."
+           key)) ;
   unit
 
 let test_sequencer_and_kernel_upgrade_via_kernel_admin =
@@ -6459,7 +6735,7 @@ let test_rpc_state_value_and_subkeys =
   let expected_subkeys =
     let keys = ["indexes"; "blocks"; "fees"; "eth_accounts"; "eth_codes"] in
     match kernel with
-    | Latest -> keys @ ["sequencer"]
+    | Latest | Previewnet -> keys @ ["sequencer"]
     | Mainnet | Tezlink_shadownet -> keys
   in
   Check.(
@@ -6561,6 +6837,8 @@ let register_evm_node ~protocols =
   test_kernel_upgrade_via_governance protocols ;
   test_kernel_upgrade_via_kernel_security_governance protocols ;
   test_kernel_upgrade_activates_michelson_runtime protocols ;
+  test_v57_michelson_runtime_paths_migration protocols ;
+  test_previewnet_storage_version_matches_constant protocols ;
   test_sequencer_and_kernel_upgrade_via_kernel_admin protocols ;
   test_rpc_sendRawTransaction protocols ;
   test_cannot_prepayed_with_delay_leads_to_no_injection protocols ;

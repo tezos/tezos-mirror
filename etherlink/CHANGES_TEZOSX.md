@@ -32,6 +32,12 @@
 
 ### Native atomic composability
 
+### Storage versions
+
+- `/evm/michelson_runtime/sunrise_level` and
+  `/evm/michelson_runtime/target_sunrise_level` move under
+  `/tez/world_state/michelson_runtime/` (storage version 57). (!21851)
+
 ### Internals
 
 - Make `Micheline::encode` and `encode_for_pack` return
@@ -53,7 +59,6 @@
   decoded-code corruption, balance overflow) via the typed
   `LookupViewError` enum, instead of silently masquerading as "view
   not found". (!21474)
-
 
 ## Version 0.3 (d2a6743ebef523c88c986c21311307a4251e67e4)
 

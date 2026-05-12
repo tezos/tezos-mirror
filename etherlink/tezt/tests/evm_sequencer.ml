@@ -13498,6 +13498,62 @@ let test_observer_divergence_fallback_on_instant_confirmations () =
       ~error_msg:"observer should have recovered and be at block >= 3, got %L") ;
   unit
 
+(* Guard against [Kernel.storage_version] in [etherlink/tezt/lib/kernel.ml]
+   drifting from the [STORAGE_VERSION] constant baked into each kernel binary.
+   Boot the kernel, then assert the value the kernel itself wrote to its
+   durable-storage [storage_version] path matches what [Kernel.storage_version]
+   reports for that kernel. If a kernel is rebaked with a new [STORAGE_VERSION]
+   and tezt's table isn't bumped, this test fails with a pointer to the file to
+   fix.
+
+   Coverage here is limited to [etherlink_all] (Mainnet + Latest) — Previewnet
+   cannot be booted by the default [register_all] fixture and is covered by
+   [test_previewnet_storage_version_matches_constant] in [evm_rollup.ml],
+   which calls [setup_evm_kernel] directly with the V49 [/evm/storage_version]
+   pre-seed required to make the previewnet kernel run its V50–V56 migration
+   ladder. *)
+let test_kernel_storage_version_matches_constant =
+  register_all
+    ~__FILE__
+    ~kernels:Kernel.[Latest; Mainnet]
+    ~tags:["durable_storage"; "storage_version"; "kernel_constant"]
+    ~time_between_blocks:Nothing
+    ~title:"Kernel.storage_version matches each kernel's baked STORAGE_VERSION"
+  @@ fun {sc_rollup_node; kernel; _} _protocol ->
+  let key = Durable_storage_path.storage_version kernel in
+  let* raw_opt =
+    Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks:Tezos_regression.rpc_hooks
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Value
+         ~key
+         ()
+  in
+  let actual =
+    match raw_opt with
+    | None ->
+        Test.fail
+          ~__LOC__
+          "No value found in durable storage at path %S — the kernel did not \
+           initialize its storage version"
+          key
+    | Some hex ->
+        let bytes = Hex.to_bytes (`Hex hex) in
+        Bytes.get_int64_le bytes 0 |> Int64.to_int
+  in
+  let expected = Kernel.storage_version kernel in
+  Check.(
+    (actual = expected)
+      int
+      ~error_msg:
+        (Printf.sprintf
+           "Kernel %s wrote V%%L to %s but Kernel.storage_version reports V%%R \
+            — update [storage_version] in etherlink/tezt/lib/kernel.ml to \
+            match the rebaked kernel."
+           (Kernel.to_tag kernel)
+           key)) ;
+  unit
+
 (* Test that everyone agrees on what the storage version of the rollup
    is. *)
 let test_durable_storage_consistency =
@@ -16244,6 +16300,7 @@ let () =
   test_block_producer_validation () ;
   test_observer_divergence_fallback_on_instant_confirmations () ;
   test_durable_storage_consistency [Alpha] ;
+  test_kernel_storage_version_matches_constant [Alpha] ;
   test_fa_deposit_can_be_claimed_and_withdrawn [Alpha] ;
   test_fast_fa_deposit_can_be_claimed_and_withdrawn [Alpha] ;
   test_claim_deposit_event [Alpha] ;

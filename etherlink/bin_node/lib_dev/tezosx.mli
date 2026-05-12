@@ -25,10 +25,11 @@ val known_runtimes : runtime list
     enable the feature. *)
 val feature_flag : runtime -> string
 
-(** [target_sunrise_level_path runtime] is the path of the target sunrise
-    level (the EVM block level at which the [runtime] will start producing
-    blocks). *)
-val target_sunrise_level_path : runtime -> string
+(** [target_sunrise_level_path ~storage_version runtime] is the path of the
+    target sunrise level (the EVM block level at which the [runtime] will
+    start producing blocks). The path depends on [storage_version] because
+    V57 relocated it under [/tez/world_state/]. *)
+val target_sunrise_level_path : storage_version:int -> runtime -> string
 
 (** [encode_target_sunrise_level n] encodes [n] as a 32-byte little-endian
     U256 value suitable for writing at [target_sunrise_level_path]. *)

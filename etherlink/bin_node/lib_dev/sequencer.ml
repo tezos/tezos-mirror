@@ -298,6 +298,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
             (fun address -> Evm_context.provision_balance address new_balance)
             funded_addresses
         in
+        let storage_version = head.storage_version in
         let* () =
           List.iter_es
             (fun (runtime, target_sunrise_level) ->
@@ -311,7 +312,10 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
               | None -> return_unit
               | Some level ->
                   Evm_context.patch_state
-                    ~key:(Tezosx.target_sunrise_level_path runtime)
+                    ~key:
+                      (Tezosx.target_sunrise_level_path
+                         ~storage_version
+                         runtime)
                     ~value:(Tezosx.encode_target_sunrise_level level)
                     ())
             with_runtimes

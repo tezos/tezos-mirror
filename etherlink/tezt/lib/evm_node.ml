@@ -168,6 +168,7 @@ type kernel_setup = {
   enable_michelson_gas_refund : bool option;
   evm_version : Evm_version.t option;
   with_runtimes : Tezosx_runtime.t list option;
+  tezosx_target_sunrise_levels : (Tezosx_runtime.t * int) list option;
   michelson_runtime_chain_id : string option;
 }
 
@@ -185,7 +186,7 @@ let make_kernel_setup ?kernel ?l2_chain_ids ?max_delayed_inbox_blueprint_length
     ?dal_publishers_whitelist ?disable_legacy_dal_signals
     ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
     ?enable_michelson_gas_refund ?evm_version ?with_runtimes
-    ?michelson_runtime_chain_id () =
+    ?tezosx_target_sunrise_levels ?michelson_runtime_chain_id () =
   let tez_bootstrap_accounts =
     match tez_bootstrap_accounts with
     | Some _ -> tez_bootstrap_accounts
@@ -235,6 +236,7 @@ let make_kernel_setup ?kernel ?l2_chain_ids ?max_delayed_inbox_blueprint_length
     enable_michelson_gas_refund;
     evm_version;
     with_runtimes;
+    tezosx_target_sunrise_levels;
     michelson_runtime_chain_id;
   }
 
@@ -1764,8 +1766,18 @@ let make_kernel_installer_config (kernel_setup : kernel_setup) ~output () =
       (Option.value ~default:[] kernel_setup.l2_chain_ids)
   in
   let with_runtimes =
+    let target_levels =
+      Option.value ~default:[] kernel_setup.tezosx_target_sunrise_levels
+    in
     List.concat_map
-      (fun runtime -> ["--with-runtime"; Tezosx_runtime.to_string runtime])
+      (fun runtime ->
+        let arg =
+          match List.assoc_opt runtime target_levels with
+          | None -> Tezosx_runtime.to_string runtime
+          | Some level ->
+              Format.sprintf "%s:%d" (Tezosx_runtime.to_string runtime) level
+        in
+        ["--with-runtime"; arg])
       (Option.value ~default:[] kernel_setup.with_runtimes)
   in
   let cmd =
