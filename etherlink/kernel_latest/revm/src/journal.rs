@@ -728,12 +728,6 @@ where
         // Deterministic fallback: reproduce the alias that the target
         // runtime's `ensure_alias` would compute (and persist on the
         // state-mutating path), but skip the storage writes.
-        //
-        // Each branch duplicates the deterministic name-derivation
-        // step from the corresponding runtime's `ensure_alias` — the
-        // canonical implementation — and must stay in sync with it.
-        // If either formula changes, this read-only path must change
-        // too.
         self.database
             .registry
             .compute_alias(AliasInfo {
