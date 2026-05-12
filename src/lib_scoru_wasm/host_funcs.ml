@@ -1461,7 +1461,7 @@ let store_write =
 
 module Nds_aux = struct
   (** Size in bytes of an NDS hash (Blake3-256). The natural full-length
-      output of {!registry_get_hash} / {!database_get_hash}; callers
+      output of {!database_get_hash}; callers
       supplying a smaller [max_bytes] receive a truncated prefix. *)
   let nds_hash_size = 32l
 
@@ -1508,22 +1508,6 @@ module Nds_aux = struct
     map_nds (Nds.clear nds db_index)
     |> Result.map (fun () -> 0l)
     |> extract_nds_error_code
-
-  let registry_get_hash ~nds ~memory ~dst ~max_bytes =
-    let open Lwt_result_syntax in
-    let*! res =
-      let*? hash = map_nds (Nds.registry_hash nds) in
-      let hash_len = Bytes.length hash in
-      let max_bytes = Int32.to_int max_bytes in
-      let written = Int.min hash_len max_bytes in
-      let data =
-        if Int.compare max_bytes hash_len < 0 then Bytes.sub hash 0 max_bytes
-        else hash
-      in
-      let* () = Aux.store_bytes_from_bytes ~memory ~addr:dst ~data in
-      return (Int32.of_int written)
-    in
-    extract_nds_error_code res
 
   let store_exists ~nds ~memory ~db_index ~key_offset ~key_len =
     let open Lwt_result_syntax in
@@ -1698,18 +1682,6 @@ let nds_hash_ticks result =
     with_error result (fun () ->
         nds_hash + value_written_in_memory Nds_aux.nds_hash_size)
     |> to_z)
-
-let nds_registry_get_hash ~nds_host_functions_enabled =
-  nds_handler @@ fun nds memories -> function
-  | [Values.(Num (I32 dst)); Values.(Num (I32 max_bytes))] ->
-      let open Lwt.Syntax in
-      if not nds_host_functions_enabled then
-        Lwt.return (nds_disabled_code, nds_hash_ticks 0l)
-      else
-        let* memory = retrieve_memory memories in
-        let+ code = Nds_aux.registry_get_hash ~nds ~memory ~dst ~max_bytes in
-        (code, nds_hash_ticks code)
-  | _ -> raise Bad_input
 
 let nds_store_exists_ticks key_size result =
   Tick_model.(
@@ -1932,15 +1904,6 @@ let nds_registry_clear_type =
   let output_types = Types.[NumType I32Type] |> Vector.of_list in
   Types.FuncType (input_types, output_types)
 
-let nds_registry_get_hash_name = "nds_registry_get_hash"
-
-let nds_registry_get_hash_type =
-  let input_types =
-    Types.[NumType I32Type; NumType I32Type] |> Vector.of_list
-  in
-  let output_types = Types.[NumType I32Type] |> Vector.of_list in
-  Types.FuncType (input_types, output_types)
-
 let nds_store_exists_name = "nds_store_exists"
 
 let nds_store_exists_type =
@@ -2090,8 +2053,6 @@ let lookup_opt ~version name =
       nds_host_function nds_registry_move_type nds_registry_move_name
   | "nds_registry_clear" ->
       nds_host_function nds_registry_clear_type nds_registry_clear_name
-  | "nds_registry_get_hash" ->
-      nds_host_function nds_registry_get_hash_type nds_registry_get_hash_name
   | "nds_store_exists" ->
       nds_host_function nds_store_exists_type nds_store_exists_name
   | "nds_store_read" ->
@@ -2207,9 +2168,6 @@ let base_V6 ~nds_host_functions_enabled =
     |> with_host_function
          ~global_name:nds_registry_clear_name
          ~implem:(nds_registry_clear ~nds_host_functions_enabled)
-    |> with_host_function
-         ~global_name:nds_registry_get_hash_name
-         ~implem:(nds_registry_get_hash ~nds_host_functions_enabled)
     |> with_host_function
          ~global_name:nds_store_exists_name
          ~implem:(nds_store_exists ~nds_host_functions_enabled)
@@ -2336,9 +2294,6 @@ module Internal_for_tests = struct
 
   let nds_registry_clear =
     Func.HostFunc (nds_registry_clear_type, nds_registry_clear_name)
-
-  let nds_registry_get_hash =
-    Func.HostFunc (nds_registry_get_hash_type, nds_registry_get_hash_name)
 
   let nds_store_exists =
     Func.HostFunc (nds_store_exists_type, nds_store_exists_name)
