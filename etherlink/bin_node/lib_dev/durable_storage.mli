@@ -153,6 +153,9 @@ type ('a, 'cap) path =
   | Tezlink_block_by_hash :
       Ethereum_types.block_hash
       -> (L2_types.Tezos_block.t, ro) path
+  | Blueprint_current_generation : (Ethereum_types.quantity, ro) path
+  | Kernel_boot_wasm : (bytes, rw) path
+  | Kernel_verbosity : (string, rw) path
 
 (** {2 Typed operations} *)
 

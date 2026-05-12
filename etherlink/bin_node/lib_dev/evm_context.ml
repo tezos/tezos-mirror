@@ -2399,7 +2399,8 @@ module State = struct
                 Ethereum_types.pp_quantity
                 block_number)
     in
-    if key = "/kernel/boot.wasm" then ctxt.session.kernel_change <- Force_change ;
+    if key = Durable_storage_path.kernel_boot_wasm then
+      ctxt.session.kernel_change <- Force_change ;
     let* previous_value =
       Durable_storage.read_opt (Raw_path key) ctxt.session.evm_state
     in
@@ -3220,7 +3221,7 @@ let patch_kernel ?block_number kernel =
       (Patch_state
          {
            commit = true;
-           key = "/kernel/boot.wasm";
+           key = Durable_storage_path.kernel_boot_wasm;
            patch = Fun.const (Some kernel);
            block_number;
          })

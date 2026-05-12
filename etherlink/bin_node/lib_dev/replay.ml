@@ -17,24 +17,13 @@ let patch_kernel ~kernel evm_state =
   let*! kernel =
     if binary then Lwt.return content else Wasm_utils_functor.wat2wasm content
   in
-  let* evm_state =
-    Durable_storage.write
-      (Raw_path "/kernel/boot.wasm")
-      (Bytes.of_string kernel)
-      evm_state
-  in
-  return evm_state
+  Durable_storage.write Kernel_boot_wasm (Bytes.of_string kernel) evm_state
 
 let patch_verbosity ~kernel_verbosity evm_state =
-  let open Lwt_result_syntax in
-  let* storage_version = Durable_storage.storage_version evm_state in
-  let* evm_state =
-    Durable_storage.write
-      (Raw_path (Durable_storage_path.kernel_verbosity ~storage_version))
-      (Bytes.of_string (Events.string_from_kernel_log_level kernel_verbosity))
-      evm_state
-  in
-  return evm_state
+  Durable_storage.write
+    Kernel_verbosity
+    (Events.string_from_kernel_log_level kernel_verbosity)
+    evm_state
 
 let alter_evm_state ~disable_da_fees ~kernel ~kernel_verbosity evm_state =
   let open Lwt_result_syntax in
