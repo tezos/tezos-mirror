@@ -166,7 +166,7 @@ pub enum TransferError {
     #[error("Transactions of 0 tez towards a contract without code are forbidden")]
     EmptyImplicitTransfer,
     #[error("Gas exhaustion")]
-    OutOfGas,
+    OutOfGas(#[from] gas::OutOfGas),
     #[error("Unexpected deposit error: {0}")]
     DepositError(String),
     // TODO: L2-971
@@ -208,7 +208,7 @@ pub enum OriginationError {
     #[error("Failed because of micheline (de)serialization {0}")]
     MichelineSerializationError(String),
     #[error("Gas exhaustion")]
-    OutOfGas,
+    OutOfGas(#[from] gas::OutOfGas),
 }
 
 impl From<mir::serializer::DecodeError> for TransferError {
@@ -273,6 +273,8 @@ pub enum ApplyOperationError {
     PastError(Vec<u8>),
     #[error("Block abort: {0}")]
     BlockAbort(String),
+    #[error("{0}")]
+    OutOfGas(#[from] gas::OutOfGas),
 }
 
 #[derive(Error, Debug, PartialEq, Eq)]

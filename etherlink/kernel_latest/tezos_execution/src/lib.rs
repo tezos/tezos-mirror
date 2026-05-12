@@ -344,7 +344,7 @@ where
         tc_ctx
             .operation_gas
             .consume(Cost::manager_operation())
-            .map_err(|_| TransferError::OutOfGas)?;
+            .map_err(TransferError::OutOfGas)?;
         log!(
             Debug,
             "Executing internal operation {operation:?} with counter {counter:?}"
@@ -551,7 +551,7 @@ where
                     let consumed_milligas = tc_ctx
                         .operation_gas
                         .get_and_reset_milligas_consumed()
-                        .map_err(|_| TransferError::OutOfGas)?;
+                        .map_err(TransferError::OutOfGas)?;
                     ContentResult::Applied(EventSuccess { consumed_milligas })
                 };
                 InternalOperationSum::Event(InternalContentWithMetadata {
@@ -613,7 +613,7 @@ where
             tc_ctx
                 .operation_gas
                 .consume(Cost::transaction())
-                .map_err(|_| TransferError::OutOfGas)?;
+                .map_err(TransferError::OutOfGas)?;
 
             if param != Micheline::from(()) || !entrypoint.is_default() {
                 return Err(TransferError::NonSmartContractExecutionCall.into());
@@ -644,7 +644,7 @@ where
                 consumed_milligas: tc_ctx
                     .operation_gas
                     .get_and_reset_milligas_consumed()
-                    .map_err(|_| TransferError::OutOfGas)?,
+                    .map_err(TransferError::OutOfGas)?,
                 ..receipt
             })
         }
@@ -723,7 +723,7 @@ where
             let consumed_milligas = tc_ctx
                 .operation_gas
                 .get_and_reset_milligas_consumed()
-                .map_err(|_| TransferError::OutOfGas)?;
+                .map_err(TransferError::OutOfGas)?;
             let lazy_storage_diff =
                 convert_big_map_diff(std::mem::take(&mut tc_ctx.big_map_diff));
 
@@ -1110,10 +1110,7 @@ where
     let origination_success = OriginationSuccess {
         balance_updates,
         originated_contracts: vec![Originated { contract }],
-        consumed_milligas: ctx
-            .operation_gas
-            .get_and_reset_milligas_consumed()
-            .map_err(|_| OriginationError::OutOfGas)?,
+        consumed_milligas: ctx.operation_gas.get_and_reset_milligas_consumed()?,
         // TODO(L2-1281): `lazy_storage_size` stays at zero — the receipt
         // undercharges originations with big-maps in their initial
         // storage (remaining half of L2-325).
@@ -1821,6 +1818,7 @@ mod tests {
     use mir::ast::big_map::BigMapId;
     use mir::ast::{Address, Entrypoint, IntoMicheline, Micheline, Type, TypedValue};
     use mir::context::TypecheckingCtx;
+    use mir::gas;
     use mir::parser::Parser;
     use mir::typechecker::typecheck_value;
     use num_traits::ops::checked::CheckedSub;
@@ -7977,7 +7975,7 @@ mod tests {
                     result: ContentResult::Failed(ApplyOperationErrors { errors }),
                     ..
                 }) if errors.iter().any(|e| match e {
-                    ApplyOperationError::Transfer(TransferError::OutOfGas) => true,
+                    ApplyOperationError::Transfer(TransferError::OutOfGas(gas::OutOfGas)) => true,
                     ApplyOperationError::Transfer(
                         TransferError::FailedToExecuteInternalOperation(msg)
                     ) => msg.contains("Gas exhaustion"),

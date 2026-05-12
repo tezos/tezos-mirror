@@ -5,6 +5,7 @@
 //! Gas accounting and costs.
 
 use num_bigint::{BigInt, BigUint};
+use tezos_data_encoding::enc::{BinWriter, BinError};
 
 /// Structure carrying the remaining gas amount.
 #[derive(Debug)]
@@ -16,6 +17,12 @@ pub struct Gas {
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 #[error("Gas_exhaustion")]
 pub struct OutOfGas;
+
+impl BinWriter for OutOfGas {
+    fn bin_write(&self, _: &mut Vec<u8>) -> Result<(), BinError> {
+        Ok(())
+    }
+}
 
 /// Default gas limit per transaction, according to
 /// <https://opentezos.com/tezos-basics/economics-and-rewards/#transaction-cost>

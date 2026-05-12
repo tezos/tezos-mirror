@@ -11,6 +11,7 @@ use mir::typechecker::typecheck_value;
 use mir::{
     ast::{Entrypoint, Micheline},
     context::CtxTrait,
+    gas::OutOfGas,
 };
 use num_bigint::{BigInt, BigUint};
 use num_traits::{ToPrimitive, Zero};
@@ -230,7 +231,7 @@ where
                 charge_gateway_payload(ctx, 4 + abi_params.len())?;
                 ctx.operation_gas()
                     .cast_and_consume_milligas(SELECTOR_COMPUTATION_MILLIGAS)
-                    .map_err(|_| TransferError::OutOfGas)?;
+                    .map_err(TransferError::OutOfGas)?;
                 let selector = compute_selector(&method_sig);
                 let mut calldata = Vec::with_capacity(4 + abi_params.len());
                 calldata.extend_from_slice(&selector);
@@ -250,7 +251,7 @@ where
                         num_user_headers
                             .saturating_mul(HEADER_VALIDATION_PER_HEADER_MILLIGAS),
                     )
-                    .map_err(|_| TransferError::OutOfGas)?;
+                    .map_err(TransferError::OutOfGas)?;
                 let body = dispatch_crac_call(ctx, request)?;
                 charge_gateway_payload(ctx, body.len())?;
                 dispatch_callback(ctx, callback, body).map_err(Into::into)
@@ -287,7 +288,7 @@ where
                 // paid here at deposit time.
                 ctx.operation_gas()
                     .cast_and_consume_milligas(collect_result_size_cost(payload.len()))
-                    .map_err(|_| TransferError::OutOfGas)?;
+                    .map_err(TransferError::OutOfGas)?;
                 ctx.journal()
                     .michelson
                     .set_frame_result(payload)
@@ -397,7 +398,7 @@ pub(crate) fn charge_gateway_base_cost(
 ) -> Result<(), TransferError> {
     ctx.operation_gas()
         .cast_and_consume_milligas(TEZOSX_GATEWAY_BASE_COST_MILLIGAS)
-        .map_err(|_| TransferError::OutOfGas)
+        .map_err(TransferError::OutOfGas)
 }
 
 /// Charge `TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * bytes` for a chunk of
@@ -413,7 +414,7 @@ pub(crate) fn charge_gateway_payload(
     }
     ctx.operation_gas()
         .cast_and_consume_milligas(cost)
-        .map_err(|_| TransferError::OutOfGas)
+        .map_err(TransferError::OutOfGas)
 }
 
 /// If `destination` is `Some`, deduct gas and return a `TRANSFER_TOKENS`
@@ -429,7 +430,7 @@ fn dispatch_callback<'a>(
     };
     ctx.operation_gas()
         .cast_and_consume_milligas(CALLBACK_DISPATCH_MILLIGAS)
-        .map_err(|_| TransferError::OutOfGas)?;
+        .map_err(TransferError::OutOfGas)?;
     let counter = ctx.operation_counter();
     Ok(vec![OperationInfo {
         operation: Operation::TransferTokens(TransferTokens {
@@ -819,7 +820,7 @@ where
     // --- sender alias ---
     ctx.operation_gas()
         .cast_and_consume_milligas(ALIAS_LOOKUP_MILLIGAS)
-        .map_err(|_| TransferError::OutOfGas)?;
+        .map_err(TransferError::OutOfGas)?;
     // When sender == source (the common case for implicit account
     // transfers), pass the source pubkey so the alias is created with
     // the credential attached.
@@ -833,13 +834,12 @@ where
                 native_address: sender.to_base58_check().into_bytes(),
             },
         };
-        let remaining_milligas =
-            ctx.gas().milligas().ok_or(TransferError::OutOfGas)? as u64;
+        let remaining_milligas = ctx.gas().milligas().ok_or(OutOfGas)? as u64;
         // Convert remaining milligas to target runtime gas: this caps the budget
         // that ensure_alias may spend on alias generation.
         let target_budget =
             convert_gas(RuntimeId::Tezos, target_runtime, remaining_milligas)
-                .ok_or(TransferError::OutOfGas)?;
+                .ok_or(OutOfGas)?;
         let sender_pubkey: Option<&[u8]> = if sender_is_source {
             Some(&source_public_key)
         } else {
@@ -862,10 +862,10 @@ where
         let sender_target_consumed = target_budget - target_remaining;
         let sender_milligas =
             convert_gas(target_runtime, RuntimeId::Tezos, sender_target_consumed)
-                .ok_or(TransferError::OutOfGas)?;
+                .ok_or(OutOfGas)?;
         ctx.operation_gas()
             .cast_and_consume_milligas(sender_milligas)
-            .map_err(|_| TransferError::OutOfGas)?;
+            .map_err(TransferError::OutOfGas)?;
         sender_alias
     };
 
@@ -878,7 +878,7 @@ where
     } else {
         ctx.operation_gas()
             .cast_and_consume_milligas(ALIAS_LOOKUP_MILLIGAS)
-            .map_err(|_| TransferError::OutOfGas)?;
+            .map_err(TransferError::OutOfGas)?;
         'source: {
             let alias_info = match read_and_resolve_routing(ctx, &source, target_runtime)?
             {
@@ -889,11 +889,10 @@ where
                     native_address: source.to_base58_check().into_bytes(),
                 },
             };
-            let remaining_milligas =
-                ctx.gas().milligas().ok_or(TransferError::OutOfGas)? as u64;
+            let remaining_milligas = ctx.gas().milligas().ok_or(OutOfGas)? as u64;
             let target_budget =
                 convert_gas(RuntimeId::Tezos, target_runtime, remaining_milligas)
-                    .ok_or(TransferError::OutOfGas)?;
+                    .ok_or(OutOfGas)?;
             let (source_alias, target_remaining) = {
                 let (host, journal, registry) = ctx.cross_runtime_split();
                 registry
@@ -911,18 +910,17 @@ where
             let source_target_consumed = target_budget - target_remaining;
             let source_milligas =
                 convert_gas(target_runtime, RuntimeId::Tezos, source_target_consumed)
-                    .ok_or(TransferError::OutOfGas)?;
+                    .ok_or(OutOfGas)?;
             ctx.operation_gas()
                 .cast_and_consume_milligas(source_milligas)
-                .map_err(|_| TransferError::OutOfGas)?;
+                .map_err(TransferError::OutOfGas)?;
             source_alias
         }
     };
     // Convert remaining Tezos milligas to the target runtime's units.
     // Use current remaining gas (not the pre-alias tezos_gas_limit) so the
     // forwarded limit reflects gas already consumed by alias resolution.
-    let remaining_after_aliases =
-        ctx.gas().milligas().ok_or(TransferError::OutOfGas)? as u64;
+    let remaining_after_aliases = ctx.gas().milligas().ok_or(OutOfGas)? as u64;
     let gas_limit =
         convert_gas(RuntimeId::Tezos, target_runtime, remaining_after_aliases)
             .ok_or_else(|| {
@@ -1076,7 +1074,7 @@ where
     // Remaining milligas is the gas budget for the cross-runtime call, in Tezos
     // milligas. `inject_context_headers` converts to the target runtime's units
     // on the way out.
-    let gas_limit = ctx.gas().milligas().ok_or(TransferError::OutOfGas)? as u64;
+    let gas_limit = ctx.gas().milligas().ok_or(OutOfGas)? as u64;
     Ok(CrossRuntimeContext {
         gas_limit,
         timestamp: bigint_to_u256(&ctx.now())?,
@@ -1146,7 +1144,7 @@ where
     if !current.0.is_zero() {
         ctx.operation_gas()
             .cast_and_consume_milligas(VALUE_TRANSFER_SURCHARGE_MILLIGAS)
-            .map_err(|_| TransferError::OutOfGas)?;
+            .map_err(TransferError::OutOfGas)?;
         let host = ctx.host();
         account
             .set_balance(host, &0u64.into())
@@ -1343,7 +1341,7 @@ fn classify_and_charge_crac_response(
     if let Some(milligas) = callee_gas {
         operation_gas
             .cast_and_consume_milligas(milligas)
-            .map_err(|_| TransferError::OutOfGas)?;
+            .map_err(TransferError::OutOfGas)?;
     }
 
     if response.status().is_success() {
@@ -2823,7 +2821,10 @@ mod tests {
             &mut ctx,
         )
         .unwrap_err();
-        assert!(matches!(err, CracError::Operation(TransferError::OutOfGas)));
+        assert!(matches!(
+            err,
+            CracError::Operation(TransferError::OutOfGas(OutOfGas))
+        ));
         assert!(journal.michelson.frame_result().is_none());
     }
 
@@ -2971,7 +2972,7 @@ mod tests {
 
         let destination = make_test_address();
         let result = dispatch_callback(&mut ctx, Some(destination), vec![]);
-        assert!(matches!(result, Err(TransferError::OutOfGas)));
+        assert!(matches!(result, Err(TransferError::OutOfGas(OutOfGas))));
     }
 
     #[test]
@@ -3169,7 +3170,7 @@ mod tests {
             ContractKt1Hash::from_base58_check("KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton")
                 .unwrap();
         let user_facing: Vec<TransferError> = vec![
-            TransferError::OutOfGas,
+            TransferError::OutOfGas(OutOfGas),
             TransferError::EmptyImplicitTransfer,
             TransferError::NonSmartContractExecutionCall,
             TransferError::MirAddressUnsupportedError,
