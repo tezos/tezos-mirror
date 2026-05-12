@@ -4,6 +4,23 @@
 
 ### EVM Runtime
 
+- The EVM runtime's cross-runtime HTTP server now dispatches on the
+  request method: `POST` keeps the existing state-mutating entry
+  (`TransactionOrigin::CrossRuntime`), `GET` is routed to a read-only
+  entry (`TransactionOrigin::CrossRuntimeStatic`) that rejects
+  `X-Tezos-Amount != 0`, suppresses the sender balance credit and the
+  `CracReceived` log emission, and runs the EVM transaction with
+  `is_static = true` on the top-level frame. REVM enforces the
+  standard `STATICCALL` contract end-to-end: any state-mutating
+  opcode (`SSTORE`, `LOG*`, `CREATE*`, `SELFDESTRUCT`, value-bearing
+  `CALL`) halts the call with `StateChangeDuringStaticCall`, surfaced
+  as a catchable `400`. Unsupported methods return `405`. Pre-existing
+  journal state from outer frames in the same enclosing transaction
+  is preserved — the static frame's revert only unwinds writes
+  performed within the read-only call. This is the EVM-side
+  groundwork for letting any other runtime expose a read-only entry
+  into EVM. (!21849)
+
 ### Michelson Runtime
 
 - Deposits targeting a Tezos implicit account now emit a Michelson `deposit`

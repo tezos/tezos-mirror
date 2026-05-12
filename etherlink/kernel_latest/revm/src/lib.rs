@@ -13,7 +13,7 @@ use helpers::storage::u256_to_le_bytes;
 use inspectors::{
     call_tracer::{CallTracer, CallTracerInput},
     struct_logger::{StructLogger, StructLoggerInput},
-    EvmInspection, TracerInput,
+    EtherlinkHandler, EvmInspection, TracerInput,
 };
 pub use michelson_types::Withdrawal;
 use precompiles::provider::EtherlinkPrecompiles;
@@ -22,13 +22,14 @@ use revm::{
         result::{EVMError, ExecutionResult},
         transaction::{AccessList, SignedAuthorization},
         tx::TxEnvBuilder,
-        BlockEnv, CfgEnv, ContextTr, Evm, LocalContext, TxEnv,
+        BlockEnv, CfgEnv, ContextSetters, ContextTr, Evm, LocalContext, TxEnv,
     },
     context_interface::{block::BlobExcessGasAndPrice, journaled_state::JournalTr},
-    handler::{instructions::EthInstructions, EthFrame},
+    handler::{instructions::EthInstructions, EthFrame, Handler},
+    inspector::InspectorHandler,
     interpreter::interpreter::EthInterpreter,
     primitives::{hardfork::SpecId, Address, Bytes, FixedBytes, TxKind, B256, U256},
-    Context, ExecuteCommitEvm, ExecuteEvm, InspectEvm, MainBuilder,
+    Context, ExecuteCommitEvm, MainBuilder,
 };
 use tezos_ethereum::{block::BlockConstants, transaction::TRANSACTION_HASH_SIZE};
 use tezos_evm_logging::{
@@ -70,6 +71,15 @@ pub enum TransactionOrigin {
     /// If `credit` is `Some`, inject a balance credit into the REVM journal
     /// before executing the transaction.
     CrossRuntime { credit: Option<(Address, U256)> },
+    /// Read-only cross-runtime call: no balance credit, no journal
+    /// commit, and the top-level frame runs with `is_static = true`
+    /// (routed through [`EtherlinkHandler::new_static`]). REVM then
+    /// enforces the standard `STATICCALL` contract — any
+    /// state-mutating opcode halts with
+    /// `StateChangeDuringStaticCall`, and only writes made *within*
+    /// this call are unwound (outer-frame state in the same
+    /// enclosing transaction is preserved).
+    CrossRuntimeStatic,
 }
 
 #[derive(Debug, PartialEq)]
@@ -168,7 +178,8 @@ fn tx_env(
                 .set_access_list(std::mem::take(access_list))
                 .map_err(|_| EvmKernelError::AccessListAlreadySet)?;
         }
-        TransactionOrigin::CrossRuntime { .. } => (),
+        TransactionOrigin::CrossRuntime { .. }
+        | TransactionOrigin::CrossRuntimeStatic => (),
     };
 
     // Using the transaction environment builder helps to
@@ -317,10 +328,14 @@ where
     ctx.build_mainnet().with_precompiles(precompiles)
 }
 
+/// Run the EVM transaction. Routes through [`EtherlinkHandler`]
+/// (not REVM's stock `transact_one`) so the `first_frame_input`
+/// override actually fires when `is_static_top_frame` is set.
 fn execute_transaction<'a, Host, R: Registry>(
     evm_context: &mut EvmContext<'a, Host, R>,
     tx: &'a TxEnv,
     transaction_hash: Option<[u8; TRANSACTION_HASH_SIZE]>,
+    is_static_top_frame: bool,
 ) -> Result<ExecutionResult, EVMError<EvmDbError>>
 where
     Host: StorageV1,
@@ -343,7 +358,14 @@ where
         };
     __trace_kernel!("evm_context.transact_commit", {
         opt_attrs_fun(evm_context.db_mut().host);
-        evm_context.transact_one(tx)
+        evm_context.set_tx(tx);
+        let mut handler: EtherlinkHandler<_, EVMError<EvmDbError>, _> =
+            if is_static_top_frame {
+                EtherlinkHandler::new_static()
+            } else {
+                EtherlinkHandler::default()
+            };
+        handler.run(evm_context)
     })
 }
 
@@ -418,7 +440,17 @@ where
             _ => None,
         };
 
-        let result = evm_context.inspect_one_tx(&tx)?;
+        // Use `EtherlinkHandler` so our `first_frame_input` override
+        // fires; stock `inspect_one_tx` would bypass it.
+        let is_static_top_frame = matches!(origin, TransactionOrigin::CrossRuntimeStatic);
+        evm_context.set_tx(&tx);
+        let mut handler: EtherlinkHandler<_, EVMError<EvmDbError>, _> =
+            if is_static_top_frame {
+                EtherlinkHandler::new_static()
+            } else {
+                EtherlinkHandler::default()
+            };
+        let result = handler.inspect_run(&mut evm_context)?;
 
         if let Some(err) = evm_context.ctx.journaled_state.take_deferred_error() {
             return Err(EvmKernelError::Runtime(err).into());
@@ -481,7 +513,13 @@ where
             _ => None,
         };
 
-        let result = execute_transaction(&mut evm_context, &tx, transaction_hash)?;
+        let is_static_top_frame = matches!(origin, TransactionOrigin::CrossRuntimeStatic);
+        let result = execute_transaction(
+            &mut evm_context,
+            &tx,
+            transaction_hash,
+            is_static_top_frame,
+        )?;
 
         if let Some(err) = evm_context.ctx.journaled_state.take_deferred_error() {
             return Err(EvmKernelError::Runtime(err).into());
