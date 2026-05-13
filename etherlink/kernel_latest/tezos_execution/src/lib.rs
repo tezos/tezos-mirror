@@ -791,9 +791,10 @@ where
             consume_storage_read_milligas(tc_ctx.operation_gas, 3, COUNTER_SIZE)
                 .map_err(TransferError::OutOfGas)?;
 
-            dest_account
-                .set_storage(tc_ctx.host, &new_storage)
-                .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
+            let storage_size_diff =
+                dest_account
+                    .set_storage(tc_ctx.host, &new_storage)
+                    .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
 
             // In L1, the receipt of an operation only shows its own gas
             // consumption, i.e. it does not include that of its internal
@@ -809,7 +810,7 @@ where
                 used_bytes,
                 allocated_bytes: paid_storage_size_diff,
             } = dest_account
-                .update_storage_space(tc_ctx.host)
+                .update_storage_space(tc_ctx.host, storage_size_diff)
                 .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
 
             match execute_internal_operations(

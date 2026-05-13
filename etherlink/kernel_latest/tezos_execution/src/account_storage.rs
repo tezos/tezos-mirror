@@ -10,6 +10,7 @@ use crate::{
     context,
     enshrined_contracts::{self, EnshrinedContracts},
 };
+use num_bigint::BigInt;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_data_encoding::{
     enc::BinWriter,
@@ -18,7 +19,7 @@ use tezos_data_encoding::{
 };
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::{
-    host::ValueType,
+    host::{RuntimeError, ValueType},
     types::{PublicKey, PublicKeyHash},
 };
 use tezos_smart_rollup_host::path::OwnedPath;
@@ -258,6 +259,21 @@ pub struct StorageSpace {
     pub allocated_bytes: Zarith,
 }
 
+#[derive(Debug, PartialEq)]
+pub struct StorageDelta(Zarith);
+
+impl From<i32> for StorageDelta {
+    fn from(value: i32) -> Self {
+        Self(value.into())
+    }
+}
+
+impl From<BigInt> for StorageDelta {
+    fn from(value: BigInt) -> Self {
+        Self(value.into())
+    }
+}
+
 pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
     fn kt1(&self) -> &ContractKt1Hash;
 
@@ -302,12 +318,12 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
         &self,
         host: &mut impl StorageV1,
         data: &[u8],
-    ) -> Result<(), tezos_storage::error::Error> {
+    ) -> Result<Zarith, tezos_storage::error::Error> {
         let path = context::code::code_path(self)?;
         host.store_write_all(&path, data)?;
         let code_size = data.len() as u64;
         self.set_code_size(host, &code_size.into())?;
-        Ok(())
+        Ok(code_size.into())
     }
 
     fn storage(
@@ -372,20 +388,27 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
     }
 
     /// Persists `data` as the contract's main storage and refreshes
-    /// the `storage_size` counter. No-op on enshrined contracts.
+    /// the `storage_size` counter. Returns the signed byte-length
+    /// delta between the new and the previous content. Returns zero
+    /// on enshrined contracts.
     fn set_storage(
         &self,
         host: &mut impl StorageV1,
         data: &[u8],
-    ) -> Result<(), tezos_storage::error::Error> {
+    ) -> Result<StorageDelta, tezos_storage::error::Error> {
         if enshrined_contracts::is_enshrined(self.kt1()) {
-            return Ok(());
+            return Ok(0.into());
         }
         let path = context::code::storage_path(self)?;
+        let prev_storage_size: BigInt = match host.store_value_size(&path) {
+            Ok(size) => size.into(),
+            Err(RuntimeError::PathNotFound) => 0.into(),
+            Err(err) => return Err(err.into()),
+        };
         host.store_write_all(&path, data)?;
-        let storage_size = data.len() as u64;
-        self.set_storage_size(host, &storage_size.into())?;
-        Ok(())
+        let new_storage_size = data.len() as u64;
+        self.set_storage_size(host, &new_storage_size.into())?;
+        Ok((BigInt::from(new_storage_size) - prev_storage_size).into())
     }
 
     fn set_paid_bytes(
@@ -412,17 +435,30 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
         code: &[u8],
         storage: &[u8],
     ) -> Result<StorageSpace, tezos_storage::error::Error> {
-        self.set_code(host, code)?;
-        self.set_storage(host, storage)?;
-        self.update_storage_space(host)
+        if enshrined_contracts::is_enshrined(self.kt1()) {
+            return Ok(StorageSpace {
+                used_bytes: 0.into(),
+                allocated_bytes: 0.into(),
+            });
+        }
+        let code_size = self.set_code(host, code)?;
+        let storage_size = self.set_storage(host, storage)?;
+        let used_bytes = Zarith(code_size.0 + storage_size.0 .0);
+        self.set_used_bytes(host, &used_bytes)?;
+        self.set_paid_bytes(host, &used_bytes)?;
+        let allocated_bytes = used_bytes.clone();
+        Ok(StorageSpace {
+            used_bytes,
+            allocated_bytes,
+        })
     }
 
-    /// Recomputes `used_bytes` from the contract's current
-    /// `code_size + storage_size + lazy_storage_size` and persists it.
-    /// No-op on enshrined contracts.
+    /// Increment the contract's `used_bytes` watermark by the signed
+    /// `storage_size_diff`. No-op on enshrined contracts.
     fn update_storage_space(
         &self,
         host: &mut impl StorageV1,
+        storage_size_diff: StorageDelta,
     ) -> Result<StorageSpace, tezos_storage::error::Error> {
         if enshrined_contracts::is_enshrined(self.kt1()) {
             return Ok(StorageSpace {
@@ -430,16 +466,9 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
                 allocated_bytes: 0.into(),
             });
         }
-        let code_size = self.code_size(host)?;
-        let storage_size: Zarith = self.storage_size(host)?.into();
-        // TODO(L2-1276): also fold in ∑ total_bytes(big-map) for permanent
-        // big-maps in this contract's storage; depending on L2-1276's design
-        // this may extend this expression here or recompute at the big-map
-        // flush site.
-        let lazy_storage_size = 0u64;
-
-        let used_bytes = Zarith(code_size.0 + storage_size.0 + lazy_storage_size);
-
+        let prev_used_bytes = self.used_bytes(host)?;
+        // TODO(L2-1276): fold the lazy-storage size delta in here too.
+        let used_bytes = Zarith(prev_used_bytes.0 + storage_size_diff.0 .0);
         self.set_used_bytes(host, &used_bytes)?;
 
         let already_paid = self.paid_bytes(host)?;
@@ -829,10 +858,10 @@ mod test {
             Zarith::from(initial_size)
         );
 
-        account.set_storage(&mut host, &larger_storage).unwrap();
+        let diff = account.set_storage(&mut host, &larger_storage).unwrap();
         let StorageSpace {
             allocated_bytes, ..
-        } = account.update_storage_space(&mut host).unwrap();
+        } = account.update_storage_space(&mut host, diff).unwrap();
         let larger_size = (code.len() + larger_storage.len()) as u64;
         assert_eq!(allocated_bytes, Zarith::from(larger_size - initial_size));
         assert_eq!(
@@ -861,10 +890,10 @@ mod test {
         account.init(&mut host, &code, &storage).unwrap();
         let initial_size = (code.len() + storage.len()) as u64;
 
-        account.set_storage(&mut host, &smaller_storage).unwrap();
+        let diff = account.set_storage(&mut host, &smaller_storage).unwrap();
         let StorageSpace {
             allocated_bytes, ..
-        } = account.update_storage_space(&mut host).unwrap();
+        } = account.update_storage_space(&mut host, diff).unwrap();
         assert_eq!(allocated_bytes, Zarith::from(0u64));
         assert_eq!(
             account.used_bytes(&host).unwrap(),
@@ -874,6 +903,27 @@ mod test {
             account.paid_bytes(&host).unwrap(),
             Zarith::from(initial_size)
         );
+    }
+
+    /// `set_storage` returns the signed byte-length delta.
+    #[test]
+    fn test_set_storage_returns_signed_diff() {
+        let mut host = MockKernelHost::default();
+        let context = context::TezlinkContext::init_context();
+        let contract = Contract::from_b58check(KT1).unwrap();
+        let account = context.originated_from_contract(&contract).unwrap();
+
+        let first = account.set_storage(&mut host, &[0u8; 30]).unwrap();
+        assert_eq!(first, 30.into(), "first write reports new_len");
+
+        let grow = account.set_storage(&mut host, &[0u8; 50]).unwrap();
+        assert_eq!(grow, 20.into(), "grow reports new_len - prev_len");
+
+        let shrink = account.set_storage(&mut host, &[0u8; 5]).unwrap();
+        assert_eq!(shrink, (-45).into(), "shrink reports the negative delta");
+
+        let same = account.set_storage(&mut host, &[1u8; 5]).unwrap();
+        assert_eq!(same, 0.into(), "same-size overwrite reports zero delta");
     }
 
     /// `set_storage` early-returns `(0, 0)` on enshrined contracts and
@@ -889,11 +939,16 @@ mod test {
         let contract = Contract::from_b58check(GATEWAY_KT1).unwrap();
         let account = context.originated_from_contract(&contract).unwrap();
 
-        account.set_storage(&mut host, &[0xef_u8; 15]).unwrap();
+        let diff = account.set_storage(&mut host, &[0xef_u8; 15]).unwrap();
+        assert_eq!(
+            diff,
+            0.into(),
+            "enshrined set_storage must report zero delta"
+        );
         let StorageSpace {
             used_bytes,
             allocated_bytes,
-        } = account.update_storage_space(&mut host).unwrap();
+        } = account.update_storage_space(&mut host, diff).unwrap();
         assert_eq!(used_bytes, Zarith::from(0u64));
         assert_eq!(allocated_bytes, Zarith::from(0u64));
 
