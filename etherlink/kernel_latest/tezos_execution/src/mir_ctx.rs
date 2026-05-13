@@ -1486,6 +1486,10 @@ pub mod tests {
     fn test_remove_with_dump() {
         let mut host = MockKernelHost::default();
         make_default_ctx!(storage, &mut host, &TezlinkContext::init_context());
+        // Arena must outlive `map1` so its `BigMap<'_>` destructor can still
+        // borrow from the arena lifetime; values are dropped in reverse
+        // declaration order.
+        let arena = Arena::new();
         let map_id1 = storage.big_map_new(&Type::Int, &Type::Int, false).unwrap();
         storage
             .big_map_update(&map_id1, TypedValue::int(0), Some(TypedValue::int(0)))
@@ -1521,7 +1525,7 @@ pub mod tests {
 
         assert_big_map_eq(
             &mut storage,
-            &Arena::new(),
+            &arena,
             &map_id1,
             Type::Int,
             Type::Int,

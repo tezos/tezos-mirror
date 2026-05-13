@@ -70,6 +70,143 @@ pub struct Ticket<'a> {
 /// deprecated and ingored. For entrypoints, see
 /// [crate::ast::michelson_address::entrypoint].
 ///
+/// Indirection that owns a shared pair of values via `Rc<(T, T)>`, with
+/// the inner Rc held in an [`Option`] so the iterative [`Type::drop`]
+/// can extract it via [`Option::take`] without by move destructuring.
+/// Outside of that drop the option is always `Some`.
+#[derive(Debug)]
+pub struct PairBox<T> {
+    inner: Option<Rc<(T, T)>>,
+}
+
+impl<T> PairBox<T> {
+    /// Build a fresh pair box around `(l, r)`.
+    pub fn new(l: T, r: T) -> Self {
+        PairBox {
+            inner: Some(Rc::new((l, r))),
+        }
+    }
+    /// View the inner pair.
+    pub fn as_ref(&self) -> &(T, T) {
+        self.inner
+            .as_ref()
+            .expect("PairBox always Some outside iterative Drop")
+            .as_ref()
+    }
+    /// Take the Rc out, leaving `None`. Used by the iterative drop.
+    fn take(&mut self) -> Option<Rc<(T, T)>> {
+        self.inner.take()
+    }
+}
+
+impl<T: Clone> PairBox<T> {
+    /// Mutable access to the inner pair, cloning the Rc body if shared.
+    pub fn make_mut(&mut self) -> &mut (T, T) {
+        let rc = self
+            .inner
+            .as_mut()
+            .expect("PairBox always Some outside iterative Drop");
+        Rc::make_mut(rc)
+    }
+}
+
+impl<T> Clone for PairBox<T> {
+    fn clone(&self) -> Self {
+        PairBox {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+impl<T: PartialEq> PartialEq for PairBox<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_ref() == other.as_ref()
+    }
+}
+
+impl<T: Eq> Eq for PairBox<T> {}
+
+impl<T> std::ops::Deref for PairBox<T> {
+    type Target = (T, T);
+    fn deref(&self) -> &(T, T) {
+        self.as_ref()
+    }
+}
+
+/// Indirection that owns a shared single value via `Rc<T>`. Same role
+/// as [`PairBox`] but for single child variants.
+#[derive(Debug)]
+pub struct SingleBox<T> {
+    inner: Option<Rc<T>>,
+}
+
+impl<T> SingleBox<T> {
+    /// Build a fresh single box around `v`.
+    pub fn new(v: T) -> Self {
+        SingleBox {
+            inner: Some(Rc::new(v)),
+        }
+    }
+    /// Wrap an existing Rc into a SingleBox without cloning the contents.
+    pub fn from_rc(rc: Rc<T>) -> Self {
+        SingleBox { inner: Some(rc) }
+    }
+    /// View the inner value.
+    pub fn as_ref(&self) -> &T {
+        self.inner
+            .as_ref()
+            .expect("SingleBox always Some outside iterative Drop")
+            .as_ref()
+    }
+    /// Clone the inner Rc (cheap, just bumps refcount).
+    pub fn clone_rc(&self) -> Rc<T> {
+        Rc::clone(
+            self.inner
+                .as_ref()
+                .expect("SingleBox always Some outside iterative Drop"),
+        )
+    }
+    /// Take the Rc out, leaving `None`. Used by the iterative drop.
+    fn take(&mut self) -> Option<Rc<T>> {
+        self.inner.take()
+    }
+}
+
+impl<T> Clone for SingleBox<T> {
+    fn clone(&self) -> Self {
+        SingleBox {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+impl<T: PartialEq> PartialEq for SingleBox<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_ref() == other.as_ref()
+    }
+}
+
+impl<T: Eq> Eq for SingleBox<T> {}
+
+impl<T> std::ops::Deref for SingleBox<T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        self.as_ref()
+    }
+}
+
+impl<T> From<Rc<T>> for SingleBox<T> {
+    fn from(rc: Rc<T>) -> Self {
+        SingleBox { inner: Some(rc) }
+    }
+}
+
+impl<T> From<T> for SingleBox<T> {
+    fn from(v: T) -> Self {
+        SingleBox::new(v)
+    }
+}
+
 /// The names of the variants correspond to the names of Michelson types, but
 /// snake_case is converted to PascalCase.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -82,23 +219,23 @@ pub enum Type {
     String,
     Unit,
     Never,
-    Pair(Rc<(Type, Type)>),
-    Option(Rc<Type>),
-    List(Rc<Type>),
+    Pair(PairBox<Type>),
+    Option(SingleBox<Type>),
+    List(SingleBox<Type>),
     Operation,
-    Set(Rc<Type>),
-    Map(Rc<(Type, Type)>),
-    BigMap(Rc<(Type, Type)>),
-    Or(Rc<(Type, Type)>),
-    Contract(Rc<Type>),
+    Set(SingleBox<Type>),
+    Map(PairBox<Type>),
+    BigMap(PairBox<Type>),
+    Or(PairBox<Type>),
+    Contract(SingleBox<Type>),
     Address,
     ChainId,
     Bytes,
     Key,
     Signature,
     KeyHash,
-    Lambda(Rc<(Type, Type)>),
-    Ticket(Rc<Type>),
+    Lambda(PairBox<Type>),
+    Ticket(SingleBox<Type>),
     Timestamp,
     #[cfg(feature = "bls")]
     Bls12381Fr,
@@ -129,52 +266,105 @@ impl Type {
 
     /// Convenience function to construct a new [Self::Pair]. Allocates a new [Rc].
     pub fn new_pair(l: Self, r: Self) -> Self {
-        Self::Pair(Rc::new((l, r)))
+        Self::Pair(PairBox::new(l, r))
     }
 
     /// Convenience function to construct a new [Self::Option]. Allocates a new [Rc].
     pub fn new_option(x: Self) -> Self {
-        Self::Option(Rc::new(x))
+        Self::Option(SingleBox::new(x))
     }
 
     /// Convenience function to construct a new [Self::List]. Allocates a new [Rc].
     pub fn new_list(x: Self) -> Self {
-        Self::List(Rc::new(x))
+        Self::List(SingleBox::new(x))
     }
 
     /// Convenience function to construct a new [Self::Set]. Allocates a new [Rc].
     pub fn new_set(v: Self) -> Self {
-        Self::Set(Rc::new(v))
+        Self::Set(SingleBox::new(v))
     }
 
     /// Convenience function to construct a new [Self::Map]. Allocates a new [Rc].
     pub fn new_map(k: Self, v: Self) -> Self {
-        Self::Map(Rc::new((k, v)))
+        Self::Map(PairBox::new(k, v))
     }
 
     /// Convenience function to construct a new [Self::BigMap]. Allocates a new [Rc].
     pub fn new_big_map(k: Self, v: Self) -> Self {
-        Self::BigMap(Rc::new((k, v)))
+        Self::BigMap(PairBox::new(k, v))
     }
 
     /// Convenience function to construct a new [Self::Or]. Allocates a new [Rc].
     pub fn new_or(l: Self, r: Self) -> Self {
-        Self::Or(Rc::new((l, r)))
+        Self::Or(PairBox::new(l, r))
     }
 
     /// Convenience function to construct a new [Self::Contract]. Allocates a new [Rc].
     pub fn new_contract(ty: Self) -> Self {
-        Self::Contract(Rc::new(ty))
+        Self::Contract(SingleBox::new(ty))
     }
 
     /// Convenience function to construct a new [Self::Ticket]. Allocates a new [Rc].
     pub fn new_ticket(ty: Self) -> Self {
-        Self::Ticket(Rc::new(ty))
+        Self::Ticket(SingleBox::new(ty))
     }
 
     /// Convenience function to construct a new [Self::Lambda]. Allocates a new [Rc].
     pub fn new_lambda(ty1: Self, ty2: Self) -> Self {
-        Self::Lambda(Rc::new((ty1, ty2)))
+        Self::Lambda(PairBox::new(ty1, ty2))
+    }
+}
+
+/// Walk an owned tree iteratively. Used by the three manual `Drop` /
+/// drain impls below: each extracts the node's children into a heap
+/// worklist, leaving the leftover node trivial; this driver then keeps
+/// pulling from the worklist until empty so the recursion happens on
+/// the heap rather than the WASM call stack.
+fn drain_iteratively<T>(root: &mut T, mut extract: impl FnMut(&mut T, &mut Vec<T>)) {
+    let mut stack: Vec<T> = Vec::new();
+    extract(root, &mut stack);
+    while let Some(mut node) = stack.pop() {
+        extract(&mut node, &mut stack);
+    }
+}
+
+
+/// Manual `Drop` to avoid the recursive destructor that would otherwise
+/// blow the call stack on a deeply nested type. Walks an explicit
+/// worklist and uses [`Option::take`] on the wrapper's inner `Rc` so the
+/// leftover `Type` drops trivially without re entering this function.
+impl Drop for Type {
+    fn drop(&mut self) {
+        drain_iteratively(self, extract_type_children);
+    }
+}
+
+fn extract_type_children(node: &mut Type, stack: &mut Vec<Type>) {
+    match node {
+        Type::Pair(rcb)
+        | Type::Or(rcb)
+        | Type::Lambda(rcb)
+        | Type::Map(rcb)
+        | Type::BigMap(rcb) => {
+            if let Some(rc) = rcb.take() {
+                if let Ok((l, r)) = Rc::try_unwrap(rc) {
+                    stack.push(l);
+                    stack.push(r);
+                }
+            }
+        }
+        Type::Option(sb)
+        | Type::List(sb)
+        | Type::Set(sb)
+        | Type::Contract(sb)
+        | Type::Ticket(sb) => {
+            if let Some(rc) = sb.take() {
+                if let Ok(inner) = Rc::try_unwrap(rc) {
+                    stack.push(inner);
+                }
+            }
+        }
+        _ => {}
     }
 }
 
@@ -617,6 +807,66 @@ impl<'a> TypedValue<'a> {
     }
 }
 
+/// Drains nested `Rc<TypedValue>` children iteratively when dropping a
+/// potentially deep value (e.g. a comb of `Pair (Pair (... (Pair Int Int)))`),
+/// so the recursive `Rc<TypedValue>` destructor chain does not blow the
+/// WASM stack.
+///
+/// Not an `impl Drop` on [`TypedValue`] because that would forbid every
+/// by move destructure of its variants throughout the codebase. External
+/// callers that build deep values invoke this explicitly before drop.
+#[allow(dead_code)]
+pub fn drain_deep_typed_value(v: &mut TypedValue<'_>) {
+    drain_iteratively(v, extract_tv_children);
+}
+
+fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<TypedValue<'a>>) {
+    use std::mem::{replace, take};
+    use TypedValue as TV;
+    let push_rc = |rc: Rc<TV<'a>>, stack: &mut Vec<TV<'a>>| {
+        if let Ok(v) = Rc::try_unwrap(rc) {
+            stack.push(v);
+        }
+    };
+    match node {
+        TV::Pair(l, r) => {
+            let old_l = replace(l, Rc::new(TV::Unit));
+            let old_r = replace(r, Rc::new(TV::Unit));
+            push_rc(old_l, stack);
+            push_rc(old_r, stack);
+        }
+        TV::Option(opt) => {
+            if let Some(rc) = opt.take() {
+                push_rc(rc, stack);
+            }
+        }
+        TV::Or(or) => {
+            let old = replace(or, Or::Left(Rc::new(TV::Unit)));
+            let rc = match old {
+                Or::Left(r) | Or::Right(r) => r,
+            };
+            push_rc(rc, stack);
+        }
+        TV::List(l) => {
+            for rc in take(l) {
+                push_rc(rc, stack);
+            }
+        }
+        TV::Set(s) => {
+            for rc in take(s) {
+                push_rc(rc, stack);
+            }
+        }
+        TV::Map(m) => {
+            for (k, v) in take(m) {
+                push_rc(k, stack);
+                push_rc(v, stack);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Enum representing typechecked Michelson instructions. Some instructions may
 /// be applied to different input stacks, for those cases the variant carries a
 /// enum specifying the particular version of the instruction (here called
@@ -749,6 +999,48 @@ pub enum Instruction<'a> {
         name: String,
         return_type: Type,
     },
+}
+
+/// Manual `Drop` to avoid the recursive destructor on deeply nested
+/// instruction trees (DIP, IF, IF_*, LOOP, LOOP_LEFT, ITER, MAP, SEQ).
+/// Uses an explicit worklist; nested bodies are extracted via
+/// [`std::mem::take`] on each `Vec<Self>` field so the leftover variant
+/// drops trivially without re entering this function.
+impl<'a> Drop for Instruction<'a> {
+    fn drop(&mut self) {
+        drain_iteratively(self, extract_instr_children);
+    }
+}
+
+fn extract_instr_children<'a>(
+    node: &mut Instruction<'a>,
+    stack: &mut Vec<Instruction<'a>>,
+) {
+    use std::mem::take;
+    match node {
+        Instruction::Dip(_, body)
+        | Instruction::Loop(body)
+        | Instruction::LoopLeft(body)
+        | Instruction::Iter(_, body)
+        | Instruction::Map(_, body)
+        | Instruction::Seq(body) => {
+            for instr in take(body) {
+                stack.push(instr);
+            }
+        }
+        Instruction::If(t, f)
+        | Instruction::IfNone(t, f)
+        | Instruction::IfCons(t, f)
+        | Instruction::IfLeft(t, f) => {
+            for instr in take(t) {
+                stack.push(instr);
+            }
+            for instr in take(f) {
+                stack.push(instr);
+            }
+        }
+        _ => {}
+    }
 }
 
 /// An untyped view, as it appears in a script
