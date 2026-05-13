@@ -32,13 +32,8 @@ try to provide enough information to keep the tutorial self-contained.
 
 ``demo_counter`` can be found in the Octez repository in ``src/proto_demo_counter/``.
 
-We refer to the first tutorial for compilation instructions. In most cases,
-it should be enough to run
-
-::
-
-   make build-deps
-   make
+As in the first part, we suppose you have built Octez from sources,
+as described in :doc:`../introduction/howtobuild`, that you have initialized a sandboxed client, and started a fresh sandboxed node.
 
 Protocol ``demo_counter``
 =========================
@@ -49,14 +44,14 @@ is indeed known by the node.
 
 ::
 
-   # octez-admin-client list protocols
+   $ octez-admin-client list protocols
    ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
    ProtoDemoCounterDemoCounterDemoCounterDemoCou4LSpdT
    ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp
    ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
    ...
 
-It is defined by several modules:
+The ``demo_counter`` protocol, whose sources are in :src:`src/proto_demo_counter`, defines several modules:
 
 ::
 
@@ -217,7 +212,7 @@ in ``TEZOS_PROTOCOL``.
 
 ::
 
-   > cat src/proto_demo_counter/lib_protocol/TEZOS_PROTOCOL
+   $ cat src/proto_demo_counter/lib_protocol/TEZOS_PROTOCOL
    {
        "expected_env_version": 17,
        "hash": "ProtoDemoCounterDemoCounterDemoCounterDemoCou4LSpdT",
@@ -253,7 +248,7 @@ We can check that ``demo_counter`` is indeed known to the client.
 
 ::
 
-   # octez-admin-client list understood protocols | grep -i demo
+   $ octez-admin-client list understood protocols | grep -i demo
    ProtoDemoCou
 
 Note that ``Proto_demo_noops`` isn’t in the list since it doesn’t have a
@@ -266,7 +261,7 @@ User interface
 
 ::
 
-   # octez-client -p ProtoDemoCou man
+   $ octez-client -p ProtoDemoCou man
    ...
    Commands for protocol Demo_counter:
      bake <message>
@@ -458,7 +453,10 @@ defined as
 
 ::
 
-   # octez-client -block genesis activate protocol ProtoDemoCounterDemoCounterDemoCounterDemoCou4LSpdT with fitness 1 and key activator and parameters protocol_parameters.json --timestamp 2019-07-05T14:30:35Z
+   $ octez-client -block genesis activate protocol \
+     ProtoDemoCounterDemoCounterDemoCounterDemoCou4LSpdT \
+     with fitness 1 and key activator and parameters protocol_parameters.json \
+     --timestamp 2019-07-05T14:30:35Z
    Injected BLf2cXRZKsby
 
 This bakes block of level ``1``, running protocol ``genesis``, with
@@ -466,7 +464,7 @@ This bakes block of level ``1``, running protocol ``genesis``, with
 
 ::
 
-   # octez-client rpc get /chains/main/blocks/head/metadata
+   $ octez-client rpc get /chains/main/blocks/head/metadata
    { "protocol": "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im",
      "next_protocol": "ProtoDemoCounterDemoCounterDemoCounterDemoCou4LSpdT",
      "test_chain_status": { "status": "not_running" }, "max_operations_ttl": 0,
@@ -479,7 +477,7 @@ from ``demo_counter`` client library.
 
 ::
 
-   # octez-client bake '"This is block 2"'
+   $ octez-client bake '"This is block 2"'
    Injected block BLrQqbn13Vrb
 
 We can check that the block was baked properly, in particular the block
@@ -489,7 +487,7 @@ header data has been set as expected. We can also see the protocol state
 
 ::
 
-   # octez-client rpc get /chains/main/blocks/head/
+   $ octez-client rpc get /chains/main/blocks/head/
    { "protocol": "ProtoDemoCounterDemoCounterDemoCounterDemoCou4LSpdT",
      "chain_id": "NetXdQprcVkpaWU",
      "hash": "BLrQqbn13VrbzUprxQypzAg6fc7YmsHaZvGwGrHJk8a4eG6e11B",
@@ -515,19 +513,19 @@ We now inject three operations using client commands.
 
 ::
 
-   octez-client increment a
+   $ octez-client increment a
    Operation receipt: operation applied successfully
    Injected: op5gBsE7EMi7
 
 ::
 
-   # octez-client increment b
+   $ octez-client increment b
    Operation receipt: operation applied successfully
    Injected: oo2YhBbAY8Vr
 
 ::
 
-   # octez-client transfer 10
+   $ octez-client transfer 10
    Operation receipt: operation applied successfully
    Injected: opJFLuHR98tf
 
@@ -536,7 +534,7 @@ node mempool.
 
 ::
 
-   # octez-client rpc get /chains/main/mempool/pending_operations
+   $ octez-client rpc get /chains/main/mempool/pending_operations
    { "applied":
        [ { "hash": "op45sL79jASRf41kpL5NDDbAUnQeTfwgZpVnZi1sXy4Cj5x18m9",
            "branch": "BLa7SnHxjHqPTsGSE2fi8sHBm39u9g6Psd9qPZm4rJCqhzHdkSp",
@@ -553,7 +551,7 @@ We bake the third block.
 
 ::
 
-   octez-client bake '"This is block 3"'
+   $ octez-client bake '"This is block 3"'
    Injected block BLz4SrcTnBQU
 
 We can see now that the three operations appear in the ``operations``
@@ -563,7 +561,7 @@ appears in this section.
 
 ::
 
-   octez-client rpc get /chains/main/blocks/head/
+   $ octez-client rpc get /chains/main/blocks/head/
    { "protocol": "ProtoDemoCounterDemoCounterDemoCounterDemoCou4LSpdT",
      "chain_id": "NetXdQprcVkpaWU",
      "hash": "BLz4SrcTnBQUiXXks1FTzGR9d5MsX6F1mhZ2g23bHTcaQwJbk3S",
@@ -611,12 +609,12 @@ We can finally test our two RPCs to query the counter values.
 
 ::
 
-   octez-client rpc get /chains/main/blocks/head/counter/a
+   $ octez-client rpc get /chains/main/blocks/head/counter/a
    91
 
 ::
 
-   octez-client rpc get /chains/main/blocks/head/counter/b
+   $ octez-client rpc get /chains/main/blocks/head/counter/b
    111
 
 The node’s trace is similar to the one presented in the previous
@@ -702,7 +700,7 @@ If you want to have more detailed traces of the node, you should indicate a data
    DATA_DIR='/tmp/tz-data' ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0
 
 
-Then the node trace appears in ``/tmp/tz-data/daily_logs/daily-20251124.log``.
+Then the node trace appears in a file such as ``/tmp/tz-data/daily_logs/daily-20251124.log``.
 
 Mempool module
 ==============

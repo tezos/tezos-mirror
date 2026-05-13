@@ -157,7 +157,7 @@ first two blocks of the blockchain (in particular the values of the
 Protocol Structure and Compilation
 ==================================
 
-Currently, the embedded protocols live in the tezos repository besides
+Currently, the embedded protocols live in the ``tezos`` repository besides
 the rest of the code. They follow the naming convention ``proto_*``. The
 code of ``proto_demo_noops`` is organized as shown below:
 
@@ -418,7 +418,7 @@ is responsible to store this state between function calls.
 Protocol ``demo_noops``
 =======================
 
-The ``demo_noops`` protocol is very simple:
+The ``demo_noops`` protocol, whose sources are in :src:`src/proto_demo_noops`, is very simple:
 
 - It has no operations (hence no-ops).
 - It does not update its state, ``context`` is never modified.
@@ -578,7 +578,7 @@ need to specify an extension using the ``-p XXX`` option, where ``XXX``
 is a protocol hash.
 
 Now we use the second RPC to obtain the binary encoding of the protocol
-block header (mind replacing the fields "predecessor", "timestamp", "operations_hash", "fitness", and "context" with the values output by the previous command):
+block header (mind replacing the fields "predecessor", "timestamp", "operations_hash", "fitness" (the whole list), and "context" with the values output by the previous command):
 
 ::
 
@@ -692,7 +692,7 @@ And when a block is baked::
 
 .. note::
 
-   Unlike ``demo_counter`` (which uses ``Logging.log`` to produce
+   Unlike ``demo_counter`` (that we'll see in the second part, which uses ``Logging.log`` to produce
    protocol-specific traces prefixed with ``demo-counter:``), the
    ``demo_noops`` protocol has **no** ``Logging.log`` calls in its code.
    Therefore, the only traces you will see come from the shell (the
