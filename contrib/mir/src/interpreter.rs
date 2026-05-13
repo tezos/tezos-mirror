@@ -11,6 +11,7 @@ use num_bigint::{BigInt, BigUint, Sign};
 use num_integer::Integer;
 use num_traits::{Signed, ToPrimitive, Zero};
 use std::cmp::min;
+use std::collections::BTreeMap;
 use std::ops::{Shl, Shr};
 use std::rc::Rc;
 use tezos_crypto_rs::hash::OperationHash;
@@ -335,17 +336,843 @@ impl<'a> Instruction<'a> {
     }
 }
 
-fn interpret<'a>(
-    ast: &[Instruction<'a>],
+/// Reference to a block of instructions. Arena owned blocks are passed
+/// by borrow (no copy); Rc owned blocks (from EXEC, View) hold their Rc
+/// so the worklist can keep them alive across iterations. `'a` is the
+/// arena lifetime; `'b` is the borrow lifetime of the caller's input
+/// slice and may be shorter than `'a`.
+enum CodeRef<'a, 'b> {
+    Borrowed(&'b [Instruction<'a>]),
+    Owned(Rc<[Instruction<'a>]>),
+}
+
+impl<'a, 'b> CodeRef<'a, 'b> {
+    fn as_slice(&self) -> &[Instruction<'a>] {
+        match self {
+            CodeRef::Borrowed(s) => s,
+            CodeRef::Owned(rc) => rc.as_ref(),
+        }
+    }
+}
+
+/// Worklist frame for the iterative interpreter driver. Each variant
+/// either kicks the next instruction in a block or finalizes the side
+/// effects of a previously opened control flow shape.
+enum InterpFrame<'a, 'b> {
+    NextInstr {
+        block: CodeRef<'a, 'b>,
+        idx: usize,
+    },
+    AfterDip {
+        protected: crate::stack::Stack<Rc<TypedValue<'a>>>,
+        opt_height: Option<u16>,
+    },
+    LoopBody {
+        body: Rc<[Instruction<'a>]>,
+    },
+    LoopLeftBody {
+        body: Rc<[Instruction<'a>]>,
+    },
+    IterList {
+        body: Rc<[Instruction<'a>]>,
+        remaining: std::vec::IntoIter<Rc<TypedValue<'a>>>,
+    },
+    IterSet {
+        body: Rc<[Instruction<'a>]>,
+        remaining: std::collections::btree_set::IntoIter<Rc<TypedValue<'a>>>,
+    },
+    IterMap {
+        body: Rc<[Instruction<'a>]>,
+        remaining: std::collections::btree_map::IntoIter<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+    },
+    MapListAccum {
+        body: Rc<[Instruction<'a>]>,
+        remaining: std::vec::IntoIter<Rc<TypedValue<'a>>>,
+        acc: Vec<Rc<TypedValue<'a>>>,
+    },
+    MapOptionAfter,
+    MapMapAccum {
+        body: Rc<[Instruction<'a>]>,
+        remaining: std::vec::IntoIter<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)>,
+        acc: BTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+        current_key: Option<Rc<TypedValue<'a>>>,
+    },
+    /// EXEC body just finished on the top sub stack; pop sub stack,
+    /// take its single result, push to the new top stack.
+    AfterExec,
+    AfterView {
+        saved_self_address: AddressHash,
+        saved_sender: AddressHash,
+        saved_amount: i64,
+        saved_balance: i64,
+    },
+}
+
+/// What a per instruction step yields. Non recursive arms produce Done;
+/// control flow arms produce Open variants that the driver expands.
+/// All bodies are owned via `Rc<[Instruction<'a>]>` so the step result
+/// has no borrow lifetime, only the arena lifetime.
+enum StepResult<'a> {
+    Done,
+    OpenBlock(Rc<[Instruction<'a>]>),
+    OpenDip {
+        body: Rc<[Instruction<'a>]>,
+        protected: crate::stack::Stack<Rc<TypedValue<'a>>>,
+        opt_height: Option<u16>,
+    },
+    OpenLoop(Rc<[Instruction<'a>]>),
+    OpenLoopLeft(Rc<[Instruction<'a>]>),
+    OpenIterList {
+        body: Rc<[Instruction<'a>]>,
+        iter: std::vec::IntoIter<Rc<TypedValue<'a>>>,
+    },
+    OpenIterSet {
+        body: Rc<[Instruction<'a>]>,
+        iter: std::collections::btree_set::IntoIter<Rc<TypedValue<'a>>>,
+    },
+    OpenIterMap {
+        body: Rc<[Instruction<'a>]>,
+        iter: std::collections::btree_map::IntoIter<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+    },
+    OpenMapList {
+        body: Rc<[Instruction<'a>]>,
+        iter: std::vec::IntoIter<Rc<TypedValue<'a>>>,
+    },
+    OpenMapOption(Rc<[Instruction<'a>]>),
+    OpenMapMap {
+        body: Rc<[Instruction<'a>]>,
+        iter: std::vec::IntoIter<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)>,
+        first_key: Rc<TypedValue<'a>>,
+    },
+    /// EXEC: enter a lambda body on a fresh sub stack containing args.
+    OpenExec {
+        code: Rc<[Instruction<'a>]>,
+        initial: IStack<'a>,
+    },
+    /// View: enter a typechecked view body on a fresh sub stack plus the
+    /// view context to install (the driver restores the saved one on exit).
+    OpenView {
+        code: Rc<[Instruction<'a>]>,
+        initial: IStack<'a>,
+        new_self_address: AddressHash,
+        new_sender: AddressHash,
+        new_amount: i64,
+        new_balance: i64,
+    },
+}
+
+/// Clone a nested body (Vec inside an Instruction variant) into a fresh
+/// Rc so its CodeRef::Owned can outlive the parent frame. Used when the
+/// parent block is Rc owned and a borrowed slice would not have a valid
+/// lifetime across worklist iterations.
+fn body_to_owned<'a>(body: &Vec<Instruction<'a>>) -> Rc<[Instruction<'a>]> {
+    body.clone().into_boxed_slice().into()
+}
+
+/// Iterative driver: walks every nested block from one explicit worklist
+/// and a stack of active IStacks instead of recursing through
+/// `interpret_one`. Each call uses the caller's stack as the bottom of
+/// the stack of stacks (moved in via `mem::take`, restored on exit).
+fn interpret<'a, 'b>(
+    ast: &'b [Instruction<'a>],
     ctx: &mut impl CtxTrait<'a>,
     arena: &'a Arena<Micheline<'a>>,
     stack: &mut IStack<'a>,
 ) -> Result<(), InterpretError<'a>> {
-    for i in ast {
-        i.interpret(ctx, arena, stack)?;
+    let initial = std::mem::take(stack);
+    let mut stacks: Vec<IStack<'a>> = vec![initial];
+    let mut frames: Vec<InterpFrame<'a, 'b>> = vec![InterpFrame::NextInstr {
+        block: CodeRef::Borrowed(ast),
+        idx: 0,
+    }];
+
+    let outcome = run_interp_driver(ctx, arena, &mut stacks, &mut frames);
+
+    // Restore the caller's stack from the bottom of the stack of stacks.
+    *stack = stacks.pop().ok_or(InterpretError::InternalError(
+        InterpretInvariant::UnreachableState,
+    ))?;
+    outcome
+}
+
+/// Borrow the active (top) sub stack. The stack of stacks always has at
+/// least the caller stack at the bottom, so an empty stack of stacks is a
+/// driver invariant violation rather than a Michelson-level error.
+fn active_stack_mut<'a, 'c>(
+    stacks: &'c mut [IStack<'a>],
+) -> Result<&'c mut IStack<'a>, InterpretError<'a>> {
+    stacks.last_mut().ok_or(InterpretError::InternalError(
+        InterpretInvariant::UnreachableState,
+    ))
+}
+
+/// Pop a value off a sub stack, turning an empty stack into the structured
+/// `EmptyValueStackPop` invariant (the recursive interpreter relied on
+/// typechecking having ensured the value was present).
+fn pop_value<'a>(stk: &mut IStack<'a>) -> Result<Rc<TypedValue<'a>>, InterpretError<'a>> {
+    stk.pop().ok_or(InterpretError::InternalError(
+        InterpretInvariant::EmptyValueStackPop,
+    ))
+}
+
+fn run_interp_driver<'a, 'b>(
+    ctx: &mut impl CtxTrait<'a>,
+    arena: &'a Arena<Micheline<'a>>,
+    stacks: &mut Vec<IStack<'a>>,
+    frames: &mut Vec<InterpFrame<'a, 'b>>,
+) -> Result<(), InterpretError<'a>> {
+    while let Some(frame) = frames.pop() {
+        match frame {
+            InterpFrame::NextInstr { block, idx } => {
+                let slice = block.as_slice();
+                if idx >= slice.len() {
+                    ctx.gas().consume(interpret_cost::INTERPRET_RET)?;
+                    continue;
+                }
+                let instr = &slice[idx];
+                // Re-push the parent NextInstr (with its block moved back
+                // by value) before any nested frames so it lands below them.
+                let parent_idx = idx + 1;
+                let step = interpret_step(instr, ctx, arena, active_stack_mut(stacks)?, &block)?;
+                frames.push(InterpFrame::NextInstr {
+                    block,
+                    idx: parent_idx,
+                });
+                handle_step(step, ctx, stacks, frames)?;
+            }
+            InterpFrame::AfterDip {
+                protected,
+                opt_height,
+            } => {
+                let stk = active_stack_mut(stacks)?;
+                ctx.gas()
+                    .consume(interpret_cost::undip(opt_height.unwrap_or(1))?)?;
+                let mut protected = protected;
+                stk.append(&mut protected);
+            }
+            InterpFrame::LoopBody { body } => {
+                let stk = active_stack_mut(stacks)?;
+                ctx.gas().consume(interpret_cost::LOOP)?;
+                let cond = match TypedValue::unwrap_rc(pop_value(stk)?) {
+                    TypedValue::Bool(b) => b,
+                    _ => {
+                        return Err(InterpretError::InternalError(
+                            InterpretInvariant::TypeMismatchOnPop {
+                                expected: "TypedValue::Bool",
+                            },
+                        ))
+                    }
+                };
+                if cond {
+                    frames.push(InterpFrame::LoopBody {
+                        body: Rc::clone(&body),
+                    });
+                    frames.push(InterpFrame::NextInstr {
+                        block: CodeRef::Owned(body),
+                        idx: 0,
+                    });
+                } else {
+                    ctx.gas().consume(interpret_cost::LOOP_EXIT)?;
+                }
+            }
+            InterpFrame::LoopLeftBody { body } => {
+                let stk = active_stack_mut(stacks)?;
+                ctx.gas().consume(interpret_cost::LOOP)?;
+                let or = match TypedValue::unwrap_rc(pop_value(stk)?) {
+                    TypedValue::Or(or) => or,
+                    _ => {
+                        return Err(InterpretError::InternalError(
+                            InterpretInvariant::TypeMismatchOnPop {
+                                expected: "TypedValue::Or",
+                            },
+                        ))
+                    }
+                };
+                match or {
+                    Or::Left(x) => {
+                        stk.push(x);
+                        frames.push(InterpFrame::LoopLeftBody {
+                            body: Rc::clone(&body),
+                        });
+                        frames.push(InterpFrame::NextInstr {
+                            block: CodeRef::Owned(body),
+                            idx: 0,
+                        });
+                    }
+                    Or::Right(x) => {
+                        stk.push(x);
+                        ctx.gas().consume(interpret_cost::LOOP_EXIT)?;
+                    }
+                }
+            }
+            InterpFrame::IterList {
+                body,
+                mut remaining,
+            } => {
+                if let Some(elem) = remaining.next() {
+                    ctx.gas().consume(interpret_cost::PUSH)?;
+                    active_stack_mut(stacks)?.push(elem);
+                    frames.push(InterpFrame::IterList {
+                        body: Rc::clone(&body),
+                        remaining,
+                    });
+                    frames.push(InterpFrame::NextInstr {
+                        block: CodeRef::Owned(body),
+                        idx: 0,
+                    });
+                }
+            }
+            InterpFrame::IterSet {
+                body,
+                mut remaining,
+            } => {
+                if let Some(elem) = remaining.next() {
+                    ctx.gas().consume(interpret_cost::PUSH)?;
+                    active_stack_mut(stacks)?.push(elem);
+                    frames.push(InterpFrame::IterSet {
+                        body: Rc::clone(&body),
+                        remaining,
+                    });
+                    frames.push(InterpFrame::NextInstr {
+                        block: CodeRef::Owned(body),
+                        idx: 0,
+                    });
+                }
+            }
+            InterpFrame::IterMap {
+                body,
+                mut remaining,
+            } => {
+                if let Some((k, v)) = remaining.next() {
+                    ctx.gas().consume(interpret_cost::PUSH)?;
+                    active_stack_mut(stacks)?.push(TypedValue::Pair(k, v));
+                    frames.push(InterpFrame::IterMap {
+                        body: Rc::clone(&body),
+                        remaining,
+                    });
+                    frames.push(InterpFrame::NextInstr {
+                        block: CodeRef::Owned(body),
+                        idx: 0,
+                    });
+                }
+            }
+            InterpFrame::MapListAccum {
+                body,
+                mut remaining,
+                mut acc,
+            } => {
+                // The body just finished; its result is on top of the stack.
+                let stk = active_stack_mut(stacks)?;
+                let result = pop_value(stk)?;
+                acc.push(result);
+                if let Some(elem) = remaining.next() {
+                    ctx.gas().consume(interpret_cost::PUSH)?;
+                    stk.push(elem);
+                    frames.push(InterpFrame::MapListAccum {
+                        body: Rc::clone(&body),
+                        remaining,
+                        acc,
+                    });
+                    frames.push(InterpFrame::NextInstr {
+                        block: CodeRef::Owned(body),
+                        idx: 0,
+                    });
+                } else {
+                    stk.push(TypedValue::List(crate::ast::MichelsonList::from(acc)));
+                }
+            }
+            InterpFrame::MapOptionAfter => {
+                let stk = active_stack_mut(stacks)?;
+                let result = pop_value(stk)?;
+                stk.push(TypedValue::new_option(Some(TypedValue::unwrap_rc(result))));
+            }
+            InterpFrame::MapMapAccum {
+                body,
+                mut remaining,
+                mut acc,
+                current_key,
+            } => {
+                // Body just finished; pop the resulting value and pair it
+                // with the key we pushed.
+                let stk = active_stack_mut(stacks)?;
+                let new_val = pop_value(stk)?;
+                let prev_key = current_key.ok_or(InterpretError::InternalError(
+                    InterpretInvariant::UnreachableState,
+                ))?;
+                acc.insert(prev_key, new_val);
+                if let Some((k, v)) = remaining.next() {
+                    ctx.gas().consume(interpret_cost::PUSH)?;
+                    stk.push(TypedValue::Pair(k.clone(), v));
+                    frames.push(InterpFrame::MapMapAccum {
+                        body: Rc::clone(&body),
+                        remaining,
+                        acc,
+                        current_key: Some(k),
+                    });
+                    frames.push(InterpFrame::NextInstr {
+                        block: CodeRef::Owned(body),
+                        idx: 0,
+                    });
+                } else {
+                    stk.push(TypedValue::Map(acc));
+                }
+            }
+            InterpFrame::AfterExec => {
+                let mut sub = stacks.pop().ok_or(InterpretError::InternalError(
+                    InterpretInvariant::UnreachableState,
+                ))?;
+                let result = pop_value(&mut sub)?;
+                active_stack_mut(stacks)?.push(result);
+            }
+            InterpFrame::AfterView {
+                saved_self_address,
+                saved_sender,
+                saved_amount,
+                saved_balance,
+            } => {
+                let mut sub = stacks.pop().ok_or(InterpretError::InternalError(
+                    InterpretInvariant::UnreachableState,
+                ))?;
+                ctx.set_view_context(
+                    saved_self_address,
+                    saved_sender,
+                    saved_amount,
+                    saved_balance,
+                );
+                let result = pop_value(&mut sub)?;
+                active_stack_mut(stacks)?
+                    .push(TypedValue::new_option(Some(TypedValue::unwrap_rc(result))));
+            }
+        }
     }
-    ctx.gas().consume(interpret_cost::INTERPRET_RET)?;
     Ok(())
+}
+
+fn handle_step<'a, 'b>(
+    step: StepResult<'a>,
+    ctx: &mut impl CtxTrait<'a>,
+    stacks: &mut Vec<IStack<'a>>,
+    frames: &mut Vec<InterpFrame<'a, 'b>>,
+) -> Result<(), InterpretError<'a>> {
+    match step {
+        StepResult::Done => {}
+        StepResult::OpenBlock(body) => {
+            frames.push(InterpFrame::NextInstr {
+                block: CodeRef::Owned(body),
+                idx: 0,
+            });
+        }
+        StepResult::OpenDip {
+            body,
+            protected,
+            opt_height,
+        } => {
+            frames.push(InterpFrame::AfterDip {
+                protected,
+                opt_height,
+            });
+            frames.push(InterpFrame::NextInstr {
+                block: CodeRef::Owned(body),
+                idx: 0,
+            });
+        }
+        StepResult::OpenLoop(body) => {
+            frames.push(InterpFrame::LoopBody { body });
+        }
+        StepResult::OpenLoopLeft(body) => {
+            frames.push(InterpFrame::LoopLeftBody { body });
+        }
+        StepResult::OpenIterList { body, iter } => {
+            frames.push(InterpFrame::IterList {
+                body,
+                remaining: iter,
+            });
+        }
+        StepResult::OpenIterSet { body, iter } => {
+            frames.push(InterpFrame::IterSet {
+                body,
+                remaining: iter,
+            });
+        }
+        StepResult::OpenIterMap { body, iter } => {
+            frames.push(InterpFrame::IterMap {
+                body,
+                remaining: iter,
+            });
+        }
+        StepResult::OpenMapList { body, iter } => {
+            // First element was already pushed by interpret_step; run the
+            // body and then collect from MapListAccum.
+            frames.push(InterpFrame::MapListAccum {
+                body: Rc::clone(&body),
+                remaining: iter,
+                acc: Vec::new(),
+            });
+            frames.push(InterpFrame::NextInstr {
+                block: CodeRef::Owned(body),
+                idx: 0,
+            });
+        }
+        StepResult::OpenMapOption(body) => {
+            frames.push(InterpFrame::MapOptionAfter);
+            frames.push(InterpFrame::NextInstr {
+                block: CodeRef::Owned(body),
+                idx: 0,
+            });
+        }
+        StepResult::OpenMapMap {
+            body,
+            iter,
+            first_key,
+        } => {
+            frames.push(InterpFrame::MapMapAccum {
+                body: Rc::clone(&body),
+                remaining: iter,
+                acc: BTreeMap::new(),
+                current_key: Some(first_key),
+            });
+            frames.push(InterpFrame::NextInstr {
+                block: CodeRef::Owned(body),
+                idx: 0,
+            });
+        }
+        StepResult::OpenExec { code, initial } => {
+            stacks.push(initial);
+            frames.push(InterpFrame::AfterExec);
+            frames.push(InterpFrame::NextInstr {
+                block: CodeRef::Owned(code),
+                idx: 0,
+            });
+        }
+        StepResult::OpenView {
+            code,
+            initial,
+            new_self_address,
+            new_sender,
+            new_amount,
+            new_balance,
+        } => {
+            let saved_self_address = ctx.self_address().clone();
+            let saved_sender = ctx.sender().clone();
+            let saved_amount = ctx.amount();
+            let saved_balance = ctx.balance();
+            ctx.set_view_context(new_self_address, new_sender, new_amount, new_balance);
+            stacks.push(initial);
+            frames.push(InterpFrame::AfterView {
+                saved_self_address,
+                saved_sender,
+                saved_amount,
+                saved_balance,
+            });
+            frames.push(InterpFrame::NextInstr {
+                block: CodeRef::Owned(code),
+                idx: 0,
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Per instruction dispatcher used by the iterative driver. Recursive
+/// instructions return an `Open` variant carrying the body and any state
+/// the driver needs; everything else delegates to `interpret_one` for
+/// the side effects on the active stack.
+fn interpret_step<'a, 'b>(
+    i: &'b Instruction<'a>,
+    ctx: &mut impl CtxTrait<'a>,
+    arena: &'a Arena<Micheline<'a>>,
+    stack: &mut IStack<'a>,
+    _parent: &CodeRef<'a, 'b>,
+) -> Result<StepResult<'a>, InterpretError<'a>> {
+    use Instruction as I;
+    use TypedValue as V;
+
+    // Panic-free counterparts of the `pop!`/`top_mut!` macros used in
+    // `interpret_one`: invariant violations (typechecking should have
+    // ruled them out) surface as `InterpretError::InternalError` rather
+    // than panicking.
+    macro_rules! pop_v {
+        ($p:path) => {{
+            match TypedValue::unwrap_rc(pop_value(stack)?) {
+                #[allow(unused_parens)]
+                $p(i) => i,
+                _ => {
+                    return Err(InterpretError::InternalError(
+                        InterpretInvariant::TypeMismatchOnPop {
+                            expected: stringify!($p),
+                        },
+                    ))
+                }
+            }
+        }};
+    }
+
+    match i {
+        I::Seq(body) => Ok(StepResult::OpenBlock(body_to_owned(body))),
+        I::Dip(opt_height, body) => {
+            ctx.gas().consume(interpret_cost::dip(*opt_height)?)?;
+            let protected_height: u16 = opt_height.unwrap_or(1);
+            let protected = stack.split_off(protected_height as usize);
+            Ok(StepResult::OpenDip {
+                body: body_to_owned(body),
+                protected,
+                opt_height: *opt_height,
+            })
+        }
+        I::If(t, f) => {
+            ctx.gas().consume(interpret_cost::IF)?;
+            let body = if pop_v!(V::Bool) { t } else { f };
+            Ok(StepResult::OpenBlock(body_to_owned(body)))
+        }
+        I::IfNone(when_none, when_some) => {
+            ctx.gas().consume(interpret_cost::IF_NONE)?;
+            let body = match pop_v!(V::Option) {
+                Some(x) => {
+                    stack.push(x);
+                    when_some
+                }
+                None => when_none,
+            };
+            Ok(StepResult::OpenBlock(body_to_owned(body)))
+        }
+        I::IfCons(when_cons, when_nil) => {
+            ctx.gas().consume(interpret_cost::IF_CONS)?;
+            let lst = match Rc::make_mut(stack.get_mut(0)?) {
+                V::List(lst) => lst,
+                _ => {
+                    return Err(InterpretError::InternalError(
+                        InterpretInvariant::TypeMismatchOnTop {
+                            expected: "V::List",
+                        },
+                    ))
+                }
+            };
+            let body = match lst.uncons() {
+                Some(x) => {
+                    stack.push(x);
+                    when_cons
+                }
+                None => {
+                    let _ = pop_value(stack)?;
+                    when_nil
+                }
+            };
+            Ok(StepResult::OpenBlock(body_to_owned(body)))
+        }
+        I::IfLeft(when_left, when_right) => {
+            ctx.gas().consume(interpret_cost::IF_LEFT)?;
+            let or = pop_v!(V::Or);
+            let body = match or {
+                Or::Left(x) => {
+                    stack.push(x);
+                    when_left
+                }
+                Or::Right(x) => {
+                    stack.push(x);
+                    when_right
+                }
+            };
+            Ok(StepResult::OpenBlock(body_to_owned(body)))
+        }
+        I::Loop(body) => {
+            ctx.gas().consume(interpret_cost::LOOP_ENTER)?;
+            Ok(StepResult::OpenLoop(body_to_owned(body)))
+        }
+        I::LoopLeft(body) => {
+            ctx.gas().consume(interpret_cost::LOOP_LEFT_ENTER)?;
+            Ok(StepResult::OpenLoopLeft(body_to_owned(body)))
+        }
+        I::Iter(overload, body) => {
+            ctx.gas().consume(interpret_cost::ITER)?;
+            match overload {
+                overloads::Iter::List => {
+                    let lst = pop_v!(V::List);
+                    Ok(StepResult::OpenIterList {
+                        body: body_to_owned(body),
+                        iter: Vec::from(lst).into_iter(),
+                    })
+                }
+                overloads::Iter::Set => {
+                    let set = pop_v!(V::Set);
+                    Ok(StepResult::OpenIterSet {
+                        body: body_to_owned(body),
+                        iter: set.into_iter(),
+                    })
+                }
+                overloads::Iter::Map => {
+                    let map = pop_v!(V::Map);
+                    Ok(StepResult::OpenIterMap {
+                        body: body_to_owned(body),
+                        iter: map.into_iter(),
+                    })
+                }
+            }
+        }
+        I::Map(overload, body) => match overload {
+            overloads::Map::List => {
+                ctx.gas().consume(interpret_cost::MAP_LIST)?;
+                let list = pop_v!(V::List);
+                let mut iter = Vec::from(list).into_iter();
+                if let Some(first) = iter.next() {
+                    ctx.gas().consume(interpret_cost::PUSH)?;
+                    stack.push(first);
+                    Ok(StepResult::OpenMapList {
+                        body: body_to_owned(body),
+                        iter,
+                    })
+                } else {
+                    stack.push(V::List(crate::ast::MichelsonList::default()));
+                    Ok(StepResult::Done)
+                }
+            }
+            overloads::Map::Option => {
+                ctx.gas().consume(interpret_cost::MAP_OPTION)?;
+                let option = pop_v!(V::Option);
+                match option {
+                    Some(elem) => {
+                        ctx.gas().consume(interpret_cost::PUSH)?;
+                        stack.push(elem);
+                        Ok(StepResult::OpenMapOption(body_to_owned(body)))
+                    }
+                    None => {
+                        stack.push(V::new_option(None));
+                        Ok(StepResult::Done)
+                    }
+                }
+            }
+            overloads::Map::Map => {
+                ctx.gas().consume(interpret_cost::MAP_MAP)?;
+                let map = pop_v!(V::Map);
+                let entries: Vec<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)> =
+                    map.into_iter().collect();
+                let mut iter = entries.into_iter();
+                if let Some((k, v)) = iter.next() {
+                    ctx.gas().consume(interpret_cost::PUSH)?;
+                    stack.push(TypedValue::Pair(k.clone(), v));
+                    Ok(StepResult::OpenMapMap {
+                        body: body_to_owned(body),
+                        iter,
+                        first_key: k,
+                    })
+                } else {
+                    stack.push(V::Map(BTreeMap::new()));
+                    Ok(StepResult::Done)
+                }
+            }
+        },
+        I::Exec => {
+            ctx.gas().consume(interpret_cost::EXEC)?;
+            let mut arg = TypedValue::unwrap_rc(pop_value(stack)?);
+            let mut closure = pop_v!(V::Lambda);
+            // Inline APPLY unwrapping (constant work, not stack recursive).
+            loop {
+                match closure {
+                    Closure::Lambda(lam) => match lam {
+                        Lambda::LambdaRec {
+                            in_ty,
+                            out_ty,
+                            micheline_code,
+                            code,
+                        } => {
+                            let code_clone = Rc::clone(&code);
+                            // Recursive lambdas put themselves on top of
+                            // the body's stack so the body can EXEC again.
+                            let initial = stk![
+                                V::Lambda(Closure::Lambda(Lambda::LambdaRec {
+                                    in_ty,
+                                    out_ty,
+                                    micheline_code,
+                                    code,
+                                })),
+                                arg
+                            ];
+                            return Ok(StepResult::OpenExec {
+                                code: code_clone,
+                                initial,
+                            });
+                        }
+                        Lambda::Lambda { code, .. } => {
+                            let initial = stk![arg];
+                            return Ok(StepResult::OpenExec { code, initial });
+                        }
+                    },
+                    Closure::Apply {
+                        arg_val,
+                        closure: inner,
+                        ..
+                    } => {
+                        ctx.gas().consume(interpret_cost::PAIR)?;
+                        arg = V::new_pair(*arg_val, arg);
+                        closure = *inner;
+                    }
+                }
+            }
+        }
+        I::IView { name, return_type } => {
+            let input = TypedValue::unwrap_rc(pop_value(stack)?);
+            let Address {
+                hash,
+                entrypoint: _,
+            } = pop_v!(V::Address);
+
+            ctx.gas().consume(interpret_cost::VIEW)?;
+
+            let kt1 = match hash {
+                AddressHash::Kt1(kt1) => kt1,
+                _ => {
+                    stack.push(V::Option(None));
+                    return Ok(StepResult::Done);
+                }
+            };
+
+            if let Some(result) =
+                ctx.try_dispatch_enshrined_view(&kt1, name, &input, return_type, arena)
+            {
+                stack.push(V::new_option(result?));
+                return Ok(StepResult::Done);
+            }
+
+            let Some((view, view_storage_ty, view_storage, view_balance)) =
+                ctx.lookup_view_storage_balance(&kt1, name, arena)?
+            else {
+                stack.push(V::Option(None));
+                return Ok(StepResult::Done);
+            };
+
+            let storage_ty = view_storage_ty.parse_ty(ctx.gas())?;
+            let storage_ty_mich = storage_ty.into_micheline_optimized_legacy(arena, ctx.gas())?;
+            let storage = Micheline::decode_raw(arena, &view_storage, ctx.gas())??
+                .typecheck_value(ctx, &storage_ty_mich)?;
+            let input_type = view.input_type.parse_ty(ctx.gas())?;
+            let output_type = view.output_type.parse_ty(ctx.gas())?;
+
+            if let Micheline::Seq(instrs) = view.code {
+                if let Ok(code) = crate::typechecker::typecheck_view(
+                    instrs,
+                    ctx.gas(),
+                    Type::Pair(Rc::new((input_type, storage_ty))),
+                    output_type,
+                ) {
+                    let initial = stk![TypedValue::new_pair(input, storage)];
+                    return Ok(StepResult::OpenView {
+                        code,
+                        initial,
+                        new_self_address: AddressHash::Kt1(kt1),
+                        new_sender: ctx.self_address().clone(),
+                        new_amount: 0,
+                        new_balance: view_balance,
+                    });
+                }
+            }
+            stack.push(V::Option(None));
+            Ok(StepResult::Done)
+        }
+        // Non recursive arms: delegate to the side effect only function.
+        _ => {
+            interpret_one(i, ctx, arena, stack)?;
+            Ok(StepResult::Done)
+        }
+    }
 }
 
 fn interpret_one<'a>(
@@ -2196,6 +3023,7 @@ fn interpret_one<'a>(
                 stack.push(V::new_option(result?));
                 return Ok(());
             }
+
 
             let Some((view, view_storage_ty, view_storage, view_balance)) =
                 ctx.lookup_view_storage_balance(&kt1, name, arena)?
