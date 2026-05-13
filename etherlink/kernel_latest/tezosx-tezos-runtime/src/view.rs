@@ -22,7 +22,7 @@ use std::rc::Rc;
 use mir::ast::big_map::BigMapId;
 use mir::ast::{AddressHash, IntoMicheline, Micheline, Type, TypedValue};
 use mir::context::{CtxTrait, TypecheckingCtx};
-use mir::gas::{Gas, OutOfGas};
+use mir::gas::OutOfGas;
 use mir::interpreter::{EnshrinedViewDispatchError, InterpretError};
 use mir::parser::Parser;
 use mir::typechecker::{typecheck_value, typecheck_view, TcError};
@@ -250,7 +250,7 @@ where
     let input_mich = if body.is_empty() {
         Micheline::from(())
     } else {
-        Micheline::decode_raw(&parser.arena, &body, &mut Gas::unmetered())
+        Micheline::decode_raw(&parser.arena, &body, tc_ctx.gas())
             .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
             .map_err(|e| {
                 TezosXRuntimeError::BadRequest(format!(
@@ -321,7 +321,7 @@ where
         // that MIR doesn't re-parse `storage_ty` from a Micheline roundtrip
         // on every view call (saves 3 `parse_ty` over the hot path).
         let storage_mich =
-            Micheline::decode_raw(&parser.arena, &storage_bytes, &mut Gas::unmetered())
+            Micheline::decode_raw(&parser.arena, &storage_bytes, mir_ctx.gas())
                 .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
                 .map_err(|e| {
                     TezosXRuntimeError::Custom(format!("failed to decode storage: {e:?}"))
@@ -371,7 +371,7 @@ where
         result
             .into_micheline_optimized_legacy(&parser.arena, mir_ctx.gas())
             .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
-            .encode(&mut Gas::unmetered())
+            .encode(mir_ctx.gas())
             .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
             .map_err(|e| {
                 TezosXRuntimeError::Custom(format!("failed to encode view result: {e}"))
