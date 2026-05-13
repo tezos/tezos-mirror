@@ -983,13 +983,31 @@ impl RuntimeInterface for TezosRuntime {
                 "Failed to decode forwarder code from hex: {e}"
             ))
         })?;
-        let storage = alias_forwarder::forwarder_storage(native_address)
-            .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
-            .map_err(|e| {
-                TezosXRuntimeError::Custom(format!(
-                    "Failed to encode forwarder storage: {e}"
-                ))
-            })?;
+        // Initialize the encoding counter with the remaining op-gas
+        // budget so the encoding work is metered against the user's
+        // actual budget; OOG inside the encode means insufficient
+        // budget, not a synthetic high-cap failure.
+        let mut encoding_gas = Gas::new(u32::try_from(remaining).unwrap_or(u32::MAX));
+        let storage =
+            alias_forwarder::forwarder_storage(native_address, &mut encoding_gas)
+                .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
+                .map_err(|e| {
+                    TezosXRuntimeError::Custom(format!(
+                        "Failed to encode forwarder storage: {e}"
+                    ))
+                })?;
+
+        // `forwarder_storage` returned `Ok`, so the counter cannot be
+        // exhausted. Surface a clear error rather than silently
+        // miscounting if a future refactor ever breaks that invariant.
+        let remaining_after_encode = encoding_gas.milligas().ok_or_else(|| {
+            TezosXRuntimeError::Custom(
+                "internal invariant violated: forwarder_storage returned Ok \
+                 but encoding_gas counter is exhausted"
+                    .into(),
+            )
+        })?;
+        remaining = remaining_after_encode.into();
 
         // Build the synthetic source/sender account. NULL_PKH carries
         // zero balance, which matches the initial-balance transfer of
@@ -1567,9 +1585,10 @@ mod tests {
         let account = context.originated_from_kt1(&kt1).unwrap();
 
         let storage = account.storage(&host).unwrap();
-        let expected = alias_forwarder::forwarder_storage(evm_address)
-            .unwrap()
-            .unwrap();
+        let expected =
+            alias_forwarder::forwarder_storage(evm_address, &mut Gas::unmetered())
+                .unwrap()
+                .unwrap();
         assert_eq!(storage, expected);
     }
 

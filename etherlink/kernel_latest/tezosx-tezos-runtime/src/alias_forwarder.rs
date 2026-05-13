@@ -52,11 +52,13 @@ pub fn forwarder_code() -> Result<Vec<u8>, hex::FromHexError> {
 
 /// Micheline-encode an EVM address string as the contract's initial storage.
 /// Outer `Result` reports gas exhaustion; inner reports serialization
-/// failures.
+/// failures. The caller passes its own gas counter so the encoding cost
+/// is charged against the operation's budget.
 pub fn forwarder_storage(
     native_evm_address: &str,
+    gas: &mut Gas,
 ) -> Result<Result<Vec<u8>, tezos_data_encoding::enc::BinError>, OutOfGas> {
-    Micheline::from(native_evm_address).encode(&mut Gas::unmetered())
+    Micheline::from(native_evm_address).encode(gas)
 }
 
 #[cfg(test)]
@@ -73,7 +75,9 @@ mod tests {
 
     #[test]
     fn forwarder_storage_encodes_string() {
-        let storage = forwarder_storage("0xabcdef").unwrap().unwrap();
+        let storage = forwarder_storage("0xabcdef", &mut Gas::unmetered())
+            .unwrap()
+            .unwrap();
         // Micheline string tag = 0x01, then 4-byte length, then string bytes
         assert_eq!(storage[0], 0x01);
         let len = u32::from_be_bytes([storage[1], storage[2], storage[3], storage[4]]);
@@ -83,7 +87,9 @@ mod tests {
 
     #[test]
     fn forwarder_storage_empty_address() {
-        let storage = forwarder_storage("").unwrap().unwrap();
+        let storage = forwarder_storage("", &mut Gas::unmetered())
+            .unwrap()
+            .unwrap();
         assert_eq!(storage, vec![0x01, 0x00, 0x00, 0x00, 0x00]);
     }
 }
