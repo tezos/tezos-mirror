@@ -154,6 +154,9 @@ could be more descriptive. If the application fails, an error is
 returned via an :doc:`error monad <error_monad>`. All
 protocol errors are registered in ``Error``.
 
+.. note::
+   ``demo_counter`` reuses the same helper (``apply_operation_aux``) for both ``validate_operation`` and ``apply_operation`` only for simplicity, meaning validation also writes to the context. A production protocol should keep validation lightweight and context-write-free.
+
 Protocol parameters
 -------------------
 
