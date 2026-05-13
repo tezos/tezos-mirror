@@ -59,8 +59,8 @@ use crate::context::Context;
 use crate::gas::Cost;
 pub use crate::gas::TezlinkOperationGas;
 use crate::mir_ctx::{
-    clear_temporary_big_maps, convert_big_map_diff, BlockCtx, Ctx, ExecCtx, OperationCtx,
-    TcCtx,
+    clear_temporary_big_maps, convert_big_map_diff, BlockCtx, Ctx, ExecCtx,
+    InterpretContext, OperationCtx, TcCtx,
 };
 
 /// Result of applying a single operation within a batch.
@@ -1675,6 +1675,7 @@ where
         context,
         operation_gas: &mut gas,
         big_map_diff: BTreeMap::new(),
+        interpret_context: InterpretContext::new(),
         next_temporary_id,
     };
     let parser = Parser::new();
