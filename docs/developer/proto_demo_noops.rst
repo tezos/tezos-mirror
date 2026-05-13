@@ -2,6 +2,9 @@
 How to write a Tezos protocol - Part 1
 ======================================
 
+.. note::
+   This tutorial is based on `a blog <https://research-development.nomadic-labs.com/how-to-write-a-tezos-protocol.html>`__ published in 2019, but has been significantly updated to fit contemporary protocol development.
+
 In this tutorial we will see how to write, compile, register, activate and use
 an extremely simple protocol. By doing so, we will also start to explore
 the interface between the protocol and the node (more specifically the
