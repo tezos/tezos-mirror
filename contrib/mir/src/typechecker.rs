@@ -1077,17 +1077,465 @@ fn parse_parameter_ty_with_entrypoints<'a>(
 ///
 /// Entrypoint map is carried as an argument, not as part of context, because it
 /// has to be locally overridden during typechecking.
-fn typecheck<'a>(
-    ast: &[Micheline<'a>],
+/// What a per instruction step yields. Non recursive arms produce a
+/// finished instruction; control flow arms with unbounded depth (IF
+/// family, LOOP family, ITER, DIP, SEQ) produce an Open variant that the
+/// driver expands into nested block frames. LAMBDA and MAP keep using
+/// their helper functions (typecheck_lambda, typecheck_map_block) whose
+/// own internal typecheck calls go through the same iterative driver.
+enum StepResult<'a, 'b> {
+    Done(Instruction<'a>),
+    OpenIf {
+        t_block: &'b [Micheline<'a>],
+        f_block: &'b [Micheline<'a>],
+        saved_f_stack: FailingTypeStack,
+    },
+    OpenIfNone {
+        none_block: &'b [Micheline<'a>],
+        some_block: &'b [Micheline<'a>],
+        some_top_ty: Type,
+    },
+    OpenIfCons {
+        cons_block: &'b [Micheline<'a>],
+        nil_block: &'b [Micheline<'a>],
+        list_ty: Type,
+        cons_top_ty: Type,
+    },
+    OpenIfLeft {
+        left_block: &'b [Micheline<'a>],
+        right_block: &'b [Micheline<'a>],
+        right_top_ty: Type,
+    },
+    OpenLoop {
+        body: &'b [Micheline<'a>],
+        initial_copy: FailingTypeStack,
+    },
+    OpenLoopLeft {
+        body: &'b [Micheline<'a>],
+        initial_copy: FailingTypeStack,
+        r_ty: Type,
+    },
+    OpenIter {
+        body: &'b [Micheline<'a>],
+        variant: overloads::Iter,
+        outer_opt_stack: FailingTypeStack,
+    },
+    OpenDip {
+        body: &'b [Micheline<'a>],
+        opt_height: Option<u16>,
+        protected: TypeStack,
+    },
+    OpenSeq {
+        body: &'b [Micheline<'a>],
+    },
+}
+
+/// Worklist frame for the iterative instruction typechecker driver.
+enum TcIFrame<'a, 'b> {
+    /// Process the next instruction in this block. When `idx == block.len()`,
+    /// the matching After frame finalizes.
+    NextInstr {
+        block: &'b [Micheline<'a>],
+        idx: usize,
+    },
+    AfterIfThen {
+        f_block: &'b [Micheline<'a>],
+        saved_f_stack: FailingTypeStack,
+    },
+    AfterIfFalse {
+        saved_t_stack: FailingTypeStack,
+    },
+    AfterIfNoneNone {
+        some_block: &'b [Micheline<'a>],
+        saved_some_stack: FailingTypeStack,
+    },
+    AfterIfNoneSome {
+        saved_none_stack: FailingTypeStack,
+    },
+    AfterIfConsCons {
+        nil_block: &'b [Micheline<'a>],
+        saved_nil_stack: FailingTypeStack,
+    },
+    AfterIfConsNil {
+        saved_cons_stack: FailingTypeStack,
+    },
+    AfterIfLeftLeft {
+        right_block: &'b [Micheline<'a>],
+        saved_right_stack: FailingTypeStack,
+    },
+    AfterIfLeftRight {
+        saved_left_stack: FailingTypeStack,
+    },
+    AfterLoop {
+        initial_copy: FailingTypeStack,
+    },
+    AfterLoopLeft {
+        initial_copy: FailingTypeStack,
+        r_ty: Type,
+    },
+    AfterIter {
+        variant: overloads::Iter,
+        outer_opt_stack: FailingTypeStack,
+    },
+    AfterDip {
+        opt_height: Option<u16>,
+        protected: TypeStack,
+    },
+    AfterSeq,
+}
+
+/// Iterative driver: typechecks every nested block from one explicit
+/// worklist instead of recursing through `typecheck` / `typecheck_instruction`.
+fn typecheck<'a, 'b>(
+    ast: &'b [Micheline<'a>],
     gas: &mut Gas,
     self_entrypoints: Option<&Entrypoints>,
     opt_stack: &mut FailingTypeStack,
     in_view: bool,
 ) -> Result<Vec<Instruction<'a>>, TcError> {
-    ast.iter()
-        .map(|i| typecheck_instruction(i, gas, self_entrypoints, opt_stack, in_view))
-        .collect()
+    let mut frames: Vec<TcIFrame<'a, 'b>> = vec![TcIFrame::NextInstr {
+        block: ast,
+        idx: 0,
+    }];
+    // One accumulator per active block. The root accumulator is at index 0;
+    // nested blocks push and pop their own.
+    let mut block_results: Vec<Vec<Instruction<'a>>> = vec![Vec::new()];
+    while let Some(frame) = frames.pop() {
+        match frame {
+            TcIFrame::NextInstr { block, idx } => {
+                if idx >= block.len() {
+                    // Block finished; the next frame in line will consume
+                    // the top of `block_results`.
+                    continue;
+                }
+                let instr = &block[idx];
+                // Re-push NextInstr advanced so subsequent finalizations
+                // know where to resume; this re-push lands *below* any
+                // nested frames we are about to add for the current instr.
+                let parent = TcIFrame::NextInstr {
+                    block,
+                    idx: idx + 1,
+                };
+                let step = typecheck_instruction_step(
+                    instr,
+                    gas,
+                    self_entrypoints,
+                    opt_stack,
+                    in_view,
+                )?;
+                match step {
+                    StepResult::Done(typed) => {
+                        block_results.last_mut().expect("block result").push(typed);
+                        frames.push(parent);
+                    }
+                    StepResult::OpenIf {
+                        t_block,
+                        f_block,
+                        saved_f_stack,
+                    } => {
+                        frames.push(parent);
+                        frames.push(TcIFrame::AfterIfThen {
+                            f_block,
+                            saved_f_stack,
+                        });
+                        block_results.push(Vec::new());
+                        frames.push(TcIFrame::NextInstr {
+                            block: t_block,
+                            idx: 0,
+                        });
+                    }
+                    StepResult::OpenIfNone {
+                        none_block,
+                        some_block,
+                        some_top_ty,
+                    } => {
+                        // The current opt_stack (post pop of the Option's
+                        // inner type) is what the None arm runs against;
+                        // the Some arm needs its own clone with `some_top_ty`
+                        // pushed on top.
+                        let mut some_stack: TypeStack = opt_stack
+                            .access_mut(TcError::FailNotInTail)?
+                            .clone();
+                        some_stack.push(some_top_ty);
+                        let saved_some_stack = FailingTypeStack::Ok(some_stack);
+                        frames.push(parent);
+                        frames.push(TcIFrame::AfterIfNoneNone {
+                            some_block,
+                            saved_some_stack,
+                        });
+                        block_results.push(Vec::new());
+                        frames.push(TcIFrame::NextInstr {
+                            block: none_block,
+                            idx: 0,
+                        });
+                    }
+                    StepResult::OpenIfCons {
+                        cons_block,
+                        nil_block,
+                        list_ty,
+                        cons_top_ty,
+                    } => {
+                        // current opt_stack is the post pop nil stack. Build
+                        // the cons stack: post pop + list_ty (the popped
+                        // list type, pushed back) + element type.
+                        let live = opt_stack.access_mut(TcError::FailNotInTail)?;
+                        let mut cons_stack: TypeStack = live.clone();
+                        cons_stack.push(list_ty);
+                        cons_stack.push(cons_top_ty);
+                        let cons_opt_stack = FailingTypeStack::Ok(cons_stack);
+                        // Save the nil stack (live), install the cons stack
+                        // as live so the cons arm runs against it.
+                        let saved_nil_stack = std::mem::replace(opt_stack, cons_opt_stack);
+                        frames.push(parent);
+                        frames.push(TcIFrame::AfterIfConsCons {
+                            nil_block,
+                            saved_nil_stack,
+                        });
+                        block_results.push(Vec::new());
+                        frames.push(TcIFrame::NextInstr {
+                            block: cons_block,
+                            idx: 0,
+                        });
+                    }
+                    StepResult::OpenIfLeft {
+                        left_block,
+                        right_block,
+                        right_top_ty,
+                    } => {
+                        // current opt_stack already has the left type pushed
+                        // (set up by the step before yielding). Build the
+                        // right stack from the clone.
+                        let mut right_stack: TypeStack = opt_stack
+                            .access_mut(TcError::FailNotInTail)?
+                            .clone();
+                        // Replace the top of right_stack (currently the
+                        // left type) with the right type.
+                        *right_stack.get_mut(0)? = right_top_ty;
+                        let saved_right_stack = FailingTypeStack::Ok(right_stack);
+                        frames.push(parent);
+                        frames.push(TcIFrame::AfterIfLeftLeft {
+                            right_block,
+                            saved_right_stack,
+                        });
+                        block_results.push(Vec::new());
+                        frames.push(TcIFrame::NextInstr {
+                            block: left_block,
+                            idx: 0,
+                        });
+                    }
+                    StepResult::OpenLoop {
+                        body,
+                        initial_copy,
+                    } => {
+                        frames.push(parent);
+                        frames.push(TcIFrame::AfterLoop { initial_copy });
+                        block_results.push(Vec::new());
+                        frames.push(TcIFrame::NextInstr { block: body, idx: 0 });
+                    }
+                    StepResult::OpenLoopLeft {
+                        body,
+                        initial_copy,
+                        r_ty,
+                    } => {
+                        frames.push(parent);
+                        frames.push(TcIFrame::AfterLoopLeft {
+                            initial_copy,
+                            r_ty,
+                        });
+                        block_results.push(Vec::new());
+                        frames.push(TcIFrame::NextInstr { block: body, idx: 0 });
+                    }
+                    StepResult::OpenIter {
+                        body,
+                        variant,
+                        outer_opt_stack,
+                    } => {
+                        frames.push(parent);
+                        frames.push(TcIFrame::AfterIter {
+                            variant,
+                            outer_opt_stack,
+                        });
+                        block_results.push(Vec::new());
+                        frames.push(TcIFrame::NextInstr { block: body, idx: 0 });
+                    }
+                    StepResult::OpenDip {
+                        body,
+                        opt_height,
+                        protected,
+                    } => {
+                        frames.push(parent);
+                        frames.push(TcIFrame::AfterDip {
+                            opt_height,
+                            protected,
+                        });
+                        block_results.push(Vec::new());
+                        frames.push(TcIFrame::NextInstr { block: body, idx: 0 });
+                    }
+                    StepResult::OpenSeq { body } => {
+                        frames.push(parent);
+                        frames.push(TcIFrame::AfterSeq);
+                        block_results.push(Vec::new());
+                        frames.push(TcIFrame::NextInstr { block: body, idx: 0 });
+                    }
+                }
+            }
+            TcIFrame::AfterIfThen {
+                f_block,
+                saved_f_stack,
+            } => {
+                // Post-true opt_stack becomes the saved_t_stack; swap
+                // saved_f_stack into the live opt_stack so the false arm
+                // runs against it.
+                let saved_t_stack = std::mem::replace(opt_stack, saved_f_stack);
+                frames.push(TcIFrame::AfterIfFalse { saved_t_stack });
+                block_results.push(Vec::new());
+                frames.push(TcIFrame::NextInstr {
+                    block: f_block,
+                    idx: 0,
+                });
+            }
+            TcIFrame::AfterIfFalse { saved_t_stack } => {
+                let f_instructions = block_results.pop().expect("if false block");
+                let t_instructions = block_results.pop().expect("if true block");
+                // Match the recursive code's unify_stacks(post_true, post_false)
+                // so error messages name the same stacks in the same order.
+                let post_false = std::mem::replace(opt_stack, saved_t_stack);
+                unify_stacks(gas, opt_stack, post_false)?;
+                block_results
+                    .last_mut()
+                    .expect("if parent")
+                    .push(Instruction::If(t_instructions, f_instructions));
+            }
+            TcIFrame::AfterIfNoneNone {
+                some_block,
+                saved_some_stack,
+            } => {
+                let saved_none_stack = std::mem::replace(opt_stack, saved_some_stack);
+                frames.push(TcIFrame::AfterIfNoneSome { saved_none_stack });
+                block_results.push(Vec::new());
+                frames.push(TcIFrame::NextInstr {
+                    block: some_block,
+                    idx: 0,
+                });
+            }
+            TcIFrame::AfterIfNoneSome { saved_none_stack } => {
+                let some_instructions = block_results.pop().expect("if_none some");
+                let none_instructions = block_results.pop().expect("if_none none");
+                let post_some = std::mem::replace(opt_stack, saved_none_stack);
+                unify_stacks(gas, opt_stack, post_some)?;
+                block_results
+                    .last_mut()
+                    .expect("if_none parent")
+                    .push(Instruction::IfNone(none_instructions, some_instructions));
+            }
+            TcIFrame::AfterIfConsCons {
+                nil_block,
+                saved_nil_stack,
+            } => {
+                // post-cons live stack saved; install nil stack to run nil.
+                let saved_cons_stack = std::mem::replace(opt_stack, saved_nil_stack);
+                frames.push(TcIFrame::AfterIfConsNil { saved_cons_stack });
+                block_results.push(Vec::new());
+                frames.push(TcIFrame::NextInstr {
+                    block: nil_block,
+                    idx: 0,
+                });
+            }
+            TcIFrame::AfterIfConsNil { saved_cons_stack } => {
+                let nil_instructions = block_results.pop().expect("if_cons nil");
+                let cons_instructions = block_results.pop().expect("if_cons cons");
+                // Recursive code orders unify(opt_stack=post_nil, cons=post_cons)
+                // since the nil arm runs second; mirror that here.
+                unify_stacks(gas, opt_stack, saved_cons_stack)?;
+                block_results
+                    .last_mut()
+                    .expect("if_cons parent")
+                    .push(Instruction::IfCons(cons_instructions, nil_instructions));
+            }
+            TcIFrame::AfterIfLeftLeft {
+                right_block,
+                saved_right_stack,
+            } => {
+                let saved_left_stack = std::mem::replace(opt_stack, saved_right_stack);
+                frames.push(TcIFrame::AfterIfLeftRight { saved_left_stack });
+                block_results.push(Vec::new());
+                frames.push(TcIFrame::NextInstr {
+                    block: right_block,
+                    idx: 0,
+                });
+            }
+            TcIFrame::AfterIfLeftRight { saved_left_stack } => {
+                let right_instructions = block_results.pop().expect("if_left right");
+                let left_instructions = block_results.pop().expect("if_left left");
+                let post_right = std::mem::replace(opt_stack, saved_left_stack);
+                unify_stacks(gas, opt_stack, post_right)?;
+                block_results
+                    .last_mut()
+                    .expect("if_left parent")
+                    .push(Instruction::IfLeft(left_instructions, right_instructions));
+            }
+            TcIFrame::AfterLoop { initial_copy } => {
+                let body = block_results.pop().expect("loop body");
+                unify_stacks(gas, opt_stack, initial_copy)?;
+                // Pop the remaining bool (if not failed) and emit I::Loop.
+                opt_stack.access_mut(()).ok().map(Stack::pop);
+                block_results
+                    .last_mut()
+                    .expect("loop parent")
+                    .push(Instruction::Loop(body));
+            }
+            TcIFrame::AfterLoopLeft { initial_copy, r_ty } => {
+                let body = block_results.pop().expect("loop_left body");
+                unify_stacks(gas, opt_stack, initial_copy)?;
+                *opt_stack
+                    .access_mut(TcError::FailNotInTail)?
+                    .get_mut(0)? = r_ty;
+                block_results
+                    .last_mut()
+                    .expect("loop_left parent")
+                    .push(Instruction::LoopLeft(body));
+            }
+            TcIFrame::AfterIter {
+                variant,
+                outer_opt_stack,
+            } => {
+                let body = block_results.pop().expect("iter body");
+                // The live opt_stack is post-body inner stack; outer was
+                // saved separately. Unify them, then restore outer.
+                let post_body = std::mem::replace(opt_stack, outer_opt_stack);
+                unify_stacks(gas, opt_stack, post_body)?;
+                block_results
+                    .last_mut()
+                    .expect("iter parent")
+                    .push(Instruction::Iter(variant, body));
+            }
+            TcIFrame::AfterDip {
+                opt_height,
+                protected,
+            } => {
+                let body = block_results.pop().expect("dip body");
+                opt_stack
+                    .access_mut(TcError::FailNotInTail)?
+                    .append(&mut { protected });
+                block_results
+                    .last_mut()
+                    .expect("dip parent")
+                    .push(Instruction::Dip(opt_height, body));
+            }
+            TcIFrame::AfterSeq => {
+                let body = block_results.pop().expect("seq body");
+                block_results
+                    .last_mut()
+                    .expect("seq parent")
+                    .push(Instruction::Seq(body));
+            }
+        }
+    }
+
+    assert_eq!(block_results.len(), 1, "block_results stack not drained");
+    Ok(block_results.pop().unwrap())
 }
+
 
 macro_rules! nothing_to_none {
     () => {
@@ -1126,13 +1574,34 @@ fn stack_top_mut(stack: &mut TypeStack) -> Result<&mut Type, TcError> {
         .map_err(|_| TcError::InternalError(TcInvariant::EmptyTypeStack))
 }
 
-pub(crate) fn typecheck_instruction<'a>(
-    i: &Micheline<'a>,
+pub(crate) fn typecheck_instruction<'a, 'b>(
+    i: &'b Micheline<'a>,
     gas: &mut Gas,
     self_entrypoints: Option<&Entrypoints>,
     opt_stack: &mut FailingTypeStack,
     in_view: bool,
 ) -> Result<Instruction<'a>, TcError> {
+    let mut results = typecheck(
+        std::slice::from_ref(i),
+        gas,
+        self_entrypoints,
+        opt_stack,
+        in_view,
+    )?;
+    Ok(results.pop().expect("typecheck_instruction produced one"))
+}
+
+/// Per instruction step used by the iterative driver. For non recursive
+/// arms, returns `StepResult::Done(...)`; for unbounded depth control
+/// flow arms (IF family, LOOP family, ITER, DIP, SEQ), returns an Open
+/// variant that the driver expands into nested block frames.
+fn typecheck_instruction_step<'a, 'b>(
+    i: &'b Micheline<'a>,
+    gas: &mut Gas,
+    self_entrypoints: Option<&Entrypoints>,
+    opt_stack: &mut FailingTypeStack,
+    in_view: bool,
+) -> Result<StepResult<'a, 'b>, TcError> {
     use Instruction as I;
     use NoMatchingOverloadReason as NMOR;
     use Type as T;
@@ -1252,7 +1721,7 @@ pub(crate) fn typecheck_instruction<'a>(
     }
 
     let stack_slice = stack.as_slice();
-    Ok(match (i, stack_slice.as_slice()) {
+    Ok(StepResult::Done(match (i, stack_slice.as_slice()) {
         (
             micheline_types!() | micheline_literals!() | micheline_fields!() | micheline_values!(),
             _,
@@ -1555,18 +2024,14 @@ pub(crate) fn typecheck_instruction<'a>(
                 _ => unexpected_micheline!(),
             };
             let protected_height = opt_height.unwrap_or(1) as usize;
-
             gas.consume(gas::tc_cost::dip_n(&opt_height)?)?;
-
             ensure_stack_len(Prim::DIP, stack, protected_height)?;
-            // Here we split off the protected portion of the stack, typecheck the code with the
-            // remaining unprotected part, then append the protected portion back on top.
-            let mut protected = stack.split_off(protected_height);
-            let nested = typecheck(nested, gas, self_entrypoints, opt_stack, in_view)?;
-            opt_stack
-                .access_mut(TcError::FailNotInTail)?
-                .append(&mut protected);
-            I::Dip(opt_height, nested)
+            let protected = stack.split_off(protected_height);
+            return Ok(StepResult::OpenDip {
+                body: nested,
+                opt_height,
+                protected,
+            });
         }
 
         (App(DROP, args, _), ..) => {
@@ -1673,16 +2138,12 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(LT, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(IF, [Seq(nested_t), Seq(nested_f)], _), [.., T::Bool]) => {
-            // pop the bool off the stack
             pop!();
-            // Clone the stack so that we have a copy to run one branch on.
-            // We can run the other branch on the live stack.
-            let mut f_opt_stack = opt_stack.clone();
-            let nested_t = typecheck(nested_t, gas, self_entrypoints, opt_stack, in_view)?;
-            let nested_f = typecheck(nested_f, gas, self_entrypoints, &mut f_opt_stack, in_view)?;
-            // If stacks unify after typecheck, all is good.
-            unify_stacks(gas, opt_stack, f_opt_stack)?;
-            I::If(nested_t, nested_f)
+            return Ok(StepResult::OpenIf {
+                t_block: nested_t,
+                f_block: nested_f,
+                saved_f_stack: FailingTypeStack::Ok(stack.clone()),
+            });
         }
         (App(IF, [Seq(_), Seq(_)], _), [.., t]) => {
             no_overload!(IF, TypesNotEqual(T::Bool, (*t).clone()))
@@ -1691,23 +2152,12 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(IF, expect_args!(2 seq), _), _) => unexpected_micheline!(),
 
         (App(IF_NONE, [Seq(when_none), Seq(when_some)], _), [.., T::Option(..)]) => {
-            // Extract option type
             let ty = pop!(T::Option);
-            // Clone the some_stack as we need to push a type on top of it
-            let mut some_stack: TypeStack = stack.clone();
-            some_stack.push(ty.as_ref().clone());
-            let mut some_opt_stack = FailingTypeStack::Ok(some_stack);
-            let when_none = typecheck(when_none, gas, self_entrypoints, opt_stack, in_view)?;
-            let when_some = typecheck(
-                when_some,
-                gas,
-                self_entrypoints,
-                &mut some_opt_stack,
-                in_view,
-            )?;
-            // If stacks unify, all is good
-            unify_stacks(gas, opt_stack, some_opt_stack)?;
-            I::IfNone(when_none, when_some)
+            return Ok(StepResult::OpenIfNone {
+                none_block: when_none,
+                some_block: when_some,
+                some_top_ty: ty.as_ref().clone(),
+            });
         }
         (App(IF_NONE, [Seq(_), Seq(_)], _), [.., t]) => {
             no_overload!(IF_NONE, NMOR::ExpectedOption((*t).clone()))
@@ -1716,24 +2166,14 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(IF_NONE, expect_args!(2 seq), _), _) => unexpected_micheline!(),
 
         (App(IF_CONS, [Seq(when_cons), Seq(when_nil)], _), [.., T::List(..)]) => {
-            // Clone the cons_stack as we need to push a type on top of it
-            let mut cons_stack: TypeStack = stack.clone();
-            // get the list element type
             let ty = pop!(T::List);
-            // push it to the cons stack
-            cons_stack.push(ty.as_ref().clone());
-            let mut cons_opt_stack = FailingTypeStack::Ok(cons_stack);
-            let when_cons = typecheck(
-                when_cons,
-                gas,
-                self_entrypoints,
-                &mut cons_opt_stack,
-                in_view,
-            )?;
-            let when_nil = typecheck(when_nil, gas, self_entrypoints, opt_stack, in_view)?;
-            // If stacks unify, all is good
-            unify_stacks(gas, opt_stack, cons_opt_stack)?;
-            I::IfCons(when_cons, when_nil)
+            let elem_ty = ty.as_ref().clone();
+            return Ok(StepResult::OpenIfCons {
+                cons_block: when_cons,
+                nil_block: when_nil,
+                list_ty: Type::List(ty),
+                cons_top_ty: elem_ty,
+            });
         }
         (App(IF_CONS, [Seq(_), Seq(_)], _), [.., t]) => {
             no_overload!(IF_CONS, NMOR::ExpectedList((*t).clone()))
@@ -1742,24 +2182,15 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(IF_CONS, expect_args!(2 seq), _), _) => unexpected_micheline!(),
 
         (App(IF_LEFT, [Seq(when_left), Seq(when_right)], _), [.., T::Or(..)]) => {
-            // get the list element type
             let (tl, tr) = pop!(T::Or).as_ref().clone();
-            // use main stack as left branch, cloned stack as right
-            let mut right_stack = stack.clone();
+            // The live stack becomes the left arm's stack; the driver
+            // builds the right arm's stack by cloning and swapping the top.
             stack.push(tl);
-            right_stack.push(tr);
-            let mut opt_right_stack = FailingTypeStack::Ok(right_stack);
-            let when_left = typecheck(when_left, gas, self_entrypoints, opt_stack, in_view)?;
-            let when_right = typecheck(
-                when_right,
-                gas,
-                self_entrypoints,
-                &mut opt_right_stack,
-                in_view,
-            )?;
-            // If stacks unify, all is good
-            unify_stacks(gas, opt_stack, opt_right_stack)?;
-            I::IfLeft(when_left, when_right)
+            return Ok(StepResult::OpenIfLeft {
+                left_block: when_left,
+                right_block: when_right,
+                right_top_ty: tr,
+            });
         }
         (App(IF_LEFT, [Seq(_), Seq(_)], _), [.., t]) => {
             no_overload!(IF_LEFT, NMOR::ExpectedOr((*t).clone()))
@@ -1821,17 +2252,12 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(ISNAT, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(LOOP, [Seq(nested)], _), [.., T::Bool]) => {
-            // copy stack for unifying with it later
             let opt_copy = FailingTypeStack::Ok(stack.clone());
-            // Pop the bool off the top
             pop!();
-            // Typecheck body with the current stack
-            let nested = typecheck(nested, gas, self_entrypoints, opt_stack, in_view)?;
-            // If the starting stack and result stack unify, all is good.
-            unify_stacks(gas, opt_stack, opt_copy)?;
-            // pop the remaining bool off (if not failed)
-            opt_stack.access_mut(()).ok().map(Stack::pop);
-            I::Loop(nested)
+            return Ok(StepResult::OpenLoop {
+                body: nested,
+                initial_copy: opt_copy,
+            });
         }
         (App(LOOP, [Seq(_)], _), [.., ty]) => {
             no_overload!(LOOP, TypesNotEqual(T::Bool, (*ty).clone()))
@@ -1840,17 +2266,14 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(LOOP, expect_args!(1 seq), _), _) => unexpected_micheline!(),
 
         (App(LOOP_LEFT, [Seq(nested)], _), [.., T::Or(_)]) => {
-            // copy current stack to unify with later
             let opt_copy = FailingTypeStack::Ok(stack.clone());
             let (l_ty, r_ty) = pop!(T::Or).as_ref().clone();
-            // loop body consumes left leaf and returns `or` again
             stack.push(l_ty);
-            let nested = typecheck(nested, gas, self_entrypoints, opt_stack, in_view)?;
-            unify_stacks(gas, opt_stack, opt_copy)?;
-            // the loop leaves the right leaf of `or` on the stack at the end
-            // this FailNotInTail should be impossible to get
-            *opt_stack.access_mut(TcError::FailNotInTail)?.get_mut(0)? = r_ty;
-            I::LoopLeft(nested)
+            return Ok(StepResult::OpenLoopLeft {
+                body: nested,
+                initial_copy: opt_copy,
+                r_ty,
+            });
         }
         (App(LOOP_LEFT, [Seq(_)], _), [.., ty]) => {
             no_overload!(LOOP_LEFT, NMOR::ExpectedOr((*ty).clone()))
@@ -1859,43 +2282,36 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(LOOP_LEFT, expect_args!(1 seq), _), _) => unexpected_micheline!(),
 
         (App(ITER, [Seq(nested)], ..), [.., T::List(..)]) => {
-            // get the list element type
             let ty = pop!(T::List);
-            // clone the rest of the stack
-            let mut inner_stack = stack.clone();
-            // push the element type to the top of the inner stack and typecheck
-            inner_stack.push(ty.as_ref().clone());
-            let mut opt_inner_stack = FailingTypeStack::Ok(inner_stack);
-            let nested = typecheck(nested, gas, self_entrypoints, &mut opt_inner_stack, in_view)?;
-            // If the starting stack (sans list) and result stack unify, all is good.
-            unify_stacks(gas, opt_stack, opt_inner_stack)?;
-            I::Iter(overloads::Iter::List, nested)
+            // Save the post pop outer stack, then push the element type so
+            // the live stack becomes the inner (body) stack.
+            let outer_opt_stack = FailingTypeStack::Ok(stack.clone());
+            stack.push(ty.as_ref().clone());
+            return Ok(StepResult::OpenIter {
+                body: nested,
+                variant: overloads::Iter::List,
+                outer_opt_stack,
+            });
         }
         (App(ITER, [Seq(nested)], _), [.., T::Set(..)]) => {
-            // get the set element type
             let ty = pop!(T::Set);
-            // clone the rest of the stack
-            let mut inner_stack = stack.clone();
-            // push the element type to the top of the inner stack and typecheck
-            inner_stack.push(ty.as_ref().clone());
-            let mut opt_inner_stack = FailingTypeStack::Ok(inner_stack);
-            let nested = typecheck(nested, gas, self_entrypoints, &mut opt_inner_stack, in_view)?;
-            // If the starting stack (sans set) and result stack unify, all is good.
-            unify_stacks(gas, opt_stack, opt_inner_stack)?;
-            I::Iter(overloads::Iter::Set, nested)
+            let outer_opt_stack = FailingTypeStack::Ok(stack.clone());
+            stack.push(ty.as_ref().clone());
+            return Ok(StepResult::OpenIter {
+                body: nested,
+                variant: overloads::Iter::Set,
+                outer_opt_stack,
+            });
         }
         (App(ITER, [Seq(nested)], _), [.., T::Map(..)]) => {
-            // get the map element type
             let kty_vty_box = pop!(T::Map);
-            // clone the rest of the stack
-            let mut inner_stack = stack.clone();
-            // push the element type to the top of the inner stack and typecheck
-            inner_stack.push(T::Pair(kty_vty_box));
-            let mut opt_inner_stack = FailingTypeStack::Ok(inner_stack);
-            let nested = typecheck(nested, gas, self_entrypoints, &mut opt_inner_stack, in_view)?;
-            // If the starting stack (sans map) and result stack unify, all is good.
-            unify_stacks(gas, opt_stack, opt_inner_stack)?;
-            I::Iter(overloads::Iter::Map, nested)
+            let outer_opt_stack = FailingTypeStack::Ok(stack.clone());
+            stack.push(T::Pair(kty_vty_box));
+            return Ok(StepResult::OpenIter {
+                body: nested,
+                variant: overloads::Iter::Map,
+                outer_opt_stack,
+            });
         }
         (App(ITER, [Seq(_)], _), [.., _]) => no_overload!(ITER),
         (App(ITER, [Seq(_)], _), []) => no_overload!(ITER, len 1),
@@ -2788,14 +3204,8 @@ pub(crate) fn typecheck_instruction<'a>(
             Err(TcError::TodoInstr(*prim))?
         }
 
-        (Seq(nested), _) => I::Seq(typecheck(
-            nested,
-            gas,
-            self_entrypoints,
-            opt_stack,
-            in_view,
-        )?),
-    })
+        (Seq(nested), _) => return Ok(StepResult::OpenSeq { body: nested }),
+    }))
 }
 
 pub(crate) fn typecheck_contract_address<'a>(
@@ -4068,6 +4478,61 @@ mod typecheck_tests {
         let mut gas = Gas::new(u32::MAX);
         let parsed = parse_ty(&mut gas, &current).expect("deep pair parses");
         assert!(matches!(parsed, Type::Pair(_)));
+    }
+
+    /// Typechecks a 100k deep nested IF, demonstrating that the iterative
+    /// instruction typechecker driver no longer blows the Rust call stack.
+    /// Ignored: the resulting `Instruction` tree overflows on its own
+    /// recursive Drop (follow up).
+    #[test]
+    #[ignore]
+    fn deeply_nested_if_typechecks() {
+        const DEPTH: usize = 100_000;
+        // Build: IF { PUSH bool True ; IF { PUSH bool True ; IF { ... } { } } { } } { }
+        let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+        let mut current_then: &[Micheline<'_>] = &[];
+        for _ in 0..DEPTH {
+            // each layer: PUSH bool True ; IF { current_then } { }
+            let push_true = Micheline::App(
+                Prim::PUSH,
+                arena.alloc_extend([
+                    Micheline::App(Prim::bool, &[], NO_ANNS),
+                    Micheline::App(Prim::True, &[], NO_ANNS),
+                ]),
+                NO_ANNS,
+            );
+            let if_instr = Micheline::App(
+                Prim::IF,
+                arena.alloc_extend([
+                    Micheline::Seq(current_then),
+                    Micheline::Seq(&[]),
+                ]),
+                NO_ANNS,
+            );
+            current_then = arena.alloc_extend([push_true, if_instr]);
+        }
+        // Top level: push a True, then run the deeply nested IF.
+        let push_true = Micheline::App(
+            Prim::PUSH,
+            arena.alloc_extend([
+                Micheline::App(Prim::bool, &[], NO_ANNS),
+                Micheline::App(Prim::True, &[], NO_ANNS),
+            ]),
+            NO_ANNS,
+        );
+        let root_if = Micheline::App(
+            Prim::IF,
+            arena.alloc_extend([Micheline::Seq(current_then), Micheline::Seq(&[])]),
+            NO_ANNS,
+        );
+        let program = arena.alloc_extend([push_true, root_if]);
+        let mut gas = Gas::new(u32::MAX);
+        let mut stack = tc_stk![];
+        let result = typecheck(program, &mut gas, None, &mut stack, false)
+            .expect("deep IF typechecks");
+        // Avoid the recursive Drop on the deep Instruction tree.
+        std::mem::forget(result);
+        std::mem::forget(stack);
     }
 
     /// Typechecks a 100k deep right leaning pair value at the matching
