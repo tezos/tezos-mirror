@@ -25,6 +25,7 @@ members = [
   "runtime",
   "tezosx-constants",
   "tezosx-interfaces",
+  "tezosx-types",
   "tezosx-ethereum-runtime",
   "tezosx-tezos-runtime",
 ]
@@ -87,6 +88,7 @@ tezos-indexable-storage = { package = "tezos-indexable-storage-latest", path = "
 tezos-storage = { package = "tezos-storage-latest", path = "./storage" }
 tezosx-constants = { package = "tezosx-constants", path = "./tezosx-constants" }
 tezosx-interfaces = { package = "tezosx-interfaces", path = "./tezosx-interfaces" }
+tezosx-types = { package = "tezosx-types", path = "./tezosx-types" }
 tezosx-ethereum-runtime = { package = "tezosx-ethereum-runtime", path = "./tezosx-ethereum-runtime" }
 tezosx-tezos-runtime = { package = "tezosx-tezos-runtime", path = "./tezosx-tezos-runtime" }
 kernel = { package = "evm_kernel", path = "./kernel"}

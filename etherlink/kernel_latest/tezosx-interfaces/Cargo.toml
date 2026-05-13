@@ -9,18 +9,11 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
-tezos-evm-logging.workspace = true
-tezos-evm-runtime.workspace = true
-tezos-smart-rollup-host.workspace = true
-# TODO: Remove this crate (L2-809)
-tezos-storage.workspace = true
-tezos_data_encoding.workspace = true
-nom.workspace = true
 primitive-types.workspace = true
-thiserror.workspace = true
+tezos-smart-rollup-host.workspace = true
 http.workspace = true
-tezosx-constants.workspace = true
 tezosx-journal.workspace = true
+tezosx-types.workspace = true
 
 [dev-dependencies]
 
