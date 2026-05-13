@@ -5,6 +5,7 @@
 //! Micheline serialization.
 
 use std::mem::size_of;
+use std::ops::Range;
 use tezos_data_encoding::{
     enc::{BinError, BinResult, BinWriter},
     types::Zarith,
@@ -14,67 +15,7 @@ use super::constants::*;
 use crate::{
     ast::{Annotation, Annotations, Micheline},
     gas::{interpret_cost, Gas, OutOfGas},
-    lexer::Prim,
 };
-
-trait AppEncoder<'a>: IntoIterator<Item = &'a Micheline<'a>> + Sized {
-    const NO_ANNOTS_TAG: u8;
-    const WITH_ANNOTS_TAG: u8;
-    fn encode(prim: &Prim, args: Self, annots: &Annotations, out: &mut Vec<u8>) -> BinResult {
-        if annots.is_empty() {
-            out.push(Self::NO_ANNOTS_TAG);
-        } else {
-            out.push(Self::WITH_ANNOTS_TAG);
-        }
-        prim.encode(out);
-        for arg in args {
-            encode_micheline(arg, out)?;
-        }
-        if !annots.is_empty() {
-            annots.encode_bytes(out)
-        }
-        Ok(())
-    }
-}
-
-impl<'a> AppEncoder<'a> for [&'a Micheline<'a>; 0] {
-    const NO_ANNOTS_TAG: u8 = APP_NO_ARGS_NO_ANNOTS_TAG;
-    const WITH_ANNOTS_TAG: u8 = APP_NO_ARGS_WITH_ANNOTS_TAG;
-}
-
-impl<'a> AppEncoder<'a> for [&'a Micheline<'a>; 1] {
-    const NO_ANNOTS_TAG: u8 = APP_ONE_ARG_NO_ANNOTS_TAG;
-    const WITH_ANNOTS_TAG: u8 = APP_ONE_ARG_WITH_ANNOTS_TAG;
-}
-
-impl<'a> AppEncoder<'a> for [&'a Micheline<'a>; 2] {
-    const NO_ANNOTS_TAG: u8 = APP_TWO_ARGS_NO_ANNOTS_TAG;
-    const WITH_ANNOTS_TAG: u8 = APP_TWO_ARGS_WITH_ANNOTS_TAG;
-}
-
-impl<'a> AppEncoder<'a> for &'a [Micheline<'a>] {
-    const NO_ANNOTS_TAG: u8 = APP_GENERIC;
-    const WITH_ANNOTS_TAG: u8 = APP_GENERIC;
-    fn encode(prim: &Prim, args: Self, annots: &Annotations, out: &mut Vec<u8>) -> BinResult {
-        match args {
-            [] => AppEncoder::encode(prim, [], annots, out),
-            [arg] => AppEncoder::encode(prim, [arg], annots, out),
-            [arg1, arg2] => AppEncoder::encode(prim, [arg1, arg2], annots, out),
-            _ => {
-                out.push(Self::WITH_ANNOTS_TAG);
-                prim.encode(out);
-                with_patchback_len_result(out, |out| {
-                    for arg in args {
-                        encode_micheline(arg, out)?;
-                    }
-                    Ok(())
-                })?;
-                annots.encode_bytes(out);
-                Ok(())
-            }
-        }
-    }
-}
 
 impl Annotation<'_> {
     /// Serialize annotation to the output byte [Vec], using the `PACK` format.
@@ -186,41 +127,119 @@ fn with_patchback_len_result(
     Ok(())
 }
 
-/// Put a container.
-fn put_seq<V>(
-    list: &[V],
-    out: &mut Vec<u8>,
-    encoder: fn(&V, &mut Vec<u8>) -> BinResult,
-) -> BinResult {
-    out.push(SEQ_TAG);
-    with_patchback_len_result(out, |out| {
-        for val in list {
-            encoder(val, out)?;
-        }
-        Ok(())
-    })
+/// Worklist frame for the iterative encoder. Visit pushes children in
+/// reverse along with any post-children frames so LIFO popping yields the
+/// correct byte order.
+enum EncFrame<'a> {
+    Visit(&'a Micheline<'a>),
+    PatchLen { len_place: Range<usize> },
+    WriteAnnots(&'a Annotations<'a>),
 }
 
-/// Recursive encoding function for [Value].
-fn encode_micheline(mich: &Micheline, out: &mut Vec<u8>) -> BinResult {
+/// Write a 4-byte length placeholder and return the range to patch later.
+fn open_len(out: &mut Vec<u8>) -> Range<usize> {
+    put_len(0, out);
+    let end = out.len();
+    (end - size_of::<Len>())..end
+}
+
+/// Patch a length placeholder with the byte distance from the placeholder
+/// to the current write head.
+fn patch_len(out: &mut Vec<u8>, len_place: Range<usize>) {
+    let len = (out.len() - len_place.end) as Len;
+    out[len_place].copy_from_slice(&len.to_be_bytes());
+}
+
+fn visit_node<'a>(
+    node: &'a Micheline<'a>,
+    out: &mut Vec<u8>,
+    frames: &mut Vec<EncFrame<'a>>,
+) -> BinResult {
     use Micheline::*;
-    match mich {
+    match node {
         Int(n) => {
-            let z = Zarith(n.clone());
             out.push(NUMBER_TAG);
-            z.bin_write(out)
+            Zarith(n.clone()).bin_write(out)?;
         }
-        String(s) => {
-            put_string(s, out);
-            Ok(())
+        String(s) => put_string(s, out),
+        Bytes(b) => put_bytes(b, out),
+        Seq(s) => {
+            out.push(SEQ_TAG);
+            let len_place = open_len(out);
+            frames.push(EncFrame::PatchLen { len_place });
+            for child in s.iter().rev() {
+                frames.push(EncFrame::Visit(child));
+            }
         }
-        Bytes(b) => {
-            put_bytes(b, out);
-            Ok(())
+        App(prim, args, anns) => {
+            let with_annots = !anns.is_empty();
+            match args.len() {
+                0 => {
+                    out.push(if with_annots {
+                        APP_NO_ARGS_WITH_ANNOTS_TAG
+                    } else {
+                        APP_NO_ARGS_NO_ANNOTS_TAG
+                    });
+                    prim.encode(out);
+                    if with_annots {
+                        anns.encode_bytes(out);
+                    }
+                }
+                1 => {
+                    out.push(if with_annots {
+                        APP_ONE_ARG_WITH_ANNOTS_TAG
+                    } else {
+                        APP_ONE_ARG_NO_ANNOTS_TAG
+                    });
+                    prim.encode(out);
+                    if with_annots {
+                        frames.push(EncFrame::WriteAnnots(anns));
+                    }
+                    frames.push(EncFrame::Visit(&args[0]));
+                }
+                2 => {
+                    out.push(if with_annots {
+                        APP_TWO_ARGS_WITH_ANNOTS_TAG
+                    } else {
+                        APP_TWO_ARGS_NO_ANNOTS_TAG
+                    });
+                    prim.encode(out);
+                    if with_annots {
+                        frames.push(EncFrame::WriteAnnots(anns));
+                    }
+                    frames.push(EncFrame::Visit(&args[1]));
+                    frames.push(EncFrame::Visit(&args[0]));
+                }
+                _ => {
+                    out.push(APP_GENERIC);
+                    prim.encode(out);
+                    let len_place = open_len(out);
+                    // APP_GENERIC always writes an annot block, even when
+                    // empty (a 4-byte zero length).
+                    frames.push(EncFrame::WriteAnnots(anns));
+                    frames.push(EncFrame::PatchLen { len_place });
+                    for arg in args.iter().rev() {
+                        frames.push(EncFrame::Visit(arg));
+                    }
+                }
+            }
         }
-        Seq(s) => put_seq(s, out, encode_micheline),
-        App(prim, args, anns) => AppEncoder::encode(prim, *args, anns, out),
     }
+    Ok(())
+}
+
+/// Encode a `Micheline` value using an explicit-frame worklist instead of
+/// Rust recursion, so encoding does not depend on call-stack depth.
+fn encode_micheline<'a>(mich: &'a Micheline<'a>, out: &mut Vec<u8>) -> BinResult {
+    let mut frames: Vec<EncFrame<'a>> = vec![EncFrame::Visit(mich)];
+    while let Some(frame) = frames.pop() {
+        match frame {
+            EncFrame::Visit(node) => visit_node(node, out, &mut frames)?,
+            EncFrame::PatchLen { len_place } => patch_len(out, len_place),
+            EncFrame::WriteAnnots(anns) => anns.encode_bytes(out),
+        }
+    }
+    Ok(())
 }
 
 impl Micheline<'_> {
@@ -392,6 +411,48 @@ mod test_encoding {
                 Micheline::Seq(&vec![app!(Unit); 1000]),
                 "0x02000007d0030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b",
           );
+        }
+    }
+
+    /// A depth that would overflow the Rust call stack under the old
+    /// recursive encoder, so the test only completes with the worklist
+    /// driver.
+    mod deep_recursion {
+        use super::*;
+        use crate::ast::annotations::NO_ANNS;
+        use typed_arena::Arena;
+
+        #[test]
+        #[ignore = "needs iterative collect_micheline_size (gas.rs); enable once MR5 lands"]
+        fn deeply_nested_seq_encodes() {
+            let arena: Arena<Micheline<'_>> = Arena::new();
+            let mut current: Micheline<'_> = Micheline::Seq(&[]);
+            for _ in 0..100_000 {
+                let slot = arena.alloc_extend(std::iter::once(current));
+                current = Micheline::Seq(slot);
+            }
+            let bytes = current
+                .encode(&mut Gas::default())
+                .expect("no OOG with unmetered")
+                .expect("deep seq encodes");
+            assert!(!bytes.is_empty());
+        }
+
+        #[test]
+        #[ignore = "needs iterative collect_micheline_size (gas.rs); enable once MR5 lands"]
+        fn deeply_nested_pair_encodes() {
+            use crate::lexer::Prim;
+            let arena: Arena<Micheline<'_>> = Arena::new();
+            let mut current: Micheline<'_> = Micheline::Int(0.into());
+            for _ in 0..100_000 {
+                let pair_args = arena.alloc_extend([Micheline::Int(0.into()), current]);
+                current = Micheline::App(Prim::Pair, pair_args, NO_ANNS);
+            }
+            let bytes = current
+                .encode(&mut Gas::default())
+                .expect("no OOG with unmetered")
+                .expect("deep pair encodes");
+            assert!(!bytes.is_empty());
         }
     }
 
