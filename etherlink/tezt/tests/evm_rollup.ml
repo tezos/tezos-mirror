@@ -4145,6 +4145,153 @@ let test_v53_migration_evm_to_base_paths =
   in
   unit
 
+(* Phase V54 (Phase 3 of the durable-storage reorg): consolidate every
+   feature flag under [/base/feature_flags/]. The migration
+
+   - moves the [/evm/feature_flags] subtree wholesale to
+     [/base/feature_flags] (preserves the 5 flags the kernel still
+     reads), and
+   - deletes three dead flags under [/evm/world_state/feature_flags/]
+     ([enable_revm], [enable_fast_withdrawal], [enable_fast_fa_withdrawal])
+     since the kernel ignores them and there is nothing to migrate.
+
+   Strategy:
+
+   - For the kept flags we do NOT seed per-flag sentinels. The
+     migration is a wholesale subtree [store_move], so there is no
+     per-flag wiring that distinct sentinels could surface — but
+     non-empty bytes at [/evm/feature_flags/enable_*] would flip the
+     pre-upgrade FarfadetR2 kernel into "feature on" mode (the
+     kernel reads via [store_has]), which then changes control flow
+     for V55/V56/V57 conditional branches downstream. Instead we ask
+     the EVM node for the subkey list at [/evm/feature_flags] before
+     the upgrade and require the same sorted list at
+     [/base/feature_flags] after — that proves the whole subtree
+     moved without any side effect on the pre-upgrade kernel boot.
+   - The 3 dead flags are kernel-ignored even in FarfadetR2, so
+     seeding them is safe and lets us verify the deletes ran. *)
+let test_v54_migration_feature_flags =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "migration"; "upgrade"; "mainnet"; "v54"; "feature_flags"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.mainnet_kernel;
+        Constant.WASM.evm_kernel;
+      ])
+    ~title:
+      "V54 moves /evm/feature_flags under /base/feature_flags and drops dead \
+       /evm/world_state/feature_flags/{enable_revm,enable_fast_withdrawal,enable_fast_fa_withdrawal} \
+       (mainnet -> latest)"
+  @@ fun protocol ->
+  (* Sentinels for the 3 dead flags only. The kernel never reads
+     these world-state paths so the byte values are inert and let us
+     prove the deletes ran. *)
+  let dead_enable_revm_sentinel = "dead0001" in
+  let dead_enable_fast_withdrawal_sentinel = "dead0002" in
+  let dead_enable_fast_fa_withdrawal_sentinel = "dead0003" in
+  (* Seed the 5 kept flags with empty bytes — that is the natural
+     "presence-only" layout the mainnet installer writes. Any of the
+     5 names would do for our subkey-set check; covering all 5 makes
+     the test resilient to the kernel team adding/removing live flags
+     before V54 ships. *)
+  let kept_flag_names =
+    [
+      "enable_multichain";
+      "enable_tezos_runtime";
+      "enable_dal";
+      "disable_legacy_dal_signals";
+      "enable_fa_bridge";
+    ]
+  in
+  let additional_config =
+    Sc_rollup_helpers.Installer_kernel_config.(
+      List.map
+        (fun name -> Set {value = ""; to_ = "/evm/feature_flags/" ^ name})
+        kept_flag_names
+      @ [
+          Set
+            {
+              value = dead_enable_revm_sentinel;
+              to_ = "/evm/world_state/feature_flags/enable_revm";
+            };
+          Set
+            {
+              value = dead_enable_fast_withdrawal_sentinel;
+              to_ = "/evm/world_state/feature_flags/enable_fast_withdrawal";
+            };
+          Set
+            {
+              value = dead_enable_fast_fa_withdrawal_sentinel;
+              to_ = "/evm/world_state/feature_flags/enable_fast_fa_withdrawal";
+            };
+        ])
+  in
+  let* mig = gen_mainnet_migration_setup ~additional_config protocol in
+  let {read_value; read_subkeys; _} = mig in
+  let dead_flags =
+    [
+      ("enable_revm", dead_enable_revm_sentinel);
+      ("enable_fast_withdrawal", dead_enable_fast_withdrawal_sentinel);
+      ("enable_fast_fa_withdrawal", dead_enable_fast_fa_withdrawal_sentinel);
+    ]
+  in
+  (* ---- Pre-upgrade: capture the sorted subkey list at the legacy
+     feature-flags subtree, and assert the dead flags carry the
+     seeded sentinels. ---- *)
+  let* pre_legacy_subkeys = read_subkeys "/evm/feature_flags" in
+  let pre_legacy_sorted = List.sort compare pre_legacy_subkeys in
+  Check.((List.length pre_legacy_sorted >= List.length kept_flag_names) int)
+    ~error_msg:
+      "Pre-upgrade: /evm/feature_flags should hold at least %R seeded flags, \
+       got %L" ;
+  let* () =
+    Lwt_list.iter_s
+      (fun (flag, sentinel) ->
+        let path = "/evm/world_state/feature_flags/" ^ flag in
+        let* pre = read_value path in
+        Check.((pre = Some sentinel) (option string))
+          ~error_msg:
+            (Printf.sprintf
+               "Pre-upgrade: %s should hold the seeded sentinel %%R, got %%L"
+               path) ;
+        unit)
+      dead_flags
+  in
+  (* ---- Trigger the upgrade. ---- *)
+  let* () = gen_mainnet_migration_upgrade mig protocol in
+  (* ---- Post-upgrade: legacy /evm/feature_flags has no subkeys;
+     /base/feature_flags has the exact same sorted subkey list we
+     captured pre-upgrade; dead flags are gone. ---- *)
+  let* legacy_parent_subkeys = read_subkeys "/evm/feature_flags" in
+  Check.((legacy_parent_subkeys = []) (list string))
+    ~error_msg:
+      "Post-upgrade: /evm/feature_flags must have no subkeys after V54, got %L" ;
+  let* post_new_subkeys = read_subkeys "/base/feature_flags" in
+  let post_new_sorted = List.sort compare post_new_subkeys in
+  Check.((post_new_sorted = pre_legacy_sorted) (list string))
+    ~error_msg:
+      "Post-upgrade: /base/feature_flags subkey list must equal the \
+       pre-upgrade /evm/feature_flags subkey list %R, got %L" ;
+  let* () =
+    Lwt_list.iter_s
+      (fun (flag, _) ->
+        let path = "/evm/world_state/feature_flags/" ^ flag in
+        let* post = read_value path in
+        Check.((post = None) (option string))
+          ~error_msg:
+            (Printf.sprintf
+               "Post-upgrade: dead flag %s must be deleted (no destination) \
+                after V54, got %%L"
+               path) ;
+        unit)
+      dead_flags
+  in
+  unit
+
 (* Previewnet counterpart of [test_kernel_storage_version_matches_constant] in
    [evm_sequencer.ml]: assert the previewnet kernel's baked STORAGE_VERSION
    matches what [Kernel.storage_version Previewnet] reports. Lives here (not
@@ -7481,6 +7628,7 @@ let register_evm_node ~protocols =
   test_v50_migration_sequencer_paths protocols ;
   test_v51_migration_ipc_paths protocols ;
   test_v53_migration_evm_to_base_paths protocols ;
+  test_v54_migration_feature_flags protocols ;
   test_previewnet_storage_version_matches_constant protocols ;
   test_sequencer_and_kernel_upgrade_via_kernel_admin protocols ;
   test_rpc_sendRawTransaction protocols ;
