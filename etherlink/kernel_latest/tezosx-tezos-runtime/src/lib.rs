@@ -1586,7 +1586,7 @@ mod tests {
 
         let storage = account.storage(&host).unwrap();
         let expected =
-            alias_forwarder::forwarder_storage(evm_address, &mut Gas::unmetered())
+            alias_forwarder::forwarder_storage(evm_address, &mut Gas::default())
                 .unwrap()
                 .unwrap();
         assert_eq!(storage, expected);
@@ -1863,7 +1863,7 @@ mod tests {
         let parameters = Parameters {
             entrypoint: mir::ast::Entrypoint::from_string_unchecked("swap".into()),
             value: mir::ast::micheline::Micheline::from(())
-                .encode(&mut Gas::unmetered())
+                .encode(&mut Gas::default())
                 .unwrap()
                 .unwrap(),
         };
@@ -1986,7 +1986,7 @@ mod tests {
         let parameters = Parameters {
             entrypoint: mir::ast::Entrypoint::default(),
             value: mir::ast::micheline::Micheline::from(())
-                .encode(&mut Gas::unmetered())
+                .encode(&mut Gas::default())
                 .unwrap()
                 .unwrap(),
         };
@@ -2082,7 +2082,7 @@ mod tests {
         let parameters = Parameters {
             entrypoint: mir::ast::Entrypoint::from_string_unchecked("swap".into()),
             value: mir::ast::micheline::Micheline::from(())
-                .encode(&mut Gas::unmetered())
+                .encode(&mut Gas::default())
                 .unwrap()
                 .unwrap(),
         };

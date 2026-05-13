@@ -75,7 +75,7 @@ mod tests {
 
     #[test]
     fn forwarder_storage_encodes_string() {
-        let storage = forwarder_storage("0xabcdef", &mut Gas::unmetered())
+        let storage = forwarder_storage("0xabcdef", &mut Gas::default())
             .unwrap()
             .unwrap();
         // Micheline string tag = 0x01, then 4-byte length, then string bytes
@@ -87,9 +87,7 @@ mod tests {
 
     #[test]
     fn forwarder_storage_empty_address() {
-        let storage = forwarder_storage("", &mut Gas::unmetered())
-            .unwrap()
-            .unwrap();
+        let storage = forwarder_storage("", &mut Gas::default()).unwrap().unwrap();
         assert_eq!(storage, vec![0x01, 0x00, 0x00, 0x00, 0x00]);
     }
 }

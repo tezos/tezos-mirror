@@ -1501,11 +1501,11 @@ mod tests {
         };
 
         let ty = Micheline::App(lexer::Prim::string, &[], NO_ANNS)
-            .encode(&mut Gas::unmetered())
+            .encode(&mut Gas::default())
             .unwrap()
             .unwrap();
         let payload = Micheline::from(crac_id.to_string())
-            .encode(&mut Gas::unmetered())
+            .encode(&mut Gas::default())
             .unwrap()
             .unwrap();
 
@@ -3163,7 +3163,7 @@ mod tests {
         let payload_bytes = e.content.payload.as_ref().unwrap();
         let parser = mir::parser::Parser::new();
         let decoded =
-            Micheline::decode_raw(&parser.arena, &payload_bytes.0, &mut Gas::unmetered())
+            Micheline::decode_raw(&parser.arena, &payload_bytes.0, &mut Gas::default())
                 .unwrap()
                 .unwrap();
 

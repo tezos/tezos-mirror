@@ -1451,12 +1451,12 @@ pub mod tests {
         let mut gas = Gas::default();
         let key_type = mir::ast::Micheline::prim0(mir::lexer::Prim::nat, &mut gas)
             .unwrap()
-            .encode(&mut Gas::unmetered())
+            .encode(&mut Gas::default())
             .unwrap()
             .unwrap();
         let value_type = mir::ast::Micheline::prim0(mir::lexer::Prim::unit, &mut gas)
             .unwrap()
-            .encode(&mut Gas::unmetered())
+            .encode(&mut Gas::default())
             .unwrap()
             .unwrap();
         let alloc_0 = StorageDiff::Alloc(Alloc {

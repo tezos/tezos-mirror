@@ -35,13 +35,13 @@ mod test_typed_encode {
         let micheline = v.into_micheline_optimized_legacy(&arena, &mut gas).unwrap();
         assert_eq!(
             &micheline
-                .encode_for_pack(&mut Gas::unmetered())
+                .encode_for_pack(&mut Gas::default())
                 .unwrap()
                 .unwrap(),
             bytes,
         );
         assert_eq!(
-            Micheline::decode_packed(&arena, bytes, &mut Gas::unmetered()),
+            Micheline::decode_packed(&arena, bytes, &mut Gas::default()),
             Ok(Ok(micheline)),
         );
     }

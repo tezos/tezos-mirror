@@ -100,12 +100,12 @@ mod tests {
         let mut gas = mir::gas::Gas::default();
         let key_type = mir::ast::Micheline::prim0(mir::lexer::Prim::nat, &mut gas)
             .unwrap()
-            .encode(&mut Gas::unmetered())
+            .encode(&mut Gas::default())
             .unwrap()
             .unwrap();
         let value_type = mir::ast::Micheline::prim0(mir::lexer::Prim::unit, &mut gas)
             .unwrap()
-            .encode(&mut Gas::unmetered())
+            .encode(&mut Gas::default())
             .unwrap()
             .unwrap();
         let diff: LazyStorageDiffList = LazyStorageDiff::BigMap(BigMapDiff {
@@ -177,13 +177,13 @@ mod tests {
     pub fn big_map_update_compatibility() {
         let mut gas = mir::gas::Gas::default();
         let key = mir::ast::Micheline::Int(1u64.into())
-            .encode(&mut Gas::unmetered())
+            .encode(&mut Gas::default())
             .unwrap()
             .unwrap();
         let value = Some(
             mir::ast::Micheline::prim0(mir::lexer::Prim::UNIT, &mut gas)
                 .unwrap()
-                .encode(&mut Gas::unmetered())
+                .encode(&mut Gas::default())
                 .unwrap()
                 .unwrap(),
         );

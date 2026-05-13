@@ -260,7 +260,7 @@ mod test_encoding {
             .strip_prefix("0x")
             .unwrap_or_else(|| panic!("The `expected` argument must start from 0x"));
         assert_eq!(
-            v.into().encode(&mut Gas::unmetered()).unwrap().unwrap(),
+            v.into().encode(&mut Gas::default()).unwrap().unwrap(),
             hex::decode(hex_bytes)
                 .unwrap_or_else(|_| panic!("Bad hex string in `expected` argument"))
         )
@@ -405,7 +405,7 @@ mod test_encoding {
         #[test]
         fn encode_returns_nested_ok() {
             let bytes = Micheline::Int(42.into())
-                .encode(&mut Gas::unmetered())
+                .encode(&mut Gas::default())
                 .expect("no OOG with unmetered")
                 .expect("no BinError for Int");
             assert!(!bytes.is_empty());
@@ -416,7 +416,7 @@ mod test_encoding {
         #[test]
         fn encode_for_pack_returns_nested_ok() {
             let bytes = Micheline::Int(0.into())
-                .encode_for_pack(&mut Gas::unmetered())
+                .encode_for_pack(&mut Gas::default())
                 .expect("no OOG with unmetered")
                 .expect("no BinError for Int");
             assert_eq!(bytes.first(), Some(&0x05));

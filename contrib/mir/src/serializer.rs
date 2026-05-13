@@ -125,7 +125,7 @@ mod tests {
             // case involving primitives: application of a primitive
             // to no argument and no annotation
             let serialized = [APP_NO_ARGS_NO_ANNOTS_TAG, tag];
-            let micheline = Micheline::decode_raw(&arena, &serialized, &mut Gas::unmetered())
+            let micheline = Micheline::decode_raw(&arena, &serialized, &mut Gas::default())
                 .unwrap_or_else(|err| {
                     panic!("decode_raw should not OOG with unmetered Gas: {err:?}")
                 })
@@ -138,7 +138,7 @@ mod tests {
             // While we are at it, we also check that serializing the
             // primitives gives back the expected tag.
             assert_eq!(
-                micheline.encode(&mut Gas::unmetered()).unwrap().unwrap(),
+                micheline.encode(&mut Gas::default()).unwrap().unwrap(),
                 serialized,
             )
         }

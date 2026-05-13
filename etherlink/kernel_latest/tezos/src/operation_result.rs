@@ -1413,7 +1413,7 @@ mod tests {
             &mut gas,
         )
         .unwrap()
-        .encode(&mut Gas::unmetered())
+        .encode(&mut Gas::default())
         .unwrap()
         .unwrap();
 
@@ -1430,7 +1430,7 @@ mod tests {
             ]),
             NO_ANNS,
         )
-        .encode(&mut Gas::unmetered())
+        .encode(&mut Gas::default())
         .unwrap()
         .unwrap();
 

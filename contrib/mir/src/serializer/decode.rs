@@ -357,7 +357,7 @@ mod test {
             Micheline::decode_raw(
                 &arena,
                 &hex::decode(hex_bytes).expect("Bad hex string in `expected` argument"),
-                &mut Gas::unmetered(),
+                &mut Gas::default(),
             ),
             Ok(Ok(v.into()))
         );
@@ -372,7 +372,7 @@ mod test {
             Micheline::decode_raw(
                 &arena,
                 &hex::decode(hex_bytes).expect("Bad hex string in `expected` argument"),
-                &mut Gas::unmetered(),
+                &mut Gas::default(),
             ),
             Ok(Err(err))
         );

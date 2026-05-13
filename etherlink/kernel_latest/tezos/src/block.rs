@@ -213,11 +213,11 @@ mod tests {
         // CRAC event payload
         let crac_id_str = "1-0";
         let ty = Micheline::App(Prim::string, &[], NO_ANNS)
-            .encode(&mut Gas::unmetered())
+            .encode(&mut Gas::default())
             .unwrap()
             .unwrap();
         let payload = Micheline::from(crac_id_str.to_string())
-            .encode(&mut Gas::unmetered())
+            .encode(&mut Gas::default())
             .unwrap()
             .unwrap();
 
@@ -377,11 +377,11 @@ mod tests {
 
         // -- Micheline expressions ----------------------------------------
         let storage_expr = Micheline::App(Prim::pair, &[], NO_ANNS)
-            .encode(&mut Gas::unmetered())
+            .encode(&mut Gas::default())
             .unwrap()
             .unwrap();
         let param_value = Micheline::Int(42u64.into())
-            .encode(&mut Gas::unmetered())
+            .encode(&mut Gas::default())
             .unwrap()
             .unwrap();
 
@@ -437,11 +437,11 @@ mod tests {
         // -- CRAC event payload -------------------------------------------
         let crac_id_str = "42-3";
         let ty = Micheline::App(Prim::string, &[], NO_ANNS)
-            .encode(&mut Gas::unmetered())
+            .encode(&mut Gas::default())
             .unwrap()
             .unwrap();
         let payload = Micheline::from(crac_id_str.to_string())
-            .encode(&mut Gas::unmetered())
+            .encode(&mut Gas::default())
             .unwrap()
             .unwrap();
 
@@ -637,7 +637,7 @@ mod tests {
         let ts = TransferSuccess {
             storage: Some(MichelineExpr(
                 Micheline::App(Prim::pair, &[], NO_ANNS)
-                    .encode(&mut Gas::unmetered())
+                    .encode(&mut Gas::default())
                     .unwrap()
                     .unwrap(),
             )),

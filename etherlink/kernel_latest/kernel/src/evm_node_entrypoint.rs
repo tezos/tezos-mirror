@@ -594,7 +594,7 @@ mod tests {
                     let micheline = Micheline::decode_raw(
                         &parser.arena,
                         &type_bytes,
-                        &mut Gas::unmetered(),
+                        &mut Gas::default(),
                     )
                     .expect("unmetered Gas cannot OOG")
                     .expect("decode micheline");

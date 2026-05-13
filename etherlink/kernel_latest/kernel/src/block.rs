@@ -1504,13 +1504,13 @@ mod tests {
             ",
             )
             .expect("Should have succeeded to parse the script")
-            .encode(&mut Gas::unmetered())
+            .encode(&mut Gas::default())
             .unwrap()
             .unwrap();
         let storage = parser
             .parse("Pair 0 0 0x00000000")
             .expect("Should have succeeded to parse the storage")
-            .encode(&mut Gas::unmetered())
+            .encode(&mut Gas::default())
             .unwrap()
             .unwrap();
 
@@ -1602,7 +1602,7 @@ mod tests {
                     .unwrap()
                     .storage(&host)
                     .unwrap(),
-                &mut Gas::unmetered(),
+                &mut Gas::default(),
             )
             .unwrap()
             .unwrap()
