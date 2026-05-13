@@ -23,6 +23,35 @@
 
 ### Michelson Runtime
 
+- Storage burn now fires on Michelson manager operations: transfer-
+  to-contract pays a variable burn proportional to
+  `paid_storage_size_diff`, origination pays the variable burn plus
+  a fixed slot burn of `origination_size × cost_per_byte`, and the
+  first credit to an unallocated implicit account also pays the
+  slot burn and flips `allocated_destination_contract` to `true` on
+  the receipt. When the source cannot cover a burn, the operation
+  is marked `Backtracked` with a new
+  `ApplyOperationError::CannotPayStorageFee` error trace,
+  `SafeStorage` rolls back the batch, and `Applied` internals are
+  cascade-demoted so the manager-operation tree stays L1-coherent. (!21840)
+
+### Native Atomic Composability
+
+### Storage versions
+
+- `/evm/michelson_runtime/sunrise_level` and
+  `/evm/michelson_runtime/target_sunrise_level` move under
+  `/tez/world_state/michelson_runtime/` (storage version 57). (!21851)
+
+### Internals
+
+- MIR: harden the Michelson runtime — internal aborts now surface as
+  structured errors. (!21866)
+
+## Version 0.4 (7e5806548ca8b86849300c461205742c24e7988a)
+
+### Michelson Runtime
+
 - Receipts of Michelson manager operations now surface non-zero
   `storage_size` and `paid_storage_size_diff`. After each successful
   operation the kernel bumps the contract's `paid_bytes` watermark
@@ -38,25 +67,6 @@
   originating shared-inbox message. (!21877)
 - Deposits targeting a Tezos implicit account now emit balance updates.
   (!21877)
-- Storage burn now fires on Michelson manager operations: transfer-
-  to-contract pays a variable burn proportional to
-  `paid_storage_size_diff`, origination pays the variable burn plus
-  a fixed slot burn of `origination_size × cost_per_byte`, and the
-  first credit to an unallocated implicit account also pays the
-  slot burn and flips `allocated_destination_contract` to `true` on
-  the receipt. When the source cannot cover a burn, the operation
-  is marked `Backtracked` with a new
-  `ApplyOperationError::CannotPayStorageFee` error trace,
-  `SafeStorage` rolls back the batch, and `Applied` internals are
-  cascade-demoted so the manager-operation tree stays L1-coherent. (!21840)
-
-### Native atomic composability
-
-### Storage versions
-
-- `/evm/michelson_runtime/sunrise_level` and
-  `/evm/michelson_runtime/target_sunrise_level` move under
-  `/tez/world_state/michelson_runtime/` (storage version 57). (!21851)
 
 ### Internals
 
@@ -79,8 +89,6 @@
   decoded-code corruption, balance overflow) via the typed
   `LookupViewError` enum, instead of silently masquerading as "view
   not found". (!21474)
-- MIR: harden the Michelson runtime — internal aborts now surface as
-  structured errors. (!21866)
 
 ## Version 0.3 (d2a6743ebef523c88c986c21311307a4251e67e4)
 
