@@ -264,7 +264,7 @@ applying (the operations contained in) the block.
 
 The signature ``PROTOCOL``
 (see :src:`src/lib_protocol_environment/sigs/v17/updater.mli`)
-in module ``Updater`` captures these general ideas (explained in more
+in :package-api:`module Updater <octez-proto-libs/Tezos_protocol_environment/V17/module-type-T/Updater/index.html>` captures these general ideas (explained in more
 detail in the `Tezos white
 paper <https://tezos.com/whitepaper.pdf>`__),
 but is slightly more complex, mostly for efficiency reasons. In this
