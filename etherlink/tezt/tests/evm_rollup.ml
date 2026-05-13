@@ -3618,6 +3618,138 @@ let test_v57_michelson_runtime_paths_migration =
        got %L" ;
   unit
 
+(* Phase V50: two sister paths move into the EVM safe-storage root.
+
+   - [/evm/sequencer]         -> [/evm/world_state/sequencer]
+   - [/evm/sequencer_upgrade] -> [/evm/world_state/sequencer_upgrade]
+
+   Both moves use [store_move] under [allow_path_not_found]. The
+   mainnet kernel (kernel_compat = FarfadetR2) still writes them at
+   the legacy paths; this test upgrades to the latest kernel and
+   asserts both moves relocated their bytes intact and wiped the
+   legacy locations.
+
+   Seeding strategy for [/evm/sequencer_upgrade]: a fresh test rollup
+   has no pending sequencer upgrade, so we send a real L1
+   sequencer-upgrade message with a far-future activation timestamp.
+   The pre-upgrade kernel ingests it, RLP-encodes it, and writes the
+   bytes at [/evm/sequencer_upgrade]; the activation date is in 2099
+   so the kernel's [possible_sequencer_upgrade] reads it on every
+   block but never fires it. This gives us guaranteed-valid bytes to
+   verify byte-preservation across the V50 migration. *)
+let test_v50_migration_sequencer_paths =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "migration"; "upgrade"; "mainnet"; "v50"; "sequencer"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.mainnet_kernel;
+        Constant.WASM.evm_kernel;
+      ])
+    ~title:
+      "V50 moves /evm/sequencer{,_upgrade} under /evm/world_state/ (mainnet -> \
+       latest)"
+  @@ fun protocol ->
+  (* [gen_mainnet_migration_setup] with [~sequencer_admin] so that
+     [setup_l1_contracts] originates the sequencer-governance contract —
+     needed below to send a real L1 sequencer-upgrade message. *)
+  let sequencer_admin = Constant.bootstrap2 in
+  let new_sequencer_key = Constant.bootstrap3 in
+  let* mig = gen_mainnet_migration_setup ~sequencer_admin protocol in
+  let {
+    evm_node;
+    client;
+    sc_rollup_node;
+    sc_rollup_address;
+    l1_contracts;
+    read_value;
+    _;
+  } =
+    mig
+  in
+  let l1_contracts = Option.get l1_contracts in
+  let sequencer_governance_contract =
+    Option.get l1_contracts.sequencer_governance
+  in
+  let legacy_sequencer = "/evm/sequencer" in
+  let new_sequencer = "/evm/world_state/sequencer" in
+  let legacy_sequencer_upgrade = "/evm/sequencer_upgrade" in
+  let new_sequencer_upgrade = "/evm/world_state/sequencer_upgrade" in
+  (* ---- Queue a real sequencer upgrade so [/evm/sequencer_upgrade]
+     holds valid RLP bytes the kernel itself wrote. Far-future
+     activation timestamp keeps the upgrade pending forever (well
+     past any test run). ---- *)
+  let upgrade_event = Evm_node.wait_for_evm_event Sequencer_upgrade evm_node in
+  let* () =
+    Test_helpers.sequencer_upgrade
+      ~sc_rollup_address
+      ~sequencer_admin:sequencer_admin.alias
+      ~sequencer_governance_contract
+      ~pool_address:Eth_account.bootstrap_accounts.(0).address
+      ~client
+      ~upgrade_to:new_sequencer_key.alias
+      ~activation_timestamp:"2099-12-31T23:59:59Z"
+  in
+  let* () =
+    repeat 2 (fun () ->
+        let* _ = Rollup.next_rollup_node_level ~client ~sc_rollup_node in
+        unit)
+  and* _ = upgrade_event in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node () in
+  (* ---- Pre-upgrade: legacy paths populated, new paths absent. ---- *)
+  let* pre_new_sequencer_before = read_value new_sequencer in
+  Check.((pre_new_sequencer_before = None) (option string))
+    ~error_msg:
+      "Pre-upgrade: /evm/world_state/sequencer should be absent before V50, \
+       got %L" ;
+  let* pre_new_sequencer_upgrade_before = read_value new_sequencer_upgrade in
+  Check.((pre_new_sequencer_upgrade_before = None) (option string))
+    ~error_msg:
+      "Pre-upgrade: /evm/world_state/sequencer_upgrade should be absent before \
+       V50, got %L" ;
+  let* pre_sequencer = read_value legacy_sequencer in
+  Check.((Option.is_some pre_sequencer = true) bool)
+    ~error_msg:
+      (Printf.sprintf
+         "Pre-upgrade: %s should hold the installer-written sequencer public \
+          key, got %%L"
+         legacy_sequencer) ;
+  let* pre_sequencer_upgrade = read_value legacy_sequencer_upgrade in
+  Check.((Option.is_some pre_sequencer_upgrade = true) bool)
+    ~error_msg:
+      (Printf.sprintf
+         "Pre-upgrade: %s should hold the queued sequencer upgrade RLP bytes \
+          written by the mainnet kernel, got %%L"
+         legacy_sequencer_upgrade) ;
+  (* ---- Trigger the upgrade to the latest kernel (V50 runs in the
+     V46->V57 migration ladder). ---- *)
+  let* () = gen_mainnet_migration_upgrade mig protocol in
+  (* ---- Post-upgrade: both legacy paths gone, both new paths carry
+     the same bytes. ---- *)
+  let* post_legacy_sequencer = read_value legacy_sequencer in
+  Check.((post_legacy_sequencer = None) (option string))
+    ~error_msg:
+      "Post-upgrade: legacy /evm/sequencer must be empty after V50, got %L" ;
+  let* post_new_sequencer = read_value new_sequencer in
+  Check.((post_new_sequencer = pre_sequencer) (option string))
+    ~error_msg:
+      "Post-upgrade: /evm/world_state/sequencer should carry the original \
+       bytes %R, got %L" ;
+  let* post_legacy_sequencer_upgrade = read_value legacy_sequencer_upgrade in
+  Check.((post_legacy_sequencer_upgrade = None) (option string))
+    ~error_msg:
+      "Post-upgrade: legacy /evm/sequencer_upgrade must be empty after V50, \
+       got %L" ;
+  let* post_new_sequencer_upgrade = read_value new_sequencer_upgrade in
+  Check.((post_new_sequencer_upgrade = pre_sequencer_upgrade) (option string))
+    ~error_msg:
+      "Post-upgrade: /evm/world_state/sequencer_upgrade should carry the \
+       original RLP bytes %R, got %L" ;
+  unit
+
 (* Previewnet counterpart of [test_kernel_storage_version_matches_constant] in
    [evm_sequencer.ml]: assert the previewnet kernel's baked STORAGE_VERSION
    matches what [Kernel.storage_version Previewnet] reports. Lives here (not
@@ -6951,6 +7083,7 @@ let register_evm_node ~protocols =
   test_kernel_upgrade_via_kernel_security_governance protocols ;
   test_kernel_upgrade_activates_michelson_runtime protocols ;
   test_v57_michelson_runtime_paths_migration protocols ;
+  test_v50_migration_sequencer_paths protocols ;
   test_previewnet_storage_version_matches_constant protocols ;
   test_sequencer_and_kernel_upgrade_via_kernel_admin protocols ;
   test_rpc_sendRawTransaction protocols ;
