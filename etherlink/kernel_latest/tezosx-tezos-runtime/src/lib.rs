@@ -205,6 +205,7 @@ fn build_crac_receipt(
     internal_receipts: Vec<InternalOperationSum>,
     crac_id: Option<&str>,
     base_nonce: u16,
+    gas: &mut Gas,
 ) -> Result<AppliedOperation, TezosXRuntimeError> {
     // Combine, in execution order:
     //   [CRAC event, ...pre_transfer_internals, alias(E_1)→target, ...further internal ops]
@@ -225,8 +226,13 @@ fn build_crac_receipt(
         use mir::{
             ast::annotations::NO_ANNS, ast::micheline::Micheline, ast::Entrypoint, lexer,
         };
+        // Synthetic kernel-emitted CRAC event. The internal-op
+        // `EventSuccess.consumed_milligas` is hardcoded to 0 (RFC),
+        // but the top-level receipt's `consumed_milligas` (computed
+        // from the caller's gas counter post-call) does include this
+        // encode cost, charging the user for the kernel bookkeeping.
         let ty = Micheline::App(lexer::Prim::string, &[], NO_ANNS)
-            .encode(&mut Gas::unmetered())
+            .encode(gas)
             .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
             .map_err(|e| {
                 TezosXRuntimeError::Custom(format!(
@@ -234,7 +240,7 @@ fn build_crac_receipt(
                 ))
             })?;
         let payload = Micheline::from(id.to_string())
-            .encode(&mut Gas::unmetered())
+            .encode(gas)
             .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
             .map_err(|e| {
                 TezosXRuntimeError::Custom(format!(
@@ -346,6 +352,7 @@ fn build_failed_crac_receipt(
     internal_receipts: Vec<InternalOperationSum>,
     crac_id: Option<&str>,
     base_nonce: u16,
+    gas: &mut Gas,
 ) -> Result<AppliedOperation, TezosXRuntimeError> {
     // Per RFC, the CRAC event is always first, even on failure.
     // Since the downstream transfer failed, the event is backtracked
@@ -360,8 +367,14 @@ fn build_failed_crac_receipt(
         use mir::{
             ast::annotations::NO_ANNS, ast::micheline::Micheline, ast::Entrypoint, lexer,
         };
+        // Synthetic kernel-emitted CRAC event (backtracked variant for
+        // failed CRAC receipt). The internal-op `EventSuccess`'s
+        // `consumed_milligas` is hardcoded to 0 inside the
+        // `BacktrackedResult` (RFC), but the top-level receipt's
+        // `consumed_milligas` (computed from the caller's gas counter
+        // post-call) does include this encode cost.
         let ty = Micheline::App(lexer::Prim::string, &[], NO_ANNS)
-            .encode(&mut Gas::unmetered())
+            .encode(gas)
             .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
             .map_err(|e| {
                 TezosXRuntimeError::Custom(format!(
@@ -369,7 +382,7 @@ fn build_failed_crac_receipt(
                 ))
             })?;
         let payload = Micheline::from(id.to_string())
-            .encode(&mut Gas::unmetered())
+            .encode(gas)
             .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
             .map_err(|e| {
                 TezosXRuntimeError::Custom(format!(
@@ -576,13 +589,18 @@ where
     let parsed = url::parse_tezos_url(request.uri())?;
     let hdrs = headers::parse_request_headers(request.headers())?;
 
+    // Start the op-gas counter early so the Unit fallback below can be
+    // metered against the user's actual budget.
+    let mut gas = TezlinkOperationGas::start_milligas(hdrs.gas_limit)
+        .map_err(|e| TezosXRuntimeError::Custom(format!("Failed to start gas: {e:?}")))?;
+
     let body = request.into_body();
     // An empty body means "no parameters" which defaults to Micheline Unit.
     // This is required for implicit account transfers where the Michelson VM
     // checks that param == Unit.
     let value = if body.is_empty() {
         mir::ast::micheline::Micheline::from(())
-            .encode(&mut Gas::unmetered())
+            .encode(&mut gas.remaining)
             .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
             .map_err(|e| {
                 TezosXRuntimeError::Custom(format!("Failed to encode Unit: {e}"))
@@ -654,8 +672,6 @@ where
                 ))
             })?;
 
-    let mut gas = TezlinkOperationGas::start_milligas(hdrs.gas_limit)
-        .map_err(|e| TezosXRuntimeError::Custom(format!("Failed to start gas: {e:?}")))?;
     let mut next_temp_id = BigMapId {
         value: Zarith(0.into()),
     };
@@ -740,11 +756,6 @@ where
             error,
             internal_receipts,
         }) => {
-            // Report consumed gas even on failure so the caller doesn't
-            // see u64::MAX (which would exhaust the EVM gas budget and
-            // prevent try/catch from working).
-            *consumed_milligas = gas.total_milligas_consumed().into();
-
             // Map CracError to its TezosXRuntimeError HTTP-status equivalent.
             // OutOfGas → 429 (catchable revert); user-facing TransferError
             // variants → 400 (catchable revert); BlockAbort → 500 (abort
@@ -769,6 +780,10 @@ where
                 // internal operations with backtracked/failed/skipped statuses.
                 // Only emitted for operation-level failures; BlockAbort aborts
                 // the whole block, so no per-operation receipt is produced.
+                //
+                // Receipt builder runs BEFORE the consumed_milligas
+                // finalisation below so the cost of its Micheline encodes
+                // is charged against the user's gas counter.
                 if let (Some(kt1), CracError::Operation(te)) =
                     (hdrs.crac_origin_contract.as_ref(), error)
                 {
@@ -785,6 +800,7 @@ where
                         internal_receipts,
                         crac_id_for_event.as_deref(),
                         base_nonce,
+                        &mut gas.remaining,
                     ) {
                         Ok(receipt) => {
                             journal.michelson.push_failed_crac_receipt(receipt);
@@ -795,11 +811,13 @@ where
                     }
                 }
             }
+            // Report consumed gas even on failure so the caller doesn't
+            // see u64::MAX (which would exhaust the EVM gas budget and
+            // prevent try/catch from working).
+            *consumed_milligas = gas.total_milligas_consumed().into();
             return Err(rt_err);
         }
     };
-
-    *consumed_milligas = gas.total_milligas_consumed().into();
 
     // For cross-runtime calls (CRAC), build the two-step receipt
     // structure per RFC: CRAC Derived Block Contents and store it
@@ -807,7 +825,12 @@ where
     //
     // source_contract = alias(E_0) from X-Tezos-Source (top-level destination)
     // sender_account.contract() = alias(E_1) from X-Tezos-Sender (internal sender)
-    if is_crac {
+    //
+    // Receipt builder runs BEFORE the consumed_milligas finalisation
+    // below so the cost of its Micheline encodes is charged against
+    // the user's gas counter and reflected in the top-level
+    // consumed_milligas the caller observes.
+    let transfer = if is_crac {
         let source_contract = Contract::Originated(
             hdrs.crac_origin_contract
                 .as_ref()
@@ -834,12 +857,15 @@ where
             result.internal_receipts,
             crac_id_for_event.as_deref(),
             base_nonce,
+            &mut gas.remaining,
         )?;
         journal.michelson.push_pending_crac_receipt(receipt);
-        Ok(TransferSuccess::default())
+        TransferSuccess::default()
     } else {
-        Ok(result.target.into())
-    }
+        result.target.into()
+    };
+    *consumed_milligas = gas.total_milligas_consumed().into();
+    Ok(transfer)
 }
 
 // --- Alias generation gas constants (milligas) ---
@@ -1837,6 +1863,7 @@ mod tests {
             vec![],
             Some(crac_id),
             0,
+            &mut Gas::default(),
         )
         .expect("build_crac_receipt should succeed");
 
@@ -1958,6 +1985,7 @@ mod tests {
             vec![],
             None, // no CRAC-ID in this variant test
             0,
+            &mut Gas::default(),
         )
         .expect("build_crac_receipt should succeed");
 
@@ -2054,6 +2082,7 @@ mod tests {
             vec![],
             Some("1-0"),
             0,
+            &mut Gas::default(),
         )
         .expect("build_failed_crac_receipt should succeed");
 
