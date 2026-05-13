@@ -73,6 +73,19 @@ type common_setup = {
 
 type mode_setup = Sequencer of {evm_node : Evm_node.t} | Proxy
 
+type migration_setup = {
+  admin : Account.key;
+  evm_node : Evm_node.t;
+  client : Client.t;
+  sc_rollup_node : Sc_rollup_node.t;
+  sc_rollup_address : string;
+  produce_block : unit -> (int, Rpc.error) result Lwt.t;
+  l1_contracts : l1_contracts option;
+  read_value : string -> string option Lwt.t;
+  read_subkeys : string -> string list Lwt.t;
+  upgrade_params : common_setup * mode_setup;
+}
+
 type full_evm_setup = {
   node : Node.t;
   client : Client.t;
@@ -362,7 +375,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     let ticketer = Option.map (fun {exchanger; _} -> exchanger) l1_contracts in
     let administrator =
       if with_administrator then
-        Option.map (fun {admin; _} -> admin) l1_contracts
+        Option.map (fun ({admin; _} : l1_contracts) -> admin) l1_contracts
       else None
     in
     let kernel_governance =
@@ -562,6 +575,82 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
         in
         let* () = Evm_node.run evm_node in
         return (common_setup, Sequencer {evm_node})
+
+(** Boot the FarfadetR2 mainnet kernel under a sequencer with a fixed
+    genesis timestamp and zero DA fee — the proven recipe from
+    [gen_kernel_migration_test] that keeps the rollup-node/sequencer
+    pair in sync while the V46->V57 migration ladder runs.
+
+    [additional_config] seeds durable-storage paths before the first
+    kernel tick (default: empty).  [sequencer_admin] is required when
+    the test needs to originate a sequencer-governance L1 contract
+    (V50 only; other tests omit it). *)
+let gen_mainnet_migration_setup ?additional_config ?sequencer_admin protocol =
+  let admin = Constant.bootstrap5 in
+  let* evm_setup =
+    setup_evm_kernel
+      ~kernel:Kernel.Mainnet
+      ?additional_config
+      ~da_fee_per_byte:Wei.zero
+      ~minimum_base_fee_per_gas:(Wei.of_string "21000")
+      ~setup_mode:
+        (Setup_sequencer
+           {
+             return_sequencer = true;
+             time_between_blocks = Some Nothing;
+             sequencer = admin;
+             max_blueprints_ahead = None;
+             genesis_timestamp =
+               Some (At (Option.get @@ Ptime.of_date (2018, 7, 1)));
+           })
+      ~admin:(Some admin)
+      ?sequencer_admin
+      protocol
+  in
+  let common_setup, mode = evm_setup in
+  let {
+    client;
+    sc_rollup_node;
+    sc_rollup_address;
+    produce_block;
+    l1_contracts;
+    _;
+  } : common_setup =
+    common_setup
+  in
+  let evm_node =
+    match mode with Sequencer {evm_node} -> evm_node | Proxy -> assert false
+  in
+  let* () =
+    bake_until_sync
+      ~timeout:90.
+      ~timeout_in_blocks:40
+      ~sc_rollup_node
+      ~client
+      ~sequencer:evm_node
+      ()
+  in
+  let read_value path =
+    let*@ v = Rpc.state_value evm_node path in
+    return v
+  in
+  let read_subkeys path =
+    let*@ v = Rpc.state_subkeys evm_node path in
+    return (Option.value ~default:[] v)
+  in
+  return
+    {
+      admin;
+      evm_node;
+      client;
+      sc_rollup_node;
+      sc_rollup_address;
+      produce_block;
+      l1_contracts;
+      read_value;
+      read_subkeys;
+      upgrade_params = evm_setup;
+    }
 
 let register_test ~title ~tags ?(kernels = Kernel.etherlink_all)
     ?additional_config ?admin ?(additional_uses = []) ?commitment_period
@@ -2424,7 +2513,8 @@ let test_preinitialized_evm_kernel =
       found_administrator_key_hex
   in
   Check.(
-    (Option.map (fun l -> l.admin) l1_contracts = found_administrator_key)
+    (Option.map (fun (l : l1_contracts) -> l.admin) l1_contracts
+    = found_administrator_key)
       (option string))
     ~error_msg:
       (sf "Expected to read %%L as administrator key, but found %%R instead") ;
@@ -2837,6 +2927,29 @@ let gen_test_kernel_upgrade ?setup_kernel_root_hash ?admin_contract ?timestamp
       kernel_boot_wasm_before_upgrade,
       root_hash,
       produce_block )
+
+(** Trigger the kernel upgrade to [evm_kernel] (Latest) and wait for
+    the sequencer to be back in sync.  Call after all pre-upgrade
+    assertions and data captures are done. *)
+let gen_mainnet_migration_upgrade
+    {admin; evm_node; client; sc_rollup_node; produce_block; upgrade_params; _}
+    protocol =
+  let* _ =
+    gen_test_kernel_upgrade
+      ~evm_setup:upgrade_params
+      ~installee:Constant.WASM.evm_kernel
+      ~admin
+      protocol
+  in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  let*@ _ = produce_block () in
+  bake_until_sync
+    ~timeout:90.
+    ~timeout_in_blocks:40
+    ~sc_rollup_node
+    ~client
+    ~sequencer:evm_node
+    ()
 
 let test_kernel_upgrade_evm_to_evm =
   Protocol.register_test
