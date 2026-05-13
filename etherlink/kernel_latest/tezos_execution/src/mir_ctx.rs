@@ -57,6 +57,11 @@ impl InterpretContext {
             self.lazy_storage_size_diff.0 += &delta.0;
         }
     }
+
+    /// Return the accumulated lazy-storage size delta and reset it to zero.
+    pub fn take_lazy_storage_size_diff(&mut self) -> Zarith {
+        std::mem::replace(&mut self.lazy_storage_size_diff, 0.into())
+    }
 }
 
 impl Default for InterpretContext {
@@ -2650,6 +2655,18 @@ pub mod tests {
             ctx.interpret_context.lazy_storage_size_diff, before_clear,
             "clear_temporary_big_maps must not touch the accumulator",
         );
+    }
+
+    #[test]
+    fn interpret_context_take_resets_to_zero() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let _ = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        let first = ctx.interpret_context.take_lazy_storage_size_diff();
+        assert!(first.0 > BigInt::from(0));
+        let second = ctx.interpret_context.take_lazy_storage_size_diff();
+        assert_eq!(second, Zarith(BigInt::from(0)));
     }
 }
 

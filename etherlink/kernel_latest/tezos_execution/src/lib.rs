@@ -791,6 +791,16 @@ where
             consume_storage_read_milligas(tc_ctx.operation_gas, 3, COUNTER_SIZE)
                 .map_err(TransferError::OutOfGas)?;
 
+            // `interpret_context` holds this operation's lazy-storage size
+            // delta, accumulated by the `LazyStorage` hooks during execution.
+            // Like `big_map_diff`, it is a per-operation value carried on the
+            // batch-lifetime `TcCtx` and drained at each operation boundary;
+            // the drain also resets it, so every frame (this transfer, and the
+            // origination path) starts empty and no separate reset is needed.
+            // TODO(L2-1481): make this draining structurally safe so a hook
+            // firing without a matching drain cannot be silently mispriced.
+            let lazy_storage_size_diff =
+                tc_ctx.interpret_context.take_lazy_storage_size_diff();
             let storage_size_diff =
                 dest_account
                     .set_storage(tc_ctx.host, &new_storage)
@@ -810,7 +820,11 @@ where
                 used_bytes,
                 allocated_bytes: paid_storage_size_diff,
             } = dest_account
-                .update_storage_space(tc_ctx.host, storage_size_diff)
+                .update_storage_space(
+                    tc_ctx.host,
+                    storage_size_diff,
+                    lazy_storage_size_diff,
+                )
                 .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
 
             match execute_internal_operations(
@@ -1181,6 +1195,16 @@ where
     let (new_storage, lazy_storage_diff) =
         handle_storage_with_big_maps(ctx, script_storage)?;
 
+    // Drain the lazy-storage size delta accumulated by the big-map hooks in
+    // `handle_storage_with_big_maps`, on the same footing as the transfer path
+    // (and as `big_map_diff`): every frame drains its per-operation accumulator
+    // so the next one starts empty. The value is discarded here — origination
+    // does not yet bill the big-maps present in the initial storage.
+    // TODO(L2-1281): pass this delta to `init` instead of `0` to bill them.
+    // TODO(L2-1481): make this draining structurally safe so a hook firing
+    // without a matching drain cannot be silently mispriced.
+    let _ = ctx.interpret_context.take_lazy_storage_size_diff();
+
     // Set the storage of the contract
     let smart_contract = ctx
         .context
@@ -1207,7 +1231,7 @@ where
         used_bytes: total_size,
         allocated_bytes: paid_storage_size_diff,
     } = smart_contract
-        .init(ctx.host, script_code, &new_storage)
+        .init(ctx.host, script_code, &new_storage, 0.into())
         .map_err(|_| OriginationError::CantInitContract)?;
 
     // There's this line in the origination `assert (Compare.Z.(total_size >= Z.zero)) ;`
@@ -2225,6 +2249,7 @@ mod tests {
                     .encode(&mut Gas::default())
                     .unwrap()
                     .unwrap(),
+                0.into(),
             )
             .expect("Account initialisation should have succeeded");
 
@@ -6545,7 +6570,7 @@ mod tests {
             .expect("ContractKt1Hash b58 conversion should have succeeded");
         let receiver_addr = ContractKt1Hash::from_base58_check(CONTRACT_2)
             .expect("ContractKt1Hash b58 conversion should have succeeded");
-        init_account(ctx.host, &tz1.pkh, 1000);
+        init_account(ctx.host, &tz1.pkh, 10_000_000);
         reveal_account(ctx.host, tz1);
 
         let parser = Parser::new();
@@ -6574,7 +6599,7 @@ mod tests {
             15,
             1,
             21040,
-            5,
+            60_000,
             tz1.clone(),
             10.into(),
             Contract::Originated(sender_addr.clone()),
@@ -7146,7 +7171,7 @@ mod tests {
             0,
             2,
             21040,
-            5,
+            60_000,
             tz1.clone(),
             0.into(),
             Contract::Originated(second_sender_contract),
