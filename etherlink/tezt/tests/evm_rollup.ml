@@ -3902,6 +3902,249 @@ let test_v51_migration_ipc_paths =
        moved by V51, got %L subkeys" ;
   unit
 
+(* Phase V53 (Phase 2 of the durable-storage reorg): 24 [/evm/...] paths
+   move under [/base/...] (governance, blueprints, delayed inbox, DAL,
+   chain configs, etc.) and the [events]/[keep_events] subtree+flag are
+   renamed to [rollup_events]/[keep_rollup_events] along the way.
+
+   Mirrors the full list in [migration.rs::StorageVersion::V53].
+   [/evm/messages] is included as [`Cleanup_only] for completeness:
+   [kernel_latest] never reads [/base/messages], the path is always
+   empty on a test rollup, and the move is therefore always a no-op —
+   but the cleanup invariant (legacy path empty post-migration) is
+   still worth asserting.
+
+   Verification strategy per path:
+
+   - [`Preserve_bytes] — for installer-written config scalars that
+     [kernel_latest] reads from [/base/] but does not rewrite on its
+     first post-migration boot, we capture the pre-upgrade bytes at the
+     legacy location and assert the new location holds exactly the same
+     bytes post-upgrade. This is the only check that distinguishes a
+     correct [store_move] from a buggy [store_delete]. Seven of these
+     paths ([maximum_allowed_ticks], [delayed_inbox_timeout],
+     [delayed_inbox_min_levels], [max_blueprint_lookahead_in_seconds],
+     [max_delayed_inbox_blueprint_length], [delayed_bridge], [dal_slots])
+     are seeded via [additional_config]; [max_blueprint_lookahead_in_seconds],
+     [admin], [kernel_governance], and [kernel_security_governance] are
+     always written by the installer and need no extra seeding.
+     [delayed_bridge] is seeded as raw ASCII bytes of a KT1 address (the
+     kernel only reads it when processing L1 bridge transactions, which
+     this test never sends). [dal_slots] is seeded as two slot indices
+     [0; 1]; without a DAL node the kernel finds no attestations and
+     continues normally.
+   - [`Cleanup_only] — for paths [kernel_latest] rewrites on every
+     boot or block (kernel_version, l1_level, current_block_header,
+     info_per_level, blueprints), for the events subtree (cleared every
+     block when [keep_events] is unset, so always empty pre-upgrade),
+     for keep_events (a one-shot presence flag consumed on first block
+     production), and for [chain_configurations] (only written by the
+     installer for L2/multichain deployments — absent on standard
+     single-EVM Etherlink mainnet and therefore always empty here), we
+     only assert the legacy path is empty post-V53.
+
+   With this classification the migration is verified bytewise on every
+   path whose bytes are stable and accessible — and the cleanup
+   invariant is verified everywhere. *)
+let test_v53_migration_evm_to_base_paths =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "migration"; "upgrade"; "mainnet"; "v53"; "base"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.mainnet_kernel;
+        Constant.WASM.evm_kernel;
+      ])
+    ~title:
+      "V53 moves /evm/ governance/sequencing paths under /base/ + renames \
+       events->rollup_events (mainnet -> latest)"
+  @@ fun protocol ->
+  (* Five config scalars are absent from the mainnet installer config in
+     this test setup (the corresponding CLI flags are optional and the
+     test does not pass them). Seed them via [additional_config] with
+     their kernel-default values encoded as little-endian bytes so that
+     the [`Preserve_bytes] checks below have something real to compare.
+     The seeded values match the kernel's hard-coded defaults precisely,
+     so booting the mainnet kernel with these bytes is identical to
+     booting it with the paths absent.
+     - maximum_allowed_ticks = 30_000_000_000 (MAX_TICKS), LE u64
+     - delayed_inbox_timeout = 43_200 (12 h default), LE u64
+     - delayed_inbox_min_levels = 720 (default), LE u32
+     - max_blueprint_lookahead_in_seconds: always written by the
+       installer; no extra seeding needed.
+     - max_delayed_inbox_blueprint_length = 1_000 (default), LE u16 *)
+  let additional_config =
+    Sc_rollup_helpers.Installer_kernel_config.
+      [
+        Set {value = "00ac23fc06000000"; to_ = "/evm/maximum_allowed_ticks"};
+        Set {value = "c0a8000000000000"; to_ = "/evm/delayed_inbox_timeout"};
+        Set {value = "d0020000"; to_ = "/evm/delayed_inbox_min_levels"};
+        Set {value = "e803"; to_ = "/evm/max_delayed_inbox_blueprint_length"};
+        (* KT1WvzYHCNBvDSdwafTHv7nJ1dWmZ8GZL3uD as raw ASCII bytes (hex).
+           The delayed bridge is a KT1 address stored as 36 ASCII bytes;
+           the kernel only reads it when processing L1 bridge transactions,
+           which this test never sends, so seeding it is safe. *)
+        Set
+          {
+            value =
+              "4b543157767a5948434e4276445364776166544876376e4a3164576d5a38475a4c337544";
+            to_ = "/evm/delayed_bridge";
+          };
+        (* DAL slot indices stored as raw bytes: slots [0; 1].
+           The mainnet kernel reads dal_slots to know which DAL slots to
+           watch; without a DAL node it simply finds no attestations for
+           those slots and continues, so seeding them is safe. *)
+        Set {value = "0001"; to_ = "/evm/dal_slots"};
+      ]
+  in
+  (* The migration list, mirrored from [migration.rs::V53]. [`Scalar]
+     means the migration applies to a single value; [`Subtree] means
+     [store_move] is recursive over children. The 4th tuple element is
+     this test's expectation for that path (see header comment). *)
+  let moves =
+    [
+      (`Subtree, "/evm/blueprints", "/base/blueprints", `Cleanup_only);
+      ( `Scalar,
+        "/evm/max_blueprint_lookahead_in_seconds",
+        "/base/max_blueprint_lookahead_in_seconds",
+        `Preserve_bytes );
+      ( `Scalar,
+        "/evm/max_delayed_inbox_blueprint_length",
+        "/base/max_delayed_inbox_blueprint_length",
+        `Preserve_bytes );
+      (`Scalar, "/evm/kernel_version", "/base/kernel_version", `Cleanup_only);
+      (`Scalar, "/evm/kernel_root_hash", "/base/kernel_root_hash", `Cleanup_only);
+      (`Scalar, "/evm/kernel_upgrade", "/base/kernel_upgrade", `Cleanup_only);
+      ( `Scalar,
+        "/evm/logging_verbosity",
+        "/base/logging_verbosity",
+        `Cleanup_only );
+      (`Scalar, "/evm/l1_level", "/base/l1_level", `Cleanup_only);
+      (* Dead path: kernel_latest never reads /base/messages; always
+         empty on a test rollup. Included for list completeness. *)
+      (`Scalar, "/evm/messages", "/base/messages", `Cleanup_only);
+      (`Scalar, "/evm/admin", "/base/admin", `Preserve_bytes);
+      ( `Scalar,
+        "/evm/kernel_governance",
+        "/base/kernel_governance",
+        `Preserve_bytes );
+      ( `Scalar,
+        "/evm/kernel_security_governance",
+        "/base/kernel_security_governance",
+        `Preserve_bytes );
+      (`Scalar, "/evm/delayed_bridge", "/base/delayed_bridge", `Preserve_bytes);
+      (`Scalar, "/evm/remove_whitelist", "/base/remove_whitelist", `Cleanup_only);
+      ( `Scalar,
+        "/evm/maximum_allowed_ticks",
+        "/base/maximum_allowed_ticks",
+        `Preserve_bytes );
+      (`Scalar, "/evm/dal_slots", "/base/dal_slots", `Preserve_bytes);
+      ( `Scalar,
+        "/evm/dal_publishers_whitelist",
+        "/base/dal_publishers_whitelist",
+        `Cleanup_only );
+      ( `Scalar,
+        "/evm/delayed_inbox_timeout",
+        "/base/delayed_inbox_timeout",
+        `Preserve_bytes );
+      ( `Scalar,
+        "/evm/delayed_inbox_min_levels",
+        "/base/delayed_inbox_min_levels",
+        `Preserve_bytes );
+      ( `Scalar,
+        "/evm/current_block_header",
+        "/base/current_block_header",
+        `Cleanup_only );
+      (`Subtree, "/evm/delayed-inbox", "/base/delayed-inbox", `Cleanup_only);
+      (`Subtree, "/evm/info_per_level", "/base/info_per_level", `Cleanup_only);
+      ( `Subtree,
+        "/evm/chain_configurations",
+        "/base/chain_configurations",
+        `Cleanup_only );
+      (* renamed: events -> rollup_events, keep_events -> keep_rollup_events.
+         keep_events is a one-shot presence flag consumed (deleted) on the
+         first call to clear_events, so it is absent by the time of the
+         pre-upgrade capture and cannot be byte-preserved. *)
+      (`Subtree, "/evm/events", "/base/rollup_events", `Cleanup_only);
+      (`Scalar, "/evm/keep_events", "/base/keep_rollup_events", `Cleanup_only);
+    ]
+  in
+  let* mig = gen_mainnet_migration_setup ~additional_config protocol in
+  let {read_value; read_subkeys; _} = mig in
+  (* Captures for byte-preservation paths: keyed by legacy path so the
+     post-upgrade pass can look up the expected bytes. *)
+  let pre_bytes : (string, string option) Hashtbl.t = Hashtbl.create 8 in
+  (* ---- Pre-upgrade: capture the bytes/subkeys for every path that
+     calls for preservation. ---- *)
+  let* () =
+    Lwt_list.iter_s
+      (fun (kind, legacy, _new_, expectation) ->
+        match (kind, expectation) with
+        | `Scalar, `Preserve_bytes ->
+            let* pre = read_value legacy in
+            Check.((Option.is_some pre = true) bool)
+              ~error_msg:
+                (Printf.sprintf
+                   "Pre-upgrade: %s should be installer-written (the V53 test \
+                    relies on its bytes for preservation), got %%L"
+                   legacy) ;
+            Hashtbl.replace pre_bytes legacy pre ;
+            unit
+        | _, `Cleanup_only -> unit
+        | _ ->
+            Test.fail
+              "V53 test: unsupported (kind, expectation) combination for %s"
+              legacy)
+      moves
+  in
+  (* ---- Trigger the upgrade. ---- *)
+  let* () = gen_mainnet_migration_upgrade mig protocol in
+  (* ---- Post-upgrade pass: cleanup invariant for every path, plus
+     bytes / subkey-set preservation for the paths that called for
+     it. ---- *)
+  let* () =
+    Lwt_list.iter_s
+      (fun (kind, legacy, new_, expectation) ->
+        let* () =
+          match kind with
+          | `Scalar ->
+              let* post_legacy = read_value legacy in
+              Check.((post_legacy = None) (option string))
+                ~error_msg:
+                  (Printf.sprintf
+                     "Post-upgrade: %s must be empty after V53, got %%L"
+                     legacy) ;
+              unit
+          | `Subtree ->
+              let* post_legacy_subkeys = read_subkeys legacy in
+              Check.((post_legacy_subkeys = []) (list string))
+                ~error_msg:
+                  (Printf.sprintf
+                     "Post-upgrade: %s must have no subkeys after V53, got %%L"
+                     legacy) ;
+              unit
+        in
+        match (kind, expectation) with
+        | `Scalar, `Preserve_bytes ->
+            let expected = Hashtbl.find pre_bytes legacy in
+            let* post_new = read_value new_ in
+            Check.((post_new = expected) (option string))
+              ~error_msg:
+                (Printf.sprintf
+                   "Post-upgrade: %s should carry the original %s bytes %%R, \
+                    got %%L"
+                   new_
+                   legacy) ;
+            unit
+        | _, `Cleanup_only -> unit
+        | _ -> assert false)
+      moves
+  in
+  unit
+
 (* Previewnet counterpart of [test_kernel_storage_version_matches_constant] in
    [evm_sequencer.ml]: assert the previewnet kernel's baked STORAGE_VERSION
    matches what [Kernel.storage_version Previewnet] reports. Lives here (not
@@ -7237,6 +7480,7 @@ let register_evm_node ~protocols =
   test_v57_michelson_runtime_paths_migration protocols ;
   test_v50_migration_sequencer_paths protocols ;
   test_v51_migration_ipc_paths protocols ;
+  test_v53_migration_evm_to_base_paths protocols ;
   test_previewnet_storage_version_matches_constant protocols ;
   test_sequencer_and_kernel_upgrade_via_kernel_admin protocols ;
   test_rpc_sendRawTransaction protocols ;
