@@ -24,7 +24,7 @@ use revm::{
 };
 use std::vec::Vec;
 
-use tezosx_journal::{LayeredStateError, TezosXJournal};
+use tezosx_journal::{LayeredStateError, OriginalSource, TezosXJournal};
 
 use crate::database::EtherlinkVMDB;
 use crate::error::{EvmRunError, OriginStorageError};
@@ -634,12 +634,14 @@ pub trait CrossRuntimeCall {
     /// Get the CRAC-ID for the current transaction.
     fn crac_id(&self) -> String;
 
-    /// Store the original EVM source address (E_0) on the first
-    /// outgoing gateway call. Subsequent calls are no-ops.
-    fn set_original_evm_source(&mut self, source: Address);
+    /// Originating runtime of the current top-level transaction.
+    fn crac_origin_runtime(&self) -> RuntimeId;
 
-    /// Retrieve the original EVM source address, if previously stored.
-    fn original_evm_source(&self) -> Option<Address>;
+    /// Store the original source (E_0) on the first outgoing gateway
+    /// call; subsequent calls are no-ops.
+    fn set_original_source(&mut self, source: OriginalSource);
+
+    fn original_source(&self) -> Option<&OriginalSource>;
 }
 
 impl<'a, Host, R: Registry> CrossRuntimeCall for Journal<'a, Host, R>
@@ -755,12 +757,20 @@ where
         self.journal.crac_id().to_string()
     }
 
-    fn set_original_evm_source(&mut self, source: Address) {
-        self.journal.evm.set_original_evm_source(source);
+    fn crac_origin_runtime(&self) -> RuntimeId {
+        // `CracId.origin_runtime` is always written from `RuntimeId::into`,
+        // so the inverse conversion is total. The `expect` surfaces a clear
+        // panic if that invariant is ever broken upstream.
+        RuntimeId::try_from(self.journal.crac_id().origin_runtime)
+            .expect("CracId.origin_runtime must encode a valid RuntimeId")
     }
 
-    fn original_evm_source(&self) -> Option<Address> {
-        self.journal.evm.original_evm_source()
+    fn set_original_source(&mut self, source: OriginalSource) {
+        self.journal.evm.set_original_source(source);
+    }
+
+    fn original_source(&self) -> Option<&OriginalSource> {
+        self.journal.evm.original_source()
     }
 }
 

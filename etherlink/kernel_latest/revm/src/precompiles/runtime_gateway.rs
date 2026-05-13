@@ -30,6 +30,7 @@ use crate::{
 };
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::Registry;
+use tezosx_journal::OriginalSource;
 
 sol! {
     contract RuntimeGateway {
@@ -230,27 +231,52 @@ where
     Ok(())
 }
 
-/// Resolve sender and source aliases, charging gas for lookups and any
-/// alias generation triggered on cache miss.
-///
-/// Return the original EVM source (E_0) for CRAC receipt construction.
-///
-/// On the first gateway call in a transaction, `tx().caller()` is the
-/// EOA and we store it.  On re-entrant calls (EVM → TEZ → EVM → …) the
-/// `tx().caller()` would be the alias of a Michelson contract, so we
-/// use the stored value instead.
-fn resolve_original_source<'j, CTX, Host, R>(context: &mut CTX) -> Address
+/// Build an [`OriginalSource`] from `tx().caller()` and the
+/// originating runtime, without touching the journal. For Tezos
+/// origins, the caller's stored `Origin` is read back to recover the
+/// PKH instead of the lossy EVM alias.
+fn capture_original_source<'j, CTX, Host, R>(
+    context: &CTX,
+    remaining_evm_gas: u64,
+) -> Result<OriginalSource, CustomPrecompileError>
 where
     Host: StorageV1 + 'j,
     R: Registry + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
-    let source = context
-        .journal()
-        .original_evm_source()
-        .unwrap_or_else(|| context.tx().caller());
-    context.journal_mut().set_original_evm_source(source);
-    source
+    let caller = context.tx().caller();
+    let runtime = context.journal().crac_origin_runtime();
+    let native_address = match runtime {
+        RuntimeId::Ethereum => caller.to_string().to_lowercase(),
+        RuntimeId::Tezos => context.journal().tezosx_resolve_source_alias_readonly(
+            caller,
+            RuntimeId::Tezos,
+            remaining_evm_gas,
+        )?,
+    };
+    Ok(OriginalSource::new(runtime, native_address, caller))
+}
+
+/// Return the captured original source, building and persisting it on
+/// the first call. Re-entrant frames (EVM → TEZ → EVM → …) re-read
+/// the depth-0 capture instead of falling back to their own
+/// `tx().caller()` (which would be the alias of the Michelson contract
+/// that re-entered the EVM).
+fn resolve_original_source<'j, CTX, Host, R>(
+    context: &mut CTX,
+    remaining_evm_gas: u64,
+) -> Result<OriginalSource, CustomPrecompileError>
+where
+    Host: StorageV1 + 'j,
+    R: Registry + 'j,
+    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
+{
+    if let Some(src) = context.journal().original_source() {
+        return Ok(src.clone());
+    }
+    let source = capture_original_source(context, remaining_evm_gas)?;
+    context.journal_mut().set_original_source(source.clone());
+    Ok(source)
 }
 
 /// Resolves sender and source aliases, charging gas for lookups and any
@@ -413,13 +439,13 @@ where
                     )
                 })?;
 
-            let source = resolve_original_source(context);
+            let source = resolve_original_source(context, gas.remaining())?;
             let (sender_alias, source_alias) = resolve_aliases(
                 context,
                 &mut gas,
                 RuntimeId::Tezos,
                 inputs.caller,
-                source,
+                source.evm_alias(),
             )?;
 
             // Convert remaining EVM gas to Tezos milligas for the target runtime
@@ -492,13 +518,13 @@ where
                     )
                 })?;
 
-            let source = resolve_original_source(context);
+            let source = resolve_original_source(context, gas.remaining())?;
             let (sender_alias, source_alias) = resolve_aliases(
                 context,
                 &mut gas,
                 RuntimeId::Tezos,
                 inputs.caller,
-                source,
+                source.evm_alias(),
             )?;
 
             let gas_limit =
@@ -581,29 +607,20 @@ where
                     )
                 })?;
 
-            // Resolve sender/source aliases through the read-only path
-            // that never mutates storage. This keeps `callMichelsonView`
-            // compatible with STATICCALL: the idiomatic Solidity
-            // pattern for calling a view is to reach this precompile
-            // from a `staticcall`, and any persistent write (alias
-            // cache miss, log emission, balance burn) would be
-            // rejected by REVM.
-            //
-            // On cache miss the deterministic KT1 is still surfaced to
-            // the Michelson side, so the callee's `SENDER`/`SOURCE`
-            // observations are identical regardless of whether the
-            // alias has been persisted by a prior state-mutating call.
-            let source = context
-                .journal()
-                .original_evm_source()
-                .unwrap_or_else(|| context.tx().caller());
+            // STATICCALL-compatible: read the persisted source if a
+            // prior outgoing call has captured one, otherwise build
+            // one locally without writing to the journal.
+            let source = match context.journal().original_source() {
+                Some(s) => s.clone(),
+                None => capture_original_source(context, gas.remaining())?,
+            };
             let sender_alias = context.journal().tezosx_resolve_source_alias_readonly(
                 inputs.caller,
                 RuntimeId::Tezos,
                 gas.remaining(),
             )?;
             let source_alias = context.journal().tezosx_resolve_source_alias_readonly(
-                source,
+                source.evm_alias(),
                 RuntimeId::Tezos,
                 gas.remaining(),
             )?;
@@ -687,7 +704,6 @@ where
             // read-only path that never writes to storage. POST keeps
             // the existing state-mutating behavior.
             let is_get = request.method() == http::Method::GET;
-            let source = resolve_original_source(context);
             let amount = inputs.value.get();
 
             let (sender_alias, source_alias) = if is_get {
@@ -697,6 +713,11 @@ where
                         gas,
                     ));
                 }
+                // STATICCALL-compatible: capture without persisting.
+                let source = match context.journal().original_source() {
+                    Some(s) => s.clone(),
+                    None => capture_original_source(context, gas.remaining())?,
+                };
                 (
                     context.journal().tezosx_resolve_source_alias_readonly(
                         inputs.caller,
@@ -704,13 +725,20 @@ where
                         gas.remaining(),
                     )?,
                     context.journal().tezosx_resolve_source_alias_readonly(
-                        source,
+                        source.evm_alias(),
                         target_runtime,
                         gas.remaining(),
                     )?,
                 )
             } else {
-                resolve_aliases(context, &mut gas, target_runtime, inputs.caller, source)?
+                let source = resolve_original_source(context, gas.remaining())?;
+                resolve_aliases(
+                    context,
+                    &mut gas,
+                    target_runtime,
+                    inputs.caller,
+                    source.evm_alias(),
+                )?
             };
 
             let gas_limit =

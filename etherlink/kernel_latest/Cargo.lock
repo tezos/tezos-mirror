@@ -3584,6 +3584,7 @@ dependencies = [
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "tezos_tezlink_latest",
+ "tezosx-types",
  "thiserror 1.0.69",
 ]
 

@@ -45,6 +45,16 @@
 
 ### Internals
 
+- Generalize the captured transaction source (E_0 / `tx.origin`) on
+  the EVM journal from a bare `Address` to a typed `OriginalSource`
+  carrying the originating `RuntimeId`, the source's native address
+  string (lowercase hex for Ethereum, b58check PKH for Tezos), and
+  the cached EVM-side alias used by `tezosx_resolve_source_alias`.
+  Tezos-originated transactions reaching the EVM via `call_evm` now
+  retain their PKH instead of collapsing it onto the alias, which
+  CRAC receipt construction and indexer-facing identity tracking
+  rely on. No user-observable change: the resolved sender/source
+  aliases on outgoing CRACs are bit-for-bit identical to before. (!21899)
 - MIR: harden the Michelson runtime — internal aborts now surface as
   structured errors. (!21866)
 
