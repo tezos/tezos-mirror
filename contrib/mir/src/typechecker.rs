@@ -19,8 +19,8 @@ pub mod type_props;
 
 use type_props::TypeProperty;
 
-use crate::ast::annotations::{AnnotationError, NO_ANNS};
-use crate::ast::big_map::BigMap;
+use crate::ast::annotations::AnnotationError;
+use crate::ast::big_map::{self, BigMap, BigMapId};
 use crate::ast::micheline::{
     micheline_fields, micheline_instructions, micheline_literals, micheline_types,
     micheline_unsupported_instructions, micheline_unsupported_types, micheline_values,
@@ -2872,240 +2872,236 @@ fn get_nth_field_ref(mut m: u16, mut ty: &mut Type) -> Result<&mut Type, Type> {
     })
 }
 
+/// Worklist frame for the iterative value typechecker. `'a` is the arena
+/// lifetime that owns `Micheline` content; `'b` is the borrow lifetime of
+/// the input passed to `typecheck_value` and may be shorter than `'a`.
+enum TvFrame<'a, 'b> {
+    /// Typecheck a Micheline value at the expected Type.
+    Visit { v: &'b Micheline<'a>, t: Type },
+    /// Behave as `Visit { v: App(Pair, vs, NO_ANNS), t }` without
+    /// constructing the synthetic Micheline (no arena is available).
+    VisitPairTail { vs: &'b [Micheline<'a>], t: Type },
+    /// Pop two `TypedValue`s, push `TV::new_pair`.
+    BuildPair,
+    /// Pop one `TypedValue`, wrap as `Or::Left`.
+    BuildLeft,
+    /// Pop one `TypedValue`, wrap as `Or::Right`.
+    BuildRight,
+    /// Pop one `TypedValue`, wrap as `Option::Some`.
+    BuildSome,
+    /// Pop a `TV::Address`, resolve a `Contract` at this type.
+    BuildContract { contract_ty: Rc<Type> },
+    /// List element iteration: one `Rc<TypedValue>` per remaining child.
+    ListAccum {
+        remaining: &'b [Micheline<'a>],
+        elem_t: Type,
+        acc: Vec<Rc<TypedValue<'a>>>,
+    },
+    /// Set element iteration with ordering check.
+    SetAccum {
+        remaining: &'b [Micheline<'a>],
+        elem_t: Type,
+        set_ty: Type,
+        acc: BTreeSet<TypedValue<'a>>,
+        prev: Option<TypedValue<'a>>,
+    },
+    /// Map or in-memory big map iteration.
+    MapAccum {
+        remaining: &'b [Micheline<'a>],
+        key_t: Type,
+        val_t: Type,
+        map_ty: Type,
+        finalize: MapFinalize,
+        acc: BTreeMap<TypedValue<'a>, TypedValue<'a>>,
+        prev_key: Option<TypedValue<'a>>,
+        stage: MapStage<'a, 'b>,
+    },
+    /// Big map from id with a diff overlay.
+    BigMapDiffAccum {
+        remaining: &'b [Micheline<'a>],
+        key_t: Type,
+        val_t: Type,
+        map_ty: Type,
+        big_map_id: BigMapId,
+        tk_final: Type,
+        tv_final: Type,
+        acc: BTreeMap<TypedValue<'a>, Option<TypedValue<'a>>>,
+        prev_key: Option<TypedValue<'a>>,
+        stage: BigMapDiffStage<'a, 'b>,
+    },
+    /// Ticket from the explicit four argument form: pop ticketer, content,
+    /// and amount results (in that LIFO order they were pushed) and build.
+    BuildTicketExplicit { content_type: Rc<Type> },
+    /// Ticket from the legacy pair form: pop one `TV::Pair`, destructure.
+    BuildTicketLegacy { content_type: Type },
+}
+
+/// How a map style iteration finishes once all elements are typed.
+enum MapFinalize {
+    /// Produces `TV::Map`.
+    Map,
+    /// Produces `TV::BigMap(BigMap::new(tk, tv, ...))`.
+    BigMapInMem { tk: Type, tv: Type },
+}
+
+enum MapStage<'a, 'b> {
+    AwaitingKey { v_expr: &'b Micheline<'a> },
+    AwaitingValue { key: TypedValue<'a> },
+}
+
+enum BigMapDiffStage<'a, 'b> {
+    AwaitingKey { v_expr: &'b Micheline<'a> },
+    AwaitingValue { key: TypedValue<'a> },
+}
+
+/// Check `set` ordering between `prev` and `next`. Returns `Err` on a
+/// duplicate or out of order element, consumes the comparison gas.
+fn set_ordering_check<'a>(
+    ctx: &mut impl TypecheckingCtx<'a>,
+    set_ty: &Type,
+    prev: &Option<TypedValue<'a>>,
+    next: &TypedValue<'a>,
+) -> Result<(), TcError> {
+    if let Some(prev) = prev {
+        ctx.gas().consume(gas::interpret_cost::compare(prev, next)?)?;
+        match prev.cmp(next) {
+            std::cmp::Ordering::Less => Ok(()),
+            std::cmp::Ordering::Equal => Err(TcError::DuplicateElements(set_ty.clone())),
+            std::cmp::Ordering::Greater => Err(TcError::ElementsNotSorted(set_ty.clone())),
+        }
+    } else {
+        Ok(())
+    }
+}
+
+/// Check map key ordering between `prev_key` and `next_key`.
+fn map_key_ordering_check<'a>(
+    ctx: &mut impl TypecheckingCtx<'a>,
+    map_ty: &Type,
+    prev_key: &Option<TypedValue<'a>>,
+    next_key: &TypedValue<'a>,
+) -> Result<(), TcError> {
+    if let Some(prev) = prev_key {
+        ctx.gas().consume(gas::interpret_cost::compare(prev, next_key)?)?;
+        match prev.cmp(next_key) {
+            std::cmp::Ordering::Less => Ok(()),
+            std::cmp::Ordering::Equal => Err(TcError::DuplicateElements(map_ty.clone())),
+            std::cmp::Ordering::Greater => Err(TcError::ElementsNotSorted(map_ty.clone())),
+        }
+    } else {
+        Ok(())
+    }
+}
+
 /// Typecheck a value. Assumes passed the type is valid, i.e. doesn't contain
 /// illegal types like `set operation` or `contract operation`.
-pub fn typecheck_value<'a>(
-    v: &Micheline<'a>,
+/// Destructure a Micheline as `Elt(key, val)` (the element shape inside
+/// a typed `map`, `big_map`, or `set`-encoded sequence). Returns the
+/// inner key and value Micheline, or a `TcError::InvalidEltForMap`
+/// carrying a cloned copy of `map_ty` for context. The clone runs only
+/// on the error path.
+fn expect_elt<'a, 'b>(
+    elt: &'b Micheline<'a>,
+    map_ty: &Type,
+) -> Result<(&'b Micheline<'a>, &'b Micheline<'a>), TcError> {
+    match elt {
+        Micheline::App(Prim::Elt, [k_expr, v_expr], _) => Ok((k_expr, v_expr)),
+        _ => Err(TcError::InvalidEltForMap(
+            format!("{elt:?}"),
+            map_ty.clone(),
+        )),
+    }
+}
+
+/// Typecheck a value. Assumes the passed type is valid, i.e. does not contain
+/// illegal types like `set operation` or `contract operation`.
+pub fn typecheck_value<'a, 'b>(
+    v: &'b Micheline<'a>,
     ctx: &mut impl TypecheckingCtx<'a>,
     t: &Type,
 ) -> Result<TypedValue<'a>, TcError> {
+    let mut frames: Vec<TvFrame<'a, 'b>> = vec![TvFrame::Visit {
+        v,
+        t: t.clone(),
+    }];
+    let mut results: Vec<TypedValue<'a>> = Vec::new();
+
+    while let Some(frame) = frames.pop() {
+        step_typecheck_value(frame, ctx, &mut frames, &mut results)?;
+    }
+    Ok(results.pop().expect("typecheck_value root"))
+}
+
+fn step_typecheck_value<'a, 'b>(
+    frame: TvFrame<'a, 'b>,
+    ctx: &mut impl TypecheckingCtx<'a>,
+    frames: &mut Vec<TvFrame<'a, 'b>>,
+    results: &mut Vec<TypedValue<'a>>,
+) -> Result<(), TcError> {
     use Micheline as V;
     use Type as T;
     use TypedValue as TV;
-    ctx.gas().consume(gas::tc_cost::VALUE_STEP)?;
-    macro_rules! invalid_value_for_type {
-        () => {
-            TcError::InvalidValueForType(format!("{v:?}"), t.clone())
-        };
-    }
-    Ok(match (t, v) {
-        (T::Nat, V::Int(n)) => TV::Nat(BigUint::try_from(n)?),
-        (T::Int, V::Int(n)) => TV::Int(n.clone()),
-        (T::Bool, V::App(Prim::True, [], _)) => TV::Bool(true),
-        (T::Bool, V::App(Prim::False, [], _)) => TV::Bool(false),
-        (T::Mutez, V::Int(n)) if !n.is_negative() => TV::Mutez(i64::try_from(n)?),
-        (T::String, V::String(s)) => TV::String(s.clone()),
-        (T::Unit, V::App(Prim::Unit, [], _)) => TV::Unit,
-        (T::Pair(pt), V::App(Prim::Pair, [vl, rest @ ..], _) | V::Seq([vl, rest @ ..]))
-            if !rest.is_empty() =>
-        {
-            let (tl, tr) = pt.as_ref();
-            let l = typecheck_value(vl, ctx, tl)?;
-            let r = match rest {
-                [vr] => typecheck_value(vr, ctx, tr)?,
-                vrs => typecheck_value(&V::App(Prim::Pair, vrs, NO_ANNS), ctx, tr)?,
-            };
-            TV::new_pair(l, r)
-        }
-        (T::Or(ot), V::App(prim @ (Prim::Left | Prim::Right), [val], _)) => {
-            let (tl, tr) = ot.as_ref();
-            let typed_val = match prim {
-                Prim::Left => crate::ast::Or::Left(typecheck_value(val, ctx, tl)?),
-                Prim::Right => crate::ast::Or::Right(typecheck_value(val, ctx, tr)?),
-                _ => {
-                    return Err(TcError::InternalError(
-                        TcInvariant::UnexpectedLeftRightPrim,
-                    ))
+
+    match frame {
+        TvFrame::Visit { v, t } => visit_value(v, t, ctx, frames, results),
+        TvFrame::VisitPairTail { vs, t } => {
+            // Implements the recursive code's
+            // `typecheck_value(&V::App(Pair, vrs, NO_ANNS), ctx, tr)` step
+            // without constructing the synthetic App: dispatch directly
+            // on (t, vs) as if vs were the args of an App(Pair).
+            ctx.gas().consume(gas::tc_cost::VALUE_STEP)?;
+            match (&t, vs) {
+                (T::Pair(pt), [vl, rest @ ..]) if !rest.is_empty() => {
+                    let (tl, tr) = pt.as_ref();
+                    frames.push(TvFrame::BuildPair);
+                    if rest.len() == 1 {
+                        frames.push(TvFrame::Visit {
+                            v: &rest[0],
+                            t: tr.clone(),
+                        });
+                    } else {
+                        frames.push(TvFrame::VisitPairTail {
+                            vs: rest,
+                            t: tr.clone(),
+                        });
+                    }
+                    frames.push(TvFrame::Visit {
+                        v: vl,
+                        t: tl.clone(),
+                    });
+                    Ok(())
                 }
-            };
-            TV::new_or(typed_val)
-        }
-        (T::Option(ty), V::App(Prim::Some, [v], _)) => {
-            let v = typecheck_value(v, ctx, ty)?;
-            TV::new_option(Some(v))
-        }
-        (T::Option(_), V::App(Prim::None, [], _)) => TV::new_option(None),
-        (T::List(ty), V::Seq(vs)) => TV::List(MichelsonList::from(
-            vs.iter()
-                .map(|v| typecheck_value(v, ctx, ty).map(Rc::new))
-                .collect::<Result<Vec<_>, TcError>>()?,
-        )),
-        (T::Set(ty), V::Seq(vs)) => {
-            let set = typecheck_set(ctx, t, ty, vs)?;
-            TV::Set(set.into_iter().map(Rc::new).collect())
-        }
-        (T::Map(m), V::Seq(vs)) => {
-            let (tk, tv) = m.as_ref();
-            let map = typecheck_map(ctx, t, tk, tv, vs)?;
-            TV::Map(
-                map.into_iter()
-                    .map(|(k, v)| (Rc::new(k), Rc::new(v)))
-                    .collect(),
-            )
-        }
-        // All valid instantiations of big map are mentioned in
-        // https://tezos.gitlab.io/michelson-reference/#type-big_map
-        (T::BigMap(m), V::Seq(vs)) => {
-            // In-memory big maps have the same syntax as regular maps
-            let (tk, tv) = m.as_ref();
-            let map = typecheck_map(ctx, t, tk, tv, vs)?;
-            TV::BigMap(BigMap::new(tk.clone(), tv.clone(), map))
-        }
-        (T::BigMap(m), v) => {
-            let (id, vs_opt, diff) = match v {
-                V::Int(i) => (i, None, false),
-                V::App(Prim::Pair, [V::Int(i), V::Seq(vs)], _) => (i, Some(vs), true),
-                _ => return Err(invalid_value_for_type!()),
-            };
-
-            let (tk, tv) = m.as_ref();
-
-            let big_map_id = id.clone().into();
-            let (key_type, value_type) = ctx
-                .big_map_get_type(&big_map_id)
-                .map_err(|e| TcError::LazyStorageError(e.to_string()))?
-                .ok_or(TcError::BigMapNotFound(id.clone()))?;
-
-            ensure_ty_eq(ctx.gas(), &key_type, tk)?;
-            ensure_ty_eq(ctx.gas(), &value_type, tv)?;
-
-            let overlay = if let Some(vs) = vs_opt {
-                typecheck_big_map(ctx, t, tk, tv, vs, diff)?
-            } else {
-                BTreeMap::default()
-            };
-            let content = big_map::BigMapContent::FromId(big_map::BigMapFromId {
-                id: big_map_id,
-                overlay,
-            });
-            TV::BigMap(BigMap {
-                content,
-                key_type: tk.clone(),
-                value_type: tv.clone(),
-            })
-        }
-        (T::Address, V::String(str)) => {
-            ctx.gas().consume(gas::tc_cost::KEY_HASH_READABLE)?;
-            TV::Address(
-                Address::from_base58_check(str)
-                    .map_err(|e| TcError::ByteReprError(T::Address, e))?,
-            )
-        }
-        (T::Address, V::Bytes(bs)) => {
-            ctx.gas().consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
-            TV::Address(Address::from_bytes(bs).map_err(|e| TcError::ByteReprError(T::Address, e))?)
-        }
-        (T::Contract(ty), addr) => {
-            let t_addr = match typecheck_value(addr, ctx, &T::Address)? {
-                TV::Address(addr) => addr,
-                _ => {
-                    return Err(TcError::InternalError(
-                        TcInvariant::TypecheckValueWrongVariant {
-                            expected: "TV::Address",
-                        },
-                    ))
-                }
-            };
-            typecheck_contract_address(ctx, t_addr, Entrypoint::default(), ty)
-                .map(TypedValue::Contract)?
-        }
-        (T::ChainId, V::String(str)) => {
-            ctx.gas().consume(gas::tc_cost::CHAIN_ID_READABLE)?;
-            TV::ChainId(
-                ChainId::from_base58_check(str).map_err(|x| TcError::ChainIdError(x.into()))?,
-            )
-        }
-        (T::ChainId, V::Bytes(bs)) => {
-            use tezos_crypto_rs::hash::HashTrait;
-            ctx.gas().consume(gas::tc_cost::CHAIN_ID_OPTIMIZED)?;
-            TV::ChainId(ChainId::try_from_bytes(bs).map_err(|x| TcError::ChainIdError(x.into()))?)
-        }
-        (T::Bytes, V::Bytes(bs)) => TV::Bytes(bs.clone()),
-        (T::Key, V::String(str)) => {
-            ctx.gas().consume(gas::tc_cost::KEY_READABLE)?;
-            TV::Key(
-                PublicKey::from_b58check(str)
-                    .map_err(|e| TcError::ByteReprError(T::Key, e.into()))?,
-            )
-        }
-        (T::Key, V::Bytes(bs)) => {
-            ctx.gas().consume(gas::tc_cost::KEY_OPTIMIZED)?;
-            TV::Key(
-                PublicKey::nom_read_exact(bs)
-                    .map_err(|e| TcError::ByteReprError(T::Key, e.into()))?,
-            )
-        }
-        (T::Signature, V::String(str)) => {
-            ctx.gas().consume(gas::tc_cost::KEY_READABLE)?;
-            TV::Signature(
-                Signature::from_base58_check(str)
-                    .map_err(|e| TcError::ByteReprError(T::Signature, e.into()))?,
-            )
-        }
-        (T::Signature, V::Bytes(bs)) => {
-            ctx.gas().consume(gas::tc_cost::KEY_OPTIMIZED)?;
-            TV::Signature(
-                Signature::try_from(bs.clone())
-                    .map_err(|e| TcError::ByteReprError(T::Signature, e.into()))?,
-            )
-        }
-        (T::KeyHash, V::String(str)) => {
-            ctx.gas().consume(gas::tc_cost::KEY_HASH_READABLE)?;
-            TV::KeyHash(
-                PublicKeyHash::from_b58check(str)
-                    .map_err(|e| TcError::ByteReprError(T::KeyHash, e.into()))?,
-            )
-        }
-        (T::KeyHash, V::Bytes(bs)) => {
-            ctx.gas().consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
-            TV::KeyHash(PublicKeyHash::nom_read_exact(bs).map_err(|err| {
-                TcError::ByteReprError(
-                    T::KeyHash,
-                    ByteReprError::WrongFormat(format!(
-                        "public key hash, optimized {}",
-                        convert_error(bs, err)
-                    )),
-                )
-            })?)
-        }
-        (T::Timestamp, V::Int(n)) => TV::Timestamp(n.clone()),
-        (T::Timestamp, V::String(n)) => {
-            ctx.gas()
-                .consume(gas::tc_cost::timestamp_decoding(n.len())?)?;
-            // First, try to parse the string as an integer
-            if let Ok(int_value) = n.parse::<i64>() {
-                TV::Timestamp(int_value.into())
-            } else {
-                // If integer parsing fails, try to parse as RFC3339 datetime
-                let dt = DateTime::parse_from_rfc3339(n);
-                match dt {
-                    Ok(dt) => TV::Timestamp(dt.timestamp().into()),
-                    Err(_) => return Err(invalid_value_for_type!()),
-                }
+                _ => Err(TcError::InvalidValueForType(
+                    format!("App(Pair, {vs:?}, [])"),
+                    t,
+                )),
             }
         }
-        (
-            T::Lambda(tys),
-            raw @ (V::Seq(instrs) | V::App(Prim::Lambda_rec, [V::Seq(instrs)], _)),
-        ) => {
-            let (in_ty, out_ty) = tys.as_ref();
-            TV::Lambda(Closure::Lambda(typecheck_lambda(
-                instrs,
-                ctx.gas(),
-                in_ty.clone(),
-                out_ty.clone(),
-                matches!(raw, V::App(Prim::Lambda_rec, ..)),
-            )?))
+        TvFrame::BuildPair => {
+            let r = results.pop().expect("pair r");
+            let l = results.pop().expect("pair l");
+            results.push(TV::new_pair(l, r));
+            Ok(())
         }
-        (
-            T::Ticket(content_type),
-            V::App(Prim::Ticket, [ticketer, content_type_bis, content, amount], _),
-        ) => {
-            let content_type_bis = parse_ty(ctx.gas(), content_type_bis)?;
-            ensure_ty_eq(ctx.gas(), content_type, &content_type_bis)?;
-            let ticketer = typecheck_value(ticketer, ctx, &T::Address)?;
-            let ticketer = match ticketer {
-                TV::Address(addr) => addr,
+        TvFrame::BuildLeft => {
+            let v = results.pop().expect("left");
+            results.push(TV::new_or(crate::ast::Or::Left(v)));
+            Ok(())
+        }
+        TvFrame::BuildRight => {
+            let v = results.pop().expect("right");
+            results.push(TV::new_or(crate::ast::Or::Right(v)));
+            Ok(())
+        }
+        TvFrame::BuildSome => {
+            let v = results.pop().expect("some");
+            results.push(TV::new_option(Some(v)));
+            Ok(())
+        }
+        TvFrame::BuildContract { contract_ty } => {
+            let addr = results.pop().expect("contract addr");
+            let t_addr = match addr {
+                TV::Address(a) => a,
                 _ => {
                     return Err(TcError::InternalError(
                         TcInvariant::TypecheckValueWrongVariant {
@@ -3114,10 +3110,264 @@ pub fn typecheck_value<'a>(
                     ))
                 }
             };
-            let content = typecheck_value(content, ctx, content_type)?;
-            let amount = typecheck_value(amount, ctx, &T::Nat)?;
+            results.push(
+                typecheck_contract_address(ctx, t_addr, Entrypoint::default(), &contract_ty)
+                    .map(TypedValue::Contract)?,
+            );
+            Ok(())
+        }
+        TvFrame::ListAccum {
+            remaining,
+            elem_t,
+            mut acc,
+        } => {
+            let elem = results.pop().expect("list elem");
+            acc.push(Rc::new(elem));
+            if let Some((next, rest)) = remaining.split_first() {
+                frames.push(TvFrame::ListAccum {
+                    remaining: rest,
+                    elem_t: elem_t.clone(),
+                    acc,
+                });
+                frames.push(TvFrame::Visit {
+                    v: next,
+                    t: elem_t,
+                });
+            } else {
+                results.push(TV::List(MichelsonList::from(acc)));
+            }
+            Ok(())
+        }
+        TvFrame::SetAccum {
+            remaining,
+            elem_t,
+            set_ty,
+            mut acc,
+            prev,
+        } => {
+            let elem = results.pop().expect("set elem");
+            set_ordering_check(ctx, &set_ty, &prev, &elem)?;
+            let next_prev = Some(elem.clone());
+            acc.insert(elem);
+            if let Some((next, rest)) = remaining.split_first() {
+                frames.push(TvFrame::SetAccum {
+                    remaining: rest,
+                    elem_t: elem_t.clone(),
+                    set_ty,
+                    acc,
+                    prev: next_prev,
+                });
+                frames.push(TvFrame::Visit {
+                    v: next,
+                    t: elem_t,
+                });
+            } else {
+                results.push(TV::Set(acc.into_iter().map(Rc::new).collect()));
+            }
+            Ok(())
+        }
+        TvFrame::MapAccum {
+            remaining,
+            key_t,
+            val_t,
+            map_ty,
+            finalize,
+            acc,
+            prev_key,
+            stage,
+        } => match stage {
+            MapStage::AwaitingKey { v_expr } => {
+                let key = results.pop().expect("map key");
+                frames.push(TvFrame::MapAccum {
+                    remaining,
+                    key_t,
+                    val_t: val_t.clone(),
+                    map_ty,
+                    finalize,
+                    acc,
+                    prev_key,
+                    stage: MapStage::AwaitingValue { key },
+                });
+                frames.push(TvFrame::Visit {
+                    v: v_expr,
+                    t: val_t,
+                });
+                Ok(())
+            }
+            MapStage::AwaitingValue { key } => {
+                let value = results.pop().expect("map value");
+                map_key_ordering_check(ctx, &map_ty, &prev_key, &key)?;
+                let next_prev = Some(key.clone());
+                let mut acc = acc;
+                acc.insert(key, value);
+                if let Some((next_elt, rest)) = remaining.split_first() {
+                    let (next_k_expr, next_v_expr) = expect_elt(next_elt, &map_ty)?;
+                    frames.push(TvFrame::MapAccum {
+                        remaining: rest,
+                        key_t: key_t.clone(),
+                        val_t,
+                        map_ty,
+                        finalize,
+                        acc,
+                        prev_key: next_prev,
+                        stage: MapStage::AwaitingKey {
+                            v_expr: next_v_expr,
+                        },
+                    });
+                    frames.push(TvFrame::Visit {
+                        v: next_k_expr,
+                        t: key_t,
+                    });
+                } else {
+                    match finalize {
+                        MapFinalize::Map => {
+                            results.push(TV::Map(
+                                acc.into_iter()
+                                    .map(|(k, v)| (Rc::new(k), Rc::new(v)))
+                                    .collect(),
+                            ));
+                        }
+                        MapFinalize::BigMapInMem { tk, tv } => {
+                            results.push(TV::BigMap(BigMap::new(tk, tv, acc)));
+                        }
+                    }
+                }
+                Ok(())
+            }
+        },
+        TvFrame::BigMapDiffAccum {
+            remaining,
+            key_t,
+            val_t,
+            map_ty,
+            big_map_id,
+            tk_final,
+            tv_final,
+            acc,
+            prev_key,
+            stage,
+        } => match stage {
+            BigMapDiffStage::AwaitingKey { v_expr } => {
+                let key = results.pop().expect("big_map key");
+                // Decide what to do with v_expr.
+                match v_expr {
+                    V::App(Prim::Some, [inner], _) => {
+                        frames.push(TvFrame::BigMapDiffAccum {
+                            remaining,
+                            key_t,
+                            val_t: val_t.clone(),
+                            map_ty,
+                            big_map_id,
+                            tk_final,
+                            tv_final,
+                            acc,
+                            prev_key,
+                            stage: BigMapDiffStage::AwaitingValue { key },
+                        });
+                        frames.push(TvFrame::Visit {
+                            v: inner,
+                            t: val_t,
+                        });
+                    }
+                    V::App(Prim::None, [], _) => {
+                        // None entry: no value typecheck; commit (key, None)
+                        // right away and continue with the next Elt.
+                        map_key_ordering_check(ctx, &map_ty, &prev_key, &key)?;
+                        let next_prev = Some(key.clone());
+                        let mut acc = acc;
+                        acc.insert(key, None);
+                        if let Some((next_elt, rest)) = remaining.split_first() {
+                            let (next_k_expr, next_v_expr) = expect_elt(next_elt, &map_ty)?;
+                            frames.push(TvFrame::BigMapDiffAccum {
+                                remaining: rest,
+                                key_t: key_t.clone(),
+                                val_t,
+                                map_ty,
+                                big_map_id,
+                                tk_final,
+                                tv_final,
+                                acc,
+                                prev_key: next_prev,
+                                stage: BigMapDiffStage::AwaitingKey {
+                                    v_expr: next_v_expr,
+                                },
+                            });
+                            frames.push(TvFrame::Visit {
+                                v: next_k_expr,
+                                t: key_t,
+                            });
+                        } else {
+                            results.push(TV::BigMap(BigMap {
+                                content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
+                                    id: big_map_id,
+                                    overlay: acc,
+                                }),
+                                key_type: tk_final,
+                                value_type: tv_final,
+                            }));
+                        }
+                    }
+                    other => {
+                        return Err(TcError::InvalidEltForMap(format!("{other:?}"), map_ty));
+                    }
+                }
+                Ok(())
+            }
+            BigMapDiffStage::AwaitingValue { key } => {
+                let value = results.pop().expect("big_map value");
+                map_key_ordering_check(ctx, &map_ty, &prev_key, &key)?;
+                let next_prev = Some(key.clone());
+                let mut acc = acc;
+                acc.insert(key, Some(value));
+                if let Some((next_elt, rest)) = remaining.split_first() {
+                    let (next_k_expr, next_v_expr) = expect_elt(next_elt, &map_ty)?;
+                    frames.push(TvFrame::BigMapDiffAccum {
+                        remaining: rest,
+                        key_t: key_t.clone(),
+                        val_t,
+                        map_ty,
+                        big_map_id,
+                        tk_final,
+                        tv_final,
+                        acc,
+                        prev_key: next_prev,
+                        stage: BigMapDiffStage::AwaitingKey {
+                            v_expr: next_v_expr,
+                        },
+                    });
+                    frames.push(TvFrame::Visit {
+                        v: next_k_expr,
+                        t: key_t,
+                    });
+                } else {
+                    results.push(TV::BigMap(BigMap {
+                        content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
+                            id: big_map_id,
+                            overlay: acc,
+                        }),
+                        key_type: tk_final,
+                        value_type: tv_final,
+                    }));
+                }
+                Ok(())
+            }
+        },
+        TvFrame::BuildTicketExplicit { content_type } => {
+            let amount = results.pop().expect("ticket amount");
+            let content = results.pop().expect("ticket content");
+            let ticketer = results.pop().expect("ticket ticketer");
+            let ticketer = match ticketer {
+                TV::Address(a) => a,
+                _ => {
+                    return Err(TcError::InternalError(
+                        TcInvariant::TypecheckValueWrongVariant {
+                            expected: "TV::Address",
+                        },
+                    ))
+                }
+            };
             let amount = match amount {
-                TV::Nat(amount) => amount,
+                TV::Nat(n) => n,
                 _ => {
                     return Err(TcError::InternalError(
                         TcInvariant::TypecheckValueWrongVariant {
@@ -3126,26 +3376,20 @@ pub fn typecheck_value<'a>(
                     ))
                 }
             };
-            TV::new_ticket(Ticket {
+            results.push(TV::new_ticket(Ticket {
                 ticketer: ticketer.hash,
                 content_type: content_type.as_ref().clone(),
                 content,
                 amount,
-            })
+            }));
+            Ok(())
         }
-        (T::Ticket(content_type), m) => {
-            let content_type = content_type.as_ref();
-            match typecheck_value(
-                m,
-                ctx,
-                &Type::new_pair(
-                    Type::Address,
-                    Type::new_pair(content_type.clone(), Type::Nat),
-                ),
-            ) {
-                Ok(TV::Pair(left, right)) => {
+        TvFrame::BuildTicketLegacy { content_type } => {
+            let pair = results.pop().expect("ticket legacy pair");
+            match pair {
+                TV::Pair(left, right) => {
                     let address = match TypedValue::unwrap_rc(left) {
-                        TV::Address(addr) => addr,
+                        TV::Address(a) => a,
                         _ => {
                             return Err(TcError::InternalError(
                                 TcInvariant::TypecheckValueWrongVariant {
@@ -3155,52 +3399,478 @@ pub fn typecheck_value<'a>(
                         }
                     };
                     let (content, amount) = match TypedValue::unwrap_rc(right) {
-                        TV::Pair(content, amount) => (content, amount),
+                        TV::Pair(c, a) => (c, a),
                         _ => {
                             return Err(TcError::InternalError(
                                 TcInvariant::ExpectedTicketNestedPair,
                             ))
                         }
                     };
-                    TV::new_ticket(Ticket {
+                    let amount = match TypedValue::unwrap_rc(amount) {
+                        TV::Nat(n) => n,
+                        _ => {
+                            return Err(TcError::InternalError(
+                                TcInvariant::ExpectedTicketNatAmount,
+                            ))
+                        }
+                    };
+                    results.push(TV::new_ticket(Ticket {
                         ticketer: address.hash,
-                        content_type: content_type.clone(),
+                        content_type,
                         content: TypedValue::unwrap_rc(content),
-                        amount: match TypedValue::unwrap_rc(amount) {
-                            TV::Nat(amount) => amount,
-                            _ => {
-                                return Err(TcError::InternalError(
-                                    TcInvariant::ExpectedTicketNatAmount,
-                                ))
-                            }
-                        },
-                    })
+                        amount,
+                    }));
+                    Ok(())
                 }
-                _ => return Err(invalid_value_for_type!()),
+                other => {
+                    // The synthetic pair value did not typecheck as a Pair,
+                    // which means the legacy ticket form was rejected.
+                    Err(TcError::InvalidValueForType(
+                        format!("{other:?}"),
+                        Type::new_ticket(content_type),
+                    ))
+                }
             }
+        }
+    }
+}
+
+fn visit_value<'a, 'b>(
+    v: &'b Micheline<'a>,
+    t: Type,
+    ctx: &mut impl TypecheckingCtx<'a>,
+    frames: &mut Vec<TvFrame<'a, 'b>>,
+    results: &mut Vec<TypedValue<'a>>,
+) -> Result<(), TcError> {
+    use Micheline as V;
+    use Type as T;
+    use TypedValue as TV;
+
+    ctx.gas().consume(gas::tc_cost::VALUE_STEP)?;
+    let invalid = || TcError::InvalidValueForType(format!("{v:?}"), t.clone());
+
+    match (&t, v) {
+        (T::Nat, V::Int(n)) => results.push(TV::Nat(BigUint::try_from(n)?)),
+        (T::Int, V::Int(n)) => results.push(TV::Int(n.clone())),
+        (T::Bool, V::App(Prim::True, [], _)) => results.push(TV::Bool(true)),
+        (T::Bool, V::App(Prim::False, [], _)) => results.push(TV::Bool(false)),
+        (T::Mutez, V::Int(n)) if !n.is_negative() => results.push(TV::Mutez(i64::try_from(n)?)),
+        (T::String, V::String(s)) => results.push(TV::String(s.clone())),
+        (T::Unit, V::App(Prim::Unit, [], _)) => results.push(TV::Unit),
+        (T::Pair(pt), V::App(Prim::Pair, [vl, rest @ ..], _) | V::Seq([vl, rest @ ..]))
+            if !rest.is_empty() =>
+        {
+            let (tl, tr) = pt.as_ref();
+            frames.push(TvFrame::BuildPair);
+            if rest.len() == 1 {
+                frames.push(TvFrame::Visit {
+                    v: &rest[0],
+                    t: tr.clone(),
+                });
+            } else {
+                frames.push(TvFrame::VisitPairTail {
+                    vs: rest,
+                    t: tr.clone(),
+                });
+            }
+            frames.push(TvFrame::Visit {
+                v: vl,
+                t: tl.clone(),
+            });
+        }
+        (T::Or(ot), V::App(prim @ (Prim::Left | Prim::Right), [val], _)) => {
+            let (tl, tr) = ot.as_ref();
+            match prim {
+                Prim::Left => {
+                    frames.push(TvFrame::BuildLeft);
+                    frames.push(TvFrame::Visit {
+                        v: val,
+                        t: tl.clone(),
+                    });
+                }
+                Prim::Right => {
+                    frames.push(TvFrame::BuildRight);
+                    frames.push(TvFrame::Visit {
+                        v: val,
+                        t: tr.clone(),
+                    });
+                }
+                _ => {
+                    return Err(TcError::InternalError(
+                        TcInvariant::UnexpectedLeftRightPrim,
+                    ))
+                }
+            }
+        }
+        (T::Option(ty), V::App(Prim::Some, [inner], _)) => {
+            frames.push(TvFrame::BuildSome);
+            frames.push(TvFrame::Visit {
+                v: inner,
+                t: ty.as_ref().clone(),
+            });
+        }
+        (T::Option(_), V::App(Prim::None, [], _)) => results.push(TV::new_option(None)),
+        (T::List(ty), V::Seq(vs)) => {
+            if let Some((first, rest)) = vs.split_first() {
+                let elem_t = ty.as_ref().clone();
+                frames.push(TvFrame::ListAccum {
+                    remaining: rest,
+                    elem_t: elem_t.clone(),
+                    acc: Vec::with_capacity(vs.len()),
+                });
+                frames.push(TvFrame::Visit { v: first, t: elem_t });
+            } else {
+                results.push(TV::List(MichelsonList::default()));
+            }
+        }
+        (T::Set(ty), V::Seq(vs)) => {
+            let elem_t = ty.as_ref().clone();
+            ctx.gas().consume(gas::tc_cost::construct_set(
+                elem_t.size_for_gas(),
+                vs.len(),
+            )?)?;
+            if let Some((first, rest)) = vs.split_first() {
+                frames.push(TvFrame::SetAccum {
+                    remaining: rest,
+                    elem_t: elem_t.clone(),
+                    set_ty: t.clone(),
+                    acc: BTreeSet::new(),
+                    prev: None,
+                });
+                frames.push(TvFrame::Visit { v: first, t: elem_t });
+            } else {
+                results.push(TV::Set(BTreeSet::new()));
+            }
+        }
+        (T::Map(m), V::Seq(vs)) => {
+            let (tk, tv) = m.as_ref();
+            let key_t = tk.clone();
+            ctx.gas().consume(gas::tc_cost::construct_map(
+                key_t.size_for_gas(),
+                vs.len(),
+            )?)?;
+            visit_map_or_bigmap_inmem(
+                v,
+                t.clone(),
+                vs,
+                key_t,
+                tv.clone(),
+                MapFinalize::Map,
+                frames,
+                results,
+            )?;
+        }
+        (T::BigMap(m), V::Seq(vs)) => {
+            // In-memory big map: same syntax as a regular map.
+            let (tk, tv) = m.as_ref();
+            let key_t = tk.clone();
+            ctx.gas().consume(gas::tc_cost::construct_map(
+                key_t.size_for_gas(),
+                vs.len(),
+            )?)?;
+            visit_map_or_bigmap_inmem(
+                v,
+                t.clone(),
+                vs,
+                key_t,
+                tv.clone(),
+                MapFinalize::BigMapInMem {
+                    tk: tk.clone(),
+                    tv: tv.clone(),
+                },
+                frames,
+                results,
+            )?;
+        }
+        (T::BigMap(m), v) => {
+            let (id, vs_opt, diff) = match v {
+                V::Int(i) => (i, None, false),
+                V::App(Prim::Pair, [V::Int(i), V::Seq(vs)], _) => (i, Some(vs), true),
+                _ => return Err(invalid()),
+            };
+            let (tk, tv) = m.as_ref();
+            let big_map_id: BigMapId = id.clone().into();
+            let (key_type, value_type) = ctx
+                .big_map_get_type(&big_map_id)
+                .map_err(|e| TcError::LazyStorageError(e.to_string()))?
+                .ok_or(TcError::BigMapNotFound(id.clone()))?;
+            ensure_ty_eq(ctx.gas(), &key_type, tk)?;
+            ensure_ty_eq(ctx.gas(), &value_type, tv)?;
+
+            let map_ty = t.clone();
+            let tk_final = tk.clone();
+            let tv_final = tv.clone();
+            let key_t = tk.clone();
+            let val_t = tv.clone();
+
+            match vs_opt {
+                None => {
+                    results.push(TV::BigMap(BigMap {
+                        content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
+                            id: big_map_id,
+                            overlay: BTreeMap::default(),
+                        }),
+                        key_type: tk_final,
+                        value_type: tv_final,
+                    }));
+                }
+                Some(vs) => {
+                    ctx.gas().consume(gas::tc_cost::construct_map(
+                        key_t.size_for_gas(),
+                        vs.len(),
+                    )?)?;
+                    if let Some((first_elt, rest)) = vs.split_first() {
+                        let (k_expr, v_expr) = expect_elt(first_elt, &map_ty)?;
+                        if !diff {
+                            // Non-diff form happens only when vs_opt is None;
+                            // reaching here means we matched the diff shape.
+                            // Keep this branch for safety even though `diff`
+                            // is always true once vs_opt is Some.
+                        }
+                        frames.push(TvFrame::BigMapDiffAccum {
+                            remaining: rest,
+                            key_t: key_t.clone(),
+                            val_t,
+                            map_ty,
+                            big_map_id,
+                            tk_final,
+                            tv_final,
+                            acc: BTreeMap::new(),
+                            prev_key: None,
+                            stage: BigMapDiffStage::AwaitingKey { v_expr },
+                        });
+                        frames.push(TvFrame::Visit {
+                            v: k_expr,
+                            t: key_t,
+                        });
+                    } else {
+                        // Empty diff: build with empty overlay.
+                        results.push(TV::BigMap(BigMap {
+                            content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
+                                id: big_map_id,
+                                overlay: BTreeMap::default(),
+                            }),
+                            key_type: tk_final,
+                            value_type: tv_final,
+                        }));
+                    }
+                }
+            }
+        }
+        (T::Address, V::String(str)) => {
+            ctx.gas().consume(gas::tc_cost::KEY_HASH_READABLE)?;
+            results.push(TV::Address(
+                Address::from_base58_check(str)
+                    .map_err(|e| TcError::ByteReprError(T::Address, e))?,
+            ));
+        }
+        (T::Address, V::Bytes(bs)) => {
+            ctx.gas().consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
+            results.push(TV::Address(
+                Address::from_bytes(bs).map_err(|e| TcError::ByteReprError(T::Address, e))?,
+            ));
+        }
+        (T::Contract(ty), addr) => {
+            frames.push(TvFrame::BuildContract {
+                contract_ty: ty.clone(),
+            });
+            frames.push(TvFrame::Visit {
+                v: addr,
+                t: T::Address,
+            });
+        }
+        (T::ChainId, V::String(str)) => {
+            ctx.gas().consume(gas::tc_cost::CHAIN_ID_READABLE)?;
+            results.push(TV::ChainId(
+                ChainId::from_base58_check(str).map_err(|x| TcError::ChainIdError(x.into()))?,
+            ));
+        }
+        (T::ChainId, V::Bytes(bs)) => {
+            use tezos_crypto_rs::hash::HashTrait;
+            ctx.gas().consume(gas::tc_cost::CHAIN_ID_OPTIMIZED)?;
+            results.push(TV::ChainId(
+                ChainId::try_from_bytes(bs).map_err(|x| TcError::ChainIdError(x.into()))?,
+            ));
+        }
+        (T::Bytes, V::Bytes(bs)) => results.push(TV::Bytes(bs.clone())),
+        (T::Key, V::String(str)) => {
+            ctx.gas().consume(gas::tc_cost::KEY_READABLE)?;
+            results.push(TV::Key(
+                PublicKey::from_b58check(str)
+                    .map_err(|e| TcError::ByteReprError(T::Key, e.into()))?,
+            ));
+        }
+        (T::Key, V::Bytes(bs)) => {
+            ctx.gas().consume(gas::tc_cost::KEY_OPTIMIZED)?;
+            results.push(TV::Key(
+                PublicKey::nom_read_exact(bs)
+                    .map_err(|e| TcError::ByteReprError(T::Key, e.into()))?,
+            ));
+        }
+        (T::Signature, V::String(str)) => {
+            ctx.gas().consume(gas::tc_cost::KEY_READABLE)?;
+            results.push(TV::Signature(
+                Signature::from_base58_check(str)
+                    .map_err(|e| TcError::ByteReprError(T::Signature, e.into()))?,
+            ));
+        }
+        (T::Signature, V::Bytes(bs)) => {
+            ctx.gas().consume(gas::tc_cost::KEY_OPTIMIZED)?;
+            results.push(TV::Signature(
+                Signature::try_from(bs.clone())
+                    .map_err(|e| TcError::ByteReprError(T::Signature, e.into()))?,
+            ));
+        }
+        (T::KeyHash, V::String(str)) => {
+            ctx.gas().consume(gas::tc_cost::KEY_HASH_READABLE)?;
+            results.push(TV::KeyHash(
+                PublicKeyHash::from_b58check(str)
+                    .map_err(|e| TcError::ByteReprError(T::KeyHash, e.into()))?,
+            ));
+        }
+        (T::KeyHash, V::Bytes(bs)) => {
+            ctx.gas().consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
+            results.push(TV::KeyHash(PublicKeyHash::nom_read_exact(bs).map_err(
+                |err| {
+                    TcError::ByteReprError(
+                        T::KeyHash,
+                        ByteReprError::WrongFormat(format!(
+                            "public key hash, optimized {}",
+                            convert_error(bs, err)
+                        )),
+                    )
+                },
+            )?));
+        }
+        (T::Timestamp, V::Int(n)) => results.push(TV::Timestamp(n.clone())),
+        (T::Timestamp, V::String(n)) => {
+            ctx.gas()
+                .consume(gas::tc_cost::timestamp_decoding(n.len())?)?;
+            if let Ok(int_value) = n.parse::<i64>() {
+                results.push(TV::Timestamp(int_value.into()));
+            } else {
+                let dt = DateTime::parse_from_rfc3339(n);
+                match dt {
+                    Ok(dt) => results.push(TV::Timestamp(dt.timestamp().into())),
+                    Err(_) => return Err(invalid()),
+                }
+            }
+        }
+        (
+            T::Lambda(tys),
+            raw @ (V::Seq(instrs) | V::App(Prim::Lambda_rec, [V::Seq(instrs)], _)),
+        ) => {
+            let (in_ty, out_ty) = tys.as_ref();
+            results.push(TV::Lambda(Closure::Lambda(typecheck_lambda(
+                instrs,
+                ctx.gas(),
+                in_ty.clone(),
+                out_ty.clone(),
+                matches!(raw, V::App(Prim::Lambda_rec, ..)),
+            )?)));
+        }
+        (
+            T::Ticket(content_type),
+            V::App(Prim::Ticket, [ticketer, content_type_bis, content, amount], _),
+        ) => {
+            let parsed_bis = parse_ty(ctx.gas(), content_type_bis)?;
+            ensure_ty_eq(ctx.gas(), content_type, &parsed_bis)?;
+            // BuildTicketExplicit pops 3 in LIFO order: amount, content, ticketer.
+            frames.push(TvFrame::BuildTicketExplicit {
+                content_type: content_type.clone(),
+            });
+            frames.push(TvFrame::Visit {
+                v: amount,
+                t: T::Nat,
+            });
+            frames.push(TvFrame::Visit {
+                v: content,
+                t: content_type.as_ref().clone(),
+            });
+            frames.push(TvFrame::Visit {
+                v: ticketer,
+                t: T::Address,
+            });
+        }
+        (T::Ticket(content_type), m) => {
+            let content_type = content_type.as_ref().clone();
+            let pair_t = Type::new_pair(
+                Type::Address,
+                Type::new_pair(content_type.clone(), Type::Nat),
+            );
+            frames.push(TvFrame::BuildTicketLegacy { content_type });
+            frames.push(TvFrame::Visit { v: m, t: pair_t });
         }
         #[cfg(feature = "bls")]
         (T::Bls12381Fr, V::Int(i)) => {
             ctx.gas().consume(gas::tc_cost::BLS_FR)?;
-            TV::Bls12381Fr(bls::Fr::from_big_int(i))
+            results.push(TV::Bls12381Fr(bls::Fr::from_big_int(i)));
         }
         #[cfg(feature = "bls")]
         (T::Bls12381Fr, V::Bytes(bs)) => {
             ctx.gas().consume(gas::tc_cost::BLS_FR)?;
-            TV::Bls12381Fr(bls::Fr::from_bytes(bs).ok_or_else(|| invalid_value_for_type!())?)
+            results.push(TV::Bls12381Fr(
+                bls::Fr::from_bytes(bs).ok_or_else(invalid)?,
+            ));
         }
         #[cfg(feature = "bls")]
         (T::Bls12381G1, V::Bytes(bs)) => {
             ctx.gas().consume(gas::tc_cost::BLS_G1)?;
-            TV::new_bls12381_g1(bls::G1::from_bytes(bs).ok_or_else(|| invalid_value_for_type!())?)
+            results.push(TV::new_bls12381_g1(
+                bls::G1::from_bytes(bs).ok_or_else(invalid)?,
+            ));
         }
         #[cfg(feature = "bls")]
         (T::Bls12381G2, V::Bytes(bs)) => {
             ctx.gas().consume(gas::tc_cost::BLS_G2)?;
-            TV::new_bls12381_g2(bls::G2::from_bytes(bs).ok_or_else(|| invalid_value_for_type!())?)
+            results.push(TV::new_bls12381_g2(
+                bls::G2::from_bytes(bs).ok_or_else(invalid)?,
+            ));
         }
-        (_, _) => return Err(invalid_value_for_type!()),
-    })
+        (_, _) => return Err(invalid()),
+    }
+    Ok(())
+}
+
+/// Shared setup for the (T::Map, Seq) and (T::BigMap, Seq) arms.
+fn visit_map_or_bigmap_inmem<'a, 'b>(
+    v: &'b Micheline<'a>,
+    map_ty: Type,
+    vs: &'b [Micheline<'a>],
+    key_t: Type,
+    val_t: Type,
+    finalize: MapFinalize,
+    frames: &mut Vec<TvFrame<'a, 'b>>,
+    results: &mut Vec<TypedValue<'a>>,
+) -> Result<(), TcError> {
+    use TypedValue as TV;
+
+    if let Some((first_elt, rest)) = vs.split_first() {
+        let (k_expr, v_expr) = expect_elt(first_elt, &map_ty)?;
+        let _ = v;
+        frames.push(TvFrame::MapAccum {
+            remaining: rest,
+            key_t: key_t.clone(),
+            val_t,
+            map_ty,
+            finalize,
+            acc: BTreeMap::new(),
+            prev_key: None,
+            stage: MapStage::AwaitingKey { v_expr },
+        });
+        frames.push(TvFrame::Visit {
+            v: k_expr,
+            t: key_t,
+        });
+    } else {
+        match finalize {
+            MapFinalize::Map => results.push(TV::Map(BTreeMap::new())),
+            MapFinalize::BigMapInMem { tk, tv } => {
+                results.push(TV::BigMap(BigMap::new(tk, tv, BTreeMap::new())))
+            }
+        }
+    }
+    Ok(())
 }
 
 #[allow(missing_docs)]
@@ -3296,154 +3966,6 @@ fn validate_u10(n: &BigInt) -> Result<u16, TcError> {
         return Err(TcError::ExpectedU10(n.clone()));
     }
     Ok(res)
-}
-
-fn typecheck_set<'a>(
-    ctx: &mut impl TypecheckingCtx<'a>,
-    set_ty: &Type,
-    elem_ty: &Type,
-    vs: &[Micheline<'a>],
-) -> Result<BTreeSet<TypedValue<'a>>, TcError> {
-    ctx.gas().consume(gas::tc_cost::construct_set(
-        elem_ty.size_for_gas(),
-        vs.len(),
-    )?)?;
-
-    let mut prev_elt = None;
-    let mut set = BTreeSet::new();
-
-    for elt in vs.iter() {
-        let elt = typecheck_value(elt, ctx, elem_ty)?;
-        if let Some(prev_elt) = prev_elt {
-            ctx.gas()
-                .consume(gas::interpret_cost::compare(&prev_elt, &elt)?)?;
-            match prev_elt.cmp(&elt) {
-                std::cmp::Ordering::Less => (),
-                std::cmp::Ordering::Equal => {
-                    return Err(TcError::DuplicateElements(set_ty.clone()))
-                }
-                std::cmp::Ordering::Greater => {
-                    return Err(TcError::ElementsNotSorted(set_ty.clone()))
-                }
-            };
-        };
-        prev_elt = Some(elt.clone());
-        set.insert(elt);
-    }
-    Ok(set)
-}
-
-fn typecheck_map<'a>(
-    ctx: &mut impl TypecheckingCtx<'a>,
-    map_ty: &Type,
-    key_type: &Type,
-    value_type: &Type,
-    vs: &[Micheline<'a>],
-) -> Result<BTreeMap<TypedValue<'a>, TypedValue<'a>>, TcError> {
-    ctx.gas().consume(gas::tc_cost::construct_map(
-        key_type.size_for_gas(),
-        vs.len(),
-    )?)?;
-
-    let mut prev_key = None;
-    let mut map = BTreeMap::new();
-
-    for mich in vs.iter() {
-        let (key, val) = match mich {
-            Micheline::App(Prim::Elt, [k_expr, v_expr], _) => {
-                let k = typecheck_value(k_expr, ctx, key_type)?;
-                let v = typecheck_value(v_expr, ctx, value_type)?;
-                (k, v)
-            }
-            _ => {
-                return Err(TcError::InvalidEltForMap(
-                    format!("{mich:?}"),
-                    map_ty.clone(),
-                ))
-            }
-        };
-        if let Some(prev_key) = prev_key {
-            ctx.gas()
-                .consume(gas::interpret_cost::compare(&prev_key, &key)?)?;
-            match prev_key.cmp(&key) {
-                std::cmp::Ordering::Less => (),
-                std::cmp::Ordering::Equal => {
-                    return Err(TcError::DuplicateElements(map_ty.clone()))
-                }
-                std::cmp::Ordering::Greater => {
-                    return Err(TcError::ElementsNotSorted(map_ty.clone()))
-                }
-            };
-        };
-        prev_key = Some(key.clone());
-        map.insert(key, val);
-    }
-    Ok(map)
-}
-
-fn typecheck_big_map<'a>(
-    ctx: &mut impl TypecheckingCtx<'a>,
-    map_ty: &Type,
-    key_type: &Type,
-    value_type: &Type,
-    vs: &[Micheline<'a>],
-    diff: bool,
-) -> Result<BTreeMap<TypedValue<'a>, Option<TypedValue<'a>>>, TcError> {
-    ctx.gas().consume(gas::tc_cost::construct_map(
-        key_type.size_for_gas(),
-        vs.len(),
-    )?)?;
-
-    let mut prev_key = None;
-    let mut map = BTreeMap::new();
-
-    for mich in vs.iter() {
-        let (key, val) = match mich {
-            Micheline::App(Prim::Elt, [k_expr, v_expr], _) => {
-                let k = typecheck_value(k_expr, ctx, key_type)?;
-                let v = if diff {
-                    match v_expr {
-                        Micheline::App(Prim::Some, [inner_val], _) => {
-                            let v = typecheck_value(inner_val, ctx, value_type)?;
-                            Some(v)
-                        }
-                        Micheline::App(Prim::None, [], _) => None,
-                        _ => {
-                            return Err(TcError::InvalidEltForMap(
-                                format!("{v_expr:?}"),
-                                map_ty.clone(),
-                            ))
-                        }
-                    }
-                } else {
-                    Some(typecheck_value(v_expr, ctx, value_type)?)
-                };
-                (k, v)
-            }
-            _ => {
-                return Err(TcError::InvalidEltForMap(
-                    format!("{mich:?}"),
-                    map_ty.clone(),
-                ))
-            }
-        };
-        if let Some(prev_key) = prev_key {
-            ctx.gas()
-                .consume(gas::interpret_cost::compare(&prev_key, &key)?)?;
-            match prev_key.cmp(&key) {
-                std::cmp::Ordering::Less => (),
-                std::cmp::Ordering::Equal => {
-                    return Err(TcError::DuplicateElements(map_ty.clone()))
-                }
-                std::cmp::Ordering::Greater => {
-                    return Err(TcError::ElementsNotSorted(map_ty.clone()))
-                }
-            };
-        };
-        prev_key = Some(key.clone());
-        map.insert(key, val);
-    }
-    Ok(map)
 }
 
 /// Ensures type stack is at least of the required length, otherwise returns
@@ -3546,6 +4068,40 @@ mod typecheck_tests {
         let mut gas = Gas::new(u32::MAX);
         let parsed = parse_ty(&mut gas, &current).expect("deep pair parses");
         assert!(matches!(parsed, Type::Pair(_)));
+    }
+
+    /// Typechecks a 100k deep right leaning pair value at the matching
+    /// pair type. Ignored for the same reason as the parse test: the
+    /// resulting `Type`/`TypedValue` tree overflows on Drop.
+    #[test]
+    #[ignore]
+    fn deeply_nested_pair_value_typechecks() {
+        const DEPTH: usize = 100_000;
+        let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+
+        // Build the type: pair(int, pair(int, pair(int, ..., int))).
+        let int_app: Micheline<'_> = Micheline::App(Prim::int, &[], NO_ANNS);
+        let mut ty_node: Micheline<'_> = int_app.clone();
+        for _ in 0..DEPTH {
+            let pair_args = arena.alloc_extend([int_app.clone(), ty_node]);
+            ty_node = Micheline::App(Prim::pair, pair_args, NO_ANNS);
+        }
+        let mut gas = Gas::new(u32::MAX);
+        let parsed_ty = parse_ty(&mut gas, &ty_node).expect("deep pair type parses");
+
+        // Build the value: pair(0, pair(0, pair(0, ..., 0))).
+        let zero: Micheline<'_> = Micheline::Int(0.into());
+        let mut v_node: Micheline<'_> = zero.clone();
+        for _ in 0..DEPTH {
+            let pair_args = arena.alloc_extend([zero.clone(), v_node]);
+            v_node = Micheline::App(Prim::Pair, pair_args, NO_ANNS);
+        }
+        let mut ctx = Ctx::default();
+        ctx.gas = Gas::new(u32::MAX);
+        let _ = typecheck_value(&v_node, &mut ctx, &parsed_ty)
+            .expect("deep pair value typechecks");
+        // The resulting Type and TypedValue overflow on their own Drop;
+        // covered by a follow up that converts those to iterative.
     }
 
     /// hack to simplify syntax in tests
