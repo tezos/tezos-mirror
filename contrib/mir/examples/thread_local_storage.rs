@@ -41,7 +41,7 @@ fn run_contract(parameter: Micheline) {
         .unwrap();
     STORAGE.with(|storage| {
         storage.replace_with(|storage| {
-            let storage = Micheline::decode_raw(&parser.arena, storage, &mut Gas::unmetered())
+            let storage = Micheline::decode_raw(&parser.arena, storage, ctx.gas())
                 .unwrap()
                 .unwrap();
             let (_, new_storage) = contract_typechecked
@@ -60,7 +60,7 @@ fn run_contract(parameter: Micheline) {
             new_storage
                 .into_micheline_optimized_legacy(&Arena::new(), &mut Gas::default())
                 .unwrap()
-                .encode(&mut Gas::unmetered())
+                .encode(ctx.gas())
                 .unwrap()
                 .unwrap()
         });

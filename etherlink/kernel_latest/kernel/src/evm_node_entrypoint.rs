@@ -525,7 +525,7 @@ fn encode_entrypoints_result(
                     // producing multi-arg pairs (equivalent to L1 normalize_types=true).
                     let type_bytes = ty
                         .into_micheline_optimized_legacy(&parser.arena, &mut gas)?
-                        .encode(&mut Gas::unmetered())??;
+                        .encode(&mut gas)??;
                     Ok((name_bytes, type_bytes))
                 })
                 .collect::<anyhow::Result<Vec<_>>>()

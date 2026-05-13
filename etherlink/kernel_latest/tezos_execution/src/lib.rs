@@ -781,14 +781,15 @@ fn get_originated_contract_entrypoint(
     code: Vec<u8>,
 ) -> Option<HashMap<Entrypoint, mir::ast::Type>> {
     let parser = Parser::new();
-    let micheline = Micheline::decode_raw(&parser.arena, &code, &mut Gas::unmetered())
+    let mut gas = Gas::default();
+    let micheline = Micheline::decode_raw(&parser.arena, &code, &mut gas)
         .ok()?
         .ok()?;
     // TODO (Linear issue L2-383): handle gas consumption here.
     let typechecked = micheline
         .split_script()
         .ok()?
-        .typecheck_script(&mut Gas::default(), true, false)
+        .typecheck_script(&mut gas, true, false)
         .ok()?;
     let entrypoints_annotations = typechecked.annotations;
     // Cast  the entry_points_annotations to the expected type
