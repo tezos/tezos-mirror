@@ -92,7 +92,7 @@ impl From<TransferError> for CracError {
             | TransferError::FailedToFetchSenderBalance
             | TransferError::FailedToUpdateContractStorage
             | TransferError::FailedToUpdateDestinationBalance
-            | TransferError::FailedToComputeBalanceUpdate => {
+            | TransferError::FailedToComputeBalanceUpdate(_) => {
                 CracError::BlockAbort(format!("internal error during transfer: {e}"))
             }
             _ => CracError::Operation(e),
@@ -3027,7 +3027,7 @@ mod tests {
             TransferError::FailedToFetchSenderBalance,
             TransferError::FailedToUpdateContractStorage,
             TransferError::FailedToUpdateDestinationBalance,
-            TransferError::FailedToComputeBalanceUpdate,
+            TransferError::FailedToComputeBalanceUpdate(String::new()),
         ];
         for variant in infra {
             let label = format!("{variant:?}");

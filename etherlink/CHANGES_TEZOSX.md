@@ -23,12 +23,32 @@
 
 ### Michelson Runtime
 
+- Receipts of Michelson manager operations now surface non-zero
+  `storage_size` and `paid_storage_size_diff`. After each successful
+  operation the kernel bumps the contract's `paid_bytes` watermark
+  to its `used_bytes`, and writes the absolute post-op `used_bytes`
+  along with the newly-allocated delta into the receipt. Origination
+  receipts surface the contract's full initial size in both fields,
+  matching what L1 produces. Indexers and wallets reading these
+  fields will observe the actual storage footprint instead of zeros.
+  (!21798)
 - Deposits targeting a Tezos implicit account now emit a Michelson `deposit`
   event of type `pair (nat %inbox_level) (nat %inbox_msg_id)` on the operation
   receipt. This gives indexers the `(level, index)` coordinates of the
   originating shared-inbox message. (!21877)
 - Deposits targeting a Tezos implicit account now emit balance updates.
   (!21877)
+- Storage burn now fires on Michelson manager operations: transfer-
+  to-contract pays a variable burn proportional to
+  `paid_storage_size_diff`, origination pays the variable burn plus
+  a fixed slot burn of `origination_size × cost_per_byte`, and the
+  first credit to an unallocated implicit account also pays the
+  slot burn and flips `allocated_destination_contract` to `true` on
+  the receipt. When the source cannot cover a burn, the operation
+  is marked `Backtracked` with a new
+  `ApplyOperationError::CannotPayStorageFee` error trace,
+  `SafeStorage` rolls back the batch, and `Applied` internals are
+  cascade-demoted so the manager-operation tree stays L1-coherent. (!21840)
 
 ### Native atomic composability
 
@@ -144,18 +164,6 @@
   runtime precompile with more than ~10.4M gas remaining would forward
   an oversized `X-Tezos-Gas-Limit` and be rejected by the Michelson
   runtime, surfacing as a misleading EVM out-of-gas. (!21791)
-
-### Michelson Runtime
-
-- Receipts of Michelson manager operations now surface non-zero
-  `storage_size` and `paid_storage_size_diff`. After each successful
-  operation the kernel bumps the contract's `paid_bytes` watermark
-  to its `used_bytes`, and writes the absolute post-op `used_bytes`
-  along with the newly-allocated delta into the receipt. Origination
-  receipts surface the contract's full initial size in both fields,
-  matching what L1 produces. Indexers and wallets reading these
-  fields will observe the actual storage footprint instead of zeros.
-  (!21798)
 
 ### Internals
 

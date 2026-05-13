@@ -1,0 +1,25 @@
+parameter (pair (pair address address) string) ;
+storage string ;
+code
+  {
+    CAR ;
+    UNPAIR ;
+    UNPAIR ;
+    CONTRACT unit ;
+    ASSERT_SOME ;
+    PUSH mutez 1 ;
+    UNIT ;
+    TRANSFER_TOKENS ;
+    SWAP ;
+    CONTRACT unit ;
+    ASSERT_SOME ;
+    PUSH mutez 1 ;
+    UNIT ;
+    TRANSFER_TOKENS ;
+    NIL operation ;
+    SWAP ;
+    CONS ;
+    SWAP ;
+    CONS ;
+    PAIR
+  }

@@ -696,6 +696,7 @@ let test_contracts_rpc =
       ~amount:(Tez.of_int 10)
       ~giver:Constant.bootstrap1.alias
       ~receiver:fresh_account.alias
+      ~burn_cap:Tez.one
       client
   in
   let*@ _ = produce_block sequencer in
@@ -1344,6 +1345,8 @@ let test_raw_json_cycle =
 
 let test_transfer =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
+  (* Slot burn for crediting an unallocated implicit account. *)
+  let allocation_burn = 64250 in
   register_tezosx_test
     ~title:"Test michelson runtime transfer"
     ~tags:["kernel"; "transfer"]
@@ -1371,7 +1374,8 @@ let test_transfer =
   in
   Check.(
     (Tez.to_mutez balance1
-    = Tez.to_mutez bootstrap_balance - Tez.to_mutez amount - Tez.to_mutez fee)
+    = Tez.to_mutez bootstrap_balance
+      - Tez.to_mutez amount - Tez.to_mutez fee - allocation_burn)
       int)
     ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
   Check.((Tez.to_mutez balance2 = Tez.to_mutez amount) int)
@@ -1380,6 +1384,8 @@ let test_transfer =
 
 let test_observer_transfer =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
+  (* Slot burn for crediting an unallocated implicit account. *)
+  let allocation_burn = 64250 in
   register_tezosx_test
     ~title:"Test michelson runtime transfer via an observer"
     ~tags:["observer"; "transfer"]
@@ -1413,7 +1419,8 @@ let test_observer_transfer =
   in
   Check.(
     (Tez.to_mutez balance1
-    = Tez.to_mutez bootstrap_balance - Tez.to_mutez amount - Tez.to_mutez fee)
+    = Tez.to_mutez bootstrap_balance
+      - Tez.to_mutez amount - Tez.to_mutez fee - allocation_burn)
       int)
     ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
   Check.((Tez.to_mutez balance2 = Tez.to_mutez amount) int)
@@ -1422,6 +1429,8 @@ let test_observer_transfer =
 
 let test_transfer_and_wait =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
+  (* Slot burn for crediting an unallocated implicit account. *)
+  let allocation_burn = 64250 in
   register_tezosx_test
     ~title:"Test michelson runtime transfer and wait for inclusion"
     ~tags:["kernel"; "transfer"; "wait"]
@@ -1457,7 +1466,8 @@ let test_transfer_and_wait =
   in
   Check.(
     (Tez.to_mutez balance1
-    = Tez.to_mutez bootstrap_balance - Tez.to_mutez amount - Tez.to_mutez fee)
+    = Tez.to_mutez bootstrap_balance
+      - Tez.to_mutez amount - Tez.to_mutez fee - allocation_burn)
       int)
     ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
   Check.((Tez.to_mutez balance2 = Tez.to_mutez amount) int)
@@ -1861,6 +1871,8 @@ let test_run_operation =
 
 let test_reveal_transfer_batch =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
+  (* Slot burn for crediting an unallocated implicit account. *)
+  let allocation_burn = 64250 in
   register_tezosx_test
     ~title:"Test michelson runtime reveal+transfer batch"
     ~tags:["kernel"; "reveal"; "transfer"; "batch"]
@@ -1938,7 +1950,9 @@ let test_reveal_transfer_batch =
   Log.info "bootstrap_2 fees: %d" fee_bootstrap2 ;
   Check.(
     (Tez.to_mutez balance1
-    = Tez.to_mutez bootstrap_balance - Tez.(to_mutez one) - fee_bootstrap1)
+    = Tez.to_mutez bootstrap_balance
+      - Tez.(to_mutez one)
+      - fee_bootstrap1 - allocation_burn)
       int)
     ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
   Check.((Tez.to_mutez balance2 = Tez.(to_mutez one) - fee_bootstrap2) int)
@@ -1946,6 +1960,8 @@ let test_reveal_transfer_batch =
   unit
 
 let test_batch =
+  (* Slot burn for crediting an unallocated implicit account. *)
+  let allocation_burn = 64250 in
   register_tezosx_test
     ~title:"Test of tezlink batches"
     ~tags:["batch"; "multiple_transfers"]
@@ -1988,6 +2004,7 @@ let test_batch =
       ~endpoint
       ~giver:Constant.bootstrap1.alias
       ~json_batch
+      ~burn_cap:Tez.one
       client
   in
   let*@ _ = produce_block sequencer in
@@ -2003,7 +2020,7 @@ let test_batch =
   Check.(
     (Tez.to_mutez end_balance1
     = Tez.to_mutez init_balance1 - Tez.to_mutez amount2 - Tez.to_mutez amount3
-      - Tez.to_mutez fee_2 - Tez.to_mutez fee_3)
+      - Tez.to_mutez fee_2 - Tez.to_mutez fee_3 - (2 * allocation_burn))
       int)
     ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
   Check.(
@@ -2070,6 +2087,8 @@ let test_long_batch =
 let test_internal_operation =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
   let faucet = Tezt_etherlink.Michelson_contracts.faucet_contract () in
+  (* code + storage size = 81 bytes. *)
+  let bootstrap_contract_first_use_burn = 81 * 250 in
   register_tezosx_test
     ~title:"Internal operation"
     ~tags:["internal"; "operation"]
@@ -2094,7 +2113,10 @@ let test_internal_operation =
     Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
   in
   Check.(
-    (Tez.to_mutez balance = Tez.to_mutez bootstrap_balance + Tez.(to_mutez one))
+    (Tez.to_mutez balance
+    = Tez.to_mutez bootstrap_balance
+      + Tez.(to_mutez one)
+      - bootstrap_contract_first_use_burn)
       int)
     ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
   unit
@@ -3462,6 +3484,7 @@ let test_michelson_gas_backlog =
       ~giver:Constant.bootstrap1.alias
       ~receiver:Constant.bootstrap2.alias
       ~fee_cap
+      ~burn_cap:Tez.one
       client_tezlink
   in
   (* Produce block containing the transfer, then another whose

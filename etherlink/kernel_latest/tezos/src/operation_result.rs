@@ -94,7 +94,7 @@ impl From<CryptoError> for ValidityError {
     }
 }
 
-#[derive(Error, Debug, PartialEq, Eq, NomReader, BinWriter)]
+#[derive(Error, Clone, Debug, PartialEq, Eq, NomReader, BinWriter)]
 pub enum RevealError {
     #[error("Revelation failed because the public key {0} was already revealed.")]
     PreviouslyRevealedKey(PublicKey),
@@ -137,8 +137,8 @@ pub enum TransferError {
     MirTypecheckingError(String),
     #[error("Failed to allocate destination")]
     FailedToAllocateDestination,
-    #[error("Failed to compute balance update due to new balance overflow")]
-    FailedToComputeBalanceUpdate,
+    #[error("Failed to compute balance update: {0}")]
+    FailedToComputeBalanceUpdate(String),
     #[error("Failed to apply balance changes")]
     FailedToApplyBalanceChanges,
     #[error("Failed to fetch destination account")]
@@ -177,14 +177,14 @@ pub enum TransferError {
     ContractDoesNotExist(Contract),
 }
 
-#[derive(Error, Debug, PartialEq, Eq, NomReader)]
+#[derive(Error, Clone, Debug, PartialEq, Eq, NomReader)]
 pub enum OriginationError {
     #[error("Failed to fetch source account")]
     FailedToFetchSourceAccount,
     #[error("Failed to fetch originated smart contract")]
     FailedToFetchOriginated,
-    #[error("Failed to compute balance update")]
-    FailedToComputeBalanceUpdate,
+    #[error("Failed to compute balance update: {0}")]
+    FailedToComputeBalanceUpdate(String),
     #[error("Failed to applied balance update")]
     FailedToApplyBalanceUpdate,
     #[error("Can't initialize smart contract")]
@@ -219,7 +219,7 @@ impl From<mir::typechecker::TcError> for TransferError {
     }
 }
 
-#[derive(Error, Debug, PartialEq, Eq)]
+#[derive(Error, Clone, Debug, PartialEq, Eq)]
 pub enum ApplyOperationError {
     #[error("Reveal error: {0}")]
     Reveal(#[from] RevealError),
@@ -235,6 +235,8 @@ pub enum ApplyOperationError {
     UnSupportedSetDelegate(String),
     #[error("Internal operation nonce overflow due to {0}")]
     InternalOperationNonceOverflow(String),
+    #[error("Cannot pay storage fee: {0}")]
+    CannotPayStorageFee(BalanceTooLow),
     // This error variant is used to encapsulate errors that were generated in the past and encoded as bson.
     // It should not be used for new errors, which should be added as new variants to this enum.
     // This is a temporary solution while waiting for better error support.
@@ -349,6 +351,7 @@ pub trait HasConsumedMilligas {
 pub trait OperationKind {
     type Success: PartialEq
         + Eq
+        + Clone
         + Debug
         + BinWriter
         + for<'a> NomReader<'a>
@@ -371,7 +374,7 @@ impl OperationKind for EventContent {
 }
 
 // Inspired from `src/proto_alpha/lib_protocol/apply_results.ml` : transaction_contract_variant_cases
-#[derive(PartialEq, Debug, NomReader, BinWriter, Eq)]
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub enum TransferTarget {
     ToContrat(TransferSuccess),
 }
@@ -390,7 +393,7 @@ impl From<TransferTarget> for TransferSuccess {
     }
 }
 
-#[derive(PartialEq, Debug, NomReader, BinWriter, Eq)]
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub struct RevealSuccess {
     pub consumed_milligas: Narith,
 }
@@ -463,7 +466,7 @@ impl NomReader<'_> for Originated {
 }
 
 // Inspired of src/proto_023_PtSeouLo/lib_protocol/apply_internal_result.mli
-#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
+#[derive(PartialEq, Debug, Clone, BinWriter, NomReader, Eq)]
 pub struct OriginationSuccess {
     #[encoding(dynamic, list)]
     pub balance_updates: Vec<BalanceUpdate>,
@@ -481,13 +484,13 @@ impl HasConsumedMilligas for OriginationSuccess {
     }
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
+#[derive(PartialEq, Debug, Clone, BinWriter, NomReader, Eq)]
 pub struct AddressRegistry {
     pub address: Contract,
     pub index: Zarith,
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
+#[derive(PartialEq, Debug, Clone, BinWriter, NomReader, Eq)]
 pub struct TransferSuccess {
     pub storage: Option<MichelineExpr>,
     #[encoding(dynamic, list)]
@@ -518,7 +521,7 @@ impl HasConsumedMilligas for TransferTarget {
     }
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
+#[derive(PartialEq, Debug, Clone, BinWriter, NomReader, Eq)]
 pub struct EventSuccess {
     pub consumed_milligas: Narith,
 }
@@ -549,7 +552,7 @@ impl Default for TransferSuccess {
 // An operation error in a Tezos receipt has no specific format
 // It should just be encoded as a JSON, so we can't derive
 // NomReader and BinWriter if we want to be Tezos compatible
-#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
+#[derive(PartialEq, Debug, Clone, BinWriter, NomReader, Eq)]
 pub struct ApplyOperationErrors {
     #[encoding(dynamic, list)]
     pub errors: Vec<ApplyOperationError>,
@@ -571,7 +574,7 @@ impl From<ApplyOperationError> for ApplyOperationErrors {
 
 // Inspired from `operation_result` in `src/proto_alpha/lib_protocol/apply_operation_result.ml`
 // Still need to implement Backtracked and Skipped
-#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
+#[derive(PartialEq, Debug, Clone, BinWriter, NomReader, Eq)]
 pub enum ContentResult<M: OperationKind> {
     Applied(M::Success),
     Failed(ApplyOperationErrors),
@@ -579,7 +582,7 @@ pub enum ContentResult<M: OperationKind> {
     BackTracked(BacktrackedResult<M>),
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
+#[derive(PartialEq, Debug, Clone, BinWriter, NomReader, Eq)]
 pub struct BacktrackedResult<M: OperationKind> {
     pub errors: Option<ApplyOperationErrors>,
     pub result: M::Success,
@@ -599,11 +602,25 @@ impl<M: OperationKind> ContentResult<M> {
             }
         }
     }
+
+    /// Demotes a top-level `Applied` to `BackTracked` carrying the
+    /// supplied error trace. No-op on a non-Applied content result.
+    pub fn backtrack_if_applied_with_errors(&mut self, errors: ApplyOperationErrors) {
+        if let ContentResult::Applied(_) = self {
+            let current_content_result = std::mem::replace(self, ContentResult::Skipped);
+            if let ContentResult::Applied(success) = current_content_result {
+                *self = ContentResult::BackTracked(BacktrackedResult {
+                    errors: Some(errors),
+                    result: success,
+                });
+            }
+        }
+    }
 }
 
 /// A [Balance] updates can be triggered on different target
 /// inspired from src/proto_alpha/lib_protocol/receipt_repr.ml
-#[derive(PartialEq, Debug, NomReader, BinWriter, Eq)]
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 #[encoding(tags = "u8")]
 pub enum Balance {
     #[encoding(tag = 0)]
@@ -617,14 +634,14 @@ pub enum Balance {
 }
 
 /// Inspired from update_origin_encoding src/proto_alpha/lib_protocol/receipt_repr.ml
-#[derive(PartialEq, Debug, NomReader, BinWriter, Eq)]
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub enum UpdateOrigin {
     BlockApplication,
 }
 
 /// Depending of the sign of [changes], the balance is credited or debited
 /// Inspired from balance_updates_encoding src/proto_alpha/lib_protocol/receipt_repr.ml
-#[derive(PartialEq, Debug, NomReader, BinWriter, Eq)]
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub struct BalanceUpdate {
     pub balance: Balance,
     pub changes: i64,
@@ -643,7 +660,7 @@ pub struct OperationResult<M: OperationKind> {
     pub internal_operation_results: Vec<InternalOperationSum>,
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
+#[derive(PartialEq, Debug, Clone, BinWriter, NomReader, Eq)]
 pub struct InternalContentWithMetadata<M: OperationKind> {
     pub sender: Contract,
     pub nonce: u16,
@@ -680,7 +697,7 @@ pub struct EventContent {
     pub payload: Option<MichelineExpr>,
 }
 
-#[derive(PartialEq, Debug, NomReader, BinWriter, Eq)]
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub enum InternalOperationSum {
     #[encoding(tag = 1)]
     Transfer(InternalContentWithMetadata<TransferContent>),
@@ -779,12 +796,57 @@ impl OperationResultSum {
         match self {
             OperationResultSum::Transfer(op_result) => {
                 op_result.result.backtrack_if_applied();
+                op_result
+                    .internal_operation_results
+                    .iter_mut()
+                    .for_each(InternalOperationSum::transform_result_backtrack);
             }
             OperationResultSum::Reveal(op_result) => {
                 op_result.result.backtrack_if_applied();
+                op_result
+                    .internal_operation_results
+                    .iter_mut()
+                    .for_each(InternalOperationSum::transform_result_backtrack);
             }
             OperationResultSum::Origination(op_result) => {
                 op_result.result.backtrack_if_applied();
+                op_result
+                    .internal_operation_results
+                    .iter_mut()
+                    .for_each(InternalOperationSum::transform_result_backtrack);
+            }
+        }
+    }
+
+    /// Demotes the top-level `ContentResult::Applied` to `BackTracked`
+    /// carrying the supplied error trace, and cascade-demotes every
+    /// entry of `internal_operation_results`. No-op when the
+    /// top-level is already non-Applied.
+    pub fn transform_applied_into_backtracked_with_errors(
+        &mut self,
+        errors: ApplyOperationErrors,
+    ) {
+        match self {
+            OperationResultSum::Transfer(op_result) => {
+                op_result.result.backtrack_if_applied_with_errors(errors);
+                op_result
+                    .internal_operation_results
+                    .iter_mut()
+                    .for_each(InternalOperationSum::transform_result_backtrack);
+            }
+            OperationResultSum::Reveal(op_result) => {
+                op_result.result.backtrack_if_applied_with_errors(errors);
+                op_result
+                    .internal_operation_results
+                    .iter_mut()
+                    .for_each(InternalOperationSum::transform_result_backtrack);
+            }
+            OperationResultSum::Origination(op_result) => {
+                op_result.result.backtrack_if_applied_with_errors(errors);
+                op_result
+                    .internal_operation_results
+                    .iter_mut()
+                    .for_each(InternalOperationSum::transform_result_backtrack);
             }
         }
     }
@@ -1017,15 +1079,17 @@ mod tests {
                     receipt: OperationResultSum::Transfer(OperationResult {
                         balance_updates: vec![],
                         result: ContentResult::BackTracked(BacktrackedResult {
-                            errors: Some(ApplyOperationErrors::from(
-                                ApplyOperationError::Transfer(
-                                    TransferError::BalanceTooLow(BalanceTooLow {
-                                        contract: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(),
-                                        balance: 10_u64.into(),
-                                        amount: 21_u64.into(),
-                                    })
-                                )
-                            )),
+                            errors: Some(ApplyOperationErrors {
+                                errors: vec![
+                                    ApplyOperationError::CannotPayStorageFee(
+                                        BalanceTooLow {
+                                            contract: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(),
+                                            balance: 10_u64.into(),
+                                            amount: 21_u64.into(),
+                                        }
+                                    ),
+                                ],
+                            }),
                             result: TransferTarget::ToContrat(TransferSuccess {
                                 storage: None,
                                 lazy_storage_diff: None,
@@ -1465,6 +1529,112 @@ mod tests {
             remaining.len(),
             0,
             "There should be no remaining bytes after decoding the past error"
+        );
+    }
+
+    #[test]
+    fn transform_result_backtracked_cascades_to_internals() {
+        let payer =
+            Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
+        let internal_applied =
+            InternalOperationSum::Transfer(InternalContentWithMetadata {
+                sender: payer.clone(),
+                nonce: 0,
+                content: TransferContent {
+                    amount: 0_u64.into(),
+                    destination: payer.clone(),
+                    parameters: Parameters::default(),
+                },
+                result: ContentResult::Applied(TransferTarget::ToContrat(
+                    TransferSuccess::default(),
+                )),
+            });
+
+        let mut receipt = OperationResultSum::Transfer(OperationResult {
+            balance_updates: vec![],
+            result: ContentResult::Applied(TransferTarget::ToContrat(
+                TransferSuccess::default(),
+            )),
+            internal_operation_results: vec![internal_applied],
+        });
+
+        receipt.transform_result_backtrack();
+
+        let OperationResultSum::Transfer(op) = &receipt else {
+            panic!("expected Transfer receipt");
+        };
+        assert!(
+            matches!(op.result, ContentResult::BackTracked(_)),
+            "top-level must demote to BackTracked, got {:?}",
+            op.result
+        );
+        let InternalOperationSum::Transfer(inner) = &op.internal_operation_results[0]
+        else {
+            panic!("expected internal Transfer");
+        };
+        assert!(
+            matches!(inner.result, ContentResult::BackTracked(_)),
+            "internal Applied must cascade-demote to BackTracked, got {:?}",
+            inner.result
+        );
+    }
+
+    /// `transform_applied_into_backtracked_with_errors` demotes the
+    /// top-level `Applied` to `BackTracked` carrying the supplied
+    /// error trace and cascades the demotion to every entry of
+    /// `internal_operation_results`.
+    #[test]
+    fn transform_applied_into_backtracked_with_errors_cascades_to_internals() {
+        let payer =
+            Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
+        let internal_applied =
+            InternalOperationSum::Transfer(InternalContentWithMetadata {
+                sender: payer.clone(),
+                nonce: 0,
+                content: TransferContent {
+                    amount: 0_u64.into(),
+                    destination: payer.clone(),
+                    parameters: Parameters::default(),
+                },
+                result: ContentResult::Applied(TransferTarget::ToContrat(
+                    TransferSuccess::default(),
+                )),
+            });
+
+        let mut receipt = OperationResultSum::Transfer(OperationResult {
+            balance_updates: vec![],
+            result: ContentResult::Applied(TransferTarget::ToContrat(
+                TransferSuccess::default(),
+            )),
+            internal_operation_results: vec![internal_applied],
+        });
+
+        let errors = ApplyOperationErrors {
+            errors: vec![ApplyOperationError::CannotPayStorageFee(BalanceTooLow {
+                contract: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+                    .unwrap(),
+                balance: 10_u64.into(),
+                amount: 21_u64.into(),
+            })],
+        };
+        receipt.transform_applied_into_backtracked_with_errors(errors);
+
+        let OperationResultSum::Transfer(op) = &receipt else {
+            panic!("expected Transfer receipt");
+        };
+        assert!(
+            matches!(op.result, ContentResult::BackTracked(_)),
+            "top-level must demote to BackTracked, got {:?}",
+            op.result
+        );
+        let InternalOperationSum::Transfer(inner) = &op.internal_operation_results[0]
+        else {
+            panic!("expected internal Transfer");
+        };
+        assert!(
+            matches!(inner.result, ContentResult::BackTracked(_)),
+            "internal Applied must cascade-demote to BackTracked, got {:?}",
+            inner.result
         );
     }
 }
