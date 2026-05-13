@@ -41,7 +41,9 @@ fn run_contract(parameter: Micheline) {
         .unwrap();
     STORAGE.with(|storage| {
         storage.replace_with(|storage| {
-            let storage = Micheline::decode_raw(&parser.arena, storage).unwrap();
+            let storage = Micheline::decode_raw(&parser.arena, storage, &mut Gas::unmetered())
+                .unwrap()
+                .unwrap();
             let (_, new_storage) = contract_typechecked
                 .interpret(
                     &mut ctx,

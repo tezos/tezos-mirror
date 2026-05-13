@@ -250,11 +250,13 @@ where
     let input_mich = if body.is_empty() {
         Micheline::from(())
     } else {
-        Micheline::decode_raw(&parser.arena, &body).map_err(|e| {
-            TezosXRuntimeError::BadRequest(format!(
-                "failed to decode view input as Micheline: {e:?}"
-            ))
-        })?
+        Micheline::decode_raw(&parser.arena, &body, &mut Gas::unmetered())
+            .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
+            .map_err(|e| {
+                TezosXRuntimeError::BadRequest(format!(
+                    "failed to decode view input as Micheline: {e:?}"
+                ))
+            })?
     };
 
     // ExecCtx carries what MIR's VIEW semantics expect: self = dest,
@@ -319,9 +321,11 @@ where
         // that MIR doesn't re-parse `storage_ty` from a Micheline roundtrip
         // on every view call (saves 3 `parse_ty` over the hot path).
         let storage_mich =
-            Micheline::decode_raw(&parser.arena, &storage_bytes).map_err(|e| {
-                TezosXRuntimeError::Custom(format!("failed to decode storage: {e:?}"))
-            })?;
+            Micheline::decode_raw(&parser.arena, &storage_bytes, &mut Gas::unmetered())
+                .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
+                .map_err(|e| {
+                    TezosXRuntimeError::Custom(format!("failed to decode storage: {e:?}"))
+                })?;
         let storage = typecheck_value(&storage_mich, &mut mir_ctx, &storage_ty)
             .map_err(classify_tc_error)?;
 

@@ -1575,7 +1575,9 @@ fn interpret_one<'a>(
             ctx.gas()
                 .consume(interpret_cost::unpack(bytes.as_slice())?)?;
             let mut try_unpack = || -> Option<TypedValue> {
-                let mich = Micheline::decode_packed(arena, &bytes).ok()?;
+                let mich = Micheline::decode_packed(arena, &bytes, &mut Gas::unmetered())
+                    .ok()?
+                    .ok()?;
                 crate::interpreter::typecheck_value(&mich, ctx, ty).ok()
             };
             stack.push(V::new_option(try_unpack()));
@@ -1979,7 +1981,7 @@ fn interpret_one<'a>(
             let storage_ty_micheline =
                 storage_ty.into_micheline_optimized_legacy(arena, ctx.gas())?;
 
-            let storage = Micheline::decode_raw(arena, &view_storage)?
+            let storage = Micheline::decode_raw(arena, &view_storage, &mut Gas::unmetered())??
                 .typecheck_value(ctx, &storage_ty_micheline)?;
 
             let input_type = view.input_type.parse_ty(ctx.gas())?;

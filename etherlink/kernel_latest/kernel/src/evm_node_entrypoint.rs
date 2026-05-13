@@ -591,8 +591,13 @@ mod tests {
                     let type_bytes: Vec<u8> =
                         pair.at(1).expect("type").as_val().expect("type val");
                     let name = String::from_utf8(name_bytes).expect("utf8 name");
-                    let micheline = Micheline::decode_raw(&parser.arena, &type_bytes)
-                        .expect("decode micheline");
+                    let micheline = Micheline::decode_raw(
+                        &parser.arena,
+                        &type_bytes,
+                        &mut Gas::unmetered(),
+                    )
+                    .expect("unmetered Gas cannot OOG")
+                    .expect("decode micheline");
                     let ty = micheline.parse_ty(&mut gas).expect("parse type");
                     map.insert(name, ty);
                 }

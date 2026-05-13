@@ -104,7 +104,7 @@
 //! // Note that you can opt to use a new parser and/or a new arena for
 //! // parameter and storage. However, they _must_ outlive `ctx`.
 //! let parameter = parser.parse("123").unwrap();
-//! let storage = Micheline::decode_raw(&parser.arena, &[0x00, 0x00]).unwrap(); // integer 0
+//! let storage = Micheline::decode_raw(&parser.arena, &[0x00, 0x00], &mut Gas::unmetered()).unwrap().unwrap(); // integer 0
 //! // Note: the arena passed in here _must_ outlive `ctx`. We reuse the one
 //! // from `parser` for simplicity, you may also opt to create a new one to
 //! // potentially save a bit of memory (depends on the workload).

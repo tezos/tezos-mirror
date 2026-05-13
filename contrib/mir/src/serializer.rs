@@ -17,14 +17,34 @@ mod integration_tests;
 pub use decode::*;
 
 use crate::ast::Micheline;
+use crate::gas::{Gas, OutOfGas};
 use typed_arena::Arena;
 
 /// Return the byte size of one canonical Micheline expression starting at
 /// `input[0]`.  Walks the binary structure without allocating an output value.
-pub fn micheline_expr_size(input: &[u8]) -> Result<usize, DecodeError> {
+///
+/// Used by the `NomReader` impl of [`MichelineExpr`]. The trait comes from
+/// the external `tezos_data_encoding` crate and its signature
+/// (`fn nom_read(input: &[u8]) -> NomResult<Self>`) has no gas argument,
+/// so this leaf function passes `Gas::unmetered()` to `decode_raw_prefix`.
+/// This is a known metering hole vs L1, which charges
+/// `cost_DECODING_MICHELINE_bytes(N)` when decoding a Micheline expression
+/// from binary. Closing the hole requires charging that cost upstream, at
+/// the operation/block decode entry point in the kernel (where the
+/// payload length is known), rather than inside this leaf. To be done in
+/// a follow-up MR.
+///
+/// Outer `Result` keeps the OOG channel exposed for symmetry with the
+/// metered decode functions; in practice, with `Gas::unmetered()`, it can
+/// only be triggered by `u32` overflow on absurdly large inputs.
+///
+/// TODO (L2-1352): the only caller is `<MichelineExpr as NomReader>::nom_read`,
+/// whose trait signature has no gas argument, so this leaf passes
+/// `Gas::unmetered()`.
+pub fn micheline_expr_size(input: &[u8]) -> Result<Result<usize, DecodeError>, OutOfGas> {
     let arena = Arena::new();
-    let (_, consumed) = Micheline::decode_raw_prefix(&arena, input)?;
-    Ok(consumed)
+    let outer = Micheline::decode_raw_prefix(&arena, input, &mut Gas::unmetered())?;
+    Ok(outer.map(|(_, consumed)| consumed))
 }
 
 /// Wrapper around raw Micheline bytes that uses self-delimiting encoding
@@ -42,7 +62,13 @@ impl tezos_data_encoding::enc::BinWriter for MichelineExpr {
 
 impl<'a> tezos_data_encoding::nom::NomReader<'a> for MichelineExpr {
     fn nom_read(input: &'a [u8]) -> tezos_data_encoding::nom::NomResult<'a, Self> {
-        let consumed = micheline_expr_size(input).map_err(|e| {
+        let inner = micheline_expr_size(input).map_err(|out_of_gas: OutOfGas| {
+            nom::Err::Error(tezos_data_encoding::nom::error::DecodeError::invalid_tag(
+                input,
+                format!("out of gas measuring Micheline expression: {out_of_gas}"),
+            ))
+        })?;
+        let consumed = inner.map_err(|e| {
             nom::Err::Error(tezos_data_encoding::nom::error::DecodeError::invalid_tag(
                 input,
                 format!("invalid Micheline expression: {e}"),
@@ -65,6 +91,7 @@ impl From<Vec<u8>> for MichelineExpr {
 mod tests {
     use super::constants::APP_NO_ARGS_NO_ANNOTS_TAG;
     use crate::ast::Micheline;
+    use crate::gas::Gas;
     use crate::lexer::Prim;
     use regex::Regex;
     use std::fs::read_to_string;
@@ -98,7 +125,10 @@ mod tests {
             // case involving primitives: application of a primitive
             // to no argument and no annotation
             let serialized = [APP_NO_ARGS_NO_ANNOTS_TAG, tag];
-            let micheline = Micheline::decode_raw(&arena, &serialized)
+            let micheline = Micheline::decode_raw(&arena, &serialized, &mut Gas::unmetered())
+                .unwrap_or_else(|err| {
+                    panic!("decode_raw should not OOG with unmetered Gas: {err:?}")
+                })
                 .unwrap_or_else(|err| panic!("tag {tag} should be decodable as primitive: {err}"));
             assert_eq!(
                 micheline,
@@ -108,10 +138,7 @@ mod tests {
             // While we are at it, we also check that serializing the
             // primitives gives back the expected tag.
             assert_eq!(
-                micheline
-                    .encode(&mut crate::gas::Gas::unmetered())
-                    .unwrap()
-                    .unwrap(),
+                micheline.encode(&mut Gas::unmetered()).unwrap().unwrap(),
                 serialized,
             )
         }

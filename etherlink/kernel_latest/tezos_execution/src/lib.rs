@@ -12,7 +12,7 @@ use mir::context::TypecheckingCtx;
 use mir::{
     ast::{big_map::BigMapId, IntoMicheline, Micheline},
     context::CtxTrait,
-    gas::Gas,
+    gas::{Gas, OutOfGas},
     parser::Parser,
 };
 use num_bigint::{BigInt, BigUint};
@@ -784,7 +784,9 @@ fn get_originated_contract_entrypoint(
     code: Vec<u8>,
 ) -> Option<HashMap<Entrypoint, mir::ast::Type>> {
     let parser = Parser::new();
-    let micheline = Micheline::decode_raw(&parser.arena, &code).ok()?;
+    let micheline = Micheline::decode_raw(&parser.arena, &code, &mut Gas::unmetered())
+        .ok()?
+        .ok()?;
     // TODO (Linear issue L2-383): handle gas consumption here.
     let typechecked = micheline
         .split_script()
@@ -840,8 +842,12 @@ where
         operation_ctx.source.contract()
     );
     let entrypoint = &parameters.entrypoint;
-    let value = Micheline::decode_raw(&parser.arena, &parameters.value)
-        .map_err(|e| CracError::Operation(TransferError::from(e)))?;
+    let value =
+        Micheline::decode_raw(&parser.arena, &parameters.value, &mut Gas::unmetered())
+            .map_err(|out_of_gas: OutOfGas| {
+                CracError::Operation(TransferError::OutOfGas(out_of_gas))
+            })?
+            .map_err(|e| CracError::Operation(TransferError::from(e)))?;
 
     transfer(
         tc_ctx,
@@ -921,8 +927,12 @@ where
     Host: StorageV1,
 {
     let entrypoint = &parameters.entrypoint;
-    let value = Micheline::decode_raw(&parser.arena, &parameters.value)
-        .map_err(|e| CracTransferError::from(TransferError::from(e)))?;
+    let value =
+        Micheline::decode_raw(&parser.arena, &parameters.value, &mut Gas::unmetered())
+            .map_err(|out_of_gas: OutOfGas| {
+                CracTransferError::from(TransferError::OutOfGas(out_of_gas))
+            })?
+            .map_err(|e| CracTransferError::from(TransferError::from(e)))?;
 
     let world_state = tc_ctx.context.path();
     let checkpoint_index = journal
@@ -1010,8 +1020,10 @@ pub fn typecheck_code_and_storage<'a, Host: StorageV1, C: Context>(
     parser: &'a Parser<'a>,
     script: &Script,
 ) -> Result<TypedValue<'a>, OriginationError> {
-    let contract_micheline = Micheline::decode_raw(&parser.arena, &script.code)
-        .map_err(|e| OriginationError::MichelineSerializationError(e.to_string()))?;
+    let contract_micheline =
+        Micheline::decode_raw(&parser.arena, &script.code, &mut Gas::unmetered())
+            .map_err(|out_of_gas: OutOfGas| OriginationError::OutOfGas(out_of_gas))?
+            .map_err(|e| OriginationError::MichelineSerializationError(e.to_string()))?;
     let allow_lazy_storage_in_storage = true;
     let contract_typechecked = contract_micheline
         .split_script()
@@ -1020,8 +1032,10 @@ pub fn typecheck_code_and_storage<'a, Host: StorageV1, C: Context>(
         })?
         .typecheck_script(ctx.gas(), allow_lazy_storage_in_storage, true)
         .map_err(|e| OriginationError::MirTypecheckingError(format!("Script : {e}")))?;
-    let storage_micheline = Micheline::decode_raw(&parser.arena, &script.storage)
-        .map_err(|e| OriginationError::MichelineSerializationError(e.to_string()))?;
+    let storage_micheline =
+        Micheline::decode_raw(&parser.arena, &script.storage, &mut Gas::unmetered())
+            .map_err(|out_of_gas: OutOfGas| OriginationError::OutOfGas(out_of_gas))?
+            .map_err(|e| OriginationError::MichelineSerializationError(e.to_string()))?;
     contract_typechecked
         .typecheck_storage(ctx, &storage_micheline)
         .map_err(|e| OriginationError::MirTypecheckingError(format!("Storage : {e}")))
@@ -1207,12 +1221,14 @@ fn execute_smart_contract_originated<'a>(
     ctx: &mut impl CtxTrait<'a>,
 ) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), TransferError> {
     // Parse and typecheck the contract
-    let contract_micheline = Micheline::decode_raw(&parser.arena, &code)?;
+    let contract_micheline =
+        Micheline::decode_raw(&parser.arena, &code, &mut Gas::unmetered())??;
     let contract_typechecked =
         contract_micheline
             .split_script()?
             .typecheck_script(ctx.gas(), true, false)?;
-    let storage_micheline = Micheline::decode_raw(&parser.arena, &storage)?;
+    let storage_micheline =
+        Micheline::decode_raw(&parser.arena, &storage, &mut Gas::unmetered())??;
 
     // Execute the contract
     let (internal_operations, new_storage) = contract_typechecked.interpret(
@@ -6695,8 +6711,10 @@ mod tests {
 
         if let Some(expected_sender_big_map) = expected_sender_big_map {
             let storage = sender_contract.storage(ctx.host).unwrap();
-            let mich_storage = Micheline::decode_raw(&parser.arena, &storage)
-                .expect("Coudln't decode storage.");
+            let mich_storage =
+                Micheline::decode_raw(&parser.arena, &storage, &mut Gas::unmetered())
+                    .unwrap()
+                    .expect("Coudln't decode storage.");
             let big_map_id = typecheck_value(&mich_storage, &mut ctx, &Type::Int)
                 .expect("Storage has unexpected type");
             match big_map_id {
@@ -6714,8 +6732,10 @@ mod tests {
 
         if let Some(expected_receiver_big_map) = expected_receiver_big_map {
             let storage = receiver_contract.storage(ctx.host).unwrap();
-            let mich_storage = Micheline::decode_raw(&parser.arena, &storage)
-                .expect("Coudln't decode storage.");
+            let mich_storage =
+                Micheline::decode_raw(&parser.arena, &storage, &mut Gas::unmetered())
+                    .unwrap()
+                    .expect("Coudln't decode storage.");
             match mich_storage {
                 Micheline::Int(id) => crate::mir_ctx::tests::assert_big_map_eq(
                     &mut ctx,
@@ -7015,9 +7035,13 @@ mod tests {
         let storage_originator = originator_contract
             .storage(ctx.host)
             .expect("Failed to fetch storage for originator");
-        let mich_storage_originator =
-            Micheline::decode_raw(&parser.arena, &storage_originator)
-                .expect("Couldn't decode storage.");
+        let mich_storage_originator = Micheline::decode_raw(
+            &parser.arena,
+            &storage_originator,
+            &mut Gas::unmetered(),
+        )
+        .unwrap()
+        .expect("Couldn't decode storage.");
         let big_map_id_originator =
             typecheck_value(&mich_storage_originator, &mut ctx, &Type::Int)
                 .expect("Storage has unexpected type");
@@ -7041,8 +7065,10 @@ mod tests {
         let storage_0 = created_acount_0
             .storage(ctx.host)
             .expect("Failed to fetch storage for created account #0");
-        let mich_storage_0 = Micheline::decode_raw(&parser.arena, &storage_0)
-            .expect("Couldn't decode storage.");
+        let mich_storage_0 =
+            Micheline::decode_raw(&parser.arena, &storage_0, &mut Gas::unmetered())
+                .unwrap()
+                .expect("Couldn't decode storage.");
         let big_map_id_0 = typecheck_value(&mich_storage_0, &mut ctx, &Type::Int)
             .expect("Storage has unexpected type");
         match big_map_id_0 {
@@ -7065,8 +7091,10 @@ mod tests {
         let storage_1 = created_acount_1
             .storage(ctx.host)
             .expect("Failed to fetch storage for created account #1");
-        let mich_storage_1 = Micheline::decode_raw(&parser.arena, &storage_1)
-            .expect("Coudln't decode storage.");
+        let mich_storage_1 =
+            Micheline::decode_raw(&parser.arena, &storage_1, &mut Gas::unmetered())
+                .unwrap()
+                .expect("Coudln't decode storage.");
         let big_map_id_1 = typecheck_value(&mich_storage_1, &mut ctx, &Type::Int)
             .expect("Storage has unexpected type");
         match big_map_id_1 {
@@ -7089,8 +7117,10 @@ mod tests {
         let storage_2 = created_acount_2
             .storage(ctx.host)
             .expect("Failed to fetch storage for created account #2");
-        let mich_storage_2 = Micheline::decode_raw(&parser.arena, &storage_2)
-            .expect("Coudln't decode storage.");
+        let mich_storage_2 =
+            Micheline::decode_raw(&parser.arena, &storage_2, &mut Gas::unmetered())
+                .unwrap()
+                .expect("Coudln't decode storage.");
         let big_map_id_2 = typecheck_value(&mich_storage_2, &mut ctx, &Type::Int)
             .expect("Storage has unexpected type");
         match big_map_id_2 {
@@ -7154,8 +7184,10 @@ mod tests {
         let storage = receiver
             .storage(ctx.host)
             .expect("Get storage should succeed");
-        let storage = Micheline::decode_raw(&parser.arena, &storage)
-            .expect("Micheline should be decodable");
+        let storage =
+            Micheline::decode_raw(&parser.arena, &storage, &mut Gas::unmetered())
+                .unwrap()
+                .expect("Micheline should be decodable");
         let typed_storage = typecheck_value(&storage, &mut ctx, &Type::Bool)
             .expect("Typecheck value should succeed");
         assert_eq!(typed_storage, TypedValue::Bool(true));
@@ -7221,8 +7253,10 @@ mod tests {
         let storage = receiver
             .storage(ctx.host)
             .expect("Get storage should succeed");
-        let storage = Micheline::decode_raw(&parser.arena, &storage)
-            .expect("Micheline should be decodable");
+        let storage =
+            Micheline::decode_raw(&parser.arena, &storage, &mut Gas::unmetered())
+                .unwrap()
+                .expect("Micheline should be decodable");
         let typed_storage = typecheck_value(&storage, &mut ctx, &Type::Bool)
             .expect("Typecheck value should succeed");
         assert_eq!(typed_storage, TypedValue::Bool(false));

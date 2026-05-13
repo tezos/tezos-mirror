@@ -40,7 +40,10 @@ mod test_typed_encode {
                 .unwrap(),
             bytes,
         );
-        assert_eq!(Micheline::decode_packed(&arena, bytes), Ok(micheline),);
+        assert_eq!(
+            Micheline::decode_packed(&arena, bytes, &mut Gas::unmetered()),
+            Ok(Ok(micheline)),
+        );
     }
 
     #[test]

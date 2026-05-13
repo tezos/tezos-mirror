@@ -3162,7 +3162,10 @@ mod tests {
         // The payload is Micheline-encoded. Decode it to verify the string.
         let payload_bytes = e.content.payload.as_ref().unwrap();
         let parser = mir::parser::Parser::new();
-        let decoded = Micheline::decode_raw(&parser.arena, &payload_bytes.0).unwrap();
+        let decoded =
+            Micheline::decode_raw(&parser.arena, &payload_bytes.0, &mut Gas::unmetered())
+                .unwrap()
+                .unwrap();
 
         match decoded {
             Micheline::String(s) => {

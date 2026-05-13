@@ -162,7 +162,8 @@ impl<'a, Host: StorageV1, C: Context> TypecheckingCtx<'a> for TcCtx<'a, Host, C>
         }?;
 
         let key_type =
-            Micheline::decode_raw(&arena, &encoded_key_type)?.parse_ty(self.gas())?;
+            Micheline::decode_raw(&arena, &encoded_key_type, &mut Gas::unmetered())??
+                .parse_ty(self.gas())?;
 
         let encoded_value_type = match self.host.store_read_all(&value_type_path) {
             Ok(key_type) => Ok(key_type),
@@ -170,7 +171,8 @@ impl<'a, Host: StorageV1, C: Context> TypecheckingCtx<'a> for TcCtx<'a, Host, C>
             Err(err) => Err(err),
         }?;
         let value_type =
-            Micheline::decode_raw(&arena, &encoded_value_type)?.parse_ty(self.gas())?;
+            Micheline::decode_raw(&arena, &encoded_value_type, &mut Gas::unmetered())??
+                .parse_ty(self.gas())?;
 
         Ok(Some((key_type, value_type)))
     }
@@ -313,7 +315,11 @@ impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> CtxTrait<'
             .map_err(|e| LookupViewError::HostError(e.to_string()))?;
         match serialized_script {
             Code::Code(serialized_script) => {
-                let decoded = Micheline::decode_raw(arena, &serialized_script)?;
+                let decoded = Micheline::decode_raw(
+                    arena,
+                    &serialized_script,
+                    &mut Gas::unmetered(),
+                )??;
                 let MichelineContractScript {
                     code: _,
                     parameter_ty: _,
@@ -946,10 +952,11 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
 
         let value_type_path = value_type_path(self.context, id)?;
         let encoded_value_type = self.host.store_read_all(&value_type_path)?;
-        let value_type = Micheline::decode_raw(arena, &encoded_value_type)?;
+        let value_type =
+            Micheline::decode_raw(arena, &encoded_value_type, &mut Gas::unmetered())??;
 
         let encoded_value = self.host.store_read_all(&value_path)?;
-        let value = Micheline::decode_raw(arena, &encoded_value)?;
+        let value = Micheline::decode_raw(arena, &encoded_value, &mut Gas::unmetered())??;
         Ok(Some(value.typecheck_value(self, &value_type)?))
     }
 

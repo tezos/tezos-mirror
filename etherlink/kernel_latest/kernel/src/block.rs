@@ -1601,8 +1601,10 @@ mod tests {
                     .originated_from_contract(&generated_contract)
                     .unwrap()
                     .storage(&host)
-                    .unwrap()
+                    .unwrap(),
+                &mut Gas::unmetered(),
             )
+            .unwrap()
             .unwrap()
         )
     }
