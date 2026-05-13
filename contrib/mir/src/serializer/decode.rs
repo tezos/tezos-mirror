@@ -8,7 +8,6 @@
 use super::constants::*;
 use bitvec::{order::Lsb0, vec::BitVec, view::BitView};
 use num_bigint::{BigInt, Sign};
-use smallvec::{smallvec, SmallVec};
 use strum::EnumCount;
 use typed_arena::Arena;
 
@@ -47,19 +46,6 @@ pub enum DecodeError {
     BadAnnotation,
 }
 
-/// If the number of arguments is small, an allocation-avoiding optimization is
-/// used. This constant specifies the upper bound for the number of arguments
-/// where it triggers.
-/// At most we expect primitives with 3 arguments.
-const EXPECTED_MAX_APP_ARGS: usize = 3;
-
-/// If the number of arguments is small, an allocation-avoiding optimization is
-/// used. This constant specifies the upper bound for the number of sequence
-/// elements where it triggers.
-/// 3 elements doesn't waste too much stack space and seems like a reasonable
-/// optimization for small sequences.
-const EXPECTED_MAX_SEQ_ELTS: usize = 3;
-
 impl<'a> Micheline<'a> {
     /// Decode raw binary data. Same as `decode_packed`, but doesn't expect the
     /// first byte to be `0x05` tag. Charges
@@ -83,7 +69,7 @@ impl<'a> Micheline<'a> {
         bytes: &[u8],
         arena: &'a Arena<Micheline<'a>>,
     ) -> Result<Micheline<'a>, DecodeError> {
-        let mut it = bytes.into();
+        let mut it: BytesIt = bytes.into();
         let res = decode_micheline(arena, &mut it)?;
         if it.peek().is_some() {
             // didn't consume bytes entirely, fail
@@ -167,33 +153,211 @@ impl<'a> From<&'a [u8]> for BytesIt<'a> {
     }
 }
 
-enum NumArgs {
-    Zero,
-    One,
-    Two,
-    Many,
+/// Worklist frame for the iterative decoder.
+///
+/// `AppArgs` reads N children from the parent iterator. `Container` opens
+/// a sub iterator scoped to one Seq or one many arg App and finalizes
+/// when that sub iterator is exhausted.
+enum DecFrame<'a> {
+    AppArgs {
+        prim: Prim,
+        remaining: usize,
+        annots: bool,
+        acc: Vec<Micheline<'a>>,
+    },
+    Container {
+        kind: ContainerKind,
+        acc: Vec<Micheline<'a>>,
+    },
 }
 
-fn decode_micheline<'a>(
+enum ContainerKind {
+    Seq,
+    AppMany { prim: Prim, annots: bool },
+}
+
+/// Read the primitive byte and validate it.
+fn read_prim(bytes: &mut BytesIt) -> Result<Prim, DecodeError> {
+    let p = bytes.next().ok_or(DecodeError::UnexpectedEOF)?;
+    if p as usize >= Prim::COUNT {
+        return Err(DecodeError::UnknownPrim(p));
+    }
+    // SAFETY: Prim is repr(u8) and the value is within bounds.
+    Ok(unsafe { std::mem::transmute(p) })
+}
+
+/// Parse a length prefixed annotation block. Always returns owned
+/// (static) annotations so callers can use them at any lifetime.
+fn read_annots(bytes: &mut BytesIt) -> Result<Annotations<'static>, DecodeError> {
+    let str = get_bytes(bytes)?;
+    if str.is_empty() {
+        Ok(NO_ANNS)
+    } else {
+        str.split(|c| c == &b' ')
+            .map(validate_ann)
+            .collect::<Result<Annotations<'static>, DecodeError>>()
+    }
+}
+
+/// Drive the decoder from an explicit worklist instead of Rust recursion,
+/// so deeply nested input does not depend on call stack depth.
+fn decode_micheline<'a, 'b>(
     arena: &'a Arena<Micheline<'a>>,
-    bytes: &mut BytesIt,
+    bytes: &mut BytesIt<'b>,
 ) -> Result<Micheline<'a>, DecodeError> {
-    match bytes.next() {
-        None => Err(DecodeError::UnexpectedEOF),
-        Some(b) => match b {
-            NUMBER_TAG => decode_int(bytes),
-            STRING_TAG => decode_string(bytes),
-            SEQ_TAG => decode_seq(arena, bytes),
-            BYTES_TAG => decode_bytes(bytes),
-            APP_NO_ARGS_NO_ANNOTS_TAG => decode_app(NumArgs::Zero, false, arena, bytes),
-            APP_NO_ARGS_WITH_ANNOTS_TAG => decode_app(NumArgs::Zero, true, arena, bytes),
-            APP_ONE_ARG_NO_ANNOTS_TAG => decode_app(NumArgs::One, false, arena, bytes),
-            APP_ONE_ARG_WITH_ANNOTS_TAG => decode_app(NumArgs::One, true, arena, bytes),
-            APP_TWO_ARGS_NO_ANNOTS_TAG => decode_app(NumArgs::Two, false, arena, bytes),
-            APP_TWO_ARGS_WITH_ANNOTS_TAG => decode_app(NumArgs::Two, true, arena, bytes),
-            APP_GENERIC => decode_app(NumArgs::Many, true, arena, bytes),
-            b => Err(DecodeError::UnknownTag(b)),
-        },
+    let initial = std::mem::replace(bytes, BytesIt(&[]));
+    let mut iters: Vec<BytesIt<'b>> = vec![initial];
+    let mut frames: Vec<DecFrame<'a>> = Vec::new();
+
+    // Single helper to deliver a finished node to the top frame, or return
+    // it as the root when the stack is empty.
+    fn deliver<'a>(frames: &mut Vec<DecFrame<'a>>, m: Micheline<'a>) -> Option<Micheline<'a>> {
+        match frames.last_mut() {
+            None => Some(m),
+            Some(DecFrame::AppArgs { remaining, acc, .. }) => {
+                acc.push(m);
+                *remaining -= 1;
+                None
+            }
+            Some(DecFrame::Container { acc, .. }) => {
+                acc.push(m);
+                None
+            }
+        }
+    }
+
+    loop {
+        // Phase A: finalize any frames whose work is done. Each finalization
+        // produces a new node which is delivered to the parent frame, which
+        // may itself become done, and so on.
+        loop {
+            let done = match frames.last() {
+                Some(DecFrame::AppArgs { remaining: 0, .. }) => true,
+                Some(DecFrame::Container { .. }) => iters.last().unwrap().peek().is_none(),
+                _ => false,
+            };
+            if !done {
+                break;
+            }
+            let m = match frames.pop().unwrap() {
+                DecFrame::AppArgs {
+                    prim, annots, acc, ..
+                } => {
+                    let active = iters.last_mut().unwrap();
+                    let anns = if annots {
+                        read_annots(active)?
+                    } else {
+                        NO_ANNS
+                    };
+                    // Allocating from a SmallVec is safe; the iterable does
+                    // not touch the arena. See the note on alloc_extend.
+                    #[allow(clippy::disallowed_methods)]
+                    Micheline::App(prim, arena.alloc_extend(acc), anns)
+                }
+                DecFrame::Container { kind, acc } => {
+                    // The scoped iter is exhausted; pop it so the parent
+                    // iter is active again. Any annot suffix for AppMany
+                    // is read from the parent iter.
+                    iters.pop();
+                    match kind {
+                        ContainerKind::Seq =>
+                        {
+                            #[allow(clippy::disallowed_methods)]
+                            Micheline::Seq(arena.alloc_extend(acc))
+                        }
+                        ContainerKind::AppMany { prim, annots } => {
+                            let active = iters.last_mut().unwrap();
+                            let anns = if annots {
+                                read_annots(active)?
+                            } else {
+                                NO_ANNS
+                            };
+                            #[allow(clippy::disallowed_methods)]
+                            Micheline::App(prim, arena.alloc_extend(acc), anns)
+                        }
+                    }
+                }
+            };
+            if let Some(root) = deliver(&mut frames, m) {
+                std::mem::swap(bytes, &mut iters[0]);
+                return Ok(root);
+            }
+        }
+
+        // Phase B: decode the next node from the active iter. The arms
+        // that produce a finished `Micheline` directly (leaves and zero
+        // argument `App`s) return `Some(m)`; the arms that open a sub
+        // iterator or push a multi argument frame return `None`. The
+        // single `deliver / swap / return` block after the match
+        // handles either case uniformly.
+        let produced: Option<Micheline<'a>> = {
+            let active = iters.last_mut().unwrap();
+            let b = active.next().ok_or(DecodeError::UnexpectedEOF)?;
+            match b {
+                NUMBER_TAG => Some(decode_int(active)?),
+                STRING_TAG => Some(decode_string(active)?),
+                BYTES_TAG => Some(decode_bytes(active)?),
+                SEQ_TAG => {
+                    let scoped: BytesIt<'b> = get_bytes(active)?.into();
+                    iters.push(scoped);
+                    frames.push(DecFrame::Container {
+                        kind: ContainerKind::Seq,
+                        acc: Vec::new(),
+                    });
+                    None
+                }
+                APP_NO_ARGS_NO_ANNOTS_TAG | APP_NO_ARGS_WITH_ANNOTS_TAG => {
+                    let annots = b == APP_NO_ARGS_WITH_ANNOTS_TAG;
+                    let prim = read_prim(active)?;
+                    let anns = if annots {
+                        read_annots(active)?
+                    } else {
+                        NO_ANNS
+                    };
+                    #[allow(clippy::disallowed_methods)]
+                    Some(Micheline::App(prim, &[], anns))
+                }
+                APP_ONE_ARG_NO_ANNOTS_TAG | APP_ONE_ARG_WITH_ANNOTS_TAG => {
+                    let annots = b == APP_ONE_ARG_WITH_ANNOTS_TAG;
+                    let prim = read_prim(active)?;
+                    frames.push(DecFrame::AppArgs {
+                        prim,
+                        remaining: 1,
+                        annots,
+                        acc: Vec::new(),
+                    });
+                    None
+                }
+                APP_TWO_ARGS_NO_ANNOTS_TAG | APP_TWO_ARGS_WITH_ANNOTS_TAG => {
+                    let annots = b == APP_TWO_ARGS_WITH_ANNOTS_TAG;
+                    let prim = read_prim(active)?;
+                    frames.push(DecFrame::AppArgs {
+                        prim,
+                        remaining: 2,
+                        annots,
+                        acc: Vec::new(),
+                    });
+                    None
+                }
+                APP_GENERIC => {
+                    let prim = read_prim(active)?;
+                    let scoped: BytesIt<'b> = get_bytes(active)?.into();
+                    iters.push(scoped);
+                    frames.push(DecFrame::Container {
+                        kind: ContainerKind::AppMany { prim, annots: true },
+                        acc: Vec::new(),
+                    });
+                    None
+                }
+                other => return Err(DecodeError::UnknownTag(other)),
+            }
+        };
+        if let Some(m) = produced {
+            if let Some(root) = deliver(&mut frames, m) {
+                std::mem::swap(bytes, &mut iters[0]);
+                return Ok(root);
+            }
+        }
     }
 }
 
@@ -258,30 +422,6 @@ fn decode_bytes(bytes: &mut BytesIt) -> Result<Micheline<'static>, DecodeError> 
     Ok(Micheline::Bytes(get_bytes(bytes)?.to_vec()))
 }
 
-fn decode_seq_raw<'a, const EXPECTED_MAX_ELTS: usize>(
-    arena: &'a Arena<Micheline<'a>>,
-    bytes: &mut BytesIt,
-) -> Result<SmallVec<[Micheline<'a>; EXPECTED_MAX_ELTS]>, DecodeError> {
-    let mut bytes: BytesIt = get_bytes(bytes)?.into();
-    let mut buf = SmallVec::new();
-    while bytes.peek().is_some() {
-        buf.push(decode_micheline(arena, &mut bytes)?);
-    }
-    Ok(buf)
-}
-
-fn decode_seq<'a>(
-    arena: &'a Arena<Micheline<'a>>,
-    bytes: &mut BytesIt,
-) -> Result<Micheline<'a>, DecodeError> {
-    let buf: SmallVec<_> = decode_seq_raw::<EXPECTED_MAX_SEQ_ELTS>(arena, bytes)?;
-    // this call to alloc_extend is safe, the iterable is a SmallVec, which
-    // doesn't touch the arena. See Note: alloc_extend
-    #[allow(clippy::disallowed_methods)]
-    let res = Micheline::Seq(arena.alloc_extend(buf));
-    Ok(res)
-}
-
 fn validate_ann(bytes: &[u8]) -> Result<Annotation<'static>, DecodeError> {
     // @%|@%%|%@|@|:|%|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*
     macro_rules! alpha_num {
@@ -302,45 +442,6 @@ fn validate_ann(bytes: &[u8]) -> Result<Annotation<'static>, DecodeError> {
     ann_from_str(str)
         .map(Annotation::into_owned)
         .map_err(|_| DecodeError::BadAnnotation)
-}
-
-fn decode_app<'a>(
-    num_args: NumArgs,
-    annotations: bool,
-    arena: &'a Arena<Micheline<'a>>,
-    bytes: &mut BytesIt,
-) -> Result<Micheline<'a>, DecodeError> {
-    let prim = bytes.next().ok_or(DecodeError::UnexpectedEOF)?;
-    if prim as usize >= Prim::COUNT {
-        return Err(DecodeError::UnknownPrim(prim));
-    }
-    // SAFETY: Prim is repr(u8), and we checked it's within bounds.
-    let prim: Prim = unsafe { std::mem::transmute(prim) };
-    let args: SmallVec<[_; EXPECTED_MAX_APP_ARGS]> = match num_args {
-        NumArgs::Zero => SmallVec::new(),
-        NumArgs::One => smallvec![decode_micheline(arena, bytes)?],
-        NumArgs::Two => smallvec![
-            decode_micheline(arena, bytes)?,
-            decode_micheline(arena, bytes)?,
-        ],
-        NumArgs::Many => decode_seq_raw(arena, bytes)?,
-    };
-    let anns = if annotations {
-        let str = get_bytes(bytes)?;
-        if str.is_empty() {
-            NO_ANNS
-        } else {
-            str.split(|c| c == &b' ')
-                .map(validate_ann)
-                .collect::<Result<Annotations, DecodeError>>()?
-        }
-    } else {
-        NO_ANNS
-    };
-    // this call to alloc_extend is safe, the iterable is a SmallVec, which
-    // doesn't touch the arena. See Note: alloc_extend
-    #[allow(clippy::disallowed_methods)]
-    Ok(Micheline::App(prim, arena.alloc_extend(args), anns))
 }
 
 #[cfg(test)]
@@ -524,6 +625,42 @@ mod test {
                 Micheline::Seq(&vec![app!(Unit); 1000]),
                 "0x02000007d0030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b",
           );
+        }
+    }
+
+    /// Depth that would overflow the Rust call stack under the old
+    /// recursive decoder; the worklist driver must complete it.
+    mod deep_recursion {
+        use super::*;
+
+        #[test]
+        fn deeply_nested_seq_roundtrips() {
+            // Build SEQ_TAG plus a 4-byte length, then DEPTH copies of the
+            // SEQ_TAG length-prefixed payload, innermost is empty.
+            const DEPTH: usize = 100_000;
+            let mut bytes: Vec<u8> = Vec::with_capacity(DEPTH * 5 + 5);
+            for _ in 0..DEPTH {
+                bytes.push(SEQ_TAG);
+                let payload_len = (DEPTH * 5 - bytes.len() + 1) as u32;
+                bytes.extend_from_slice(&payload_len.to_be_bytes());
+            }
+            // innermost empty Seq: tag + zero length
+            bytes.push(SEQ_TAG);
+            bytes.extend_from_slice(&0u32.to_be_bytes());
+
+            let arena: Arena<Micheline<'_>> = Arena::new();
+            let result = Micheline::decode_raw(&arena, &bytes, &mut crate::gas::Gas::default())
+                .expect("gas suffices")
+                .expect("deep seq decodes");
+            // peel off DEPTH layers
+            let mut node = &result;
+            for _ in 0..DEPTH {
+                match node {
+                    Micheline::Seq([only]) => node = only,
+                    _ => panic!("expected deeply nested Seq, got mismatch at this level"),
+                }
+            }
+            assert!(matches!(node, Micheline::Seq([])));
         }
     }
 
