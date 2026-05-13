@@ -567,196 +567,476 @@ pub(crate) fn parse_ty<'a>(gas: &mut Gas, ty: &Micheline<'a>) -> Result<Type, Tc
     parse_ty_with_entrypoints(gas, ty, None, &mut HashMap::new(), Vec::new())
 }
 
-fn parse_ty_with_entrypoints<'a>(
+/// Worklist frame for the iterative type parser. Visit consumes the
+/// PARSE_TYPE_STEP cost, dispatches leaves inline and pushes Build plus
+/// child Visits for compound types so LIFO popping yields the recursive
+/// order.
+enum PtyFrame<'a, 'b> {
+    Visit {
+        ty: &'b Micheline<'a>,
+        with_entrypoints: bool,
+        path: Vec<Direction>,
+    },
+    Build {
+        ty: &'b Micheline<'a>,
+        with_entrypoints: bool,
+        path: Vec<Direction>,
+        kind: BuildKind,
+    },
+}
+
+enum BuildKind {
+    Pair,
+    Or,
+    Lambda,
+    Map,
+    BigMap,
+    Option,
+    List,
+    Set,
+    Ticket,
+    Contract,
+}
+
+/// Push the frames that drive a parse_ty visit of one nested type
+/// (Option, List, Set, Contract, Ticket): the outer `Build` frame for
+/// the parent followed by a `Visit` for the inner child. Children
+/// never carry an entrypoint path; entrypoint propagation lives on the
+/// outer Build via `with_entrypoints` / `path`.
+fn push_single_child_visit<'a, 'b>(
+    frames: &mut Vec<PtyFrame<'a, 'b>>,
+    ty: &'b Micheline<'a>,
+    with_entrypoints: bool,
+    path: Vec<Direction>,
+    kind: BuildKind,
+    child: &'b Micheline<'a>,
+) {
+    frames.push(PtyFrame::Build {
+        ty,
+        with_entrypoints,
+        path,
+        kind,
+    });
+    frames.push(PtyFrame::Visit {
+        ty: child,
+        with_entrypoints: false,
+        path: Vec::new(),
+    });
+}
+
+/// Push the frames that drive a parse_ty visit of two nested types
+/// (Lambda, Map, BigMap). Order: outer Build, then right child Visit,
+/// then left child Visit. LIFO popping yields left-then-right.
+fn push_pair_children_visit<'a, 'b>(
+    frames: &mut Vec<PtyFrame<'a, 'b>>,
+    ty: &'b Micheline<'a>,
+    with_entrypoints: bool,
+    path: Vec<Direction>,
+    kind: BuildKind,
+    left: &'b Micheline<'a>,
+    right: &'b Micheline<'a>,
+) {
+    frames.push(PtyFrame::Build {
+        ty,
+        with_entrypoints,
+        path,
+        kind,
+    });
+    frames.push(PtyFrame::Visit {
+        ty: right,
+        with_entrypoints: false,
+        path: Vec::new(),
+    });
+    frames.push(PtyFrame::Visit {
+        ty: left,
+        with_entrypoints: false,
+        path: Vec::new(),
+    });
+}
+
+/// Register the field annotation of this `ty` as an entrypoint if the
+/// node is being parsed as part of an entrypoint-bearing path, then push
+/// the parsed Type onto the result stack.
+fn finalize_node<'a, 'b>(
+    ty: &'b Micheline<'a>,
+    parsed_ty: Type,
+    with_entrypoints: bool,
+    path: Vec<Direction>,
+    entrypoints: Option<&mut Entrypoints>,
+    routed_annotations: &mut HashMap<FieldAnnotation<'a>, (Vec<Direction>, Type)>,
+    results: &mut Vec<Type>,
+) -> Result<(), TcError> {
+    if with_entrypoints {
+        if let Option::Some(eps) = entrypoints {
+            // we just ensured it's an application of some type primitive
+            let Micheline::App(_prim, _args, anns) = ty else {
+                return Err(TcError::InternalError(
+                    TcInvariant::ExpectedMichelineApp,
+                ));
+            };
+            if let Option::Some(field_ann) = anns.get_single_field_ann()? {
+                routed_annotations.insert(field_ann.clone(), (path, parsed_ty.clone()));
+                if let Ok(entrypoint) = Entrypoint::try_from(field_ann) {
+                    let entry = eps.entry(entrypoint);
+                    match entry {
+                        Entry::Occupied(e) => {
+                            return Err(TcError::DuplicateEntrypoint(e.key().clone()));
+                        }
+                        Entry::Vacant(e) => {
+                            e.insert(parsed_ty.clone());
+                        }
+                    };
+                }
+            }
+        }
+    }
+    results.push(parsed_ty);
+    Ok(())
+}
+
+fn parse_ty_with_entrypoints<'a, 'b>(
     gas: &mut Gas,
-    ty: &Micheline<'a>,
+    ty: &'b Micheline<'a>,
     mut entrypoints: Option<&mut Entrypoints>,
     routed_annotations: &mut HashMap<FieldAnnotation<'a>, (Vec<Direction>, Type)>,
     path: Vec<Direction>,
 ) -> Result<Type, TcError> {
     use Micheline::*;
-    use Prim::*;
-    gas.consume(gas::tc_cost::PARSE_TYPE_STEP)?;
-    fn make_pair<'a>(
-        gas: &mut Gas,
-        args: (&Micheline<'a>, &Micheline<'a>, &[Micheline<'a>]),
-        // NB: the tuple models a slice of at least 2 elements
-    ) -> Result<Type, TcError> {
-        Ok(match args {
-            (ty1, ty2, []) => Type::new_pair(parse_ty(gas, ty1)?, parse_ty(gas, ty2)?),
-            (ty1, ty2, [ty3, rest @ ..]) => {
-                Type::new_pair(parse_ty(gas, ty1)?, make_pair(gas, (ty2, ty3, rest))?)
-            }
-        })
-    }
-    let unexpected = || Err(TcError::UnexpectedMicheline(format!("{ty:?}")));
-    let parsed_ty = match ty {
-        App(int, [], _) => Type::Int,
-        App(int, ..) => unexpected()?,
+    let with_entrypoints_root = entrypoints.is_some();
+    let mut frames: Vec<PtyFrame<'a, 'b>> = vec![PtyFrame::Visit {
+        ty,
+        with_entrypoints: with_entrypoints_root,
+        path,
+    }];
+    let mut results: Vec<Type> = Vec::new();
 
-        App(nat, [], _) => Type::Nat,
-        App(nat, ..) => unexpected()?,
+    while let Some(frame) = frames.pop() {
+        match frame {
+            PtyFrame::Visit {
+                ty,
+                with_entrypoints,
+                path,
+            } => {
+                use Prim::*;
+                gas.consume(gas::tc_cost::PARSE_TYPE_STEP)?;
+                let unexpected = || Err(TcError::UnexpectedMicheline(format!("{ty:?}")));
+                // Small helper that captures the current Visit's metadata so
+                // leaf arms can finalize in one short line.
+                macro_rules! emit_leaf {
+                    ($t:expr) => {{
+                        finalize_node(
+                            ty,
+                            $t,
+                            with_entrypoints,
+                            path,
+                            entrypoints.as_deref_mut(),
+                            routed_annotations,
+                            &mut results,
+                        )?;
+                    }};
+                }
+                match ty {
+                    App(int, [], _) => emit_leaf!(Type::Int),
+                    App(int, ..) => return unexpected(),
 
-        App(bool, [], _) => Type::Bool,
-        App(bool, ..) => unexpected()?,
+                    App(nat, [], _) => emit_leaf!(Type::Nat),
+                    App(nat, ..) => return unexpected(),
 
-        App(mutez, [], _) => Type::Mutez,
-        App(mutez, ..) => unexpected()?,
+                    App(bool, [], _) => emit_leaf!(Type::Bool),
+                    App(bool, ..) => return unexpected(),
 
-        App(string, [], _) => Type::String,
-        App(string, ..) => unexpected()?,
+                    App(mutez, [], _) => emit_leaf!(Type::Mutez),
+                    App(mutez, ..) => return unexpected(),
 
-        App(operation, [], _) => Type::Operation,
-        App(operation, ..) => unexpected()?,
+                    App(string, [], _) => emit_leaf!(Type::String),
+                    App(string, ..) => return unexpected(),
 
-        App(never, [], _) => Type::Never,
-        App(never, ..) => unexpected()?,
+                    App(operation, [], _) => emit_leaf!(Type::Operation),
+                    App(operation, ..) => return unexpected(),
 
-        App(unit, [], _) => Type::Unit,
-        App(unit, ..) => unexpected()?,
+                    App(never, [], _) => emit_leaf!(Type::Never),
+                    App(never, ..) => return unexpected(),
 
-        App(address, [], _) => Type::Address,
-        App(address, ..) => unexpected()?,
+                    App(unit, [], _) => emit_leaf!(Type::Unit),
+                    App(unit, ..) => return unexpected(),
 
-        App(chain_id, [], _) => Type::ChainId,
-        App(chain_id, ..) => unexpected()?,
+                    App(address, [], _) => emit_leaf!(Type::Address),
+                    App(address, ..) => return unexpected(),
 
-        App(ticket, [t], _) => {
-            let t = parse_ty(gas, t)?;
-            // NB: The inner type of ticket only needs to be comparable.
-            // See https://tezos.gitlab.io/michelson-reference/#type-ticket
-            t.ensure_prop(gas, TypeProperty::Comparable)?;
-            Type::new_ticket(t)
-        }
-        App(ticket, ..) => unexpected()?,
+                    App(chain_id, [], _) => emit_leaf!(Type::ChainId),
+                    App(chain_id, ..) => return unexpected(),
 
-        App(timestamp, [], _) => Type::Timestamp,
-        App(timestamp, ..) => unexpected()?,
+                    App(timestamp, [], _) => emit_leaf!(Type::Timestamp),
+                    App(timestamp, ..) => return unexpected(),
 
-        App(pair, [ty1, ty2, rest @ ..], _) => make_pair(gas, (ty1, ty2, rest))?,
-        App(pair, ..) => unexpected()?,
+                    App(bytes, [], _) => emit_leaf!(Type::Bytes),
+                    App(bytes, ..) => return unexpected(),
 
-        App(or, [l, r], _) => Type::new_or(
-            parse_ty_with_entrypoints(gas, l, entrypoints.as_deref_mut(), routed_annotations, {
-                let mut new_path = path.clone();
-                new_path.push(Direction::Left);
-                new_path
-            })?,
-            parse_ty_with_entrypoints(gas, r, entrypoints.as_deref_mut(), routed_annotations, {
-                let mut new_path = path.clone();
-                new_path.push(Direction::Right);
-                new_path
-            })?,
-        ),
+                    App(key, [], _) => emit_leaf!(Type::Key),
+                    App(key, ..) => return unexpected(),
 
-        App(or, ..) => unexpected()?,
+                    App(key_hash, [], _) => emit_leaf!(Type::KeyHash),
+                    App(key_hash, ..) => return unexpected(),
 
-        App(option, [t], _) => Type::new_option(parse_ty(gas, t)?),
-        App(option, ..) => unexpected()?,
+                    App(signature, [], _) => emit_leaf!(Type::Signature),
+                    App(signature, ..) => return unexpected(),
 
-        App(list, [t], _) => Type::new_list(parse_ty(gas, t)?),
-        App(list, ..) => unexpected()?,
+                    #[cfg(feature = "bls")]
+                    App(bls12_381_fr, [], _) => emit_leaf!(Type::Bls12381Fr),
+                    #[cfg(feature = "bls")]
+                    App(bls12_381_fr, ..) => return unexpected(),
 
-        App(lambda, [ty1, ty2], _) => Type::new_lambda(parse_ty(gas, ty1)?, parse_ty(gas, ty2)?),
-        App(lambda, ..) => unexpected()?,
+                    #[cfg(feature = "bls")]
+                    App(bls12_381_g1, [], _) => emit_leaf!(Type::Bls12381G1),
+                    #[cfg(feature = "bls")]
+                    App(bls12_381_g1, ..) => return unexpected(),
 
-        App(contract, [t], _) => {
-            let t = parse_ty(gas, t)?;
-            // NB: despite `contract` type being duplicable and packable, its
-            // argument doesn't need to be. The only constraint is that it needs
-            // to be passable, as it represents the contract's parameter type.
-            // See https://tezos.gitlab.io/michelson-reference/#type-contract
-            t.ensure_prop(gas, TypeProperty::Passable)?;
-            Type::new_contract(t)
-        }
-        App(contract, ..) => unexpected()?,
+                    #[cfg(feature = "bls")]
+                    App(bls12_381_g2, [], _) => emit_leaf!(Type::Bls12381G2),
+                    #[cfg(feature = "bls")]
+                    App(bls12_381_g2, ..) => return unexpected(),
 
-        App(set, [k], _) => {
-            let k = parse_ty(gas, k)?;
-            k.ensure_prop(gas, TypeProperty::Comparable)?;
-            Type::new_set(k)
-        }
-        App(set, ..) => unexpected()?,
+                    App(ticket, [t], _) => push_single_child_visit(
+                        &mut frames,
+                        ty,
+                        with_entrypoints,
+                        path,
+                        BuildKind::Ticket,
+                        t,
+                    ),
+                    App(ticket, ..) => return unexpected(),
 
-        App(map, [k, v], _) => {
-            let k = parse_ty(gas, k)?;
-            k.ensure_prop(gas, TypeProperty::Comparable)?;
-            let v = parse_ty(gas, v)?;
-            Type::new_map(k, v)
-        }
-        App(map, ..) => unexpected()?,
-
-        App(big_map, [k, v], _) => {
-            let k = parse_ty(gas, k)?;
-            k.ensure_prop(gas, TypeProperty::Comparable)?;
-            let v = parse_ty(gas, v)?;
-            v.ensure_prop(gas, TypeProperty::BigMapValue)?;
-            Type::new_big_map(k, v)
-        }
-        App(big_map, ..) => unexpected()?,
-
-        App(bytes, [], _) => Type::Bytes,
-        App(bytes, ..) => unexpected()?,
-
-        App(key, [], _) => Type::Key,
-        App(key, ..) => unexpected()?,
-
-        App(key_hash, [], _) => Type::KeyHash,
-        App(key_hash, ..) => unexpected()?,
-
-        App(signature, [], _) => Type::Signature,
-        App(signature, ..) => unexpected()?,
-
-        #[cfg(feature = "bls")]
-        App(bls12_381_fr, [], _) => Type::Bls12381Fr,
-        #[cfg(feature = "bls")]
-        App(bls12_381_fr, ..) => unexpected()?,
-
-        #[cfg(feature = "bls")]
-        App(bls12_381_g1, [], _) => Type::Bls12381G1,
-        #[cfg(feature = "bls")]
-        App(bls12_381_g1, ..) => unexpected()?,
-
-        #[cfg(feature = "bls")]
-        App(bls12_381_g2, [], _) => Type::Bls12381G2,
-        #[cfg(feature = "bls")]
-        App(bls12_381_g2, ..) => unexpected()?,
-
-        Seq(..)
-        | micheline_fields!()
-        | micheline_instructions!()
-        | micheline_literals!()
-        | micheline_values!() => unexpected()?,
-
-        App(prim @ micheline_unsupported_types!(), ..) => Err(TcError::TodoType(*prim))?,
-    };
-
-    if let Option::Some(eps) = entrypoints {
-        // We just ensured it's an application of some type primitive.
-        let Micheline::App(_, _, anns) = ty else {
-            return Err(TcError::InternalError(
-                TcInvariant::ExpectedMichelineApp,
-            ));
-        };
-        if let Option::Some(field_ann) = anns.get_single_field_ann()? {
-            // NB: field annotations may be longer than entrypoints; however
-            // it's not an error to have an overly-long field annotation, it
-            // just doesn't count as an entrypoint.
-            routed_annotations.insert(field_ann.clone(), (path, parsed_ty.clone()));
-            if let Ok(entrypoint) = Entrypoint::try_from(field_ann) {
-                let entry = eps.entry(entrypoint);
-                match entry {
-                    Entry::Occupied(e) => {
-                        return Err(TcError::DuplicateEntrypoint(e.key().clone()));
+                    App(pair, [ty1, ty2, rest @ ..], _) => {
+                        // The recursive shape is right leaning:
+                        // new_pair(ty1, new_pair(ty2, new_pair(ty3, ...))).
+                        // We push N - 1 Build::Pair frames then the N children
+                        // in reverse so the first child pops first and the
+                        // outermost Build::Pair pops last.
+                        let total_children = 2 + rest.len();
+                        for _ in 0..(total_children - 1) {
+                            // All but the outermost Build::Pair are anonymous:
+                            // they do not carry the entrypoint path of the
+                            // original pair node; only the outermost one does.
+                            frames.push(PtyFrame::Build {
+                                ty,
+                                with_entrypoints: false,
+                                path: Vec::new(),
+                                kind: BuildKind::Pair,
+                            });
+                        }
+                        // Override the outermost Build::Pair (the first pushed)
+                        // to carry the real entrypoint metadata.
+                        let outermost_idx = frames.len() - (total_children - 1);
+                        frames[outermost_idx] = PtyFrame::Build {
+                            ty,
+                            with_entrypoints,
+                            path,
+                            kind: BuildKind::Pair,
+                        };
+                        // Push children in reverse so the first child pops first.
+                        for child in rest.iter().rev() {
+                            frames.push(PtyFrame::Visit {
+                                ty: child,
+                                with_entrypoints: false,
+                                path: Vec::new(),
+                            });
+                        }
+                        frames.push(PtyFrame::Visit {
+                            ty: ty2,
+                            with_entrypoints: false,
+                            path: Vec::new(),
+                        });
+                        frames.push(PtyFrame::Visit {
+                            ty: ty1,
+                            with_entrypoints: false,
+                            path: Vec::new(),
+                        });
                     }
-                    Entry::Vacant(e) => {
-                        e.insert(parsed_ty.clone());
+                    App(pair, ..) => return unexpected(),
+
+                    App(or, [l, r], _) => {
+                        let mut left_path = path.clone();
+                        left_path.push(Direction::Left);
+                        let mut right_path = path.clone();
+                        right_path.push(Direction::Right);
+                        frames.push(PtyFrame::Build {
+                            ty,
+                            with_entrypoints,
+                            path,
+                            kind: BuildKind::Or,
+                        });
+                        frames.push(PtyFrame::Visit {
+                            ty: r,
+                            with_entrypoints,
+                            path: right_path,
+                        });
+                        frames.push(PtyFrame::Visit {
+                            ty: l,
+                            with_entrypoints,
+                            path: left_path,
+                        });
+                    }
+                    App(or, ..) => return unexpected(),
+
+                    App(option, [t], _) => push_single_child_visit(
+                        &mut frames,
+                        ty,
+                        with_entrypoints,
+                        path,
+                        BuildKind::Option,
+                        t,
+                    ),
+                    App(option, ..) => return unexpected(),
+
+                    App(list, [t], _) => push_single_child_visit(
+                        &mut frames,
+                        ty,
+                        with_entrypoints,
+                        path,
+                        BuildKind::List,
+                        t,
+                    ),
+                    App(list, ..) => return unexpected(),
+
+                    App(lambda, [ty1, ty2], _) => push_pair_children_visit(
+                        &mut frames,
+                        ty,
+                        with_entrypoints,
+                        path,
+                        BuildKind::Lambda,
+                        ty1,
+                        ty2,
+                    ),
+                    App(lambda, ..) => return unexpected(),
+
+                    App(contract, [t], _) => push_single_child_visit(
+                        &mut frames,
+                        ty,
+                        with_entrypoints,
+                        path,
+                        BuildKind::Contract,
+                        t,
+                    ),
+                    App(contract, ..) => return unexpected(),
+
+                    App(set, [k], _) => push_single_child_visit(
+                        &mut frames,
+                        ty,
+                        with_entrypoints,
+                        path,
+                        BuildKind::Set,
+                        k,
+                    ),
+                    App(set, ..) => return unexpected(),
+
+                    App(map, [k, v], _) => push_pair_children_visit(
+                        &mut frames,
+                        ty,
+                        with_entrypoints,
+                        path,
+                        BuildKind::Map,
+                        k,
+                        v,
+                    ),
+                    App(map, ..) => return unexpected(),
+
+                    App(big_map, [k, v], _) => push_pair_children_visit(
+                        &mut frames,
+                        ty,
+                        with_entrypoints,
+                        path,
+                        BuildKind::BigMap,
+                        k,
+                        v,
+                    ),
+                    App(big_map, ..) => return unexpected(),
+
+                    Seq(..)
+                    | micheline_fields!()
+                    | micheline_instructions!()
+                    | micheline_literals!()
+                    | micheline_values!() => return unexpected(),
+
+                    App(prim @ micheline_unsupported_types!(), ..) => {
+                        return Err(TcError::TodoType(*prim));
+                    }
+                }
+            }
+            PtyFrame::Build {
+                ty,
+                with_entrypoints,
+                path,
+                kind,
+            } => {
+                let parsed = match kind {
+                    BuildKind::Pair => {
+                        let r = results.pop().expect("pair r");
+                        let l = results.pop().expect("pair l");
+                        Type::new_pair(l, r)
+                    }
+                    BuildKind::Or => {
+                        let r = results.pop().expect("or r");
+                        let l = results.pop().expect("or l");
+                        Type::new_or(l, r)
+                    }
+                    BuildKind::Lambda => {
+                        let ret = results.pop().expect("lambda ret");
+                        let arg = results.pop().expect("lambda arg");
+                        Type::new_lambda(arg, ret)
+                    }
+                    BuildKind::Map => {
+                        let v = results.pop().expect("map v");
+                        let k = results.pop().expect("map k");
+                        k.ensure_prop(gas, TypeProperty::Comparable)?;
+                        Type::new_map(k, v)
+                    }
+                    BuildKind::BigMap => {
+                        let v = results.pop().expect("big_map v");
+                        let k = results.pop().expect("big_map k");
+                        k.ensure_prop(gas, TypeProperty::Comparable)?;
+                        v.ensure_prop(gas, TypeProperty::BigMapValue)?;
+                        Type::new_big_map(k, v)
+                    }
+                    BuildKind::Option => {
+                        let t = results.pop().expect("option t");
+                        Type::new_option(t)
+                    }
+                    BuildKind::List => {
+                        let t = results.pop().expect("list t");
+                        Type::new_list(t)
+                    }
+                    BuildKind::Set => {
+                        let t = results.pop().expect("set t");
+                        t.ensure_prop(gas, TypeProperty::Comparable)?;
+                        Type::new_set(t)
+                    }
+                    BuildKind::Ticket => {
+                        let t = results.pop().expect("ticket t");
+                        // The inner type of ticket only needs to be comparable.
+                        t.ensure_prop(gas, TypeProperty::Comparable)?;
+                        Type::new_ticket(t)
+                    }
+                    BuildKind::Contract => {
+                        let t = results.pop().expect("contract t");
+                        // The argument of contract only needs to be passable;
+                        // contract itself is duplicable and packable.
+                        t.ensure_prop(gas, TypeProperty::Passable)?;
+                        Type::new_contract(t)
                     }
                 };
+                finalize_node(
+                    ty,
+                    parsed,
+                    with_entrypoints,
+                    path,
+                    entrypoints.as_deref_mut(),
+                    routed_annotations,
+                    &mut results,
+                )?;
             }
         }
     }
-    Ok(parsed_ty)
+    Ok(results.pop().expect("root type"))
 }
 
 #[allow(clippy::type_complexity)]
@@ -3247,6 +3527,26 @@ mod typecheck_tests {
     use std::rc::Rc;
     use Instruction::*;
     use Option::None;
+
+    /// Parses a 100k deep right leaning `pair` type without overflowing
+    /// the Rust call stack. Currently ignored: the parser completes, but
+    /// the resulting `Type` overflows on its own recursive Drop, which a
+    /// follow up commit converts to an iterative Drop.
+    #[test]
+    #[ignore]
+    fn deeply_nested_pair_parses() {
+        const DEPTH: usize = 100_000;
+        let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+        let int_app: Micheline<'_> = Micheline::App(Prim::int, &[], NO_ANNS);
+        let mut current: Micheline<'_> = int_app.clone();
+        for _ in 0..DEPTH {
+            let pair_args = arena.alloc_extend([int_app.clone(), current]);
+            current = Micheline::App(Prim::pair, pair_args, NO_ANNS);
+        }
+        let mut gas = Gas::new(u32::MAX);
+        let parsed = parse_ty(&mut gas, &current).expect("deep pair parses");
+        assert!(matches!(parsed, Type::Pair(_)));
+    }
 
     /// hack to simplify syntax in tests
     fn typecheck_instruction<'a>(
