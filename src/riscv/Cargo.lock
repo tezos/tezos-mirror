@@ -196,9 +196,9 @@ dependencies = [
 
 [[package]]
 name = "blake3"
-version = "1.8.4"
+version = "1.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d2d5991425dfd0785aed03aedcf0b321d61975c9b5b3689c774a2610ae0b51e"
+checksum = "0aa83c34e62843d924f905e0f5c866eb1dd6545fc4d719e803d9ba6030371fce"
 dependencies = [
  "arrayref",
  "arrayvec",
@@ -1334,9 +1334,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.29"
+version = "0.4.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
+checksum = "616ec5685824bcc94416c6d4a7a446eea774a31efd7062c8480ba6fd06d7a6e5"
 
 [[package]]
 name = "lz4-sys"
@@ -1510,7 +1510,7 @@ dependencies = [
 [[package]]
 name = "octez-riscv"
 version = "0.0.0"
-source = "git+https://github.com/tezos/riscv-pvm.git?rev=7f80f04c2cf5ae9ff19d91b95e213c69b518f0fb#7f80f04c2cf5ae9ff19d91b95e213c69b518f0fb"
+source = "git+https://github.com/tezos/riscv-pvm.git?rev=5b1ec2306e1970193802658262c0a13d72a81459#5b1ec2306e1970193802658262c0a13d72a81459"
 dependencies = [
  "arbitrary-int 2.1.1",
  "bincode",
@@ -1579,7 +1579,7 @@ dependencies = [
 [[package]]
 name = "octez-riscv-data"
 version = "0.0.0"
-source = "git+https://github.com/tezos/riscv-pvm.git?rev=7f80f04c2cf5ae9ff19d91b95e213c69b518f0fb#7f80f04c2cf5ae9ff19d91b95e213c69b518f0fb"
+source = "git+https://github.com/tezos/riscv-pvm.git?rev=5b1ec2306e1970193802658262c0a13d72a81459#5b1ec2306e1970193802658262c0a13d72a81459"
 dependencies = [
  "bincode",
  "blake3",
@@ -1597,7 +1597,7 @@ dependencies = [
 [[package]]
 name = "octez-riscv-durable-storage"
 version = "0.0.0"
-source = "git+https://github.com/tezos/riscv-pvm.git?rev=7f80f04c2cf5ae9ff19d91b95e213c69b518f0fb#7f80f04c2cf5ae9ff19d91b95e213c69b518f0fb"
+source = "git+https://github.com/tezos/riscv-pvm.git?rev=5b1ec2306e1970193802658262c0a13d72a81459#5b1ec2306e1970193802658262c0a13d72a81459"
 dependencies = [
  "bincode",
  "bytes",
@@ -2196,12 +2196,13 @@ dependencies = [
 
 [[package]]
 name = "sha3"
-version = "0.11.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be176f1a57ce4e3d31c1a166222d9768de5954f811601fb7ca06fc8203905ce1"
+checksum = "bc9bad02c26382724b2d2692c6f179285e4b54eeecd7968f52a50059c3c11759"
 dependencies = [
  "digest 0.11.2",
  "keccak",
+ "sponge-cursor",
 ]
 
 [[package]]
@@ -2284,6 +2285,12 @@ dependencies = [
  "base64ct",
  "der 0.7.9",
 ]
+
+[[package]]
+name = "sponge-cursor"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a0219bd7d979d58245a4f41f695e1ac9f8befdffadd7f61f1bae9e39abc6620"
 
 [[package]]
 name = "stable_deref_trait"
@@ -2398,7 +2405,7 @@ dependencies = [
 [[package]]
 name = "tezos-protocol"
 version = "0.1.0"
-source = "git+https://gitlab.com/tezos/tezos.git#28d33862af5f1d90618c9922fbc145cceadf9dcb"
+source = "git+https://gitlab.com/tezos/tezos.git#8e0ed04230235c555802591287045733c7e2f24b"
 dependencies = [
  "hex",
  "nom",
@@ -2410,7 +2417,7 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-build-utils"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#28d33862af5f1d90618c9922fbc145cceadf9dcb"
+source = "git+https://gitlab.com/tezos/tezos.git#8e0ed04230235c555802591287045733c7e2f24b"
 dependencies = [
  "rustc_version",
 ]
@@ -2418,12 +2425,12 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-constants"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#28d33862af5f1d90618c9922fbc145cceadf9dcb"
+source = "git+https://gitlab.com/tezos/tezos.git#8e0ed04230235c555802591287045733c7e2f24b"
 
 [[package]]
 name = "tezos-smart-rollup-core"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#28d33862af5f1d90618c9922fbc145cceadf9dcb"
+source = "git+https://gitlab.com/tezos/tezos.git#8e0ed04230235c555802591287045733c7e2f24b"
 dependencies = [
  "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-constants",
@@ -2432,7 +2439,7 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-encoding"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#28d33862af5f1d90618c9922fbc145cceadf9dcb"
+source = "git+https://gitlab.com/tezos/tezos.git#8e0ed04230235c555802591287045733c7e2f24b"
 dependencies = [
  "hex",
  "nom",
@@ -2452,7 +2459,7 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-host"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#28d33862af5f1d90618c9922fbc145cceadf9dcb"
+source = "git+https://gitlab.com/tezos/tezos.git#8e0ed04230235c555802591287045733c7e2f24b"
 dependencies = [
  "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-core",
@@ -2463,7 +2470,7 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-mock"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#28d33862af5f1d90618c9922fbc145cceadf9dcb"
+source = "git+https://gitlab.com/tezos/tezos.git#8e0ed04230235c555802591287045733c7e2f24b"
 dependencies = [
  "hex",
  "tezos-smart-rollup-core",
@@ -2476,7 +2483,7 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-utils"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#28d33862af5f1d90618c9922fbc145cceadf9dcb"
+source = "git+https://gitlab.com/tezos/tezos.git#8e0ed04230235c555802591287045733c7e2f24b"
 dependencies = [
  "clap",
  "hex",
@@ -2492,7 +2499,7 @@ dependencies = [
 [[package]]
 name = "tezos_crypto_rs"
 version = "0.6.0"
-source = "git+https://gitlab.com/tezos/tezos.git#28d33862af5f1d90618c9922fbc145cceadf9dcb"
+source = "git+https://gitlab.com/tezos/tezos.git#8e0ed04230235c555802591287045733c7e2f24b"
 dependencies = [
  "anyhow",
  "bs58",
@@ -2517,7 +2524,7 @@ dependencies = [
 [[package]]
 name = "tezos_data_encoding"
 version = "0.6.0"
-source = "git+https://gitlab.com/tezos/tezos.git#28d33862af5f1d90618c9922fbc145cceadf9dcb"
+source = "git+https://gitlab.com/tezos/tezos.git#8e0ed04230235c555802591287045733c7e2f24b"
 dependencies = [
  "bit-vec",
  "bitvec",
@@ -2534,7 +2541,7 @@ dependencies = [
 [[package]]
 name = "tezos_data_encoding_derive"
 version = "0.6.0"
-source = "git+https://gitlab.com/tezos/tezos.git#28d33862af5f1d90618c9922fbc145cceadf9dcb"
+source = "git+https://gitlab.com/tezos/tezos.git#8e0ed04230235c555802591287045733c7e2f24b"
 dependencies = [
  "lazy_static",
  "once_cell",
