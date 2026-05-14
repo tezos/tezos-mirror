@@ -17,6 +17,7 @@ use octez_riscv_durable_storage::errors as ds_errors;
 use octez_riscv_durable_storage::key::Key;
 use octez_riscv_durable_storage::registry as ds_registry;
 use octez_riscv_durable_storage::storage::KeyValueStore;
+use trait_set::trait_set;
 
 use crate::BytesParam;
 use crate::KeyParam;
@@ -28,11 +29,16 @@ use crate::split_ds_errors;
 /// Type alias for a mutable registry state backed by a generic key-value store.
 pub type DsRegistry<KV, G> = MutableState<RegistryState<KV, G>>;
 
+trait_set! {
+    /// [`KeyValueStore`] that can be used in a background thread
+    pub trait BackgroundKeyValueStore = KeyValueStore + Send + Sync + 'static;
+}
+
 /// Compute the hash of the registry state.
 #[inline(always)]
 pub fn registry_hash<KV, G>(state: SafePointer<DsRegistry<KV, G>>) -> BytesWrapper<Hash>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
+    KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     DsRegistry<KV, G>: Sync,
 {
@@ -45,8 +51,8 @@ where
 #[inline(always)]
 pub fn registry_size<KV, G>(state: SafePointer<DsRegistry<KV, G>>) -> OcamlFallible<u64>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
-    KV::Repo: Clone + Send + Sync,
+    KV: BackgroundKeyValueStore,
+    KV::Repo: Send + Sync,
     DsRegistry<KV, G>: Sync,
 {
     let size: usize = state.apply_ro(ds_registry::Registry::len);
@@ -61,7 +67,7 @@ pub fn registry_resize<KV, G, Err>(
     size: u64,
 ) -> SplitDsResult<(), Err>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
+    KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     DsRegistry<KV, G>: Sync,
     Err: From<ds_errors::InvalidArgumentError>,
@@ -80,7 +86,7 @@ pub fn registry_copy<KV, G, Err>(
     dst_index: u64,
 ) -> SplitDsResult<(), Err>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
+    KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     DsRegistry<KV, G>: Sync,
     Err: From<ds_errors::InvalidArgumentError>,
@@ -101,7 +107,7 @@ pub fn registry_move<KV, G, Err>(
     dst_index: u64,
 ) -> SplitDsResult<(), Err>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
+    KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     DsRegistry<KV, G>: Sync,
     Err: From<ds_errors::InvalidArgumentError>,
@@ -121,7 +127,7 @@ pub fn registry_clear<KV, G, Err>(
     db_index: u64,
 ) -> SplitDsResult<(), Err>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
+    KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     DsRegistry<KV, G>: Sync,
     Err: From<ds_errors::InvalidArgumentError>,
@@ -141,8 +147,8 @@ pub fn database_exists<KV, G, Err>(
     key: KeyParam,
 ) -> SplitDsResult<bool, Err>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
-    KV::Repo: Clone + Send + Sync,
+    KV: BackgroundKeyValueStore,
+    KV::Repo: Send + Sync,
     DsRegistry<KV, G>: Sync,
     Err: From<ds_errors::InvalidArgumentError>,
 {
@@ -167,7 +173,7 @@ pub fn database_set<KV, G, Err>(
     value: BytesParam,
 ) -> SplitDsResult<(), Err>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
+    KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     DsRegistry<KV, G>: Sync,
     Err: From<ds_errors::InvalidArgumentError>,
@@ -197,7 +203,7 @@ pub fn database_write<KV, G, Err>(
     value: BytesParam,
 ) -> SplitDsResult<u64, Err>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
+    KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     DsRegistry<KV, G>: Sync,
     Err: From<ds_errors::InvalidArgumentError>,
@@ -227,8 +233,8 @@ pub fn database_read<KV, G, Err>(
     len: u64,
 ) -> SplitDsResult<BytesWrapper<Vec<u8>>, Err>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
-    KV::Repo: Clone + Send + Sync,
+    KV: BackgroundKeyValueStore,
+    KV::Repo: Send + Sync,
     DsRegistry<KV, G>: Sync,
     Err: From<ds_errors::InvalidArgumentError>,
 {
@@ -264,8 +270,8 @@ pub fn value_length<KV, G, Err>(
     key: KeyParam,
 ) -> SplitDsResult<u64, Err>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
-    KV::Repo: Clone + Send + Sync,
+    KV: BackgroundKeyValueStore,
+    KV::Repo: Send + Sync,
     DsRegistry<KV, G>: Sync,
     Err: From<ds_errors::InvalidArgumentError>,
 {
@@ -290,7 +296,7 @@ pub fn database_delete<KV, G, Err>(
     key: KeyParam,
 ) -> SplitDsResult<(), Err>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
+    KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     DsRegistry<KV, G>: Sync,
     Err: From<ds_errors::InvalidArgumentError>,
@@ -314,8 +320,8 @@ pub fn database_hash<KV, G, Err>(
     db_index: u64,
 ) -> SplitDsResult<BytesWrapper<Hash>, Err>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
-    KV::Repo: Clone + Send + Sync,
+    KV: BackgroundKeyValueStore,
+    KV::Repo: Send + Sync,
     DsRegistry<KV, G>: Sync,
     Err: From<ds_errors::InvalidArgumentError>,
 {

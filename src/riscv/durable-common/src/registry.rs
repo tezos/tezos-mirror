@@ -9,11 +9,14 @@ use std::ops::Deref;
 use std::ops::DerefMut;
 
 use octez_riscv_api_common::move_semantics::CustomGcResource;
+use octez_riscv_api_common::move_semantics::MutableState;
 use octez_riscv_api_common::try_clone::TryClone;
 use octez_riscv_data::mode::Normal;
 use octez_riscv_durable_storage::errors::OperationalError;
 use octez_riscv_durable_storage::registry;
 use octez_riscv_durable_storage::storage::KeyValueStore;
+
+use crate::api_common::BackgroundKeyValueStore;
 
 /// Marker trait supplying OCaml GC resource names.
 pub trait GcNames {
@@ -30,7 +33,7 @@ pub struct RegistryState<KV: KeyValueStore, G> {
     _phantom: PhantomData<G>,
 }
 
-impl<KV: KeyValueStore + Send + Sync + 'static, G> RegistryState<KV, G> {
+impl<KV: BackgroundKeyValueStore, G> RegistryState<KV, G> {
     /// Construct a new registry.
     pub fn new(repo: KV::Repo) -> Result<Self, OperationalError> {
         let reg = registry::Registry::new(repo)?;
@@ -66,7 +69,7 @@ impl<KV: KeyValueStore, G> DerefMut for RegistryState<KV, G> {
 
 impl<KV, G> TryClone for RegistryState<KV, G>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
+    KV: BackgroundKeyValueStore,
     KV::Repo: Clone,
 {
     type Error = OperationalError;
@@ -83,3 +86,6 @@ impl<KV: KeyValueStore, G: GcNames> CustomGcResource for RegistryState<KV, G> {
     const IMMUTABLE_NAME: &'static str = G::IMMUTABLE_NAME;
     const MUTABLE_NAME: &'static str = G::MUTABLE_NAME;
 }
+
+/// Type alias for a mutable registry state backed by a generic key-value store.
+pub type DsRegistry<KV, G> = MutableState<RegistryState<KV, G>>;

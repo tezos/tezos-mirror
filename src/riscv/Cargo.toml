@@ -17,6 +17,7 @@ num_enum = "0.7.2"
 ocaml-build = "1.0.0"
 sha2 = "0.10.9"
 parking_lot = "0.12.5"
+trait-set = "0.3.0"
 
 [workspace.dependencies.derive_more]
 version = "2.1.1"
