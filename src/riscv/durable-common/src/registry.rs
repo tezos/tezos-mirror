@@ -13,10 +13,11 @@ use octez_riscv_api_common::move_semantics::MutableState;
 use octez_riscv_api_common::try_clone::TryClone;
 use octez_riscv_data::mode::Normal;
 use octez_riscv_durable_storage::errors::OperationalError;
-use octez_riscv_durable_storage::registry;
+use octez_riscv_durable_storage::registry::Registry;
 use octez_riscv_durable_storage::storage::KeyValueStore;
 
 use crate::api_common::BackgroundKeyValueStore;
+use crate::api_common::RegistryApply;
 
 /// Marker trait supplying OCaml GC resource names.
 pub trait GcNames {
@@ -29,14 +30,14 @@ pub trait GcNames {
 /// Wrapper to enable customizing OCaml GC's resource tracking.
 #[repr(transparent)]
 pub struct RegistryState<KV: KeyValueStore, G> {
-    inner: registry::Registry<KV, Normal>,
+    inner: Registry<KV, Normal>,
     _phantom: PhantomData<G>,
 }
 
 impl<KV: BackgroundKeyValueStore, G> RegistryState<KV, G> {
     /// Construct a new registry.
     pub fn new(repo: KV::Repo) -> Result<Self, OperationalError> {
-        let reg = registry::Registry::new(repo)?;
+        let reg = Registry::new(repo)?;
         Ok(Self {
             inner: reg,
             _phantom: PhantomData,
@@ -44,8 +45,8 @@ impl<KV: BackgroundKeyValueStore, G> RegistryState<KV, G> {
     }
 }
 
-impl<KV: KeyValueStore, G> From<registry::Registry<KV, Normal>> for RegistryState<KV, G> {
-    fn from(value: registry::Registry<KV, Normal>) -> Self {
+impl<KV: KeyValueStore, G> From<Registry<KV, Normal>> for RegistryState<KV, G> {
+    fn from(value: Registry<KV, Normal>) -> Self {
         Self {
             inner: value,
             _phantom: PhantomData,
@@ -54,7 +55,7 @@ impl<KV: KeyValueStore, G> From<registry::Registry<KV, Normal>> for RegistryStat
 }
 
 impl<KV: KeyValueStore, G> Deref for RegistryState<KV, G> {
-    type Target = registry::Registry<KV, Normal>;
+    type Target = Registry<KV, Normal>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
@@ -89,3 +90,24 @@ impl<KV: KeyValueStore, G: GcNames> CustomGcResource for RegistryState<KV, G> {
 
 /// Type alias for a mutable registry state backed by a generic key-value store.
 pub type DsRegistry<KV, G> = MutableState<RegistryState<KV, G>>;
+
+impl<KV, G> RegistryApply<KV, Normal> for DsRegistry<KV, G>
+where
+    KV: BackgroundKeyValueStore,
+    KV::Repo: Send + Sync,
+{
+    fn apply<F, R>(&self, fun: F) -> Result<R, OperationalError>
+    where
+        F: FnOnce(&mut Registry<KV, Normal>) -> R,
+        KV::Repo: Clone,
+    {
+        MutableState::apply(self, fun)
+    }
+
+    fn apply_ro<F, R>(&self, fun: F) -> Result<R, OperationalError>
+    where
+        F: FnOnce(&Registry<KV, Normal>) -> R,
+    {
+        Ok(MutableState::apply_ro(self, fun))
+    }
+}

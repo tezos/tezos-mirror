@@ -201,8 +201,8 @@ pub fn octez_riscv_durable_on_disk_registry_checkout(
 #[ocaml::sig("registry -> bytes")]
 pub fn octez_riscv_durable_on_disk_registry_hash(
     state: SafePointer<Registry>,
-) -> BytesWrapper<Hash> {
-    api_common::registry_hash(state)
+) -> OcamlFallible<BytesWrapper<Hash>> {
+    api_common::registry_hash(&*state)
 }
 
 #[ocaml::func]
@@ -210,7 +210,7 @@ pub fn octez_riscv_durable_on_disk_registry_hash(
 pub fn octez_riscv_durable_on_disk_registry_size(
     state: SafePointer<Registry>,
 ) -> OcamlFallible<u64> {
-    api_common::registry_size(state)
+    api_common::registry_size(&*state)
 }
 
 #[ocaml::func]
@@ -219,7 +219,7 @@ pub fn octez_riscv_durable_on_disk_registry_resize(
     state: SafePointer<Registry>,
     size: u64,
 ) -> SplitDsResult<()> {
-    api_common::registry_resize(state, size)
+    api_common::registry_resize(&*state, size)
 }
 
 #[ocaml::func]
@@ -229,7 +229,7 @@ pub fn octez_riscv_durable_on_disk_registry_copy(
     src_index: u64,
     dst_index: u64,
 ) -> SplitDsResult<()> {
-    api_common::registry_copy(state, src_index, dst_index)
+    api_common::registry_copy(&*state, src_index, dst_index)
 }
 
 #[ocaml::func]
@@ -239,7 +239,7 @@ pub fn octez_riscv_durable_on_disk_registry_move(
     src_index: u64,
     dst_index: u64,
 ) -> SplitDsResult<()> {
-    api_common::registry_move(state, src_index, dst_index)
+    api_common::registry_move(&*state, src_index, dst_index)
 }
 
 #[ocaml::func]
@@ -248,7 +248,7 @@ pub fn octez_riscv_durable_on_disk_registry_clear(
     state: SafePointer<Registry>,
     db_index: u64,
 ) -> SplitDsResult<()> {
-    api_common::registry_clear(state, db_index)
+    api_common::registry_clear(&*state, db_index)
 }
 
 // Normal mode — database
@@ -260,7 +260,7 @@ pub fn octez_riscv_durable_on_disk_database_exists(
     db_index: u64,
     key: KeyParam,
 ) -> SplitDsResult<bool> {
-    api_common::database_exists(state, db_index, key)
+    api_common::database_exists(&*state, db_index, key)
 }
 
 #[ocaml::func]
@@ -271,7 +271,7 @@ pub fn octez_riscv_durable_on_disk_database_set(
     key: KeyParam,
     value: BytesParam,
 ) -> SplitDsResult<()> {
-    api_common::database_set(state, db_index, key, value)
+    api_common::database_set(&*state, db_index, key, value)
 }
 
 #[ocaml::func]
@@ -285,7 +285,7 @@ pub fn octez_riscv_durable_on_disk_database_write(
     offset: u64,
     value: BytesParam,
 ) -> SplitDsResult<u64> {
-    api_common::database_write(state, db_index, key, offset, value)
+    api_common::database_write(&*state, db_index, key, offset, value)
 }
 
 #[ocaml::func]
@@ -299,7 +299,7 @@ pub fn octez_riscv_durable_on_disk_database_read(
     offset: u64,
     len: u64,
 ) -> SplitDsResult<BytesWrapper<Vec<u8>>> {
-    api_common::database_read(state, db_index, key, offset, len)
+    api_common::database_read(&*state, db_index, key, offset, len)
 }
 
 #[ocaml::func]
@@ -309,7 +309,7 @@ pub fn octez_riscv_durable_on_disk_database_value_length(
     db_index: u64,
     key: KeyParam,
 ) -> SplitDsResult<u64> {
-    api_common::value_length(state, db_index, key)
+    api_common::value_length(&*state, db_index, key)
 }
 
 #[ocaml::func]
@@ -319,7 +319,7 @@ pub fn octez_riscv_durable_on_disk_database_delete(
     db_index: u64,
     key: KeyParam,
 ) -> SplitDsResult<()> {
-    api_common::database_delete(state, db_index, key)
+    api_common::database_delete(&*state, db_index, key)
 }
 
 #[ocaml::func]
@@ -328,7 +328,7 @@ pub fn octez_riscv_durable_on_disk_database_hash(
     state: SafePointer<Registry>,
     db_index: u64,
 ) -> SplitDsResult<BytesWrapper<Hash>> {
-    api_common::database_hash(state, db_index)
+    api_common::database_hash(&*state, db_index)
 }
 
 // Prove mode — registry
