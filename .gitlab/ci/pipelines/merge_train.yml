@@ -85,6 +85,7 @@ oc.docker:rust-sdk-bindings:amd64:
   variables:
     DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "false"
+    IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-05e36a5c
   artifacts:
     reports:
       dotenv: rust_sdk_bindings_image_tag.env
@@ -920,7 +921,7 @@ sdk_bindings.test:
     - contrib/sdk-bindings/**/*
     - images/create_image.sh
     - images/rust-sdk-bindings/**/*
-    - images/scripts/install_datadog_static.sh
+    - images/scripts/install_sccache_static.sh
     - scripts/version.sh
     - sdk/rust/**/*
     when: on_success

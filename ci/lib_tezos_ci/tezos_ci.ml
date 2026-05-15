@@ -1743,6 +1743,8 @@ module Images = struct
           ("Build internal rust-sdk-bindings images for "
           ^ Runner.Arch.show_uniform arch)
         ~ci_docker_hub:false
+        ~variables:
+          [("IMAGE", Base_images.(Format.asprintf "%a" pp debian_trixie))]
         ~artifacts:
           (artifacts
              ~reports:(reports ~dotenv:"rust_sdk_bindings_image_tag.env" ())
