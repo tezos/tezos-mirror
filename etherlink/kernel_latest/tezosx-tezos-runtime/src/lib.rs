@@ -455,9 +455,12 @@ where
             // receipt, but it still deposits its Micheline result into
             // the topmost frame's `frame_result` slot (same slot the
             // entrypoint path fills via `%collect_result`), so the
-            // journal is threaded through.
+            // journal is threaded through. The registry is threaded
+            // alongside it because the kernel `Ctx` now carries it as
+            // a first-class field for trait-based access.
             view::execute_view_call(
                 chain_id,
+                registry,
                 host,
                 journal,
                 request,

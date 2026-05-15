@@ -71,10 +71,18 @@ pub struct ExecCtx {
     pub contract_account: TezlinkOriginatedAccount,
 }
 
-pub struct Ctx<'a, 'operation, Host: StorageV1, C: Context> {
+pub struct Ctx<
+    'a,
+    'operation,
+    Host: StorageV1,
+    C: Context,
+    R: tezosx_interfaces::Registry,
+> {
     pub tc_ctx: &'a mut TcCtx<'operation, Host, C>,
     pub exec_ctx: ExecCtx,
     pub operation_ctx: &'a mut OperationCtx<'operation, C::ImplicitAccountType>,
+    pub journal: &'a mut tezosx_journal::TezosXJournal,
+    pub registry: &'a R,
 }
 
 pub struct BlockCtx<'block> {
@@ -167,7 +175,9 @@ impl<'a, Host: StorageV1, C: Context> TypecheckingCtx<'a> for TcCtx<'a, Host, C>
     }
 }
 
-impl<'a, Host: StorageV1, C: Context> TypecheckingCtx<'a> for Ctx<'_, '_, Host, C> {
+impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> TypecheckingCtx<'a>
+    for Ctx<'_, '_, Host, C, R>
+{
     fn gas(&mut self) -> &mut mir::gas::Gas {
         self.tc_ctx.gas()
     }
@@ -187,7 +197,9 @@ impl<'a, Host: StorageV1, C: Context> TypecheckingCtx<'a> for Ctx<'_, '_, Host, 
     }
 }
 
-impl<'a, Host: StorageV1, C: Context> CtxTrait<'a> for Ctx<'_, 'a, Host, C> {
+impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> CtxTrait<'a>
+    for Ctx<'_, 'a, Host, C, R>
+{
     fn sender(&self) -> AddressHash {
         self.exec_ctx.sender.clone()
     }
@@ -375,8 +387,38 @@ pub trait HasOriginLookup {
     ) -> Result<Option<tezosx_interfaces::Origin>, tezos_storage::error::Error>;
 }
 
-impl<'a, 'operation, Host: StorageV1, C: Context> HasContractAccount
-    for Ctx<'a, 'operation, Host, C>
+/// Access the per-operation CRAC journal.
+pub trait HasJournal {
+    fn journal(&mut self) -> &mut tezosx_journal::TezosXJournal;
+}
+
+/// Access the per-operation cross-runtime registry.
+pub trait HasRegistry {
+    type R: tezosx_interfaces::Registry;
+    fn registry(&self) -> &Self::R;
+}
+
+/// Atomically expose `host`, `journal`, and `registry` as a tuple
+/// of disjoint borrows on the same `ctx`. Required for the
+/// `registry.serve(host, journal, request)` and
+/// `registry.ensure_alias(host, journal, ...)` calls where the three
+/// fields must be live simultaneously — sequential `host()`,
+/// `journal()`, `registry()` trait method calls would each hold
+/// `&mut self` exclusively and conflict. Implementors construct the
+/// tuple via direct field access so the borrow checker accepts the
+/// distinct-field split.
+pub trait HasCrossRuntime<Host: StorageV1>: HasJournal + HasRegistry {
+    fn cross_runtime_split(
+        &mut self,
+    ) -> (
+        &mut Host,
+        &mut tezosx_journal::TezosXJournal,
+        &<Self as HasRegistry>::R,
+    );
+}
+
+impl<'a, 'operation, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry>
+    HasContractAccount for Ctx<'a, 'operation, Host, C, R>
 {
     type Account = TezlinkOriginatedAccount;
     fn contract_account(&self) -> &Self::Account {
@@ -384,16 +426,16 @@ impl<'a, 'operation, Host: StorageV1, C: Context> HasContractAccount
     }
 }
 
-impl<'a, 'operation, Host: StorageV1, C: Context> HasHost<Host>
-    for Ctx<'a, 'operation, Host, C>
+impl<'a, 'operation, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry>
+    HasHost<Host> for Ctx<'a, 'operation, Host, C, R>
 {
     fn host(&mut self) -> &mut Host {
         self.tc_ctx.host
     }
 }
 
-impl<'a, 'operation, Host: StorageV1, C: Context> HasOriginLookup
-    for Ctx<'a, 'operation, Host, C>
+impl<'a, 'operation, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry>
+    HasOriginLookup for Ctx<'a, 'operation, Host, C, R>
 {
     fn read_origin_for_address(
         &self,
@@ -405,13 +447,55 @@ impl<'a, 'operation, Host: StorageV1, C: Context> HasOriginLookup
     }
 }
 
-impl<Host: StorageV1, C: Context> HasOperationGas for Ctx<'_, '_, Host, C> {
+impl<'a, 'operation, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry>
+    HasJournal for Ctx<'a, 'operation, Host, C, R>
+{
+    fn journal(&mut self) -> &mut tezosx_journal::TezosXJournal {
+        self.journal
+    }
+}
+
+impl<'a, 'operation, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry>
+    HasRegistry for Ctx<'a, 'operation, Host, C, R>
+{
+    type R = R;
+    fn registry(&self) -> &Self::R {
+        self.registry
+    }
+}
+
+impl<'a, 'operation, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry>
+    HasCrossRuntime<Host> for Ctx<'a, 'operation, Host, C, R>
+{
+    fn cross_runtime_split(
+        &mut self,
+    ) -> (&mut Host, &mut tezosx_journal::TezosXJournal, &R) {
+        (self.tc_ctx.host, self.journal, self.registry)
+    }
+}
+
+impl<'operation, Host: StorageV1, C: Context> HasOriginLookup
+    for TcCtx<'operation, Host, C>
+{
+    fn read_origin_for_address(
+        &self,
+        address: &AddressHash,
+    ) -> Result<Option<tezosx_interfaces::Origin>, tezos_storage::error::Error> {
+        self.context.read_origin_for_address(&*self.host, address)
+    }
+}
+
+impl<Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> HasOperationGas
+    for Ctx<'_, '_, Host, C, R>
+{
     fn operation_gas(&mut self) -> &mut crate::gas::TezlinkOperationGas {
         self.tc_ctx.operation_gas
     }
 }
 
-impl<Host: StorageV1, C: Context> HasSourcePublicKey for Ctx<'_, '_, Host, C> {
+impl<Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> HasSourcePublicKey
+    for Ctx<'_, '_, Host, C, R>
+{
     fn source_public_key(&self) -> &[u8] {
         self.operation_ctx.source_public_key
     }
@@ -1234,10 +1318,60 @@ pub mod tests {
             },
         };
 
+        // The test exercises `lookup_view_storage_balance` directly,
+        // not the enshrined-view hook, so journal and registry are
+        // just placeholders that satisfy the type system.
+        struct StubRegistry;
+        impl tezosx_interfaces::Registry for StubRegistry {
+            fn ensure_alias<Host>(
+                &self,
+                _host: &mut Host,
+                _journal: &mut tezosx_journal::TezosXJournal,
+                _alias_info: tezosx_interfaces::AliasInfo,
+                _native_public_key: Option<&[u8]>,
+                _target_runtime: tezosx_interfaces::RuntimeId,
+                _context: tezosx_interfaces::CrossRuntimeContext,
+                _gas_remaining: u64,
+            ) -> Result<(String, u64), tezosx_interfaces::TezosXRuntimeError>
+            where
+                Host: StorageV1,
+            {
+                Ok((String::new(), 0))
+            }
+            fn compute_alias(
+                &self,
+                _alias_info: tezosx_interfaces::AliasInfo,
+            ) -> Result<String, tezosx_interfaces::TezosXRuntimeError> {
+                Ok(String::new())
+            }
+            fn address_from_string(
+                &self,
+                _address_str: &str,
+                _runtime_id: tezosx_interfaces::RuntimeId,
+            ) -> Result<Vec<u8>, tezosx_interfaces::TezosXRuntimeError> {
+                Ok(Vec::new())
+            }
+            fn serve<Host>(
+                &self,
+                _host: &mut Host,
+                _journal: &mut tezosx_journal::TezosXJournal,
+                _request: http::Request<Vec<u8>>,
+            ) -> http::Response<Vec<u8>>
+            where
+                Host: StorageV1,
+            {
+                http::Response::new(Vec::new())
+            }
+        }
+        let mut journal =
+            tezosx_journal::TezosXJournal::new(tezosx_journal::CracId::new(1, 0));
+        let registry = StubRegistry;
         let ctx = Ctx {
             tc_ctx: &mut tc_ctx,
             exec_ctx,
             operation_ctx: &mut operation_ctx,
+            journal: &mut journal,
+            registry: &registry,
         };
 
         // A KT1 that the fresh `MockKernelHost` has never seen.
@@ -1265,8 +1399,15 @@ pub(crate) mod mock {
 
     /// Mock execution context for testing enshrined contracts.
     /// Implements CtxTrait and HasHost with configurable values.
-    pub struct MockCtx<'a, Host: StorageV1> {
-        pub host: &'a mut Host,
+    ///
+    /// Lifetimes are decoupled (host/journal/registry independently) so
+    /// tests can construct `MockCtx` from a long-lived host and shorter-
+    /// lived journal/registry locals without forcing the borrow checker
+    /// to unify them under a single `'a`.
+    pub struct MockCtx<'h, 'j, 'r, Host: StorageV1, R: tezosx_interfaces::Registry> {
+        pub host: &'h mut Host,
+        pub journal: &'j mut tezosx_journal::TezosXJournal,
+        pub registry: &'r R,
         pub sender: AddressHash,
         pub amount: i64,
         pub level: BigUint,
@@ -1278,10 +1419,20 @@ pub(crate) mod mock {
         pub context: crate::context::TezlinkContext,
     }
 
-    impl<'a, Host: StorageV1> MockCtx<'a, Host> {
-        pub fn new(host: &'a mut Host, sender: AddressHash, amount: i64) -> Self {
+    impl<'h, 'j, 'r, Host: StorageV1, R: tezosx_interfaces::Registry>
+        MockCtx<'h, 'j, 'r, Host, R>
+    {
+        pub fn new(
+            host: &'h mut Host,
+            journal: &'j mut tezosx_journal::TezosXJournal,
+            registry: &'r R,
+            sender: AddressHash,
+            amount: i64,
+        ) -> Self {
             Self {
                 host,
+                journal,
+                registry,
                 sender,
                 amount,
                 level: 1u32.into(),
@@ -1298,7 +1449,36 @@ pub(crate) mod mock {
         }
     }
 
-    impl<'a, Host: StorageV1> HasOriginLookup for MockCtx<'a, Host> {
+    impl<'h, 'j, 'r, Host: StorageV1, R: tezosx_interfaces::Registry> HasJournal
+        for MockCtx<'h, 'j, 'r, Host, R>
+    {
+        fn journal(&mut self) -> &mut tezosx_journal::TezosXJournal {
+            self.journal
+        }
+    }
+
+    impl<'h, 'j, 'r, Host: StorageV1, R: tezosx_interfaces::Registry> HasRegistry
+        for MockCtx<'h, 'j, 'r, Host, R>
+    {
+        type R = R;
+        fn registry(&self) -> &Self::R {
+            self.registry
+        }
+    }
+
+    impl<'h, 'j, 'r, Host: StorageV1, R: tezosx_interfaces::Registry>
+        HasCrossRuntime<Host> for MockCtx<'h, 'j, 'r, Host, R>
+    {
+        fn cross_runtime_split(
+            &mut self,
+        ) -> (&mut Host, &mut tezosx_journal::TezosXJournal, &R) {
+            (self.host, self.journal, self.registry)
+        }
+    }
+
+    impl<'h, 'j, 'r, Host: StorageV1, R: tezosx_interfaces::Registry> HasOriginLookup
+        for MockCtx<'h, 'j, 'r, Host, R>
+    {
         fn read_origin_for_address(
             &self,
             address: &AddressHash,
@@ -1308,32 +1488,42 @@ pub(crate) mod mock {
         }
     }
 
-    impl<'a, Host: StorageV1> HasHost<Host> for MockCtx<'a, Host> {
+    impl<'h, 'j, 'r, Host: StorageV1, R: tezosx_interfaces::Registry> HasHost<Host>
+        for MockCtx<'h, 'j, 'r, Host, R>
+    {
         fn host(&mut self) -> &mut Host {
             self.host
         }
     }
 
-    impl<'a, Host: StorageV1> HasContractAccount for MockCtx<'a, Host> {
+    impl<'h, 'j, 'r, Host: StorageV1, R: tezosx_interfaces::Registry> HasContractAccount
+        for MockCtx<'h, 'j, 'r, Host, R>
+    {
         type Account = TezlinkOriginatedAccount;
         fn contract_account(&self) -> &Self::Account {
             &self.contract_account
         }
     }
 
-    impl<'a, Host: StorageV1> HasOperationGas for MockCtx<'a, Host> {
+    impl<'h, 'j, 'r, Host: StorageV1, R: tezosx_interfaces::Registry> HasOperationGas
+        for MockCtx<'h, 'j, 'r, Host, R>
+    {
         fn operation_gas(&mut self) -> &mut crate::gas::TezlinkOperationGas {
             &mut self.operation_gas
         }
     }
 
-    impl<'a, Host: StorageV1> HasSourcePublicKey for MockCtx<'a, Host> {
+    impl<'h, 'j, 'r, Host: StorageV1, R: tezosx_interfaces::Registry> HasSourcePublicKey
+        for MockCtx<'h, 'j, 'r, Host, R>
+    {
         fn source_public_key(&self) -> &[u8] {
             &[]
         }
     }
 
-    impl<'a, Host: StorageV1> TypecheckingCtx<'a> for MockCtx<'a, Host> {
+    impl<'a, 'h, 'j, 'r, Host: StorageV1, R: tezosx_interfaces::Registry>
+        TypecheckingCtx<'a> for MockCtx<'h, 'j, 'r, Host, R>
+    {
         fn gas(&mut self) -> &mut mir::gas::Gas {
             &mut self.operation_gas.remaining
         }
@@ -1353,7 +1543,9 @@ pub(crate) mod mock {
         }
     }
 
-    impl<'a, Host: StorageV1> CtxTrait<'a> for MockCtx<'a, Host> {
+    impl<'a, 'h, 'j, 'r, Host: StorageV1, R: tezosx_interfaces::Registry> CtxTrait<'a>
+        for MockCtx<'h, 'j, 'r, Host, R>
+    {
         fn sender(&self) -> AddressHash {
             self.sender.clone()
         }
