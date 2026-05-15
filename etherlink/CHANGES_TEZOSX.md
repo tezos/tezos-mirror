@@ -40,6 +40,8 @@
   synchronously. The view's typed shape is
   `pair string bytes : option bytes` (`(destination, calldata)`
   argument, EVM response body wrapped in `Some` on success). (!21875)
+- Aliases originated as part of a native atomic calls are now surfaced via
+  dedicated receipts. (!21904)
 
 ### Native Atomic Composability
 

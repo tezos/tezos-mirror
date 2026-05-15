@@ -346,6 +346,13 @@ let evm_gateway_address = "0xff00000000000000000000000000000000000007"
     See [revm/src/precompiles/constants.rs:FA12_WRAPPER_SOL_ADDR]. *)
 let fa12_wrapper_address = "0xff00000000000000000000000000000000ffff09"
 
+(** Null implicit address — the synthetic source the kernel uses for
+    all CRAC-shape operations (top-level transactions, alias-forwarder
+    originations, CRAC events). Same constant as [handler_address] in
+    [cross_runtime.ml]; kept local here to avoid a cross-file dep
+    between two tezt test modules. *)
+let null_pkh = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
+
 let assert_evm_balance_zero ~address sequencer =
   let*@ balance = Rpc.get_balance ~address sequencer in
   Check.(
@@ -4777,6 +4784,109 @@ let test_alias_forwarder_created_by_evm_cross_runtime_call =
   in
   let alias_kt1 = Result.get_ok alias_result in
   Log.info "EVM sender %s has Tezos alias %s" evm_sender.address alias_kt1 ;
+  (* Step 2b: The alias materialization must surface as an internal
+     `Origination` (sender = `NULL_PKH`, `originated_contracts` =
+     [alias_kt1]) inside the receipt of the synthetic top-level CRAC
+     manager-op — there is exactly ONE top-level operation in the
+     block: the pre-existing CRAC's Transaction with destination =
+     [alias_kt1] (alias of E_0). The alias internal op is plumbed
+     from the EVM precompile through the
+     `X-Tezos-Alias-Origination` HTTP header and prepended to the
+     CRAC's internal_operation_results. *)
+  let tezlink_endpoint =
+    Endpoint.{(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"}
+  in
+  let* block_operations =
+    RPC_core.call tezlink_endpoint @@ RPC.get_chain_block_operations ()
+  in
+  let open JSON in
+  let managers = List.nth (as_list block_operations) 3 |> as_list in
+  let crac_op =
+    match managers with
+    | [op] -> op
+    | _ ->
+        Test.fail
+          "Expected exactly one top-level manager operation in the Michelson \
+           head block, found %d"
+          (List.length managers)
+  in
+  let content = crac_op |-> "contents" |=> 0 in
+  Check.(
+    (content |-> "kind" |> as_string = "transaction")
+      string
+      ~error_msg:"Expected top-level kind %R but got %L") ;
+  Check.(
+    (content |-> "source" |> as_string = null_pkh)
+      string
+      ~error_msg:"Expected top-level source %R but got %L") ;
+  Check.(
+    (content |-> "destination" |> as_string = alias_kt1)
+      string
+      ~error_msg:"Expected top-level destination %R but got %L") ;
+  let internals =
+    content |-> "metadata" |-> "internal_operation_results" |> as_list
+  in
+  let internal_originations_for_alias =
+    List.filter
+      (fun iop ->
+        iop |-> "kind" |> as_string = "origination"
+        &&
+        let originated =
+          iop |-> "result" |-> "originated_contracts" |> as_list
+          |> List.map as_string
+        in
+        originated = [alias_kt1])
+      internals
+  in
+  let origination_internal =
+    match internal_originations_for_alias with
+    | [op] -> op
+    | [] ->
+        Test.fail
+          "Expected one internal Origination for alias %s among the CRAC's \
+           internals, found none"
+          alias_kt1
+    | ops ->
+        Test.fail
+          "Expected one internal Origination for alias %s, found %d"
+          alias_kt1
+          (List.length ops)
+  in
+  Check.(
+    (origination_internal |-> "source" |> as_string = null_pkh)
+      string
+      ~error_msg:"Expected internal Origination source %R but got %L") ;
+  Check.(
+    (origination_internal |-> "result" |-> "status" |> as_string = "applied")
+      string
+      ~error_msg:"Expected alias origination status %R but got %L") ;
+  (* The alias materialization must precede the synthetic transfer
+     in the CRAC receipt's internal ops: the cross-runtime call
+     enters Michelson AFTER its aliases exist. The synthetic
+     transfer is sourced by the resolved sender alias (alias(E_1)),
+     which equals [alias_kt1] in this test where sender == source. *)
+  let position predicate = List.find_index predicate internals |> Option.get in
+  let origination_idx =
+    position (fun iop ->
+        iop |-> "kind" |> as_string = "origination"
+        &&
+        let originated =
+          iop |-> "result" |-> "originated_contracts" |> as_list
+          |> List.map as_string
+        in
+        originated = [alias_kt1])
+  in
+  let transfer_idx =
+    position (fun iop ->
+        iop |-> "kind" |> as_string = "transaction"
+        && iop |-> "source" |> as_string = alias_kt1)
+  in
+  Check.(
+    (origination_idx < transfer_idx)
+      int
+      ~error_msg:
+        "Expected alias origination at position %L to precede the synthetic \
+         transfer at position %R, but it did not") ;
   (* Step 3: Record the EVM sender balance before forwarding. *)
   let*@ evm_balance_before =
     Rpc.get_balance ~address:evm_sender.address sequencer
@@ -4813,6 +4923,292 @@ let test_alias_forwarder_created_by_evm_cross_runtime_call =
       ~error_msg:
         "Expected EVM balance to increase by forwarded amount: expected %R but \
          got %L") ;
+  unit
+
+(** Test that when an EVM transaction triggers alias materialization
+    via the gateway and then reverts, the alias-forwarder origination
+    surfaces in the Michelson block with a [Backtracked] status (the
+    enclosing synthetic CRAC top-level and any other internal ops are
+    backtracked too), while the underlying storage write is rolled
+    back so the alias account no longer exists post-revert. *)
+let test_alias_forwarder_backtracked_when_evm_reverts =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:
+      "Alias origination is Backtracked when the enclosing EVM frame reverts"
+    ~tags:["alias"; "forwarder"; "cross_runtime"; "revert"; "backtracked"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@ fun {sequencer; evm_version; _} _protocol ->
+  let evm_sender = Eth_account.bootstrap_accounts.(0) in
+  let tezos_destination = Constant.bootstrap1.public_key_hash in
+  (* Step 1: Deploy a contract that calls the gateway with a valid
+     destination (succeeding inside the gateway) and then reverts
+     unconditionally. *)
+  let* contract = Solidity_contracts.gateway_call_then_revert evm_version in
+  let bytecode = Tezt.Base.read_file contract.bin in
+  let* contract_address =
+    deploy_evm_contract
+      ~sequencer
+      ~sender:evm_sender
+      ~nonce:0
+      ~init_code:("0x" ^ bytecode)
+      ()
+  in
+  (* Step 2: Invoke callAndRevert. The EVM transaction must revert
+     (status=false) because the contract's terminal opcode is REVERT. *)
+  let* _receipt =
+    craft_and_send_evm_transaction
+      ~sequencer
+      ~sender:evm_sender
+      ~nonce:1
+      ~value:(Wei.of_tez (Tez.of_int 1))
+      ~address:contract_address
+      ~abi_signature:"callAndRevert(string)"
+      ~arguments:[tezos_destination]
+      ~expected_status:false
+      ()
+  in
+  (* Step 3: The Tezos alias for the EVM sender (the EOA, which is
+     the SOURCE of the EVM transaction) is what the kernel would
+     have materialized; compute it via the read-only RPC. The
+     transaction reverted before materialization could persist, so
+     reading the alias does NOT fault, and the deterministic KT1 is
+     what we look for in the (backtracked) receipt below. *)
+  let* alias_result =
+    Rpc.Tezosx.tez_getEthereumTezosAddress evm_sender.address sequencer
+  in
+  let alias_kt1 = Result.get_ok alias_result in
+  (* Step 4: Inspect the Michelson head block. Expect exactly one
+     top-level Transaction, whose status is Backtracked (the EVM
+     frame reverted), whose internals contain the alias-forwarder
+     origination ALSO Backtracked. *)
+  let tezlink_endpoint =
+    Endpoint.{(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"}
+  in
+  let* block_operations =
+    RPC_core.call tezlink_endpoint @@ RPC.get_chain_block_operations ()
+  in
+  let open JSON in
+  let managers = List.nth (as_list block_operations) 3 |> as_list in
+  let crac_op =
+    match managers with
+    | [op] -> op
+    | _ ->
+        Test.fail
+          "Expected exactly one top-level manager operation, found %d"
+          (List.length managers)
+  in
+  let content = crac_op |-> "contents" |=> 0 in
+  Check.(
+    (content |-> "source" |> as_string = null_pkh)
+      string
+      ~error_msg:"Expected top-level source %R but got %L") ;
+  Check.(
+    (content |-> "metadata" |-> "operation_result" |-> "status" |> as_string
+   = "backtracked")
+      string
+      ~error_msg:"Expected top-level status %R but got %L") ;
+  let internals =
+    content |-> "metadata" |-> "internal_operation_results" |> as_list
+  in
+  let origination_internal =
+    match
+      List.filter
+        (fun iop ->
+          iop |-> "kind" |> as_string = "origination"
+          &&
+          let originated =
+            iop |-> "result" |-> "originated_contracts" |> as_list
+            |> List.map as_string
+          in
+          originated = [alias_kt1])
+        internals
+    with
+    | [op] -> op
+    | _ ->
+        Test.fail
+          "Expected one internal Origination for alias %s among internals"
+          alias_kt1
+  in
+  Check.(
+    (origination_internal |-> "result" |-> "status" |> as_string = "backtracked")
+      string
+      ~error_msg:
+        "Expected alias origination status %R but got %L (the storage write \
+         was rolled back so the receipt must reflect Backtracked)") ;
+  Check.(
+    (origination_internal |-> "source" |> as_string = null_pkh)
+      string
+      ~error_msg:"Expected internal Origination source %R but got %L") ;
+  unit
+
+(** Test that two distinct alias materializations triggered by a
+    single EVM transaction surface as two separate Origination
+    internals inside the merged Michelson CRAC receipt, in
+    execution order. The Solidity driver deploys two proxy
+    contracts (different addresses → different EVM senders → two
+    distinct Tezos aliases) and calls them in sequence inside one
+    EVM transaction. The two gateway calls produce two CRAC
+    AppliedOperations on the Michelson side, which the kernel's
+    [drain_pending_crac_receipts] / [merge_crac_internals] merge
+    into one final top-level operation with both alias originations
+    interleaved with their respective synthetic transfers. *)
+let test_alias_forwarders_multi_crac_in_one_evm_tx =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:
+      "Two alias originations in one EVM transaction surface in execution order"
+    ~tags:["alias"; "forwarder"; "cross_runtime"; "nested"; "multi"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@ fun {sequencer; evm_version; _} _protocol ->
+  let evm_sender = Eth_account.bootstrap_accounts.(0) in
+  let destination_a = Constant.bootstrap1.public_key_hash in
+  let destination_b = Constant.bootstrap2.public_key_hash in
+  (* Step 1: Deploy the driver, which spawns two proxy contracts in
+     its constructor. *)
+  let* contract = Solidity_contracts.gateway_chain_two_aliases evm_version in
+  let bytecode = Tezt.Base.read_file contract.bin in
+  let* driver_address =
+    deploy_evm_contract
+      ~sequencer
+      ~sender:evm_sender
+      ~nonce:0
+      ~init_code:("0x" ^ bytecode)
+      ()
+  in
+  (* Step 2: Read the two proxy addresses from the driver's public
+     getters [proxyA()] / [proxyB()]. *)
+  let eth_call ~to_ ~data =
+    let* response =
+      Evm_node.(
+        call_evm_rpc
+          sequencer
+          {
+            method_ = "eth_call";
+            parameters =
+              `A
+                [
+                  `O [("to", `String to_); ("data", `String data)];
+                  `String "latest";
+                ];
+          })
+    in
+    return (response |> Evm_node.extract_result |> JSON.as_string)
+  in
+  let* proxy_a_data = Cast.calldata "proxyA()" in
+  let* proxy_a_hex = eth_call ~to_:driver_address ~data:proxy_a_data in
+  let* proxy_b_data = Cast.calldata "proxyB()" in
+  let* proxy_b_hex = eth_call ~to_:driver_address ~data:proxy_b_data in
+  (* The view return is a left-padded 20-byte address inside a
+     32-byte word: take the last 40 hex chars. *)
+  let trim_address hex =
+    let h =
+      if String.length hex >= 2 && String.sub hex 0 2 = "0x" then
+        String.sub hex 2 (String.length hex - 2)
+      else hex
+    in
+    "0x" ^ String.sub h (String.length h - 40) 40
+  in
+  let proxy_a_address = trim_address proxy_a_hex in
+  let proxy_b_address = trim_address proxy_b_hex in
+  Log.info "proxyA=%s proxyB=%s" proxy_a_address proxy_b_address ;
+  (* Step 3: Call runTwoCalls(destinationA, destinationB) with value
+     so each proxy forwards half through the gateway. *)
+  let* _receipt =
+    craft_and_send_evm_transaction
+      ~sequencer
+      ~sender:evm_sender
+      ~nonce:1
+      ~value:(Wei.of_tez (Tez.of_int 2))
+      ~address:driver_address
+      ~abi_signature:"runTwoCalls(string,string)"
+      ~arguments:[destination_a; destination_b]
+      ()
+  in
+  (* Step 4: Resolve the expected Tezos-side aliases for proxyA and
+     proxyB. tez_getEthereumTezosAddress is the deterministic
+     read-only lookup, so calling it post-tx returns the canonical
+     KT1 either runtime would compute. *)
+  let* alias_a_res =
+    Rpc.Tezosx.tez_getEthereumTezosAddress proxy_a_address sequencer
+  in
+  let* alias_b_res =
+    Rpc.Tezosx.tez_getEthereumTezosAddress proxy_b_address sequencer
+  in
+  let alias_a = Result.get_ok alias_a_res in
+  let alias_b = Result.get_ok alias_b_res in
+  Log.info "alias(proxyA)=%s alias(proxyB)=%s" alias_a alias_b ;
+  (* Step 5: Inspect the Michelson head block. Expect ONE top-level
+     Transaction (the merged CRAC receipt) whose internals contain
+     both proxy aliases as Origination ops, in proxyA-before-proxyB
+     order. *)
+  let tezlink_endpoint =
+    Endpoint.{(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"}
+  in
+  let* block_operations =
+    RPC_core.call tezlink_endpoint @@ RPC.get_chain_block_operations ()
+  in
+  let open JSON in
+  let managers = List.nth (as_list block_operations) 3 |> as_list in
+  let crac_op =
+    match managers with
+    | [op] -> op
+    | _ ->
+        Test.fail
+          "Expected exactly one top-level manager operation in the merged \
+           block, found %d"
+          (List.length managers)
+  in
+  let content = crac_op |-> "contents" |=> 0 in
+  Check.(
+    (content |-> "source" |> as_string = null_pkh)
+      string
+      ~error_msg:"Expected top-level source %R but got %L") ;
+  let internals =
+    content |-> "metadata" |-> "internal_operation_results" |> as_list
+  in
+  let find_origination_idx alias_kt1 =
+    match
+      List.find_index
+        (fun iop ->
+          iop |-> "kind" |> as_string = "origination"
+          &&
+          let originated =
+            iop |-> "result" |-> "originated_contracts" |> as_list
+            |> List.map as_string
+          in
+          originated = [alias_kt1])
+        internals
+    with
+    | Some i -> i
+    | None ->
+        Test.fail
+          "Expected an internal Origination for alias %s among the merged \
+           CRAC's internals, found none"
+          alias_kt1
+  in
+  let idx_a = find_origination_idx alias_a in
+  let idx_b = find_origination_idx alias_b in
+  Check.(
+    (idx_a < idx_b)
+      int
+      ~error_msg:
+        "Expected alias(proxyA) origination at position %L to precede \
+         alias(proxyB) origination at position %R, but order was reversed") ;
+  (* And both must be Applied (the EVM tx did not revert). *)
+  let status_at idx =
+    List.nth internals idx |-> "result" |-> "status" |> as_string
+  in
+  Check.(
+    (status_at idx_a = "applied")
+      string
+      ~error_msg:"Expected proxyA alias origination status %R but got %L") ;
+  Check.(
+    (status_at idx_b = "applied")
+      string
+      ~error_msg:"Expected proxyB alias origination status %R but got %L") ;
   unit
 
 (** Transfer tez between two accounts on the Michelson runtime and verify
@@ -5312,6 +5708,8 @@ let () =
   test_cross_runtime_michelson_sender_is_alias [Alpha] ;
   test_alias_forwarder_forwards_to_evm [Alpha] ;
   test_alias_forwarder_created_by_evm_cross_runtime_call [Alpha] ;
+  test_alias_forwarder_backtracked_when_evm_reverts [Alpha] ;
+  test_alias_forwarders_multi_crac_in_one_evm_tx [Alpha] ;
   test_tez_transfer [Alpha] ;
   test_michelson_runtime_chain_id_derivation
     ~evm_chain_id:1337

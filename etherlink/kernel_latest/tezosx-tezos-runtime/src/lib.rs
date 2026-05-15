@@ -36,14 +36,15 @@ use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::{
     block::AppliedOperation,
     operation::{
-        ManagerOperation, ManagerOperationContent, Parameters, Script, TransferContent,
+        ManagerOperation, ManagerOperationContent, OriginationContent, Parameters,
+        Script, TransferContent,
     },
     operation_result::{
         ApplyOperationError, ApplyOperationErrors, BacktrackedResult, ContentResult,
         EventContent, EventSuccess, InternalContentWithMetadata, InternalOperationSum,
         OperationBatchWithMetadata, OperationDataAndMetadata, OperationResult,
-        OperationResultSum, OperationWithMetadata, TransferError, TransferSuccess,
-        TransferTarget,
+        OperationResultSum, OperationWithMetadata, OriginationSuccess, TransferError,
+        TransferSuccess, TransferTarget,
     },
 };
 use tezosx_interfaces::{
@@ -175,15 +176,23 @@ fn build_crac_receipt(
     destination: &Contract,
     parameters: &Parameters,
     target: TransferTarget,
+    pre_transfer_internals: Vec<InternalOperationSum>,
     internal_receipts: Vec<InternalOperationSum>,
     crac_id: Option<&str>,
     base_nonce: u16,
 ) -> Result<AppliedOperation, TezosXRuntimeError> {
-    // Combine: [CRAC event, alias(E_1)→target, ...further internal ops]
+    // Combine, in execution order:
+    //   [CRAC event, ...pre_transfer_internals, alias(E_1)→target, ...further internal ops]
     // Per RFC, the CRAC event is always the first internal operation (#0).
-    // Nonces are pre-allocated from the block-global counter (L1 semantics):
-    //   event = base_nonce, transfer = base_nonce+1 (or base_nonce if no event).
-    // MIR internal ops already have correct nonces assigned during execution.
+    // `pre_transfer_internals` carries the alias-forwarder origination
+    // internal ops materialized during alias resolution — they must
+    // appear BEFORE the synthetic transfer because the EVM precompile
+    // materializes the aliases before initiating the cross-runtime
+    // call those aliases participate in.
+    // Nonces written here are local placeholders; `renumber_nonces`
+    // reassigns them block-wide from the flat list order at block
+    // finalization, so what matters is the position in
+    // `internal_operation_results`, not the numeric value below.
     let mut all_internal = Vec::new();
     let mut next_nonce = base_nonce;
 
@@ -220,6 +229,8 @@ fn build_crac_receipt(
             }),
         }));
     }
+
+    all_internal.extend(pre_transfer_internals);
 
     let transfer_internal = InternalOperationSum::Transfer(InternalContentWithMetadata {
         sender: sender_contract.clone(),
@@ -302,6 +313,7 @@ fn build_failed_crac_receipt(
     destination: &Contract,
     parameters: &Parameters,
     error: TransferError,
+    pre_transfer_internals: Vec<InternalOperationSum>,
     internal_receipts: Vec<InternalOperationSum>,
     crac_id: Option<&str>,
     base_nonce: u16,
@@ -310,7 +322,9 @@ fn build_failed_crac_receipt(
     // Since the downstream transfer failed, the event is backtracked
     // (matching Tezos protocol semantics where all applied internal ops
     // preceding a failure are backtracked).
-    // Nonces are pre-allocated from the block-global counter (L1 semantics).
+    // `pre_transfer_internals` (alias-forwarder originations) keep
+    // their applied status — those materializations happened before
+    // the CRAC body ran and their storage effects are persistent.
     let mut all_internal = Vec::new();
     let mut next_nonce = base_nonce;
     if let Some(id) = crac_id {
@@ -349,6 +363,8 @@ fn build_failed_crac_receipt(
             }),
         }));
     }
+
+    all_internal.extend(pre_transfer_internals);
 
     // Per RFC, include the failed transfer (alias(E_1) → target) so
     // indexers can see which contract call was attempted.
@@ -412,6 +428,29 @@ fn build_failed_crac_receipt(
         hash,
         branch: BlockHash::default(),
         op_and_receipt: op_data,
+    })
+}
+
+/// Build an [`InternalOperationSum::Origination`] surfacing an
+/// alias-forwarder materialization (`ensure_alias` branch 3). The
+/// `nonce` is a 0 placeholder; the receiving runtime stamps the real
+/// nonce when assembling the CRAC receipt. The result carries the
+/// [`OriginationSuccess`] returned by [`originate_contract`] —
+/// script, balance updates, consumed gas, `originated_contracts`.
+fn build_alias_origination_internal(
+    null_pkh: &PublicKeyHash,
+    script: Script,
+    success: OriginationSuccess,
+) -> InternalOperationSum {
+    InternalOperationSum::Origination(InternalContentWithMetadata {
+        sender: Contract::Implicit(null_pkh.clone()),
+        nonce: 0,
+        content: OriginationContent {
+            balance: Narith(0u64.into()),
+            delegate: None,
+            script,
+        },
+        result: ContentResult::Applied(success),
     })
 }
 
@@ -487,6 +526,20 @@ fn execute_entrypoint_call<Host>(
 where
     Host: StorageV1,
 {
+    // Drain on entry, NOT on exit: pending alias-origination
+    // internal ops in the journal at this point can only belong
+    // to THIS call's gateway precompile invocation, since:
+    //   (a) any prior outer cross-runtime call has already entered
+    //       its own `execute_entrypoint_call` and drained whatever
+    //       was pending for IT,
+    //   (b) any re-entrant inner cross-runtime call that
+    //       `cross_runtime_transfer` triggers below will, in turn,
+    //       drain its own aliases at its entry — never seeing our
+    //       captured ones because we already moved them out of the
+    //       journal here.
+    // The result is per-call scoping with no watermarking logic.
+    let alias_origination_internals =
+        journal.michelson.take_pending_alias_origination_internals();
     let parsed = url::parse_tezos_url(request.uri())?;
     let hdrs = headers::parse_request_headers(request.headers())?;
 
@@ -606,6 +659,36 @@ where
     } else {
         0
     };
+    // Stamp the alias-forwarder origination internal ops (drained
+    // from the journal at function entry) with placeholder nonces
+    // taken from `nonce_counter` BEFORE running `cross_runtime_transfer`,
+    // so MIR ops receive higher local nonces than the alias ops. The
+    // alias ops are passed to `build_crac_receipt` separately and get
+    // placed between the synthetic CRAC event and the synthetic
+    // transfer in the final receipt — the cross-runtime call enters
+    // Michelson AFTER its aliases have been materialized. The flat-
+    // list order is what matters: `renumber_nonces` reassigns
+    // block-global nonces at block finalization based on that order.
+    let alias_origination_internals: Vec<InternalOperationSum> =
+        alias_origination_internals
+            .into_iter()
+            .map(|op| {
+                let n = nonce_counter;
+                nonce_counter = nonce_counter.checked_add(1).ok_or_else(|| {
+                    TezosXRuntimeError::Custom(
+                        "alias-origination internal-op nonce counter overflowed"
+                            .to_string(),
+                    )
+                })?;
+                Ok(match op {
+                    InternalOperationSum::Origination(mut meta) => {
+                        meta.nonce = n;
+                        InternalOperationSum::Origination(meta)
+                    }
+                    other => other,
+                })
+            })
+            .collect::<Result<_, TezosXRuntimeError>>()?;
     let result = match cross_runtime_transfer(
         &mut tc_ctx,
         &mut operation_ctx,
@@ -664,6 +747,7 @@ where
                         &parsed.destination,
                         &parameters,
                         te,
+                        alias_origination_internals,
                         internal_receipts,
                         crac_id_for_event.as_deref(),
                         base_nonce,
@@ -700,6 +784,10 @@ where
                 })?
                 .clone(),
         );
+        // Pass the alias-forwarder origination internals separately so
+        // `build_crac_receipt` can insert them BETWEEN the CRAC event
+        // and the synthetic transfer — the materializations happen
+        // before the cross-runtime transfer they participate in.
         let receipt = build_crac_receipt(
             &source_pkh,
             &source_contract,
@@ -708,6 +796,7 @@ where
             &parsed.destination,
             &parameters,
             result.target,
+            alias_origination_internals,
             result.internal_receipts,
             crac_id_for_event.as_deref(),
             base_nonce,
@@ -752,7 +841,7 @@ impl RuntimeInterface for TezosRuntime {
         &self,
         _registry: &impl Registry,
         host: &mut Host,
-        _journal: &mut TezosXJournal,
+        journal: &mut TezosXJournal,
         alias_info: AliasInfo,
         _native_public_key: Option<&[u8]>,
         _context: CrossRuntimeContext,
@@ -858,7 +947,7 @@ impl RuntimeInterface for TezosRuntime {
 
         let script = Script { code, storage };
         let origin = Origin::Alias(alias_info);
-        {
+        let receipt = {
             let mut gas =
                 TezlinkOperationGas::start_milligas(remaining).map_err(|e| {
                     TezosXRuntimeError::Custom(format!("Failed to start gas: {e:?}"))
@@ -880,7 +969,7 @@ impl RuntimeInterface for TezosRuntime {
                         "Failed to typecheck forwarder script: {e:?}"
                     ))
                 })?;
-            let receipt = originate_contract(
+            originate_contract(
                 &mut tc_ctx,
                 kt1,
                 &source_account,
@@ -893,14 +982,25 @@ impl RuntimeInterface for TezosRuntime {
                 TezosXRuntimeError::Custom(format!(
                     "Failed to originate alias forwarder: {e:?}"
                 ))
-            })?;
-            let consumed: u64 = receipt.consumed_milligas.0.try_into().map_err(|_| {
-                TezosXRuntimeError::Custom(
-                    "consumed_milligas does not fit in u64".to_string(),
-                )
-            })?;
-            consume(&mut remaining, consumed)?;
-        }
+            })?
+        };
+        let consumed: u64 = (&receipt.consumed_milligas.0).try_into().map_err(|_| {
+            TezosXRuntimeError::Custom(
+                "consumed_milligas does not fit in u64".to_string(),
+            )
+        })?;
+        consume(&mut remaining, consumed)?;
+
+        // Park the internal `Origination` on the Michelson journal.
+        // `execute_entrypoint_call` drains the journal at entry of
+        // every cross-runtime call it serves and folds the entries
+        // into THAT call's CRAC receipt. The kernel never sees a
+        // separate AppliedOperation for the alias materialization;
+        // it surfaces only as an internal op of the enclosing CRAC.
+        let internal_op = build_alias_origination_internal(&null_pkh, script, receipt);
+        journal
+            .michelson
+            .push_pending_alias_origination_internal(internal_op);
 
         Ok((kt1_str, remaining))
     }
@@ -1429,7 +1529,7 @@ mod tests {
         let runtime = test_runtime();
         let evm_address = "0x3333333333333333333333333333333333333333";
 
-        let (first_alias, first_remaining) = runtime
+        let first = runtime
             .ensure_alias(
                 &StubRegistry,
                 &mut host,
@@ -1441,7 +1541,7 @@ mod tests {
             )
             .unwrap();
 
-        let (second_alias, second_remaining) = runtime
+        let second = runtime
             .ensure_alias(
                 &StubRegistry,
                 &mut host,
@@ -1453,13 +1553,13 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(first_alias, second_alias);
+        assert_eq!(first.0, second.0);
         // The no-op branch performs no durable writes, so its metered
         // cost is zero — only the first call pays for the storage init
         // (via the `originate_contract` receipt) and the classification
         // write.
-        let first_consumed = 1_000_000 - first_remaining;
-        let second_consumed = 500_000 - second_remaining;
+        let first_consumed = 1_000_000 - first.1;
+        let second_consumed = 500_000 - second.1;
         assert!(
             second_consumed < first_consumed / 10,
             "second call must be vastly cheaper than the first (first {first_consumed}, second {second_consumed})"
@@ -1611,6 +1711,7 @@ mod tests {
             &parameters,
             target,
             vec![],
+            vec![],
             Some(crac_id),
             0,
         )
@@ -1728,6 +1829,7 @@ mod tests {
             &parameters,
             target,
             vec![],
+            vec![],
             None, // no CRAC-ID in this variant test
             0,
         )
@@ -1819,6 +1921,7 @@ mod tests {
             &destination,
             &parameters,
             error,
+            vec![],
             vec![],
             Some("1-0"),
             0,

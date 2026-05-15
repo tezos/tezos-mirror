@@ -455,6 +455,18 @@ let gateway_catch_revert =
     ~label:"gateway_catch_revert"
     ~contract:"GatewayCatchRevert"
 
+let gateway_call_then_revert =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/gateway_call_then_revert.sol")
+    ~label:"gateway_call_then_revert"
+    ~contract:"GatewayCallThenRevert"
+
+let gateway_chain_two_aliases =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/gateway_chain_two_aliases.sol")
+    ~label:"gateway_chain_two_aliases"
+    ~contract:"GatewayChainTwoAliases"
+
 let nested_delegatecalls_A =
   compile_contract
     ~source:(solidity_contracts_path ^ "/nested_delegatecalls.sol")
