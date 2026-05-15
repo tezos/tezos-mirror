@@ -1,0 +1,30 @@
+parameter unit ;
+storage (pair (option %last bytes) (string %destination)) ;
+# L2-1259: on-chain Michelson contract demonstrating that
+# `VIEW "staticcall_evm"` works from an entrypoint body — not just
+# from inside a view. The entrypoint issues the synthetic view call
+# against the TezosX gateway, captures the EVM response bytes, and
+# stashes them under the `%last` storage field. Reached by a regular
+# (state-mutating) delayed-inbox call.
+code
+  { UNPAIR ; DROP ;
+    DUP ; CDR ;
+    # destination : storage
+    PUSH bytes 0xa87d942c ; # calldata: getCount() selector
+    SWAP ;
+    PAIR ;
+    # (Pair destination calldata) : storage
+    PUSH address "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw" ;
+    SWAP ;
+    # input : gateway : storage
+    VIEW "staticcall_evm" bytes ;
+    # option bytes : storage
+    IF_NONE
+      { PUSH string "staticcall_evm failed" ; FAILWITH }
+      { } ;
+    # bytes : storage
+    DIP { CDR } ;
+    SOME ;
+    PAIR ;
+    NIL operation ; PAIR
+  } ;
