@@ -37,6 +37,18 @@
 
 ### Native Atomic Composability
 
+- Reject `STATICCALL` on the runtime gateway precompile's
+  state-mutating selectors (`transfer`, `callMichelson`, and `call`
+  with a non-`GET` method). REVM commits a custom precompile's
+  journal writes unconditionally on `Ok` return — `inputs.is_static`
+  is passed in but never re-validated at frame exit — so the
+  precompile has to police the contract itself. The two read-only
+  entries (`callMichelsonView` and `call(GET)`) keep their existing
+  `STATICCALL`-compatibility intact: they thread alias resolution
+  through the read-only journal API, refuse value transfer, and emit
+  no log. Completes the DELEGATECALL/CALLCODE guard added earlier
+  on the same precompile. (!21905)
+
 ### Storage versions
 
 - `/evm/michelson_runtime/sunrise_level` and

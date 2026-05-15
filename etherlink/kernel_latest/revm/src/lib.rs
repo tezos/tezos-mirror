@@ -2975,6 +2975,388 @@ mod test {
         }
     }
 
+    mod runtime_gateway {
+        //! Validate the STATICCALL / DELEGATECALL / CALLCODE dispatch
+        //! contract of the runtime gateway precompile by probing it
+        //! through Solidity `StaticCaller` / `DelegateCaller` helpers.
+        //!
+        //! Two guard mechanisms are exercised:
+        //!
+        //! - DELEGATECALL / CALLCODE rejection — a universal guard at
+        //!   the top of [`super::super::precompiles::runtime_gateway`]
+        //!   that rejects any frame where `target != bytecode`, before
+        //!   any selector dispatch.
+        //! - STATICCALL behavior per selector — the four entries fall
+        //!   in two groups: state-mutating (`transfer`,
+        //!   `callMichelson`, `call` with POST) revert under
+        //!   STATICCALL, read-only (`callMichelsonView`, `call` with
+        //!   GET) succeed.
+        //!
+        //! The DELEGATECALL guard is universal, so a single probe per
+        //! selector is overkill; we test two selectors (one mutating,
+        //! one view) to confirm the guard fires before dispatch.
+
+        use alloy_sol_types::{sol, SolCall, SolInterface};
+        use revm::{
+            context::{
+                result::{ExecutionResult, Output},
+                transaction::AccessList,
+            },
+            primitives::{hex::FromHex, Address, Bytes, U256},
+            state::AccountInfo,
+        };
+        use tezos_ethereum::block::BlockConstants;
+        use tezos_evm_runtime::runtime::MockKernelHost;
+        use tezosx_journal::TezosXJournal;
+
+        use crate::{
+            precompiles::{
+                constants::RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                runtime_gateway::RuntimeGateway::{
+                    callCall, callMichelsonCall, callMichelsonViewCall, transferCall,
+                    RuntimeGatewayCalls,
+                },
+            },
+            run_transaction,
+            storage::world_state_handler::StorageAccount,
+            test::{
+                utilities::{Registry, DEFAULT_SPEC_ID},
+                GAS_LIMIT,
+            },
+            ExecutionOutcome, GasData, TransactionOrigin,
+        };
+
+        sol!("contracts/tests/static_caller.sol");
+        sol!("contracts/tests/delegate_caller.sol");
+
+        use self::DelegateCaller::makeDelegateCallCall;
+        use self::StaticCaller::makeStaticCallCall;
+
+        // Compiled deploy bytecode for `contracts/tests/static_caller.sol`.
+        // Mirrors the inline literal used by `mod fa_bridge` —
+        // duplicated here to keep the module self-contained.
+        const STATIC_CALLER_BYTECODE: &str = "6080604052348015600e575f5ffd5b506102bf8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c806315ed14111461002d575b5f5ffd5b610047600480360381019061004291906101a5565b61005d565b604051610054919061021c565b60405180910390f35b5f5f5f8573ffffffffffffffffffffffffffffffffffffffff168585604051610087929190610271565b5f60405180830381855afa9150503d805f81146100bf576040519150601f19603f3d011682016040523d82523d5f602084013e6100c4565b606091505b5091509150816100d657805160208201fd5b81925050509392505050565b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610113826100ea565b9050919050565b61012381610109565b811461012d575f5ffd5b50565b5f8135905061013e8161011a565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f84011261016557610164610144565b5b8235905067ffffffffffffffff81111561018257610181610148565b5b60208301915083600182028301111561019e5761019d61014c565b5b9250929050565b5f5f5f604084860312156101bc576101bb6100e2565b5b5f6101c986828701610130565b935050602084013567ffffffffffffffff8111156101ea576101e96100e6565b5b6101f686828701610150565b92509250509250925092565b5f8115159050919050565b61021681610202565b82525050565b5f60208201905061022f5f83018461020d565b92915050565b5f81905092915050565b828183375f83830152505050565b5f6102588385610235565b935061026583858461023f565b82840190509392505050565b5f61027d82848661024d565b9150819050939250505056fea2646970667358221220479572b5582551531e4488ebe613bfc74bb6a52e067fdb85660015539d4a2d2b64736f6c634300081e0033";
+
+        // Compiled deploy bytecode for `contracts/tests/delegate_caller.sol`.
+        const DELEGATE_CALLER_BYTECODE: &str = "6080604052348015600e575f5ffd5b506102bf8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c80638771074f1461002d575b5f5ffd5b610047600480360381019061004291906101a5565b61005d565b604051610054919061021c565b60405180910390f35b5f5f5f8573ffffffffffffffffffffffffffffffffffffffff168585604051610087929190610271565b5f60405180830381855af49150503d805f81146100bf576040519150601f19603f3d011682016040523d82523d5f602084013e6100c4565b606091505b5091509150816100d657805160208201fd5b81925050509392505050565b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610113826100ea565b9050919050565b61012381610109565b811461012d575f5ffd5b50565b5f8135905061013e8161011a565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f84011261016557610164610144565b5b8235905067ffffffffffffffff81111561018257610181610148565b5b60208301915083600182028301111561019e5761019d61014c565b5b9250929050565b5f5f5f604084860312156101bc576101bb6100e2565b5b5f6101c986828701610130565b935050602084013567ffffffffffffffff8111156101ea576101e96100e6565b5b6101f686828701610150565b92509250509250925092565b5f8115159050919050565b61021681610202565b82525050565b5f60208201905061022f5f83018461020d565b92915050565b5f81905092915050565b828183375f83830152505050565b5f6102588385610235565b935061026583858461023f565b82840190509392505050565b5f61027d82848661024d565b9150819050939250505056fea2646970667358221220065aceddd10343ed6e9faf40c53bcf49432de8e786641789238cf6d0eaf59c7364736f6c634300081e0033";
+
+        fn block_constants() -> BlockConstants {
+            let mut bc = BlockConstants::test_block_with_no_fees();
+            bc.tezos_experimental_features = true;
+            bc
+        }
+
+        fn fund_caller(host: &mut MockKernelHost, caller: Address) {
+            let mut acct = StorageAccount::from_address(&caller).unwrap();
+            acct.set_info(
+                host,
+                AccountInfo {
+                    balance: U256::MAX,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        }
+
+        fn deploy(
+            host: &mut MockKernelHost,
+            caller: Address,
+            bytecode_hex: &str,
+        ) -> Address {
+            let calldata = Bytes::from_hex(bytecode_hex).unwrap();
+            let registry = Registry::new();
+            let mut journal = TezosXJournal::default();
+            let outcome = run_transaction(
+                host,
+                &registry,
+                &mut journal,
+                DEFAULT_SPEC_ID,
+                &block_constants(),
+                None,
+                caller,
+                None,
+                calldata,
+                GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
+                U256::ZERO,
+                None,
+                None,
+                false,
+                TransactionOrigin::UserInput {
+                    access_list: AccessList::default(),
+                },
+            )
+            .unwrap();
+            match outcome.result {
+                ExecutionResult::Success {
+                    output: Output::Create(_, Some(addr)),
+                    ..
+                } => addr,
+                other => panic!("contract deploy failed: {other:?}"),
+            }
+        }
+
+        fn call_into(
+            host: &mut MockKernelHost,
+            caller: Address,
+            destination: Address,
+            calldata: Bytes,
+        ) -> ExecutionOutcome {
+            let registry = Registry::new();
+            let mut journal = TezosXJournal::default();
+            run_transaction(
+                host,
+                &registry,
+                &mut journal,
+                DEFAULT_SPEC_ID,
+                &block_constants(),
+                None,
+                caller,
+                Some(destination),
+                calldata,
+                GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
+                U256::ZERO,
+                None,
+                None,
+                false,
+                TransactionOrigin::UserInput {
+                    access_list: AccessList::default(),
+                },
+            )
+            .unwrap()
+        }
+
+        fn transfer_payload() -> Bytes {
+            RuntimeGatewayCalls::transfer(transferCall {
+                implicitAddress: "tz1abc".to_string(),
+            })
+            .abi_encode()
+            .into()
+        }
+
+        fn call_michelson_payload() -> Bytes {
+            RuntimeGatewayCalls::callMichelson(callMichelsonCall {
+                destination: "KT1abc".to_string(),
+                entrypoint: "ep".to_string(),
+                parameters: vec![].into(),
+            })
+            .abi_encode()
+            .into()
+        }
+
+        fn call_michelson_view_payload() -> Bytes {
+            RuntimeGatewayCalls::callMichelsonView(callMichelsonViewCall {
+                destination: "KT1abc".to_string(),
+                viewName: "balanceOf".to_string(),
+                input: vec![].into(),
+            })
+            .abi_encode()
+            .into()
+        }
+
+        // method: 0 = GET (view-shaped), 1 = POST (state-mutating).
+        fn call_payload(method: u8) -> Bytes {
+            RuntimeGatewayCalls::call(callCall {
+                url: "http://tezos/KT1abc".to_string(),
+                headers: vec![],
+                body: vec![].into(),
+                method,
+            })
+            .abi_encode()
+            .into()
+        }
+
+        // --- DELEGATECALL guard ----------------------------------------------
+
+        /// DELEGATECALL on `transfer` hits the universal guard at the
+        /// top of the precompile and reverts before any selector logic
+        /// runs. The guard pattern (`target != bytecode`) selects
+        /// DELEGATECALL/CALLCODE exclusively.
+        #[test]
+        fn runtime_gateway_rejects_delegate_call_on_transfer() {
+            let mut host = MockKernelHost::default();
+            let caller = Address::from([1u8; 20]);
+            fund_caller(&mut host, caller);
+            let delegate_caller = deploy(&mut host, caller, DELEGATE_CALLER_BYTECODE);
+
+            let outer = makeDelegateCallCall::new((
+                RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                transfer_payload(),
+            ))
+            .abi_encode()
+            .into();
+
+            let res = call_into(&mut host, caller, delegate_caller, outer);
+            match res.result {
+                ExecutionResult::Revert { .. } => { /* expected */ }
+                other => {
+                    panic!("DELEGATECALL on runtime gateway should revert, got {other:?}")
+                }
+            }
+        }
+
+        /// Confirms the DELEGATECALL guard is universal: it rejects
+        /// even view selectors, before any per-selector dispatch.
+        #[test]
+        fn runtime_gateway_rejects_delegate_call_on_call_michelson_view() {
+            let mut host = MockKernelHost::default();
+            let caller = Address::from([1u8; 20]);
+            fund_caller(&mut host, caller);
+            let delegate_caller = deploy(&mut host, caller, DELEGATE_CALLER_BYTECODE);
+
+            let outer = makeDelegateCallCall::new((
+                RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                call_michelson_view_payload(),
+            ))
+            .abi_encode()
+            .into();
+
+            let res = call_into(&mut host, caller, delegate_caller, outer);
+            match res.result {
+                ExecutionResult::Revert { .. } => { /* expected */ }
+                other => {
+                    panic!("DELEGATECALL on runtime gateway should revert, got {other:?}")
+                }
+            }
+        }
+
+        // --- STATICCALL on state-mutating selectors --------------------------
+
+        /// STATICCALL on `transfer` must revert: the precompile would
+        /// otherwise persist alias entries, emit a `CracSent` log, and
+        /// potentially burn precompile residual balance — all
+        /// state-mutating effects forbidden under STATICCALL.
+        #[test]
+        fn runtime_gateway_rejects_static_call_on_transfer() {
+            let mut host = MockKernelHost::default();
+            let caller = Address::from([1u8; 20]);
+            fund_caller(&mut host, caller);
+            let static_caller = deploy(&mut host, caller, STATIC_CALLER_BYTECODE);
+
+            let outer = makeStaticCallCall::new((
+                RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                transfer_payload(),
+            ))
+            .abi_encode()
+            .into();
+
+            let res = call_into(&mut host, caller, static_caller, outer);
+            match res.result {
+                ExecutionResult::Revert { .. } | ExecutionResult::Halt { .. } => {
+                    /* expected */
+                }
+                other => panic!(
+                    "STATICCALL on transfer (mutating) should revert, got {other:?}"
+                ),
+            }
+        }
+
+        #[test]
+        fn runtime_gateway_rejects_static_call_on_call_michelson() {
+            let mut host = MockKernelHost::default();
+            let caller = Address::from([1u8; 20]);
+            fund_caller(&mut host, caller);
+            let static_caller = deploy(&mut host, caller, STATIC_CALLER_BYTECODE);
+
+            let outer = makeStaticCallCall::new((
+                RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                call_michelson_payload(),
+            ))
+            .abi_encode()
+            .into();
+
+            let res = call_into(&mut host, caller, static_caller, outer);
+            match res.result {
+                ExecutionResult::Revert { .. } | ExecutionResult::Halt { .. } => {
+                    /* expected */
+                }
+                other => panic!(
+                    "STATICCALL on callMichelson (mutating) should revert, got {other:?}"
+                ),
+            }
+        }
+
+        /// `call(POST)` is the mutating branch of the `call` entry —
+        /// it persists alias state, emits `CracSent`, and runs
+        /// `burn_gateway_residual`. STATICCALL must revert.
+        #[test]
+        fn runtime_gateway_rejects_static_call_on_call_post() {
+            let mut host = MockKernelHost::default();
+            let caller = Address::from([1u8; 20]);
+            fund_caller(&mut host, caller);
+            let static_caller = deploy(&mut host, caller, STATIC_CALLER_BYTECODE);
+
+            let outer = makeStaticCallCall::new((
+                RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                call_payload(1),
+            ))
+            .abi_encode()
+            .into();
+
+            let res = call_into(&mut host, caller, static_caller, outer);
+            match res.result {
+                ExecutionResult::Revert { .. } | ExecutionResult::Halt { .. } => {
+                    /* expected */
+                }
+                other => panic!(
+                    "STATICCALL on call(POST) (mutating) should revert, got {other:?}"
+                ),
+            }
+        }
+
+        // --- STATICCALL on view selectors ------------------------------------
+
+        /// STATICCALL on `callMichelsonView` succeeds: the entry is
+        /// read-only by design — uses the read-only alias resolver,
+        /// rejects non-zero value, emits no log, and never burns
+        /// residual balance.
+        #[test]
+        fn runtime_gateway_allows_static_call_on_call_michelson_view() {
+            let mut host = MockKernelHost::default();
+            let caller = Address::from([1u8; 20]);
+            fund_caller(&mut host, caller);
+            let static_caller = deploy(&mut host, caller, STATIC_CALLER_BYTECODE);
+
+            let outer = makeStaticCallCall::new((
+                RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                call_michelson_view_payload(),
+            ))
+            .abi_encode()
+            .into();
+
+            let res = call_into(&mut host, caller, static_caller, outer);
+            assert!(
+                res.result.is_success(),
+                "STATICCALL on callMichelsonView (view) should succeed, \
+                 got {:?}",
+                res.result
+            );
+        }
+
+        /// `call(GET)` mirrors the STATICCALL-compatibility contract
+        /// of `callMichelsonView`. STATICCALL must succeed.
+        #[test]
+        fn runtime_gateway_allows_static_call_on_call_get() {
+            let mut host = MockKernelHost::default();
+            let caller = Address::from([1u8; 20]);
+            fund_caller(&mut host, caller);
+            let static_caller = deploy(&mut host, caller, STATIC_CALLER_BYTECODE);
+
+            let outer = makeStaticCallCall::new((
+                RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                call_payload(0),
+            ))
+            .abi_encode()
+            .into();
+
+            let res = call_into(&mut host, caller, static_caller, outer);
+            assert!(
+                res.result.is_success(),
+                "STATICCALL on call(GET) (view) should succeed, got {:?}",
+                res.result
+            );
+        }
+    }
+
     #[test]
     fn test_osaka_clz_is_enabled() {
         let mut host = MockKernelHost::default();
