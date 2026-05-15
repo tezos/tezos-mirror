@@ -21,6 +21,7 @@ rlp.workspace = true
 # Types
 evm-types.workspace = true
 michelson-types.workspace = true
+tezosx-types.workspace = true
 anyhow.workspace = true
 tezos-smart-rollup-host.workspace = true
 

@@ -3559,16 +3559,10 @@ name = "tezosx-interfaces"
 version = "0.1.0"
 dependencies = [
  "http",
- "nom",
  "primitive-types",
- "tezos-evm-logging-latest",
- "tezos-evm-runtime-latest",
  "tezos-smart-rollup-host",
- "tezos-storage-latest",
- "tezos_data_encoding",
- "tezosx-constants",
  "tezosx-journal",
- "thiserror 1.0.69",
+ "tezosx-types",
 ]
 
 [[package]]
@@ -3590,6 +3584,7 @@ dependencies = [
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "tezos_tezlink_latest",
+ "tezosx-types",
  "thiserror 1.0.69",
 ]
 
@@ -3616,6 +3611,20 @@ dependencies = [
  "tezos_tezlink_latest",
  "tezosx-interfaces",
  "tezosx-journal",
+]
+
+[[package]]
+name = "tezosx-types"
+version = "0.1.0"
+dependencies = [
+ "http",
+ "nom",
+ "primitive-types",
+ "tezos-smart-rollup-host",
+ "tezos-storage-latest",
+ "tezos_data_encoding",
+ "tezosx-constants",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
