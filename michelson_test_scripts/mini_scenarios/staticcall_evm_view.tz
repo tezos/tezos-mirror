@@ -1,0 +1,28 @@
+parameter unit ;
+storage string ;
+# L2-1259: Michelson view that issues a read-only cross-runtime call
+# to the EVM runtime through the gateway's `staticcall_evm` synthetic
+# view.  Reached from EVM via `callMichelsonView(this_kt1, "read_evm",
+# Unit)`; the outer EVM->Michelson hop is a HTTP GET (handled by the
+# Michelson view-execution path added in L2-1244), and inside the
+# view body we issue another HTTP GET back to EVM via the new
+# `VIEW "staticcall_evm"` hook (L2-1259).
+#
+# The gateway address (KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw) is the
+# enshrined CRAC contract with a deterministic address.  The calldata
+# is hardcoded to the 4-byte selector `0xa87d942c` (Keccak prefix for
+# `getCount()` on `counter.sol`); the test's EVM contract ignores
+# calldata and returns `msg.sender` left-padded to 32 bytes, which
+# the test then matches against the deterministic alias of this KT1.
+view "read_evm" unit bytes
+     { CDR ;
+       PUSH bytes 0xa87d942c ;
+       SWAP ;
+       PAIR ;
+       PUSH address "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw" ;
+       SWAP ;
+       VIEW "staticcall_evm" bytes ;
+       IF_NONE
+         { PUSH string "staticcall_evm: dispatch failed" ; FAILWITH }
+         { } } ;
+code { CDR ; NIL operation ; PAIR } ;

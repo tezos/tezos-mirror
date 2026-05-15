@@ -175,6 +175,16 @@ pub enum TransferError {
     GatewayError(String),
     #[error("Contract {0} does not exist.")]
     ContractDoesNotExist(Contract),
+    /// MIR's `VIEW` opcode reached a synthetic enshrined-view dispatch
+    /// (today: the gateway's `staticcall_evm`) and the peer runtime
+    /// returned a 5xx or could not be reached. Distinct from the
+    /// caller-mistake variants of `EnshrinedViewDispatchError` (which
+    /// stay routed through `MichelsonContractInterpretError` →
+    /// `CracError::Operation`) — this one routes to
+    /// `CracError::BlockAbort`, matching how Boundary-2 (gateway HTTP)
+    /// already classifies the same brokenness on the entrypoint path.
+    #[error("Enshrined view dispatch reported peer-runtime failure: {0}")]
+    EnshrinedViewDispatchAbort(String),
 }
 
 #[derive(Error, Clone, Debug, PartialEq, Eq, NomReader)]
@@ -209,6 +219,25 @@ impl From<mir::serializer::DecodeError> for TransferError {
 
 impl From<mir::interpreter::ContractInterpretError<'_>> for TransferError {
     fn from(err: mir::interpreter::ContractInterpretError) -> Self {
+        use mir::interpreter::{
+            ContractInterpretError, EnshrinedViewDispatchError, InterpretError,
+        };
+        // Peer-runtime brokenness (5xx, gas-budget overflow, dispatch-
+        // request build) reaching MIR via `VIEW staticcall_evm` must
+        // map to the block-abort lane, not collapse onto the generic
+        // operation-failure string — same `CracError::BlockAbort`
+        // outcome the gateway-HTTP classifier produces on the
+        // entrypoint path. `InvalidDestination` is the one caller-
+        // controllable variant and stays on the operation-failure
+        // lane.
+        if let ContractInterpretError::InterpretError(
+            InterpretError::EnshrinedViewDispatch(ref inner),
+        ) = err
+        {
+            if !matches!(inner, EnshrinedViewDispatchError::InvalidDestination { .. }) {
+                return Self::EnshrinedViewDispatchAbort(inner.to_string());
+            }
+        }
         Self::MichelsonContractInterpretError(err.to_string())
     }
 }

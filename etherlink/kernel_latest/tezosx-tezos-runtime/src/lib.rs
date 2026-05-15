@@ -456,8 +456,9 @@ where
             // the topmost frame's `frame_result` slot (same slot the
             // entrypoint path fills via `%collect_result`), so the
             // journal is threaded through. The registry is threaded
-            // alongside it because the kernel `Ctx` now carries it as
-            // a first-class field for trait-based access.
+            // too so the view can issue nested cross-runtime reads
+            // through the gateway's `staticcall_evm` synthetic view
+            // (L2-1259).
             view::execute_view_call(
                 chain_id,
                 registry,

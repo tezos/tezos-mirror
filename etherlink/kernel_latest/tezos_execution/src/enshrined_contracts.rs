@@ -96,6 +96,14 @@ impl From<TransferError> for CracError {
             | TransferError::FailedToComputeBalanceUpdate(_) => {
                 CracError::BlockAbort(format!("internal error during transfer: {e}"))
             }
+            // Peer-runtime brokenness surfaced via MIR `VIEW
+            // staticcall_evm` (5xx, gas-budget translation overflow,
+            // dispatch-request build) — same EVM-runtime breakage
+            // would surface as `CracError::BlockAbort` on the
+            // gateway-HTTP entrypoint path; the view path must agree.
+            TransferError::EnshrinedViewDispatchAbort(_) => {
+                CracError::BlockAbort(format!("enshrined view dispatch: {e}"))
+            }
             _ => CracError::Operation(e),
         }
     }
@@ -936,7 +944,6 @@ where
     Ok(request)
 }
 
-#[allow(unused)]
 fn tezosx_resolve_source_alias_readonly(
     ctx: &impl HasOriginLookup,
     registry: &impl Registry,
@@ -1146,6 +1153,159 @@ where
             .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
     }
     Ok(response_body)
+}
+
+/// Read-only counterpart to [`dispatch_crac_call`], shaped for the
+/// view-side bridge that backs the gateway's `staticcall_evm`
+/// synthetic view: build a `GET http://ethereum/<destination>`,
+/// inject the same `X-Tezos-*` context headers `dispatch_crac_call`
+/// would, fire `registry.serve`, charge `X-Tezos-Gas-Consumed` back
+/// to `operation_gas`, and classify the response.
+///
+/// - **2xx** → `Ok(Some(body))`.
+/// - **4xx** → `Ok(None)`, mirroring the standard MIR view dispatch's
+///   "view not found" outcome so the Michelson caller can `IF_NONE`.
+/// - **5xx / 1xx / 3xx** →
+///   `Err(EnshrinedViewDispatchError::UnclassifiableResponse)`. The
+///   EVM runtime's `serve()` only ever emits 200/400/500-class
+///   statuses today, so 1xx/3xx are unreachable; the typed variant
+///   surfaces the status code if that ever changes.
+///
+/// Internal failures (alias resolution, gas-unit overflow,
+/// request-build) surface as typed
+/// [`EnshrinedViewDispatchError`](mir::interpreter::EnshrinedViewDispatchError)
+/// variants; the caller (`view.rs::classify_interpret_error`) routes
+/// them to `TezosXRuntimeError::Custom` (→ 500) so they don't
+/// masquerade as caller-side `BadRequest`s.
+///
+/// The inner EVM gas limit is derived from `operation_gas.remaining`
+/// at call time, so it scales with the outer view's remaining
+/// budget rather than a hardcoded magic.
+#[allow(clippy::too_many_arguments)]
+pub fn dispatch_staticcall_evm_get<'a, Host, R, C>(
+    host: &mut Host,
+    operation_gas: &mut crate::gas::TezlinkOperationGas,
+    registry: &R,
+    journal: &mut TezosXJournal,
+    context: &C,
+    calling_kt1: &ContractKt1Hash,
+    crac_id: &str,
+    timestamp: &str,
+    block_number: &str,
+    destination: &str,
+    calldata: &[u8],
+) -> Result<Option<Vec<u8>>, mir::interpreter::InterpretError<'a>>
+where
+    Host: StorageV1,
+    R: Registry,
+    C: crate::context::Context,
+{
+    // Minimal `HasOriginLookup` adapter for the read-only alias
+    // resolution path: needs an immutable host plus the context, no
+    // operation gas / no source public key. Defined locally so the
+    // helper has no extra preconditions on its callers.
+    struct ViewOriginLookup<'a, H, C> {
+        host: &'a H,
+        context: &'a C,
+    }
+    impl<H: StorageV1, C: crate::context::Context> HasOriginLookup
+        for ViewOriginLookup<'_, H, C>
+    {
+        fn read_origin_for_address(
+            &self,
+            address: &AddressHash,
+        ) -> Result<Option<tezosx_interfaces::Origin>, tezos_storage::error::Error>
+        {
+            self.context.read_origin_for_address(self.host, address)
+        }
+    }
+
+    let sender_addr_hex = {
+        let lookup = ViewOriginLookup {
+            host: &*host,
+            context,
+        };
+        tezosx_resolve_source_alias_readonly(
+            &lookup,
+            registry,
+            &AddressHash::Kt1(calling_kt1.clone()),
+            RuntimeId::Ethereum,
+        )
+        .map_err(|_| mir::interpreter::EnshrinedViewDispatchError::AliasResolution)?
+    };
+
+    // Inner EVM gas budget derived from the view's remaining
+    // milligas. Out-of-gas surfaces as `OutOfGas`; a conversion
+    // failure (unrepresentable in EVM units) surfaces as
+    // `BudgetOverflow`. Neither is silently zeroed — silent zero
+    // would mask exhaustion as a "view target said no" 4xx.
+    let remaining_milligas = operation_gas
+        .remaining
+        .milligas()
+        .ok_or(mir::interpreter::InterpretError::OutOfGas)?
+        as u64;
+    let evm_gas_limit = tezosx_interfaces::gas::convert(
+        RuntimeId::Tezos,
+        RuntimeId::Ethereum,
+        remaining_milligas,
+    )
+    .ok_or(mir::interpreter::EnshrinedViewDispatchError::BudgetOverflow)?;
+
+    // Parse the URI up-front so a caller-supplied bad destination
+    // surfaces as `InvalidDestination` (→ 400) rather than getting
+    // lumped into the kernel-side `DispatchSetup` (→ 500). Michelson
+    // `string` allows characters that `http::Uri` rejects
+    // (e.g. spaces), so this path is reachable from caller input.
+    let url = format!("http://ethereum/{destination}");
+    let uri: http::Uri = url.parse().map_err(|_| {
+        mir::interpreter::EnshrinedViewDispatchError::InvalidDestination {
+            destination: destination.to_string(),
+        }
+    })?;
+    let request = http::Request::builder()
+        .method(http::Method::GET)
+        .uri(uri)
+        .header(tezosx_interfaces::X_TEZOS_SENDER, sender_addr_hex.as_str())
+        // Views have no separate operation source (the kernel
+        // synthesizes a null implicit account on this path); mirror
+        // sender so `dispatch_crac_call`'s state-mutating counterpart
+        // stays comparable.
+        .header(tezosx_interfaces::X_TEZOS_SOURCE, sender_addr_hex.as_str())
+        .header(tezosx_interfaces::X_TEZOS_AMOUNT, "0")
+        .header(
+            tezosx_interfaces::X_TEZOS_GAS_LIMIT,
+            evm_gas_limit.to_string(),
+        )
+        .header(tezosx_interfaces::X_TEZOS_TIMESTAMP, timestamp)
+        .header(tezosx_interfaces::X_TEZOS_BLOCK_NUMBER, block_number)
+        .header(tezosx_interfaces::X_TEZOS_CRAC_ID, crac_id)
+        .body(calldata.to_vec())
+        .map_err(|_| mir::interpreter::EnshrinedViewDispatchError::DispatchSetup)?;
+
+    let response = registry.serve(host, journal, request);
+    let status = response.status().as_u16();
+
+    // Charge the inner EVM execution cost back to the operation gas —
+    // `X-Tezos-Gas-Consumed` is mandatory on 2xx and best-effort on
+    // 4xx; mirrors `classify_and_charge_crac_response`.
+    if let Ok(consumed_milligas) = extract_gas_consumed(&response, Some("ethereum")) {
+        operation_gas
+            .cast_and_consume_milligas(consumed_milligas)
+            .map_err(|_| mir::interpreter::InterpretError::OutOfGas)?;
+    }
+
+    if (200..300).contains(&status) {
+        Ok(Some(response.into_body()))
+    } else if (400..500).contains(&status) {
+        Ok(None)
+    } else {
+        Err(
+            mir::interpreter::EnshrinedViewDispatchError::UnclassifiableResponse {
+                status,
+            }
+            .into(),
+        )
+    }
 }
 
 fn bigint_to_u256(value: &num_bigint::BigInt) -> Result<U256, TransferError> {

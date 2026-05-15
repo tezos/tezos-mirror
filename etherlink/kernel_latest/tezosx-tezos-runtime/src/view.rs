@@ -22,7 +22,7 @@ use std::rc::Rc;
 use mir::ast::big_map::BigMapId;
 use mir::ast::{AddressHash, IntoMicheline, Micheline, Type, TypedValue};
 use mir::context::{CtxTrait, TypecheckingCtx};
-use mir::interpreter::InterpretError;
+use mir::interpreter::{EnshrinedViewDispatchError, InterpretError};
 use mir::parser::Parser;
 use mir::typechecker::{typecheck_value, typecheck_view, TcError};
 use tezos_crypto_rs::hash::OperationHash;
@@ -64,13 +64,26 @@ fn classify_tc_error(e: TcError) -> TezosXRuntimeError {
 
 /// Classify a MIR interpreter error. Same invariant as
 /// [`classify_tc_error`]: every error must map to a catchable 4XX
-/// except `OutOfGas` (including the variant nested under `TcError`),
-/// which routes to [`TezosXRuntimeError::OutOfGas`]; everything else
-/// defaults to [`TezosXRuntimeError::BadRequest`].
+/// **except** kernel-side failures surfaced via
+/// [`InterpretError::EnshrinedViewDispatch`] (alias resolution,
+/// gas-conversion overflow, request-build, unclassifiable peer
+/// response), which route to [`TezosXRuntimeError::Custom`] (→ 500).
+/// The `InvalidDestination` arm of that enum is caller-controllable
+/// (Michelson `string` allows characters that `http::Uri` rejects),
+/// so it routes to `BadRequest` instead. `OutOfGas` (including the
+/// variant nested under `TcError`) routes to
+/// [`TezosXRuntimeError::OutOfGas`]; everything else defaults to
+/// [`TezosXRuntimeError::BadRequest`].
 fn classify_interpret_error(e: InterpretError) -> TezosXRuntimeError {
     match e {
         InterpretError::OutOfGas => TezosXRuntimeError::OutOfGas,
         InterpretError::TcError(TcError::OutOfGas) => TezosXRuntimeError::OutOfGas,
+        InterpretError::EnshrinedViewDispatch(
+            err @ EnshrinedViewDispatchError::InvalidDestination { .. },
+        ) => TezosXRuntimeError::BadRequest(err.to_string()),
+        InterpretError::EnshrinedViewDispatch(err) => {
+            TezosXRuntimeError::Custom(err.to_string())
+        }
         other => TezosXRuntimeError::BadRequest(format!("{other:?}")),
     }
 }

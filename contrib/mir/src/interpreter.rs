@@ -81,6 +81,28 @@ pub enum InterpretError<'a> {
     /// Stack index was out of bounds when it shouldn't have been.
     #[error(transparent)]
     StackOob(#[from] StackOob),
+    #[allow(missing_docs)]
+    #[error(transparent)]
+    EnshrinedViewDispatch(#[from] EnshrinedViewDispatchError),
+}
+
+#[allow(missing_docs)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum EnshrinedViewDispatchError {
+    #[error("enshrined view dispatch: could not resolve caller alias in the peer runtime")]
+    AliasResolution,
+    #[error("enshrined view dispatch: gas-budget translation overflow")]
+    BudgetOverflow,
+    /// Destination string supplied by the Michelson caller could not be
+    /// parsed into a valid URL. Caller-side mistake — routes to 400.
+    #[error("enshrined view dispatch: invalid destination {destination:?}")]
+    InvalidDestination { destination: String },
+    /// Kernel-side request construction failure (header assembly, body
+    /// construction). Routes to 500.
+    #[error("enshrined view dispatch: could not build dispatch request")]
+    DispatchSetup,
+    #[error("enshrined view dispatch: unclassifiable peer-runtime response: status {status}")]
+    UnclassifiableResponse { status: u16 },
 }
 
 impl<'a> From<OutOfGas> for InterpretError<'a> {
@@ -1523,8 +1545,7 @@ fn interpret_one<'a>(
             let mich = v.into_micheline_optimized_legacy(&arena);
             ctx.gas()
                 .consume(interpret_cost::micheline_encoding(&mich)?)?;
-            let encoded = mich
-                .encode_for_pack()?;
+            let encoded = mich.encode_for_pack()?;
             stack.push(V::Bytes(encoded));
         }
         I::Unpack(ty) => {
@@ -1900,10 +1921,7 @@ fn interpret_one<'a>(
             ))
         }
         I::Seq(nested) => interpret(nested, ctx, arena, stack)?,
-        I::IView {
-            name,
-            return_type: _,
-        } => {
+        I::IView { name, return_type } => {
             let input = TypedValue::unwrap_rc(stack.pop().unwrap_or_else(|| unreachable_state()));
             let Address {
                 hash,
@@ -1920,8 +1938,15 @@ fn interpret_one<'a>(
                 }
             };
 
-            let Some((view, view_storage_ty, view_storage, view_balance)) = ctx
-                .lookup_view_storage_balance(&kt1, name, arena)?
+            if let Some(result) =
+                ctx.try_dispatch_enshrined_view(&kt1, name, &input, return_type, arena)
+            {
+                stack.push(V::new_option(result?));
+                return Ok(());
+            }
+
+            let Some((view, view_storage_ty, view_storage, view_balance)) =
+                ctx.lookup_view_storage_balance(&kt1, name, arena)?
             else {
                 stack.push(V::Option(None));
                 return Ok(());

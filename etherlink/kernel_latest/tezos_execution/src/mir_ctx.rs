@@ -358,6 +358,127 @@ impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> CtxTrait<'
         self.exec_ctx.amount = amount;
         self.exec_ctx.balance = balance;
     }
+
+    /// Synthesize the gateway's `staticcall_evm` view: when
+    /// `(kt1, name)` matches the TezosX gateway, that view name, and
+    /// the declared `return_type` is `bytes`, build the cross-runtime
+    /// GET to the EVM destination via
+    /// [`dispatch_staticcall_evm_view`](Ctx::dispatch_staticcall_evm_view).
+    /// Any mismatch (wrong KT1, return type, input shape) falls
+    /// through to the standard view-code dispatch by returning
+    /// `None`.
+    ///
+    /// The boundary cost (base + calldata + response payload, in
+    /// milligas) is charged here, mirroring the state-mutating
+    /// `%call_evm` entrypoint. The inner EVM execution cost
+    /// (gas the EVM target spent on its read) is charged by
+    /// `dispatch_staticcall_evm_get` via the
+    /// `X-Tezos-Gas-Consumed` response header.
+    fn try_dispatch_enshrined_view(
+        &mut self,
+        kt1: &ContractKt1Hash,
+        name: &str,
+        input: &TypedValue<'a>,
+        return_type: &Type,
+        // Reserved for future synthetic views that need to
+        // materialize Micheline values; the EVM bridge's output is
+        // a plain byte vector so the arena is unused here.
+        _arena: &'a typed_arena::Arena<Micheline<'a>>,
+    ) -> Option<Result<Option<TypedValue<'a>>, mir::interpreter::InterpretError<'a>>>
+    {
+        let Some(crate::enshrined_contracts::EnshrinedContracts::TezosXGateway) =
+            crate::enshrined_contracts::from_kt1(kt1)
+        else {
+            return None;
+        };
+        // Dispatched by view name so adding a future synthetic view
+        // on the gateway is just a new arm. Unknown names fall
+        // through to the standard view-code dispatch.
+        match name {
+            "staticcall_evm" => self.dispatch_staticcall_evm_view(input, return_type),
+            _ => None,
+        }
+    }
+}
+
+impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry>
+    Ctx<'_, 'a, Host, C, R>
+{
+    /// Body of the `staticcall_evm` arm of
+    /// [`try_dispatch_enshrined_view`](CtxTrait::try_dispatch_enshrined_view).
+    /// Type-checks `return_type == bytes`, destructures the
+    /// `(string, bytes)` input, charges the boundary cost, then
+    /// dispatches through
+    /// [`crate::enshrined_contracts::dispatch_staticcall_evm_get`]
+    /// with `self.journal` and `self.registry`.
+    fn dispatch_staticcall_evm_view(
+        &mut self,
+        input: &TypedValue<'a>,
+        return_type: &Type,
+    ) -> Option<Result<Option<TypedValue<'a>>, mir::interpreter::InterpretError<'a>>>
+    {
+        if !matches!(return_type, Type::Bytes) {
+            return Some(Ok(None));
+        }
+        let (destination, calldata) = match input {
+            TypedValue::Pair(d, c) => match (d.as_ref(), c.as_ref()) {
+                (TypedValue::String(d), TypedValue::Bytes(c)) => {
+                    (d.as_str(), c.as_slice())
+                }
+                _ => return Some(Ok(None)),
+            },
+            _ => return Some(Ok(None)),
+        };
+        // Destination validation is delegated to the EVM runtime's URL
+        // parser (`parse_ethereum_url`); empty / malformed destinations
+        // surface there as 4xx, which `dispatch_staticcall_evm_get`
+        // then maps to `Ok(None)`. Keeping a single source of truth.
+        let calling_kt1 = match &self.exec_ctx.self_address {
+            AddressHash::Kt1(kt1) => kt1.clone(),
+            _ => return Some(Ok(None)),
+        };
+        if crate::enshrined_contracts::charge_gateway_base_cost(self).is_err()
+            || crate::enshrined_contracts::charge_gateway_payload(self, calldata.len())
+                .is_err()
+        {
+            return Some(Err(mir::interpreter::InterpretError::OutOfGas));
+        }
+        let crac_id_str = self.journal.crac_id().to_string();
+        let timestamp_str = i64::from(*self.operation_ctx.now).to_string();
+        let block_number_str = u32::from(*self.operation_ctx.level).to_string();
+        // Distinct-field split borrows on `self`: `tc_ctx.host`,
+        // `tc_ctx.operation_gas`, `tc_ctx.context`, `journal`,
+        // `registry`. The dispatcher consumes them for the call only.
+        let host: &mut Host = self.tc_ctx.host;
+        let operation_gas: &mut crate::gas::TezlinkOperationGas =
+            self.tc_ctx.operation_gas;
+        let context: &C = self.tc_ctx.context;
+        let result = crate::enshrined_contracts::dispatch_staticcall_evm_get(
+            host,
+            operation_gas,
+            self.registry,
+            self.journal,
+            context,
+            &calling_kt1,
+            &crac_id_str,
+            &timestamp_str,
+            &block_number_str,
+            destination,
+            calldata,
+        );
+        if let Ok(Some(ref bytes)) = result {
+            if crate::enshrined_contracts::charge_gateway_payload(self, bytes.len())
+                .is_err()
+            {
+                return Some(Err(mir::interpreter::InterpretError::OutOfGas));
+            }
+        }
+        match result {
+            Ok(Some(bytes)) => Some(Ok(Some(TypedValue::Bytes(bytes)))),
+            Ok(None) => Some(Ok(None)),
+            Err(e) => Some(Err(e)),
+        }
+    }
 }
 
 pub trait HasHost<Host> {

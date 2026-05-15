@@ -162,10 +162,7 @@ pub trait CtxTrait<'a>: TypecheckingCtx<'a> {
         contract: &ContractKt1Hash,
         name: &str,
         arena: &'a Arena<Micheline<'a>>,
-    ) -> Result<
-        Option<(MichelineView<Micheline<'a>>, Micheline<'a>, Vec<u8>, i64)>,
-        LookupViewError,
-    >;
+    ) -> Result<Option<(MichelineView<Micheline<'a>>, Micheline<'a>, Vec<u8>, i64)>, LookupViewError>;
 
     /// Override the execution context for a view call.
     /// Sets `self_address`, `sender`, `amount`, and `balance`.
@@ -176,6 +173,36 @@ pub trait CtxTrait<'a>: TypecheckingCtx<'a> {
         amount: i64,
         balance: i64,
     );
+
+    /// Hook called by `VIEW` before the standard view-code dispatch,
+    /// so the embedder can expose runtime-defined synthetic views.
+    /// `None` falls through to the standard dispatch;
+    /// `Some(Ok(Some(_)))` pushes `Some value`; `Some(Ok(None))`
+    /// pushes `None` (caller-visible failure); `Some(Err(_))`
+    /// propagates as an interpret error.
+    ///
+    /// **Type soundness:** the value the embedder returns in the
+    /// `Some(Ok(Some(_)))` branch must be of the declared
+    /// `return_type` — the typechecker has already inferred the
+    /// caller's post-stack as `option return_type`, so a mismatch
+    /// would violate the typed-stack invariant. On any declared-type
+    /// mismatch the embedder must choose between `None`
+    /// (fall through to the standard dispatch, in case some
+    /// on-chain view with the same name exists) and `Some(Ok(None))`
+    /// (short-circuit to a `None` push). Choose `Some(Ok(None))`
+    /// only when the synthetic-view target is guaranteed to have no
+    /// on-chain views (e.g. an enshrined contract with no real
+    /// storage).
+    fn try_dispatch_enshrined_view(
+        &mut self,
+        _kt1: &ContractKt1Hash,
+        _name: &str,
+        _input: &TypedValue<'a>,
+        _return_type: &Type,
+        _arena: &'a Arena<Micheline<'a>>,
+    ) -> Option<Result<Option<TypedValue<'a>>, crate::interpreter::InterpretError<'a>>> {
+        None
+    }
 }
 
 /// Standalone implementation of the MIR execution context, used for tests,
@@ -412,10 +439,8 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
         contract: &ContractKt1Hash,
         view_name: &str,
         arena: &'a Arena<Micheline<'a>>,
-    ) -> Result<
-        Option<(MichelineView<Micheline<'a>>, Micheline<'a>, Vec<u8>, i64)>,
-        LookupViewError,
-    > {
+    ) -> Result<Option<(MichelineView<Micheline<'a>>, Micheline<'a>, Vec<u8>, i64)>, LookupViewError>
+    {
         let addr = AddressHash::Kt1(contract.clone());
         let Some(contract_view) = self.views.get(&addr).and_then(|m| m.get(view_name)) else {
             return Ok(None);
