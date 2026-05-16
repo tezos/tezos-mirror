@@ -79,6 +79,7 @@ val job :
   ?coverage:string ->
   ?retry:retry ->
   ?parallel:parallel ->
+  ?environment:environment ->
   name:string ->
   script:string list ->
   unit ->

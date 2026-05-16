@@ -101,6 +101,48 @@ let%expect_test _ =
       script:
       - rm -rf /
       - echo it is all gone now |}] ;
+  (* environment: shorthand form (action = None) *)
+  p
+    [
+      Types.(
+        Generic_job
+          (Job
+             (Util.job
+                ~stage:"publish"
+                ~name:"publish_docs"
+                ~environment:{name = "documentation"; action = None}
+                ~script:["./publish.sh"]
+                ())));
+    ] ;
+  [%expect
+    {|
+    publish_docs:
+      stage: publish
+      script:
+      - ./publish.sh
+      environment: documentation |}] ;
+  (* environment: structured form with action = Access *)
+  p
+    [
+      Types.(
+        Generic_job
+          (Job
+             (Util.job
+                ~stage:"publish"
+                ~name:"publish_docs"
+                ~environment:{name = "documentation"; action = Some Access}
+                ~script:["./publish.sh"]
+                ())));
+    ] ;
+  [%expect
+    {|
+    publish_docs:
+      stage: publish
+      script:
+      - ./publish.sh
+      environment:
+        name: documentation
+        action: access |}] ;
   ()
 
 (** {2 Test {!If}-expressions} *)

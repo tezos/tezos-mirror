@@ -383,7 +383,13 @@ val enc_git_strategy : git_strategy -> string
     This takes the first tag that is compatible with your requirements,
     from a list of tags ordered in a priority list located in [runner.ml].
     You may also specify the runner [tag] explicitly instead,
-    in which case the function simply checks that your requirements are compatible. *)
+    in which case the function simply checks that your requirements are compatible.
+
+    - [environment] binds the job to a GitLab environment, granting it
+      access to variables scoped to that environment. Use [action:Access]
+      to avoid registering a deployment.
+      If omitted, only variables with the wildcard scope are available.
+      See {{:https://docs.gitlab.com/ci/environments/} GitLab environments}. *)
 val job :
   ?arch:Runner.Arch.t ->
   ?after_script:string list ->
@@ -406,6 +412,7 @@ val job :
   ?git_strategy:git_strategy ->
   ?retry:Gitlab_ci.Types.retry ->
   ?parallel:Gitlab_ci.Types.parallel ->
+  ?environment:Gitlab_ci.Types.environment ->
   ?description:string ->
   ?dev_infra:bool ->
   __POS__:string * int * int * int ->
@@ -511,6 +518,7 @@ val job_docker_authenticated :
   ?tag:Runner.Tag.t ->
   ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
   ?parallel:Gitlab_ci.Types.parallel ->
+  ?environment:Gitlab_ci.Types.environment ->
   ?timeout:Gitlab_ci.Types.time_interval ->
   ?retry:Gitlab_ci.Types.retry ->
   ?description:string ->
