@@ -34,8 +34,8 @@ let include_rule ?changes ?if_ ?(when_ : when_workflow = Always) () :
 
 let job ?after_script ?allow_failure ?artifacts ?before_script ?cache ?id_tokens
     ?image ?interruptible ?needs ?dependencies ?rules ?services ?stage
-    ?variables ?timeout ?tags ?when_ ?coverage ?retry ?parallel ~name ~script ()
-    =
+    ?variables ?timeout ?tags ?when_ ?coverage ?retry ?parallel ?environment
+    ~name ~script () =
   {
     name;
     after_script;
@@ -59,6 +59,7 @@ let job ?after_script ?allow_failure ?artifacts ?before_script ?cache ?id_tokens
     coverage;
     retry;
     parallel;
+    environment;
   }
 
 let trigger_job ?needs ?inherit_ ?rules ?stage ?variables ?when_

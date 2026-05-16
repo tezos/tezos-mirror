@@ -219,6 +219,7 @@ type job = {
   image_dependencies : Tezos_ci.Image.t list;
   services : Gitlab_ci.Types.service list option;
   id_tokens : Gitlab_ci.Types.id_tokens option;
+  environment : Gitlab_ci.Types.environment option;
 }
 
 type trigger = Auto | Immediate | Manual
@@ -585,6 +586,7 @@ let convert_graph ?(interruptible_pipeline = true)
                     image_dependencies;
                     services;
                     id_tokens;
+                    environment;
                   };
                 trigger;
                 only_if;
@@ -692,6 +694,7 @@ let convert_graph ?(interruptible_pipeline = true)
                 ~image_dependencies
                 ~dependencies:(Dependent dependencies)
                 ?parallel
+                ?environment
                 ?rules
                 ?services
                 ?id_tokens
@@ -767,6 +770,7 @@ module type COMPONENT_API = sig
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
     ?parallel:Gitlab_ci.Types.parallel ->
+    ?environment:Gitlab_ci.Types.environment ->
     ?variables:Gitlab_ci.Types.variables ->
     ?artifacts:Gitlab_ci.Types.artifacts ->
     ?cache:Gitlab_ci.Types.cache list ->
@@ -987,7 +991,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
   let job ~__POS__:source_location ~stage ~description ?provider ?arch ?cpu
       ?storage ?tag ?image ?only_if_changed ?(force = false)
       ?(force_if_label = []) ?(needs = []) ?(needs_legacy = []) ?parallel
-      ?variables ?artifacts ?cache ?(cargo_cache = false) ?sccache
+      ?environment ?variables ?artifacts ?cache ?(cargo_cache = false) ?sccache
       ?(dune_cache = false) ?(disable_datadog = false) ?allow_failure ?retry
       ?timeout ?(image_dependencies = []) ?services ?id_tokens ?(script = [])
       name =
@@ -1042,6 +1046,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       image_dependencies;
       services;
       id_tokens;
+      environment;
     }
 
   module SH = struct
