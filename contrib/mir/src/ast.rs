@@ -209,7 +209,11 @@ impl<T> From<T> for SingleBox<T> {
 
 /// The names of the variants correspond to the names of Michelson types, but
 /// snake_case is converted to PascalCase.
-#[derive(Debug, Clone, Eq, PartialEq)]
+///
+/// `PartialEq` is implemented manually as an iterative tree walk so equality
+/// of deeply nested types does not blow the WASM call stack. `Eq` is a
+/// marker and stays derived.
+#[derive(Debug, Clone, Eq)]
 #[allow(missing_docs)]
 pub enum Type {
     Nat,
@@ -247,21 +251,29 @@ pub enum Type {
 
 impl Type {
     /// Returns abstract size of the type representation. Used for gas cost
-    /// estimation.
+    /// estimation. Iterative tree walk so it does not blow the WASM call
+    /// stack on deeply nested types.
     pub fn size_for_gas(&self) -> usize {
         use Type::*;
-        match self {
-            Nat | Int | Bool | Mutez | String | Unit | Never | Operation | Address | ChainId
-            | Bytes | Key | Signature | KeyHash | Timestamp => 1,
-
-            #[cfg(feature = "bls")]
-            Bls12381Fr | Bls12381G1 | Bls12381G2 => 1,
-
-            Pair(p) | Or(p) | Map(p) | BigMap(p) | Lambda(p) => {
-                1 + p.0.size_for_gas() + p.1.size_for_gas()
+        let mut total: usize = 0;
+        let mut stack: Vec<&Type> = vec![self];
+        while let Some(t) = stack.pop() {
+            total += 1;
+            match t {
+                Nat | Int | Bool | Mutez | String | Unit | Never | Operation | Address
+                | ChainId | Bytes | Key | Signature | KeyHash | Timestamp => {}
+                #[cfg(feature = "bls")]
+                Bls12381Fr | Bls12381G1 | Bls12381G2 => {}
+                Pair(p) | Or(p) | Map(p) | BigMap(p) | Lambda(p) => {
+                    stack.push(&p.0);
+                    stack.push(&p.1);
+                }
+                Option(x) | List(x) | Set(x) | Contract(x) | Ticket(x) => {
+                    stack.push(x);
+                }
             }
-            Option(x) | List(x) | Set(x) | Contract(x) | Ticket(x) => 1 + x.size_for_gas(),
         }
+        total
     }
 
     /// Convenience function to construct a new [Self::Pair]. Allocates a new [Rc].
@@ -315,6 +327,56 @@ impl Type {
     }
 }
 
+/// Iterative `PartialEq` so that comparing two deeply nested types (e.g.
+/// the two arms of an IF whose unify_stacks runs ensure_ty_eq on a 100k
+/// deep pair type) does not blow the WASM call stack. Semantics match
+/// what `#[derive(PartialEq)]` would produce: structural equality, with
+/// `PairBox` and `SingleBox` compared by their inner values.
+impl PartialEq for Type {
+    fn eq(&self, other: &Self) -> bool {
+        use Type::*;
+        let mut stack: Vec<(&Type, &Type)> = vec![(self, other)];
+        while let Some((a, b)) = stack.pop() {
+            match (a, b) {
+                (Nat, Nat)
+                | (Int, Int)
+                | (Bool, Bool)
+                | (Mutez, Mutez)
+                | (String, String)
+                | (Unit, Unit)
+                | (Never, Never)
+                | (Operation, Operation)
+                | (Address, Address)
+                | (ChainId, ChainId)
+                | (Bytes, Bytes)
+                | (Key, Key)
+                | (Signature, Signature)
+                | (KeyHash, KeyHash)
+                | (Timestamp, Timestamp) => {}
+                #[cfg(feature = "bls")]
+                (Bls12381Fr, Bls12381Fr) | (Bls12381G1, Bls12381G1) | (Bls12381G2, Bls12381G2) => {}
+                (Pair(p), Pair(q))
+                | (Or(p), Or(q))
+                | (Map(p), Map(q))
+                | (BigMap(p), BigMap(q))
+                | (Lambda(p), Lambda(q)) => {
+                    stack.push((&p.0, &q.0));
+                    stack.push((&p.1, &q.1));
+                }
+                (Option(p), Option(q))
+                | (List(p), List(q))
+                | (Set(p), Set(q))
+                | (Contract(p), Contract(q))
+                | (Ticket(p), Ticket(q)) => {
+                    stack.push((p, q));
+                }
+                _ => return false,
+            }
+        }
+        true
+    }
+}
+
 /// Walk an owned tree iteratively. Used by the three manual `Drop` /
 /// drain impls below: each extracts the node's children into a heap
 /// worklist, leaving the leftover node trivial; this driver then keeps
@@ -327,7 +389,6 @@ fn drain_iteratively<T>(root: &mut T, mut extract: impl FnMut(&mut T, &mut Vec<T
         extract(&mut node, &mut stack);
     }
 }
-
 
 /// Manual `Drop` to avoid the recursive destructor that would otherwise
 /// blow the call stack on a deeply nested type. Walks an explicit
