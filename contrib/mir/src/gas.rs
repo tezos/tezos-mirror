@@ -897,31 +897,33 @@ pub mod interpret_cost {
         (size.nodes_num * 100 + size.zariths * 25 + size.str_byte * 10).as_gas_cost()
     }
 
+    /// Iterative tree fold over `Micheline` so the size accounting (and
+    /// the resulting `PACK` gas charge) does not blow the WASM call stack
+    /// on deeply nested input. Order of visit does not matter: the counter
+    /// is a commutative sum, so the result is bit identical to the
+    /// previous recursive form.
     fn collect_micheline_size<'a>(mich: &'a Micheline<'a>, size: &mut MichelineSize) {
-        size.nodes_num += 1;
-        match mich {
-            Micheline::String(s) => size.str_byte += s.len() as u64,
-            Micheline::Bytes(bs) => size.str_byte += bs.len() as u64,
-            Micheline::Int(i) => size.zariths += i.byte_size(),
-            Micheline::Seq(ms) => {
-                for m in *ms {
-                    collect_micheline_size(m, size)
-                }
-            }
-            Micheline::App(_prim, args, annots) => {
-                for arg in *args {
-                    collect_micheline_size(arg, size)
-                }
-                for annot in annots {
-                    // Annotations are accounted as simple string literals
-                    use crate::ast::Annotation as Ann;
-                    size.str_byte += match annot {
-                        // Including annotation prefix into the size too
-                        Ann::Field(a) => a.len() + 1,
-                        Ann::Variable(a) => a.len() + 1,
-                        Ann::Type(a) => a.len() + 1,
-                        Ann::Special(a) => a.len(),
-                    } as u64
+        use crate::ast::Annotation as Ann;
+        let mut stack: Vec<&'a Micheline<'a>> = vec![mich];
+        while let Some(m) = stack.pop() {
+            size.nodes_num += 1;
+            match m {
+                Micheline::String(s) => size.str_byte += s.len() as u64,
+                Micheline::Bytes(bs) => size.str_byte += bs.len() as u64,
+                Micheline::Int(i) => size.zariths += i.byte_size(),
+                Micheline::Seq(ms) => stack.extend(ms.iter()),
+                Micheline::App(_prim, args, annots) => {
+                    stack.extend(args.iter());
+                    for annot in annots {
+                        // Annotations are accounted as simple string literals
+                        size.str_byte += match annot {
+                            // Including annotation prefix into the size too
+                            Ann::Field(a) => a.len() + 1,
+                            Ann::Variable(a) => a.len() + 1,
+                            Ann::Type(a) => a.len() + 1,
+                            Ann::Special(a) => a.len(),
+                        } as u64
+                    }
                 }
             }
         }

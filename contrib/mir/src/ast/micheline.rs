@@ -60,26 +60,6 @@ impl<'a> Micheline<'a> {
         arena.alloc_extend(args)
     }
 
-    pub(crate) fn alloc_iter<Err>(
-        arena: &'a Arena<Self>,
-        mut iter: impl ExactSizeIterator<Item = Result<Self, Err>>,
-    ) -> Result<&'a [Micheline<'a>], Err> {
-        // preallocate the slice, filling it with Micheline::Seq(&[]), which is
-        // the simplest Micheline variant. We control the iterator here, it
-        // doesn't allocate in the arena, the call is safe.
-        // See Note: alloc_extend
-        #[allow(clippy::disallowed_methods)]
-        let buf = arena.alloc_extend(std::iter::repeat_n(Micheline::Seq(&[]), iter.len()));
-        let mut actual_len: usize = 0;
-        for (dest, item) in buf.iter_mut().zip(&mut iter) {
-            *dest = item?;
-            actual_len += 1;
-        }
-        assert!(iter.next().is_none());
-        assert!(buf.len() == actual_len);
-        Ok(buf)
-    }
-
     /// Construct the Int case.
     pub fn int(i: BigInt, gas: &mut Gas) -> Result<Micheline<'a>, OutOfGas> {
         // The `unparsing_cost` helpers return `CostOverflow` (a pure
@@ -103,6 +83,7 @@ impl<'a> Micheline<'a> {
         gas.consume(unparsing_cost::bytes(&s).map_err(|_| OutOfGas)?)?;
         Ok(Self::Bytes(s))
     }
+
 
     /// Construct a primitive application with zero arguments.
     pub fn prim0(prim: Prim, gas: &mut Gas) -> Result<Self, OutOfGas> {

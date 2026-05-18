@@ -4965,6 +4965,30 @@ mod typecheck_tests {
         typecheck_instruction(&if_instr, &mut gas, &mut stack).expect("IF unifies deep types");
     }
 
+    /// Packs a 100k deep `TypedValue::Pair`, exercising the iterative
+    /// `TypedValue::into_micheline_optimized_legacy` plus iterative
+    /// `gas::collect_micheline_size`. Mirrors the PACK scenario from the
+    /// Linear "Prevent stack overflows in MIR" project (dynamically
+    /// building a deep value with `UNIT ; PAIR`, then packing it).
+    #[test]
+    fn deeply_nested_pair_packs() {
+        use crate::ast::IntoMicheline;
+        use std::rc::Rc;
+        const DEPTH: usize = 100_000;
+        let mut deep: TypedValue<'_> = TypedValue::Unit;
+        for _ in 0..DEPTH {
+            deep = TypedValue::Pair(Rc::new(TypedValue::Unit), Rc::new(deep));
+        }
+        let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+        let mich = deep
+            .into_micheline_optimized_legacy(&arena, &mut Gas::new(u32::MAX))
+            .expect("into_micheline succeeds");
+        let _bytes = mich
+            .encode_for_pack(&mut Gas::default())
+            .expect("gas suffices")
+            .expect("pack succeeds");
+    }
+
     /// hack to simplify syntax in tests
     fn typecheck_instruction<'a>(
         i: &Micheline<'a>,
