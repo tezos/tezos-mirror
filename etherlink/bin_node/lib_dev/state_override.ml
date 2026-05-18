@@ -31,19 +31,17 @@ let () =
 let update_storage address state_diff state =
   let open Ethereum_types in
   let open Lwt_result_syntax in
+  let*? fixed_addr = Durable_storage_path.Accounts.fixed_address address in
   let update key value state =
-    let (Hex key) = key in
-    let (Hex value) = value in
-    if String.length value = 64 then
-      let*? key = Durable_storage_path.Accounts.storage_e address key in
-      let* state =
-        Durable_storage.write
-          (Raw_path key)
-          (Bytes.of_string (hex_to_bytes (Hex value)))
-          state
-      in
-      return state
-    else tzfail (Invalid_storage_value value)
+    let (Hex key_hex) = key in
+    let (Hex value_hex) = value in
+    if String.length value_hex = 64 then
+      let*? fixed_idx = Durable_storage_path.Accounts.fixed_index key_hex in
+      Durable_storage.write
+        (Evm_account_storage (fixed_addr, fixed_idx))
+        (Hex value_hex)
+        state
+    else tzfail (Invalid_storage_value value_hex)
   in
   StorageMap.fold_es update state_diff state
 
@@ -52,8 +50,10 @@ let replace_storage address state_override state =
   match state_override with
   | None -> return state
   | Some state_override ->
-      let*? key = Durable_storage_path.Accounts.storage_dir_e address in
-      let* state = Durable_storage.delete_dir (Raw_dir key) state in
+      let*? fixed_addr = Durable_storage_path.Accounts.fixed_address address in
+      let* state =
+        Durable_storage.delete_dir (Evm_account_storage_dir fixed_addr) state
+      in
       update_storage address state_override state
 
 let is_invalid state_override =
@@ -63,65 +63,40 @@ let is_invalid state_override =
     || StorageMap.is_empty state_override.state_diff)
 
 let update_account address state_override evm_state =
-  let open Durable_storage_path in
   let open Lwt_result_syntax in
   if is_invalid state_override then tzfail State_and_state_diff
   else
-    let* info =
-      Durable_storage.read_opt (Raw_path (Accounts.info address)) evm_state
-    in
+    let* info = Durable_storage.read_opt (Evm_account_info address) evm_state in
     let* evm_state =
       match info with
       | None ->
-          let update v_opt key encode state =
+          let update v_opt path state =
             match v_opt with
             | None -> return state
-            | Some v ->
-                let* state =
-                  Durable_storage.write
-                    (Raw_path key)
-                    (Bytes.of_string (encode v))
-                    state
-                in
-                return state
+            | Some v -> Durable_storage.write path v state
           in
-
-          let durable_balance v =
-            v |> Ethereum_types.encode_u256_le |> Bytes.to_string
-          in
-          let durable_nonce v =
-            v |> Ethereum_types.encode_u64_le |> Bytes.to_string
-          in
-          let durable_code = Ethereum_types.hex_to_bytes in
           let* evm_state =
             update
               state_override.nonce
-              (Accounts.nonce address)
-              durable_nonce
+              (Evm_legacy_account_nonce address)
               evm_state
           in
           let* evm_state =
             update
               state_override.balance
-              (Accounts.balance address)
-              durable_balance
+              (Evm_legacy_account_balance address)
               evm_state
           in
-
           let* evm_state =
             update
               state_override.code
-              (Accounts.code address)
-              durable_code
+              (Evm_legacy_account_code address)
               evm_state
           in
           return evm_state
-      | Some info -> (
-          let old_info =
-            Etherlink_durable_storage.AccountInfo.decode_exn info
-          in
+      | Some old_info -> (
           let new_info =
-            Etherlink_durable_storage.AccountInfo.
+            Durable_storage.EVM_account_info.
               {
                 balance =
                   Option.value ~default:old_info.balance state_override.balance;
@@ -138,21 +113,15 @@ let update_account address state_override evm_state =
               }
           in
           let* evm_state =
-            Durable_storage.write
-              (Raw_path (Accounts.info address))
-              (Etherlink_durable_storage.AccountInfo.encode new_info)
-              evm_state
+            Durable_storage.write (Evm_account_info address) new_info evm_state
           in
           match state_override.code with
           | None -> return evm_state
           | Some code ->
-              let* evm_state =
-                Durable_storage.write
-                  (Raw_path (Code.code new_info.code_hash))
-                  (Bytes.of_string (Ethereum_types.hex_to_bytes code))
-                  evm_state
-              in
-              return evm_state)
+              Durable_storage.write
+                (Evm_code_by_hash new_info.code_hash)
+                code
+                evm_state)
     in
     let* evm_state =
       update_storage address state_override.state_diff evm_state

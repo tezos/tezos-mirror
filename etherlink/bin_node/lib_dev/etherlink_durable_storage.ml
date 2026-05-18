@@ -13,109 +13,55 @@ let root = Durable_storage_path.etherlink_root
 let post_v41_unsupported_function ~__FUNCTION__ =
   Invalid_argument (__FUNCTION__ ^ " is not supported for storage version >= 41")
 
-module AccountInfo = struct
-  type t = {
-    balance : Ethereum_types.quantity;
-    nonce : Ethereum_types.quantity;
-    code_hash : Ethereum_types.hash;
-  }
-
-  let encode {balance; nonce; code_hash} =
-    let open Rlp in
-    Rlp.encode
-      (List
-         [
-           Value (encode_u256_le balance);
-           Value (encode_u64_le nonce);
-           Value (encode_hash code_hash);
-         ])
-
-  let decode_opt b =
-    match Rlp.decode b with
-    | Ok (List [Value balance; Value nonce; Value code_hash]) ->
-        let balance = decode_number_le balance in
-        let nonce = decode_number_le nonce in
-        let code_hash = decode_hash code_hash in
-        Some {balance; nonce; code_hash}
-    | _ -> None
-
-  let decode_exn b =
-    match decode_opt b with
-    | Some x -> x
-    | None ->
-        Stdlib.failwith
-        @@ Format.asprintf "Invalid account info format: %s"
-        @@ Bytes.to_string b
-end
-
-let inspect_and_decode_opt_account state address =
-  inspect_durable_and_decode_opt
-    state
-    (Durable_storage_path.Accounts.info address)
-    AccountInfo.decode_exn
-
 let balance state address =
   let open Lwt_result_syntax in
-  let* answer = inspect_and_decode_opt_account state address in
+  let* answer = Durable_storage.read_opt (Evm_account_info address) state in
   match answer with
   | Some info -> return info.balance
   | None ->
-      inspect_durable_and_decode_default
+      Durable_storage.read_or_default
         ~default:(Ethereum_types.Qty Z.zero)
+        (Evm_legacy_account_balance address)
         state
-        (Durable_storage_path.Accounts.balance address)
-        decode_number_le
 
 let nonce state address =
   let open Lwt_result_syntax in
-  let* answer = inspect_and_decode_opt_account state address in
+  let* answer = Durable_storage.read_opt (Evm_account_info address) state in
   match answer with
   | Some info -> return @@ Some info.nonce
-  | None ->
-      inspect_durable_and_decode_opt
-        state
-        (Durable_storage_path.Accounts.nonce address)
-        decode_number_le
+  | None -> Durable_storage.read_opt (Evm_legacy_account_nonce address) state
 
 let code state address =
   let open Lwt_result_syntax in
   let default = Ethereum_types.Hex "" in
-  let decode bytes =
-    bytes |> Hex.of_bytes |> Hex.show |> Ethereum_types.hex_of_string
+  let* account_opt =
+    Durable_storage.read_opt (Evm_account_info address) state
   in
-  let* account_opt = inspect_and_decode_opt_account state address in
   match account_opt with
   | Some info ->
-      inspect_durable_and_decode_default
+      Durable_storage.read_or_default
         ~default
+        (Evm_code_by_hash info.code_hash)
         state
-        (Durable_storage_path.Code.code info.code_hash)
-        decode
   | None -> (
       let* code_opt =
-        inspect_durable_and_decode_opt
-          state
-          (Durable_storage_path.Accounts.code address)
-          decode
+        Durable_storage.read_opt (Evm_legacy_account_code address) state
       in
       match code_opt with
       | Some code -> return code
       | None -> (
           let* hash_opt =
-            inspect_durable_and_decode_opt
+            Durable_storage.read_opt
+              (Evm_legacy_account_code_hash address)
               state
-              (Durable_storage_path.Accounts.code_hash address)
-              (fun bytes ->
-                Hex.of_bytes bytes |> Hex.show |> Ethereum_types.hash_of_string)
           in
           match hash_opt with
           | None -> return default
           | Some hash ->
-              inspect_durable_and_decode_default
+              Durable_storage.read_or_default
                 ~default
-                state
-                (Durable_storage_path.Code.code hash)
-                decode))
+                (Evm_code_by_hash hash)
+                state))
 
 let current_block_number state =
   Durable_storage.read (Current_block_number L2_types.EVM) state
@@ -486,17 +432,12 @@ let storage_at state address (Qty pos) =
     String.make (64 - len) '0' ^ s
   in
   let index = Z.format "#x" pos |> pad32left0 in
-  let+ answer =
-    inspect_durable_and_decode_opt
-      state
-      (Durable_storage_path.Accounts.storage address index)
-      Fun.id
-  in
-  match answer with
-  | Some bytes ->
-      Bytes.to_string bytes |> Hex.of_string |> Hex.show
-      |> Ethereum_types.hex_of_string
-  | None -> Ethereum_types.Hex (pad32left0 "0")
+  let*? fixed_addr = Durable_storage_path.Accounts.fixed_address address in
+  let*? fixed_idx = Durable_storage_path.Accounts.fixed_index index in
+  Durable_storage.read_or_default
+    ~default:(Ethereum_types.Hex (pad32left0 "0"))
+    (Evm_account_storage (fixed_addr, fixed_idx))
+    state
 
 let coinbase state =
   let open Lwt_result_syntax in

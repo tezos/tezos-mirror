@@ -133,16 +133,33 @@ module Accounts : sig
   (** Path to the account's code hash. DEPRECATED use `info` *)
   val code_hash : address -> path
 
-  (** Path to the account's storage at a given index. *)
-  val storage : address -> path -> path
-
   type error += Invalid_address of string | Invalid_key of string
 
-  (** Path to the account's storage at a given index. Error if address or
-      storage key is invalid. *)
-  val storage_e : address -> path -> path tzresult
+  (** Validated EVM address (exactly 40 hex characters). The only way to
+      construct a value is through {!fixed_address}, which surfaces
+      [Invalid_address] for malformed inputs. Coerces to a {!path} so
+      callers can observe the underlying string without re-validating. *)
+  type fixed_address = private path
 
-  val storage_dir_e : address -> path tzresult
+  (** Validated EVM storage-slot index (exactly 64 hex characters). The only
+      way to construct a value is through {!fixed_index}, which surfaces
+      [Invalid_key] for malformed inputs. Coerces to a {!path} so callers
+      can observe the underlying string without re-validating. *)
+  type fixed_index = private path
+
+  (** [fixed_address a] returns [a] tagged as validated, or fails with
+      [Invalid_address] if the underlying hex string is not 40 characters. *)
+  val fixed_address : address -> fixed_address tzresult
+
+  (** [fixed_index s] returns [s] tagged as validated, or fails with
+      [Invalid_key] if [s] is not 64 hex characters. *)
+  val fixed_index : path -> fixed_index tzresult
+
+  (** Path to a storage slot for a validated address/index pair. *)
+  val storage : fixed_address -> fixed_index -> path
+
+  (** Directory holding all storage slots of a validated address. *)
+  val storage_dir : fixed_address -> path
 end
 
 module Code : sig
