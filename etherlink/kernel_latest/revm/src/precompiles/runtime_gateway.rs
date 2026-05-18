@@ -417,8 +417,28 @@ where
         ));
     };
 
+    // Reject STATICCALL on state-mutating selectors. The
+    // `target_address != bytecode_address` guard above already covers
+    // DELEGATECALL/CALLCODE; this complements it by rejecting
+    // STATICCALL on the entries that would write to the journal —
+    // alias persistence, `CracSent` log emission, residual balance
+    // burn. REVM commits a custom precompile's journal writes
+    // unconditionally on `Ok` return (`revm-handler::frame::Frame::
+    // make_call_frame`), so the static-call contract is not enforced
+    // for us; the check has to live here.
+    //
+    // The two read-only entries (`callMichelsonView` and `call` with
+    // `method == GET`) intentionally bypass this guard — they thread
+    // through the read-only journal API, refuse value transfer, and
+    // never emit a log.
     match function_call {
         RuntimeGatewayCalls::transfer(call) => {
+            if inputs.is_static {
+                return Err(CustomPrecompileError::Revert(
+                    "runtime gateway: STATICCALL not allowed on transfer".into(),
+                    gas,
+                ));
+            }
             charge(&mut gas, RUNTIME_GATEWAY_BASE_COST)?;
             // Per-byte payload surcharge on calldata (body is empty).
             charge_payload(&mut gas, calldata.len())?;
@@ -491,6 +511,12 @@ where
             context.journal_mut().log(crac_log);
         }
         RuntimeGatewayCalls::callMichelson(call) => {
+            if inputs.is_static {
+                return Err(CustomPrecompileError::Revert(
+                    "runtime gateway: STATICCALL not allowed on callMichelson".into(),
+                    gas,
+                ));
+            }
             charge(&mut gas, RUNTIME_GATEWAY_BASE_COST)?;
             // Per-byte payload surcharge on calldata + outgoing body.
             charge_payload(&mut gas, calldata.len())?;
@@ -731,6 +757,12 @@ where
                     )?,
                 )
             } else {
+                if inputs.is_static {
+                    return Err(CustomPrecompileError::Revert(
+                        "runtime gateway: STATICCALL not allowed on call with non-GET method".into(),
+                        gas,
+                    ));
+                }
                 let source = resolve_original_source(context, gas.remaining())?;
                 resolve_aliases(
                     context,
