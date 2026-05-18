@@ -166,6 +166,21 @@ type ('a, 'cap) path =
   | Tezos_account_info :
       Tezosx.Tezos_runtime.address
       -> (Tezosx.Tezos_runtime.account_info, ro) path
+  | Evm_block_hash_by_number :
+      Durable_storage_path.Block.number
+      -> (Ethereum_types.block_hash, ro) path
+  | Evm_transaction_receipt_by_hash :
+      Ethereum_types.hash * Ethereum_types.block_hash
+      -> (Transaction_receipt.t, ro) path
+  | Evm_transaction_object_by_hash :
+      Ethereum_types.hash * Ethereum_types.block_hash option
+      -> (Ethereum_types.legacy_transaction_object, ro) path
+  | Evm_current_block_receipts :
+      Ethereum_types.block_hash
+      -> (Transaction_receipt.t list, ro) path
+  | Evm_current_block_transactions_objects :
+      Ethereum_types.block_hash
+      -> (Ethereum_types.legacy_transaction_object list, ro) path
 
 (** Read-capable resolution variants. [Delete_only] is intentionally absent
     here — it lives directly in {!resolved}, so [path_and_decode] can
@@ -545,6 +560,76 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
            {
              path = Tezosx.Durable_storage_path.Accounts.Tezos.info pkh;
              decode = Tezosx.Tezos_runtime.decode_account_info;
+           })
+  | Evm_block_hash_by_number number ->
+      static_read
+        (Read_only
+           {
+             path =
+               Durable_storage_path.Indexes.block_by_number
+                 ~root:Durable_storage_path.etherlink_root
+                 number;
+             decode = infallible_decode Ethereum_types.decode_block_hash;
+           })
+  | Evm_transaction_receipt_by_hash (tx_hash, block_hash) ->
+      static_read
+        (Read_only
+           {
+             path = Durable_storage_path.Transaction_receipt.receipt tx_hash;
+             decode =
+               infallible_decode (Transaction_receipt.of_rlp_bytes block_hash);
+           })
+  | Evm_transaction_object_by_hash (tx_hash, block_hash) ->
+      static_read
+        (Read_only
+           {
+             path = Durable_storage_path.Transaction_object.object_ tx_hash;
+             decode =
+               infallible_decode
+                 (Ethereum_types.legacy_transaction_object_from_rlp block_hash);
+           })
+  | Evm_current_block_receipts block_hash ->
+      static_read
+        (Read_only
+           {
+             path =
+               Durable_storage_path.Block.current_receipts
+                 ~root:Durable_storage_path.etherlink_root;
+             decode =
+               infallible_decode (fun bytes ->
+                   match Rlp.decode bytes with
+                   | Ok (Rlp.List receipts_rlp) ->
+                       List.map
+                         (fun rlp ->
+                           Transaction_receipt.of_rlp_item block_hash rlp)
+                         receipts_rlp
+                   | _ ->
+                       raise
+                         (Invalid_argument
+                            "Transaction receipts should be a list"));
+           })
+  | Evm_current_block_transactions_objects block_hash ->
+      static_read
+        (Read_only
+           {
+             path =
+               Durable_storage_path.Block.current_transactions_objects
+                 ~root:Durable_storage_path.etherlink_root;
+             decode =
+               infallible_decode (fun bytes ->
+                   match Rlp.decode bytes with
+                   | Ok (Rlp.List objects_rlp) ->
+                       List.map
+                         (fun rlp ->
+                           Ethereum_types
+                           .legacy_transaction_object_from_rlp_item
+                             (Some block_hash)
+                             rlp)
+                         objects_rlp
+                   | _ ->
+                       raise
+                         (Invalid_argument
+                            "Transaction objects should be a list"));
            })
 
 let storage_version state =

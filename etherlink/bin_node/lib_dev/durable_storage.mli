@@ -114,6 +114,21 @@ type ('a, 'cap) path =
   | Tezos_account_info :
       Tezosx.Tezos_runtime.address
       -> (Tezosx.Tezos_runtime.account_info, ro) path
+  | Evm_block_hash_by_number :
+      Durable_storage_path.Block.number
+      -> (Ethereum_types.block_hash, ro) path
+  | Evm_transaction_receipt_by_hash :
+      Ethereum_types.hash * Ethereum_types.block_hash
+      -> (Transaction_receipt.t, ro) path
+  | Evm_transaction_object_by_hash :
+      Ethereum_types.hash * Ethereum_types.block_hash option
+      -> (Ethereum_types.legacy_transaction_object, ro) path
+  | Evm_current_block_receipts :
+      Ethereum_types.block_hash
+      -> (Transaction_receipt.t list, ro) path
+  | Evm_current_block_transactions_objects :
+      Ethereum_types.block_hash
+      -> (Ethereum_types.legacy_transaction_object list, ro) path
 
 (** {2 Typed operations} *)
 
