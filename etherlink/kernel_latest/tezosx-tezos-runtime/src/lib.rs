@@ -18,12 +18,13 @@ use tezos_data_encoding::{
 };
 use tezos_evm_logging::{log, Level::*};
 use tezos_execution::{
-    account_storage::{StorageSpace, TezlinkAccount, TezosOriginatedAccount},
+    account_storage::{TezlinkAccount, TezosOriginatedAccount},
     context::Context,
     cross_runtime_transfer,
     enshrined_contracts::CracError,
     mir_ctx::{OperationCtx, TcCtx},
-    CracTransferError, OriginationNonce, TezlinkOperationGas,
+    originate_contract, typecheck_code_and_storage, CracTransferError, OriginationNonce,
+    TezlinkOperationGas,
 };
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKeyHash;
@@ -34,7 +35,9 @@ use tezos_smart_rollup_host::storage::StorageV1;
 // to be moved to a shared crate.
 use tezos_tezlink::{
     block::AppliedOperation,
-    operation::{ManagerOperation, ManagerOperationContent, Parameters, TransferContent},
+    operation::{
+        ManagerOperation, ManagerOperationContent, Parameters, Script, TransferContent,
+    },
     operation_result::{
         ApplyOperationError, ApplyOperationErrors, BacktrackedResult, ContentResult,
         EventContent, EventSuccess, InternalContentWithMetadata, InternalOperationSum,
@@ -714,36 +717,31 @@ where
 
 // --- Alias generation gas constants (milligas) ---
 //
-// Alias generation runs inside an existing CRAC frame: the outer
-// transaction has already paid the manager-operation envelope (e.g.
-// EVM's 21,000-gas baseline), and the forwarder script is
-// kernel-supplied bytes written verbatim — no MIR decode or typecheck
-// is invoked. So the cost here only accounts for the BLAKE2b digest
-// and the durable writes performed by `account.init` and
-// `set_balance`. The origination storage-burn is handled separately.
-
-/// BLAKE2b-160 of the native address. Derived from the Tezos protocol
-/// schedule: `430 + (size/8 + size)` milligas.
-const ALIAS_BLAKE2B_DIGEST_MILLIGAS: u64 = 477;
+// Alias generation runs inside an existing CRAC frame whose outer
+// transaction already paid the manager-operation envelope. Branch 3
+// (full materialization) is metered end-to-end through
+// `originate_contract`'s receipt (`consumed_milligas`), including the
+// classification write — `originate_contract` writes the origin
+// itself when given `Origin::Alias`. Branch 2 (legacy patch-only)
+// performs a single classification write outside any receipt and
+// hand-rolls its gas envelope below. Computational steps (the BLAKE2b
+// digest, base58 encoding, alias_info parsing) are absorbed by the
+// surrounding gas budget and are not charged separately.
+//
+// TODO https://linear.app/tezos/issue/L2-435/durable-storage-readwrites-induces-gas-costs
+// `originate_contract`'s receipt currently underreports gas: the
+// kernel does not charge gas envelopes for durable-store writes,
+// unlike L1's carbonated storage layer. Once L2-435 lands and the
+// storage primitives meter every read/write, every alias branch
+// inherits correct accounting automatically — and the
+// `STORAGE_WRITE_BASE_MILLIGAS` charge in branch 2 should fold into
+// the same uniform helper.
 
 /// Fixed overhead for a single durable-store write (independent of
 /// payload size): path resolution, PVM host call boundary, journal
-/// bookkeeping.
-///
-/// TODO(L2-1165): replace with a benchmarked value from `octez-snoop`.
-const DURABLE_WRITE_BASE_MILLIGAS: u64 = 2_000;
-
-/// Per-byte cost for a durable-store write. `account.init` performs
-/// four writes (code, storage, paid_bytes, used_bytes); `set_balance`
-/// adds a fifth. This scales each of them with its payload size rather
-/// than charging a flat constant.
-///
-/// TODO(L2-1165): replace with a benchmarked value from `octez-snoop`.
-const DURABLE_WRITE_PER_BYTE_MILLIGAS: u64 = 400;
-
-/// Approximate size of the serialized `Narith` balance (`0u64` →
-/// 1 byte of payload plus encoding overhead).
-const BALANCE_WRITE_BYTES: u64 = 8;
+/// bookkeeping. Used in branch 2 for the standalone classification
+/// write.
+const STORAGE_WRITE_BASE_MILLIGAS: u64 = 2_000;
 
 impl RuntimeInterface for TezosRuntime {
     fn ensure_alias<Host>(
@@ -771,20 +769,25 @@ impl RuntimeInterface for TezosRuntime {
             })?;
 
         // Gas costs in milligas, charged incrementally so we fail early.
+        // The closure pattern would persist a borrow on `remaining`; a
+        // free function lets the borrow last only for the duration of
+        // each call so we can also pass `remaining` to
+        // `TezlinkOperationGas::start_milligas` below.
         let mut remaining = gas_remaining;
-        let mut consume = |cost: u64| -> Result<(), TezosXRuntimeError> {
-            remaining = remaining.checked_sub(cost).ok_or_else(|| {
+        fn consume(remaining: &mut u64, cost: u64) -> Result<(), TezosXRuntimeError> {
+            *remaining = remaining.checked_sub(cost).ok_or_else(|| {
                 TezosXRuntimeError::Custom(
                     "Out of gas during alias generation".to_string(),
                 )
             })?;
             Ok(())
-        };
+        }
 
-        // Step 1: derive the deterministic alias address. The hash is
-        // unconditional because the kernel needs the address regardless
-        // of which branch runs next.
-        consume(ALIAS_BLAKE2B_DIGEST_MILLIGAS)?;
+        // Derive the deterministic alias address. The BLAKE2b digest
+        // and the base58 encoding are computational steps absorbed by
+        // the surrounding gas budget — alias generation runs inside an
+        // existing CRAC frame whose envelope already covers the
+        // computation. Only durable-store writes are metered below.
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(&alias_info.native_address));
         let kt1_str = kt1.to_base58_check();
 
@@ -813,14 +816,15 @@ impl RuntimeInterface for TezosRuntime {
         if account.exists(host).map_err(|e| {
             TezosXRuntimeError::Custom(format!("Failed to check alias existence: {e}"))
         })? {
-            consume(DURABLE_WRITE_BASE_MILLIGAS)?;
+            consume(&mut remaining, STORAGE_WRITE_BASE_MILLIGAS)?;
             let new_origin = Origin::Alias(alias_info);
             set_origin_at(host, &account_path, &new_origin)?;
             return Ok((kt1_str, remaining));
         }
 
-        // Branch 3: full materialization. Deploy the forwarder, set
-        // the balance, and record the classification at the end.
+        // Branch 3: full materialization. Deploy the forwarder via the
+        // shared `originate_contract` path, passing `Origin::Alias` so
+        // the classification write is performed in the same call.
         let code = alias_forwarder::forwarder_code().map_err(|e| {
             TezosXRuntimeError::Custom(format!(
                 "Failed to decode forwarder code from hex: {e}"
@@ -832,42 +836,67 @@ impl RuntimeInterface for TezosRuntime {
                     "Failed to encode forwarder storage: {e}"
                 ))
             })?;
-        let payload_bytes = (code.len() as u64).saturating_add(storage.len() as u64);
 
-        // Durable writes performed by `account.init`: code, storage,
-        // paid_bytes, used_bytes. Charge a per-write base plus a
-        // per-byte component sized by the actual payload.
-        consume(
-            DURABLE_WRITE_BASE_MILLIGAS
-                .saturating_mul(4)
-                .saturating_add(
-                    DURABLE_WRITE_PER_BYTE_MILLIGAS.saturating_mul(payload_bytes),
-                ),
-        )?;
-        // TODO(L2-1294): charge alias-forwarder origination at the CRAC
-        // boundary; for now `StorageSpace.allocated_bytes` is dropped —
-        // the alias-forwarder origination is silently free.
-        let _: StorageSpace = account.init(host, &code, &storage).map_err(|e| {
-            TezosXRuntimeError::Custom(format!(
-                "Failed to initialize alias forwarder contract: {e}"
-            ))
+        // Build the synthetic source/sender account. NULL_PKH carries
+        // zero balance, which matches the initial-balance transfer of
+        // zero requested below.
+        let null_pkh = PublicKeyHash::from_b58check(NULL_PKH).map_err(|e| {
+            TezosXRuntimeError::ConversionError(format!("Failed to parse null PKH: {e}"))
         })?;
+        let source_account =
+            context
+                .implicit_from_public_key_hash(&null_pkh)
+                .map_err(|e| {
+                    TezosXRuntimeError::Custom(format!(
+                        "Failed to fetch null source account: {e:?}"
+                    ))
+                })?;
 
-        // Balance write (5th durable write of the origination).
-        consume(DURABLE_WRITE_BASE_MILLIGAS.saturating_add(
-            DURABLE_WRITE_PER_BYTE_MILLIGAS.saturating_mul(BALANCE_WRITE_BYTES),
-        ))?;
-        account.set_balance(host, &0u64.into()).map_err(|e| {
-            TezosXRuntimeError::Custom(format!("Failed to set alias balance: {e}"))
-        })?;
-
-        // Origin classification write. Same persistence model as the
-        // surrounding deploy: both go to durable storage, both survive
-        // a revert in the surrounding frame, and the next call to
-        // ensure_alias finds the no-op branch.
-        consume(DURABLE_WRITE_BASE_MILLIGAS)?;
-        let new_origin = Origin::Alias(alias_info);
-        set_origin_at(host, &account_path, &new_origin)?;
+        let script = Script { code, storage };
+        let origin = Origin::Alias(alias_info);
+        {
+            let mut gas =
+                TezlinkOperationGas::start_milligas(remaining).map_err(|e| {
+                    TezosXRuntimeError::Custom(format!("Failed to start gas: {e:?}"))
+                })?;
+            let mut next_temp_id = BigMapId {
+                value: Zarith((-1).into()),
+            };
+            let mut tc_ctx = TcCtx {
+                host: &mut *host,
+                context: &context,
+                operation_gas: &mut gas,
+                big_map_diff: BTreeMap::new(),
+                next_temporary_id: &mut next_temp_id,
+            };
+            let parser = mir::parser::Parser::new();
+            let typed_storage = typecheck_code_and_storage(&mut tc_ctx, &parser, &script)
+                .map_err(|e| {
+                    TezosXRuntimeError::Custom(format!(
+                        "Failed to typecheck forwarder script: {e:?}"
+                    ))
+                })?;
+            let receipt = originate_contract(
+                &mut tc_ctx,
+                kt1,
+                &source_account,
+                &Narith(0u64.into()),
+                &script.code,
+                typed_storage,
+                &origin,
+            )
+            .map_err(|e| {
+                TezosXRuntimeError::Custom(format!(
+                    "Failed to originate alias forwarder: {e:?}"
+                ))
+            })?;
+            let consumed: u64 = receipt.consumed_milligas.0.try_into().map_err(|_| {
+                TezosXRuntimeError::Custom(
+                    "consumed_milligas does not fit in u64".to_string(),
+                )
+            })?;
+            consume(&mut remaining, consumed)?;
+        }
 
         Ok((kt1_str, remaining))
     }
@@ -1421,9 +1450,10 @@ mod tests {
             .unwrap();
 
         assert_eq!(first_alias, second_alias);
-        // The no-op branch still pays for the BLAKE2b digest needed to
-        // compute the alias address. Anything else (storage init,
-        // balance write, classification write) is skipped.
+        // The no-op branch performs no durable writes, so its metered
+        // cost is zero — only the first call pays for the storage init
+        // (via the `originate_contract` receipt) and the classification
+        // write.
         let first_consumed = 1_000_000 - first_remaining;
         let second_consumed = 500_000 - second_remaining;
         assert!(
