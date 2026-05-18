@@ -1464,8 +1464,7 @@ let opt_var name f = function Some value -> [(name, f value)] | None -> []
 
 (** Helper to create jobs that uses the Docker daemon.
 
-    It sets the appropriate image. Furthermore, unless
-    [skip_docker_initialization] is [true], it:
+    It sets the appropriate image. Furthermore, it:
     - activates the Docker daemon as a service;
     - sets up authentification with Docker registries
     in the job's [before_script] section.
@@ -1473,8 +1472,7 @@ let opt_var name f = function Some value -> [(name, f value)] | None -> []
     If [ci_docker_hub] is set to [true], then the job will
     authenticate with Docker Hub provided the environment variable
     [CI_DOCKER_AUTH] contains the appropriate credentials. *)
-let job_docker_authenticated ?(skip_docker_initialization = false)
-    ?ci_docker_hub ?artifacts ?(variables = []) ?rules
+let job_docker_authenticated ?ci_docker_hub ?artifacts ?(variables = []) ?rules
     ?(dependencies = Staged []) ?image_dependencies ?arch ?storage ?tag
     ?allow_failure ?parallel ?timeout ?retry ?description ?dev_infra ~__POS__
     ~stage ~name script : tezos_job =
@@ -1499,10 +1497,7 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
       ([("DOCKER_VERSION", docker_version)]
       @ opt_var "CI_DOCKER_HUB" Bool.to_string ci_docker_hub
       @ variables)
-    ~before_script:
-      (if not skip_docker_initialization then
-         ["./scripts/ci/docker_initialize.sh"]
-       else [])
+    ~before_script:["./scripts/ci/docker_initialize.sh"]
     ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
     ~stage
     ~name
@@ -1693,7 +1688,6 @@ module Images = struct
         ~__POS__
         ~arch
         ?storage
-        ~skip_docker_initialization:true
         ~stage
         ~name:("oc.docker:rust-toolchain:" ^ Runner.Arch.show_uniform arch)
         ~description:
@@ -1771,7 +1765,6 @@ module Images = struct
         ~__POS__
         ~arch
         ?storage
-        ~skip_docker_initialization:true
         ~stage
         ~timeout:(Minutes 90)
         ~name:("oc.docker:ci:" ^ Runner.Arch.show_uniform arch)

@@ -67,8 +67,6 @@ image_tag=$(docker_tag "$arch" "$image_tag_suffix")
 # Store the image name for jobs that use it.
 echo "ci_image_tag=$image_tag" > ci_image_tag.env
 
-./scripts/ci/docker_initialize.sh
-
 # Build images unless they already exists in the registry..
 exists="true"
 

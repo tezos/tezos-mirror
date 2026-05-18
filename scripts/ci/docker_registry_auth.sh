@@ -3,6 +3,9 @@ set -eu
 
 # Setup Docker registry authentication for either Docker Hub (release)
 # or GCP Artefact registry (dev).
+#
+# This script ONLY handles authentication. It does not compute
+# distribution image names (see docker_image_names.sh for that).
 
 # Export Google Auth token to build DockerFile
 echo "Current active user: $(gcloud config get-value account)"
@@ -36,6 +39,3 @@ if [ "${CI_DOCKER_HUB:-}" = 'true' ] && [ "${CI_PROJECT_NAMESPACE}" = "tezos" ] 
   # Publishing to Docker Hub, as done on protected refs, has higher priority.
   echo "{\"auths\":{\"https://index.docker.io/v1/\":{\"auth\":\"${CI_DOCKER_AUTH}\"}}}" > ~/.docker/config.json
 fi
-
-# Call a helper script to setup docker image names and tags
-scripts/ci/docker_image_names.sh

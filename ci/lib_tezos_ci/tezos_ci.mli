@@ -497,7 +497,6 @@ val append_after_script : string list -> tezos_job -> tezos_job
 val with_interruptible : bool -> tezos_job -> tezos_job
 
 val job_docker_authenticated :
-  ?skip_docker_initialization:bool ->
   ?ci_docker_hub:bool ->
   ?artifacts:Gitlab_ci.Types.artifacts ->
   ?variables:(string * string) list ->

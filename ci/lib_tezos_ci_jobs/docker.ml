@@ -69,9 +69,9 @@ let job_docker_snapshot =
        as [master-YYYYMMDD] for publishing to DockerHub."
     ~scripts:
       [
-        "./scripts/ci/docker_initialize.sh";
-        (* Override the image tag computed by [docker_initialize.sh] (which
-           defaults to the branch name) with a dated master tag. *)
+        "./scripts/ci/docker_initialize.sh --image-names";
+        (* Override the image tag computed by [docker_initialize.sh --image-names]
+           (which defaults to the branch name) with a dated master tag. *)
         "./scripts/ci/docker_image_names.sh --image-tag master-$(date +%Y%m%d)";
         "./scripts/ci/docker_release.sh";
       ]
@@ -90,7 +90,10 @@ let job_docker =
       "Build the Docker image for Octez for the specified architecture, with \
        experimental executables."
     ~scripts:
-      ["./scripts/ci/docker_initialize.sh"; "./scripts/ci/docker_release.sh"]
+      [
+        "./scripts/ci/docker_initialize.sh --image-names";
+        "./scripts/ci/docker_release.sh";
+      ]
     contents
     mode
     arch
@@ -135,9 +138,9 @@ let job_docker_merge_manifests_snapshot =
       ]
     ~scripts:
       [
-        "./scripts/ci/docker_initialize.sh";
-        (* Override the image tag computed by [docker_initialize.sh] (which
-           defaults to the branch name) with a dated master tag. *)
+        "./scripts/ci/docker_initialize.sh --image-names";
+        (* Override the image tag computed by [docker_initialize.sh --image-names]
+           (which defaults to the branch name) with a dated master tag. *)
         "./scripts/ci/docker_image_names.sh --image-tag master-$(date +%Y%m%d)";
         "./scripts/ci/docker_merge_manifests.sh";
       ]
@@ -166,7 +169,7 @@ let job_docker_merge_manifests =
       ]
     ~scripts:
       [
-        "./scripts/ci/docker_initialize.sh";
+        "./scripts/ci/docker_initialize.sh --image-names";
         "./scripts/ci/docker_merge_manifests.sh";
       ]
     mode
@@ -190,7 +193,7 @@ let job_script_docker_verify_image =
         "scripts/ci/docker_wait_for_daemon.sh";
         "scripts/ci/docker_check_version.sh";
         "scripts/ci/docker_registry_auth.sh";
-        (* Scripts that are called by [docker_registry_auth.sh]. *)
+        (* Scripts that are called by [docker_initialize.sh --image-names]. *)
         "scripts/ci/docker_image_names.sh";
         (* Scripts that are called by [docker_image_names.sh]. *)
         "scripts/ci/docker_registry.inc.sh";
@@ -223,7 +226,7 @@ let job_script_docker_verify_image =
     ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
     ~script:
       [
-        "./scripts/ci/docker_initialize.sh";
+        "./scripts/ci/docker_initialize.sh --image-names";
         "./scripts/ci/docker_verify_signature.sh";
       ]
 
