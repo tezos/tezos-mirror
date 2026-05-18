@@ -56,8 +56,16 @@ use crate::{headers, url, NULL_PKH, TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH};
 /// input, type mismatch, unknown entrypoint, ...) and maps to
 /// [`TezosXRuntimeError::BadRequest`] (→ 400).
 fn classify_tc_error(e: TcError) -> TezosXRuntimeError {
+    use mir::gas::CompareError;
     match e {
-        TcError::OutOfGas(_) => TezosXRuntimeError::OutOfGas,
+        // Resource exhaustion in any form (direct budget exhaustion, a
+        // cost helper running out of gas, or a cost-arithmetic overflow
+        // — which is "the cost is unrepresentably large", catchable like
+        // OOG) maps to OutOfGas. `CompareError::Incomparable` is a
+        // deterministic type failure and falls through to BadRequest.
+        TcError::OutOfGas(_)
+        | TcError::CostOverflow(_)
+        | TcError::CompareError(CompareError::Cost(_)) => TezosXRuntimeError::OutOfGas,
         other => TezosXRuntimeError::BadRequest(format!("{other:?}")),
     }
 }
@@ -77,9 +85,17 @@ fn classify_tc_error(e: TcError) -> TezosXRuntimeError {
 fn classify_interpret_error(e: InterpretError) -> TezosXRuntimeError {
     use mir::gas::CompareError;
     match e {
-        InterpretError::OutOfGas => TezosXRuntimeError::OutOfGas,
-        InterpretError::TcError(TcError::OutOfGas(_)) => TezosXRuntimeError::OutOfGas,
-        InterpretError::CompareError(CompareError::Cost(_)) => {
+        // All flavours of resource exhaustion → OutOfGas: direct
+        // interpreter budget exhaustion, the nested-TcError forms, a
+        // cost helper failing (gas or arithmetic overflow), and the
+        // comparison-cost path. `CompareError::Incomparable` (a
+        // deterministic type failure) falls through to BadRequest.
+        InterpretError::OutOfGas
+        | InterpretError::CostOverflow(_)
+        | InterpretError::CompareError(CompareError::Cost(_))
+        | InterpretError::TcError(TcError::OutOfGas(_))
+        | InterpretError::TcError(TcError::CostOverflow(_))
+        | InterpretError::TcError(TcError::CompareError(CompareError::Cost(_))) => {
             TezosXRuntimeError::OutOfGas
         }
         InterpretError::EnshrinedViewDispatch(

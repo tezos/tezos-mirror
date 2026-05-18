@@ -25,7 +25,7 @@ use crate::ast::*;
 #[cfg(feature = "bls")]
 use crate::bls;
 use crate::context::{CtxTrait, TypecheckingCtx};
-use crate::gas::{interpret_cost, CompareError, OutOfGas};
+use crate::gas::{interpret_cost, CompareError, CostOverflow, OutOfGas};
 use crate::interpreter::interpret_cost::SigCostError;
 use crate::irrefutable_match::irrefutable_match;
 use crate::lexer::Prim;
@@ -78,12 +78,14 @@ pub enum InterpretError<'a> {
     /// Error when typechecking unserialized data
     #[error(transparent)]
     TcError(#[from] TcError),
-    /// Comparison-cost failure (out-of-gas while computing the cost, or an
-    /// attempt to compare incomparable values). Kept distinct from
-    /// [`InterpretError::OutOfGas`] so callers can tell apart "the
-    /// interpreter ran out of its budget" from "I couldn't compute the cost
-    /// of this comparison because the budget didn't cover it (or the types
-    /// can't be compared)".
+    /// A cost-helper overflowed while computing a gas cost (the helpers do
+    /// pure cost arithmetic; gas is charged separately at the call site).
+    /// Distinct from [`InterpretError::OutOfGas`] (a direct `Gas::consume`
+    /// exhaustion) and kept structure-preserving rather than flattened.
+    #[error(transparent)]
+    CostOverflow(#[from] CostOverflow),
+    /// Comparison-cost failure (cost computation, or an attempt to compare
+    /// incomparable values).
     #[error(transparent)]
     CompareError(#[from] CompareError),
     #[allow(missing_docs)]

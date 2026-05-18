@@ -31,7 +31,7 @@ use crate::ast::*;
 #[cfg(feature = "bls")]
 use crate::bls;
 use crate::context::TypecheckingCtx;
-use crate::gas::{self, tc_cost, CompareError, Gas, OutOfGas};
+use crate::gas::{self, tc_cost, CompareError, CostOverflow, Gas, OutOfGas};
 use crate::irrefutable_match::irrefutable_match;
 use crate::lexer::Prim;
 use crate::stack::*;
@@ -42,9 +42,20 @@ pub enum TcError {
     /// Two stacks didn't compare equal when they should have.
     #[error("type stacks not equal: {0:?} != {1:?}")]
     StacksNotEqual(TypeStack, TypeStack, StacksNotEqualReason),
-    /// Ran out of gas during typechecking.
+    /// Ran out of gas during typechecking (direct `Gas::consume`).
     #[error(transparent)]
     OutOfGas(#[from] OutOfGas),
+    /// A cost-helper overflowed while computing a gas cost (the helpers do
+    /// pure cost arithmetic; gas is charged separately at the call site).
+    /// Kept structure-preserving rather than flattened into
+    /// `OutOfGas`/`InternalError`.
+    #[error(transparent)]
+    CostOverflow(#[from] CostOverflow),
+    /// A comparison-cost helper failed (cost computation or an attempt to
+    /// compare incomparable values — the latter is an internal invariant
+    /// violation, unreachable for typechecked input).
+    #[error(transparent)]
+    CompareError(#[from] CompareError),
     /// The type didn't satisfy a given [TypeProperty].
     #[error("type is not {0}: {1:?}")]
     InvalidTypeProperty(TypeProperty, Type),
@@ -196,17 +207,6 @@ impl From<ByteReprError> for TcError {
 impl From<StackOob> for TcError {
     fn from(_: StackOob) -> Self {
         TcError::InternalError("stack index out of bounds".to_owned())
-    }
-}
-
-impl From<CompareError> for TcError {
-    fn from(e: CompareError) -> Self {
-        match e {
-            CompareError::Cost(err) => err.into(),
-            CompareError::Incomparable => {
-                TcError::InternalError("comparison of incomparable values".to_owned())
-            }
-        }
     }
 }
 
@@ -3095,7 +3095,7 @@ mod typecheck_tests {
     use crate::ast::michelson_address as addr;
     use crate::ast::or::Or::{Left, Right};
     use crate::context::Ctx;
-    use crate::gas::Gas;
+    use crate::gas::{CostOverflow, Gas};
     use crate::parser::test_helpers::*;
     use crate::typechecker::*;
     use std::collections::HashMap;
@@ -9229,12 +9229,16 @@ mod typecheck_tests {
     }
 
     #[test]
-    fn compare_error_incomparable_converts_to_internal_error() {
+    fn compare_error_converts_to_compare_error_variant() {
+        // No flattening: CompareError is preserved structure-intact
+        // inside TcError via the #[from] variant.
         let err: TcError = CompareError::Incomparable.into();
-        assert_eq!(
-            err,
-            TcError::InternalError("comparison of incomparable values".to_owned())
-        );
+        assert_eq!(err, TcError::CompareError(CompareError::Incomparable));
     }
 
+    #[test]
+    fn cost_overflow_converts_to_cost_overflow_variant() {
+        let ovf: TcError = CostOverflow.into();
+        assert_eq!(ovf, TcError::CostOverflow(CostOverflow));
+    }
 }

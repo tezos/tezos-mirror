@@ -13,7 +13,10 @@ pub struct Gas {
     milligas_amount: Option<u32>,
 }
 
-/// Out of gas error.
+/// Gas-budget exhaustion. Produced **only** by [`Gas::consume`] when the
+/// caller's remaining budget is insufficient. Arithmetic-overflow failures
+/// during cost computation use [`CostOverflow`] instead — `OutOfGas` is not
+/// an arithmetic error.
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 #[error("Gas_exhaustion")]
 pub struct OutOfGas;
@@ -24,12 +27,26 @@ impl BinWriter for OutOfGas {
     }
 }
 
+/// Arithmetic overflow during cost computation. Produced by
+/// [`AsGasCost::as_gas_cost`] and [`Log2i::log2i`] when a cost-formula
+/// intermediate exceeds `u32` or an input falls outside the helper's
+/// domain (e.g. `log2i(0)`, `log2i(usize::MAX)`). Distinct from
+/// [`OutOfGas`]: the caller's budget was not exhausted; the cost itself
+/// is unrepresentable.
+#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
+#[error("arithmetic overflow in cost computation")]
+pub struct CostOverflow;
+
 /// Error when computing comparison cost.
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 pub enum CompareError {
-    /// Ran out of gas while computing the cost.
+    /// Cost arithmetic overflowed while sizing the comparison. The
+    /// cost-helper functions in [`tc_cost`] / [`interpret_cost`] do not
+    /// charge gas (that happens at the call site via [`Gas::consume`]),
+    /// they only do cost arithmetic, so [`CostOverflow`] is their only
+    /// failure mode.
     #[error(transparent)]
-    Cost(#[from] OutOfGas),
+    Cost(#[from] CostOverflow),
     /// Attempted to compare incomparable values.
     #[error("comparison of incomparable values")]
     Incomparable,
@@ -74,26 +91,31 @@ impl Gas {
 }
 
 trait AsGasCost {
-    /// Try to convert a checked numeric type to gas cost; return `OutOfGas` on
-    /// overflow.
-    fn as_gas_cost(&self) -> Result<u32, OutOfGas>;
+    /// Try to convert a checked numeric type to gas cost; return
+    /// [`CostOverflow`] on overflow. This is pure cost arithmetic — it
+    /// never returns `OutOfGas` (the budget is not consulted here).
+    fn as_gas_cost(&self) -> Result<u32, CostOverflow>;
 }
 
 impl AsGasCost for checked::Checked<u32> {
-    fn as_gas_cost(&self) -> Result<u32, OutOfGas> {
-        self.ok_or(OutOfGas)
+    fn as_gas_cost(&self) -> Result<u32, CostOverflow> {
+        self.ok_or(CostOverflow)
     }
 }
 
 impl AsGasCost for checked::Checked<usize> {
-    fn as_gas_cost(&self) -> Result<u32, OutOfGas> {
-        self.ok_or(OutOfGas)?.try_into().map_err(|_| OutOfGas)
+    fn as_gas_cost(&self) -> Result<u32, CostOverflow> {
+        self.ok_or(CostOverflow)?
+            .try_into()
+            .map_err(|_| CostOverflow)
     }
 }
 
 impl AsGasCost for checked::Checked<u64> {
-    fn as_gas_cost(&self) -> Result<u32, OutOfGas> {
-        self.ok_or(OutOfGas)?.try_into().map_err(|_| OutOfGas)
+    fn as_gas_cost(&self) -> Result<u32, CostOverflow> {
+        self.ok_or(CostOverflow)?
+            .try_into()
+            .map_err(|_| CostOverflow)
     }
 }
 
@@ -108,34 +130,34 @@ trait Log2i {
     /// ```
     /// &c
     ///
-    /// `log2i(0)` is not well-defined, and likely is a logic error, hence the
-    /// function returns [OutOfGas] on `0`. The same is true for inputs whose
-    /// next power of two would overflow the integer type (e.g. `usize::MAX`):
-    /// they also return [OutOfGas] rather than panic or wrap silently.
-    fn log2i(self) -> Result<u32, OutOfGas>;
+    /// `log2i(0)` is out of domain, as are inputs whose next power of two
+    /// would overflow the integer type (e.g. `usize::MAX`). Both return
+    /// [`CostOverflow`] rather than panic or wrap silently. This is a
+    /// cost-arithmetic helper, so it never returns `OutOfGas`.
+    fn log2i(self) -> Result<u32, CostOverflow>;
 }
 
 impl Log2i for usize {
-    fn log2i(self) -> Result<u32, OutOfGas> {
+    fn log2i(self) -> Result<u32, CostOverflow> {
         if self == 0 {
-            Err(OutOfGas)
+            Err(CostOverflow)
         } else {
             Ok(self
                 .checked_next_power_of_two()
-                .ok_or(OutOfGas)?
+                .ok_or(CostOverflow)?
                 .trailing_zeros())
         }
     }
 }
 
 impl Log2i for u64 {
-    fn log2i(self) -> Result<u32, OutOfGas> {
+    fn log2i(self) -> Result<u32, CostOverflow> {
         if self == 0 {
-            Err(OutOfGas)
+            Err(CostOverflow)
         } else {
             Ok(self
                 .checked_next_power_of_two()
-                .ok_or(OutOfGas)?
+                .ok_or(CostOverflow)?
                 .trailing_zeros())
         }
     }
@@ -146,7 +168,7 @@ impl Log2i for u64 {
 pub mod tc_cost {
     use checked::Checked;
 
-    use super::{AsGasCost, Log2i, OutOfGas};
+    use super::{AsGasCost, CostOverflow, Log2i};
 
     // Due to the quirk of the Tezos protocol implementation, step gas is
     // charged twice as often as in MIR.
@@ -194,43 +216,43 @@ pub mod tc_cost {
     // corresponds to cost_DECODING_CHAIN_ID in the protocol
     pub const CHAIN_ID_OPTIMIZED: u32 = 50;
 
-    pub fn timestamp_decoding(l: usize) -> Result<u32, OutOfGas> {
+    pub fn timestamp_decoding(l: usize) -> Result<u32, CostOverflow> {
         use integer_sqrt::IntegerSquareRoot;
         let v0: Checked<usize> = Checked::from(l.integer_sqrt()) * l;
         (105 + ((v0 >> 5) + (v0 >> 6))).as_gas_cost()
     }
 
-    fn variadic(depth: u16) -> Result<u32, OutOfGas> {
+    fn variadic(depth: u16) -> Result<u32, CostOverflow> {
         let depth = Checked::from(depth as u32);
         (depth * 50).as_gas_cost()
     }
 
-    pub fn dig_n(depth: usize) -> Result<u32, OutOfGas> {
+    pub fn dig_n(depth: usize) -> Result<u32, CostOverflow> {
         // corresponds to Cost_of.Typechecking.proof_argument in the protocol
         (Checked::from(depth) * 50).as_gas_cost()
     }
 
-    pub fn dug_n(depth: usize) -> Result<u32, OutOfGas> {
+    pub fn dug_n(depth: usize) -> Result<u32, CostOverflow> {
         // corresponds to Cost_of.Typechecking.proof_argument in the protocol
         (Checked::from(depth) * 50).as_gas_cost()
     }
 
-    pub fn drop_n(depth: &Option<u16>) -> Result<u32, OutOfGas> {
+    pub fn drop_n(depth: &Option<u16>) -> Result<u32, CostOverflow> {
         depth.map_or(Ok(0), variadic)
     }
 
-    pub fn dip_n(depth: &Option<u16>) -> Result<u32, OutOfGas> {
+    pub fn dip_n(depth: &Option<u16>) -> Result<u32, CostOverflow> {
         depth.map_or(Ok(0), variadic)
     }
 
-    pub fn ty_eq(sz1: usize, sz2: usize) -> Result<u32, OutOfGas> {
+    pub fn ty_eq(sz1: usize, sz2: usize) -> Result<u32, CostOverflow> {
         // complexity of comparing types T and U is O(min(|T|, |U|)), as
         // comparison short-circuits at the first mismatch
         let sz = Checked::from(std::cmp::min(sz1, sz2));
         (sz * 60).as_gas_cost()
     }
 
-    pub fn construct_map(key_size: usize, sz: usize) -> Result<u32, OutOfGas> {
+    pub fn construct_map(key_size: usize, sz: usize) -> Result<u32, CostOverflow> {
         // Tezos protocol constructs maps element by element, thus the cost ends
         // up Σ (80 + key_size*log2(i)) = 80 * n + key_size * Σ log2(i) = 80 * n
         // + key_size * log2(Π i) = 80 * n + key_size * log2(n!)
@@ -240,34 +262,34 @@ pub mod tc_cost {
         // to avoid log2(0) it's more practical to compute log2(n + 1)
         let n = Checked::from(sz);
         let key_size = Checked::from(key_size);
-        let log2n = (n + 1).ok_or(OutOfGas)?.log2i()? as usize;
+        let log2n = (n + 1).ok_or(CostOverflow)?.log2i()? as usize;
         (80 * n + key_size * n * log2n).as_gas_cost()
     }
 
-    pub fn construct_set(val_size: usize, sz: usize) -> Result<u32, OutOfGas> {
+    pub fn construct_set(val_size: usize, sz: usize) -> Result<u32, CostOverflow> {
         // Similar to `construct_map`, only the coefficient differs
         let n = Checked::from(sz);
         let key_size = Checked::from(val_size);
-        let log2n = (n + 1).ok_or(OutOfGas)?.log2i()? as usize;
+        let log2n = (n + 1).ok_or(CostOverflow)?.log2i()? as usize;
         (130 * n + key_size * n * log2n).as_gas_cost()
     }
 
-    pub fn pair_n(size: usize) -> Result<u32, OutOfGas> {
+    pub fn pair_n(size: usize) -> Result<u32, CostOverflow> {
         // corresponds to Cost_of.Typechecking.proof_argument in the protocol
         (Checked::from(size) * 50).as_gas_cost()
     }
 
-    pub fn unpair_n(size: usize) -> Result<u32, OutOfGas> {
+    pub fn unpair_n(size: usize) -> Result<u32, CostOverflow> {
         // corresponds to Cost_of.Typechecking.proof_argument in the protocol
         (Checked::from(size) * 50).as_gas_cost()
     }
 
-    pub fn get_n(size: usize) -> Result<u32, OutOfGas> {
+    pub fn get_n(size: usize) -> Result<u32, CostOverflow> {
         // corresponds to Cost_of.Typechecking.proof_argument in the protocol
         (Checked::from(size) * 50).as_gas_cost()
     }
 
-    pub fn update_n(size: usize) -> Result<u32, OutOfGas> {
+    pub fn update_n(size: usize) -> Result<u32, CostOverflow> {
         // corresponds to Cost_of.Typechecking.proof_argument in the protocol
         (Checked::from(size) * 50).as_gas_cost()
     }
@@ -307,7 +329,7 @@ pub mod interpret_cost {
     use tezos_crypto_rs::CryptoError;
     use thiserror::Error;
 
-    use super::{AsGasCost, BigIntByteSize, CompareError, Log2i, OutOfGas};
+    use super::{AsGasCost, BigIntByteSize, CompareError, CostOverflow, Log2i, OutOfGas};
     use crate::ast::{Micheline, Or, Ticket, TypedValue};
 
     pub const DIP: u32 = 10;
@@ -422,33 +444,33 @@ pub mod interpret_cost {
         Ok(add_num(&t1.amount, &t2.amount)?)
     }
 
-    pub fn split_ticket(amount1: &BigUint, amount2: &BigUint) -> Result<u32, OutOfGas> {
+    pub fn split_ticket(amount1: &BigUint, amount2: &BigUint) -> Result<u32, CostOverflow> {
         use std::mem::size_of_val;
         let sz = Checked::from(std::cmp::max(size_of_val(amount1), size_of_val(amount2)));
         (40 + (sz >> 1)).as_gas_cost()
     }
 
-    fn dropn(n: u16) -> Result<u32, OutOfGas> {
+    fn dropn(n: u16) -> Result<u32, CostOverflow> {
         // Approximates 30 + 2.713108*n, copied from the Tezos protocol
         let n = Checked::from(n as u32);
         (30 + n * 2 + (n >> 1) + (n >> 3)).as_gas_cost()
     }
 
-    pub fn drop(mb_n: Option<u16>) -> Result<u32, OutOfGas> {
+    pub fn drop(mb_n: Option<u16>) -> Result<u32, CostOverflow> {
         mb_n.map_or(Ok(DROP), dropn)
     }
 
-    fn dipn(n: u16) -> Result<u32, OutOfGas> {
+    fn dipn(n: u16) -> Result<u32, CostOverflow> {
         // Approximates 15 + 4.05787663635*n, copied from the Tezos protocol
         let n = Checked::from(n as u32);
         (15 + n * 4).as_gas_cost()
     }
 
-    pub fn dip(mb_n: Option<u16>) -> Result<u32, OutOfGas> {
+    pub fn dip(mb_n: Option<u16>) -> Result<u32, CostOverflow> {
         mb_n.map_or(Ok(DIP), dipn)
     }
 
-    pub fn undip(n: u16) -> Result<u32, OutOfGas> {
+    pub fn undip(n: u16) -> Result<u32, CostOverflow> {
         // this is derived by observing gas costs as of Nairobi, as charged by
         // the Tezos protocol. It seems undip cost is charged as
         // cost_N_KUndip * n + cost_N_KCons,
@@ -457,55 +479,64 @@ pub mod interpret_cost {
         ((n + 1) * 10).as_gas_cost()
     }
 
-    fn dupn(n: u16) -> Result<u32, OutOfGas> {
+    fn dupn(n: u16) -> Result<u32, CostOverflow> {
         // Approximates 20 + 1.222263*n, copied from the Tezos protocol
         let n = Checked::from(n as u32);
         (20 + n + (n >> 2)).as_gas_cost()
     }
 
-    pub fn dig(n: u16) -> Result<u32, OutOfGas> {
+    pub fn dig(n: u16) -> Result<u32, CostOverflow> {
         let n = Checked::from(n as u32);
         (30 + 6 * n + (n >> 1) + (n >> 2)).as_gas_cost()
     }
 
-    pub fn dug(n: u16) -> Result<u32, OutOfGas> {
+    pub fn dug(n: u16) -> Result<u32, CostOverflow> {
         let n = Checked::from(n as u32);
         (35 + 6 * n + (n >> 1) + (n >> 2)).as_gas_cost()
     }
 
-    pub fn dup(mb_n: Option<u16>) -> Result<u32, OutOfGas> {
+    pub fn dup(mb_n: Option<u16>) -> Result<u32, CostOverflow> {
         mb_n.map_or(Ok(DUP), dupn)
     }
 
-    pub fn add_num(i1: &impl BigIntByteSize, i2: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
+    pub fn add_num(
+        i1: &impl BigIntByteSize,
+        i2: &impl BigIntByteSize,
+    ) -> Result<u32, CostOverflow> {
         // max is copied from the Tezos protocol, ostensibly adding two big ints depends on
         // the larger of the two due to result allocation
         let sz = Checked::from(std::cmp::max(i1.byte_size(), i2.byte_size()));
         (35 + (sz >> 1)).as_gas_cost()
     }
 
-    pub fn sub_num(i1: &impl BigIntByteSize, i2: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
+    pub fn sub_num(
+        i1: &impl BigIntByteSize,
+        i2: &impl BigIntByteSize,
+    ) -> Result<u32, CostOverflow> {
         let sz = Checked::from(std::cmp::max(i1.byte_size(), i2.byte_size()));
         (35 + (sz >> 1)).as_gas_cost()
     }
 
     /// Cost for `AND` on numbers and bytearrays
-    pub fn and_num(i1: &impl BigIntByteSize, i2: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
+    pub fn and_num(
+        i1: &impl BigIntByteSize,
+        i2: &impl BigIntByteSize,
+    ) -> Result<u32, CostOverflow> {
         let sz = Checked::from(Ord::min(i1.byte_size(), i2.byte_size()));
         (35 + (sz >> 1)).as_gas_cost()
     }
 
-    pub fn and_bytes(b1: &[u8], b2: &[u8]) -> Result<u32, OutOfGas> {
+    pub fn and_bytes(b1: &[u8], b2: &[u8]) -> Result<u32, CostOverflow> {
         let sz = Checked::from(Ord::min(b1.len(), b2.len()));
         (35 + (sz >> 1)).as_gas_cost()
     }
 
-    pub fn or_num(i1: &impl BigIntByteSize, i2: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
+    pub fn or_num(i1: &impl BigIntByteSize, i2: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
         let sz = Checked::from(Ord::min(i1.byte_size(), i2.byte_size()));
         (35 + (sz >> 1)).as_gas_cost()
     }
 
-    pub fn or_bytes(b1: &[u8], b2: &[u8]) -> Result<u32, OutOfGas> {
+    pub fn or_bytes(b1: &[u8], b2: &[u8]) -> Result<u32, CostOverflow> {
         // NB: Tezos takes maximum of the sizes, but in our implementation only
         // touches bytes in two vectors intersection. So taking the same formula
         // as in [and_bytes].
@@ -513,33 +544,33 @@ pub mod interpret_cost {
         (35 + (sz >> 1)).as_gas_cost()
     }
 
-    pub fn xor_nat(i1: &BigUint, i2: &BigUint) -> Result<u32, OutOfGas> {
+    pub fn xor_nat(i1: &BigUint, i2: &BigUint) -> Result<u32, CostOverflow> {
         let sz = Checked::from(Ord::min(i1.byte_size(), i2.byte_size()));
         (35 + (sz >> 1)).as_gas_cost()
     }
 
-    pub fn xor_bytes(b1: &[u8], b2: &[u8]) -> Result<u32, OutOfGas> {
+    pub fn xor_bytes(b1: &[u8], b2: &[u8]) -> Result<u32, CostOverflow> {
         let sz = Checked::from(Ord::min(b1.len(), b2.len()));
         (40 + (sz >> 1)).as_gas_cost()
     }
 
-    pub fn not_num<T: BigIntByteSize>(n: &T) -> Result<u32, OutOfGas> {
+    pub fn not_num<T: BigIntByteSize>(n: &T) -> Result<u32, CostOverflow> {
         let sz = Checked::from(n.byte_size());
         (25 + (sz >> 1)).as_gas_cost()
     }
 
-    pub fn not_bytes(b: &[u8]) -> Result<u32, OutOfGas> {
+    pub fn not_bytes(b: &[u8]) -> Result<u32, CostOverflow> {
         let sz = Checked::from(b.len());
         (30 + (sz >> 1)).as_gas_cost()
     }
 
-    pub fn lsl_nat(i1: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
+    pub fn lsl_nat(i1: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
         let sz = i1.byte_size();
         let w1 = sz >> 1;
         Checked::from(w1 + 130).as_gas_cost()
     }
 
-    pub fn lsl_bytes(i1: &[u8], i2: &usize) -> Result<u32, OutOfGas> {
+    pub fn lsl_bytes(i1: &[u8], i2: &usize) -> Result<u32, CostOverflow> {
         let size_1 = i1.len();
         let size_2 = *i2;
         let w1 = if size_2 > 0 {
@@ -550,12 +581,12 @@ pub mod interpret_cost {
         Checked::from(w1 + (size_1 >> 2) + 65).as_gas_cost()
     }
 
-    pub fn lsr_nat(i1: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
+    pub fn lsr_nat(i1: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
         let sz = i1.byte_size();
         Checked::from((sz >> 1) + 45).as_gas_cost()
     }
 
-    pub fn lsr_bytes(i1: &[u8], i2: &usize) -> Result<u32, OutOfGas> {
+    pub fn lsr_bytes(i1: &[u8], i2: &usize) -> Result<u32, CostOverflow> {
         let size_1 = i1.len();
         let size_2 = *i2;
         let w1 = if size_1 >= (size_2 >> 3) {
@@ -566,18 +597,24 @@ pub mod interpret_cost {
         ((w1 >> 1) + (w1 >> 2) + 55).as_gas_cost()
     }
 
-    pub fn mul_int(i1: &impl BigIntByteSize, i2: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
+    pub fn mul_int(
+        i1: &impl BigIntByteSize,
+        i2: &impl BigIntByteSize,
+    ) -> Result<u32, CostOverflow> {
         let a = Checked::from(i1.byte_size()) + Checked::from(i2.byte_size());
         // log2 is ill-defined for zero, hence this check
         let v0 = if a.is_zero() {
             Checked::from(0)
         } else {
-            a * (a.ok_or(OutOfGas)?.log2i()? as u64)
+            a * (a.ok_or(CostOverflow)?.log2i()? as u64)
         };
         (55 + (v0 >> 1) + (v0 >> 2) + (v0 >> 4)).as_gas_cost()
     }
 
-    pub fn ediv_int(i1: &impl BigIntByteSize, i2: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
+    pub fn ediv_int(
+        i1: &impl BigIntByteSize,
+        i2: &impl BigIntByteSize,
+    ) -> Result<u32, CostOverflow> {
         let size_1 = Checked::from(i1.byte_size());
         let size_2 = Checked::from(i2.byte_size());
         let w1 = if size_1 >= size_2 {
@@ -589,7 +626,10 @@ pub mod interpret_cost {
             .as_gas_cost()
     }
 
-    pub fn ediv_nat(i1: &impl BigIntByteSize, i2: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
+    pub fn ediv_nat(
+        i1: &impl BigIntByteSize,
+        i2: &impl BigIntByteSize,
+    ) -> Result<u32, CostOverflow> {
         let size_1 = Checked::from(i1.byte_size());
         let size_2 = Checked::from(i2.byte_size());
         let w1 = if size_1 >= size_2 {
@@ -711,26 +751,26 @@ pub mod interpret_cost {
 
     /// Cost charged for computing total entries size (needed for the subsequent
     /// gas calculation, so this is meta-gas).
-    pub fn concat_list_precheck(list_size: usize) -> Result<u32, OutOfGas> {
+    pub fn concat_list_precheck(list_size: usize) -> Result<u32, CostOverflow> {
         (10 * Checked::from(list_size)).as_gas_cost()
     }
 
-    pub fn concat_string_list(total_len: Checked<usize>) -> Result<u32, OutOfGas> {
+    pub fn concat_string_list(total_len: Checked<usize>) -> Result<u32, CostOverflow> {
         // Copied from the Tezos protocol
         (total_len / 2 + 100).as_gas_cost()
     }
 
-    pub fn concat_bytes_list(total_len: Checked<usize>) -> Result<u32, OutOfGas> {
+    pub fn concat_bytes_list(total_len: Checked<usize>) -> Result<u32, CostOverflow> {
         // Copied from the Tezos protocol
         (total_len / 2 + 100).as_gas_cost()
     }
 
-    pub fn concat_string_pair(len1: usize, len2: usize) -> Result<u32, OutOfGas> {
+    pub fn concat_string_pair(len1: usize, len2: usize) -> Result<u32, CostOverflow> {
         // Copied from the Tezos protocol
         ((Checked::from(len1) + Checked::from(len2)) / 2 + 45).as_gas_cost()
     }
 
-    pub fn concat_bytes_pair(len1: usize, len2: usize) -> Result<u32, OutOfGas> {
+    pub fn concat_bytes_pair(len1: usize, len2: usize) -> Result<u32, CostOverflow> {
         // Copied from the Tezos protocol
         ((Checked::from(len1) + Checked::from(len2)) / 2 + 45).as_gas_cost()
     }
@@ -753,7 +793,7 @@ pub mod interpret_cost {
         // exactly one comparison.
         let map_size = Checked::from(map_size);
         let compare_cost = compare(k, k)?;
-        let size_log = (map_size + 1).ok_or(OutOfGas)?.log2i()?;
+        let size_log = (map_size + 1).ok_or(CostOverflow)?.log2i()?;
         let lookup_cost = Checked::from(compare_cost) * size_log;
         Ok((80 + lookup_cost).as_gas_cost()?)
     }
@@ -761,7 +801,7 @@ pub mod interpret_cost {
     pub fn set_mem(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
         // NB: same considerations as for map_get
         let compare_cost = compare(k, k)?;
-        let size_log = (Checked::from(map_size) + 1).ok_or(OutOfGas)?.log2i()?;
+        let size_log = (Checked::from(map_size) + 1).ok_or(CostOverflow)?.log2i()?;
         let lookup_cost = Checked::from(compare_cost) * size_log;
         Ok((115 + lookup_cost).as_gas_cost()?)
     }
@@ -770,7 +810,7 @@ pub mod interpret_cost {
         // NB: same considerations as for map_get
         let map_size = Checked::from(map_size);
         let compare_cost = compare(k, k)?;
-        let size_log = (map_size + 1).ok_or(OutOfGas)?.log2i()?;
+        let size_log = (map_size + 1).ok_or(CostOverflow)?.log2i()?;
         let lookup_cost = Checked::from(compare_cost) * size_log;
         // NB: 2 factor copied from Tezos protocol, in principle it should
         // reflect update vs get overhead.
@@ -780,7 +820,7 @@ pub mod interpret_cost {
     pub fn set_update(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
         // NB: same considerations as for map_update
         let compare_cost = compare(k, k)?;
-        let size_log = (Checked::from(map_size) + 1).ok_or(OutOfGas)?.log2i()?;
+        let size_log = (Checked::from(map_size) + 1).ok_or(CostOverflow)?.log2i()?;
         let lookup_cost = Checked::from(compare_cost) * size_log;
         // coefficient larger than in case of Map looks suspicious, something
         // to benchmark later
@@ -790,7 +830,7 @@ pub mod interpret_cost {
     pub fn map_get_and_update(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
         // NB: same considerations as for map_get
         let compare_cost = compare(k, k)?;
-        let size_log = (Checked::from(map_size) + 1).ok_or(OutOfGas)?.log2i()?;
+        let size_log = (Checked::from(map_size) + 1).ok_or(CostOverflow)?.log2i()?;
         let lookup_cost = Checked::from(compare_cost) * size_log;
         // NB: 3 factor copied from Tezos protocol, in principle it should
         // reflect update vs get overhead, but it seems like an overestimation,
@@ -825,13 +865,13 @@ pub mod interpret_cost {
         }
     }
 
-    pub fn micheline_encoding<'a>(mich: &'a Micheline<'a>) -> Result<u32, OutOfGas> {
+    pub fn micheline_encoding<'a>(mich: &'a Micheline<'a>) -> Result<u32, CostOverflow> {
         let mut size = MichelineSize::default();
         collect_micheline_size(mich, &mut size);
         micheline_encoding_by_size(size)
     }
 
-    fn micheline_encoding_by_size(size: MichelineSize) -> Result<u32, OutOfGas> {
+    fn micheline_encoding_by_size(size: MichelineSize) -> Result<u32, CostOverflow> {
         (size.nodes_num * 100 + size.zariths * 25 + size.str_byte * 10).as_gas_cost()
     }
 
@@ -893,7 +933,7 @@ pub mod interpret_cost {
         Ok(serialization_cost + checked_cost)
     }
 
-    pub fn slice(length: usize) -> Result<u32, OutOfGas> {
+    pub fn slice(length: usize) -> Result<u32, CostOverflow> {
         // In the protocol, the gas costs for slicing strings and bytes are defined
         // separately (see `cost_N_ISlice_bytes` and `cost_N_ISlice_string`).
         //
@@ -901,41 +941,41 @@ pub mod interpret_cost {
         ((Checked::from(length) >> 1) + 25).as_gas_cost()
     }
 
-    pub fn blake2b(msg: &[u8]) -> Result<u32, OutOfGas> {
+    pub fn blake2b(msg: &[u8]) -> Result<u32, CostOverflow> {
         /* fun size -> (430. + (1.125 * size)) */
         let size = Checked::from(msg.len());
         (Checked::from(430) + ((size >> 3) + size)).as_gas_cost()
     }
 
-    pub fn keccak(msg: &[u8]) -> Result<u32, OutOfGas> {
+    pub fn keccak(msg: &[u8]) -> Result<u32, CostOverflow> {
         /* fun size -> (1350. + (8.25 * size)) */
         let size = Checked::from(msg.len());
         (Checked::from(1350) + ((size >> 2) + (size * 8))).as_gas_cost()
     }
 
-    pub fn sha256(msg: &[u8]) -> Result<u32, OutOfGas> {
+    pub fn sha256(msg: &[u8]) -> Result<u32, CostOverflow> {
         /* fun size -> (600. + (4.75 * size)) */
         let size = Checked::from(msg.len());
         (Checked::from(600) + ((size >> 2) + ((size >> 1) + (size * 4)))).as_gas_cost()
     }
 
-    pub fn sha3(msg: &[u8]) -> Result<u32, OutOfGas> {
+    pub fn sha3(msg: &[u8]) -> Result<u32, CostOverflow> {
         /* fun size -> (1350. + (8.25 * size)) */
         let size = Checked::from(msg.len());
         (Checked::from(1350) + ((size >> 2) + (size * 8))).as_gas_cost()
     }
 
-    pub fn sha512(msg: &[u8]) -> Result<u32, OutOfGas> {
+    pub fn sha512(msg: &[u8]) -> Result<u32, CostOverflow> {
         /* fun size -> (680. + (3. * size)) */
         let size = Checked::from(msg.len());
         (Checked::from(680) + (size * 3)).as_gas_cost()
     }
 
-    pub fn pairing_check(size: usize) -> Result<u32, OutOfGas> {
+    pub fn pairing_check(size: usize) -> Result<u32, CostOverflow> {
         (450_000 + 342_500 * Checked::from(size)).as_gas_cost()
     }
 
-    pub fn mul_bls_fr_big_int(int: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
+    pub fn mul_bls_fr_big_int(int: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
         // 265. + 1.0625 * size
         // NB: cost_N_IMul_bls12_381_fr_z and
         // cost_N_IMul_bls12_381_z_fr ar distinct in the protocol, but they're the
@@ -944,13 +984,13 @@ pub mod interpret_cost {
         (265 + ((size >> 4) + size)).as_gas_cost()
     }
 
-    pub fn neg_int(int: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
+    pub fn neg_int(int: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
         // NB: taken from the protocol, this doesn't fit with MIR implementation.
         let size = Checked::from(int.byte_size());
         (25 + (size >> 1)).as_gas_cost()
     }
 
-    pub fn abs(int: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
+    pub fn abs(int: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
         // NB: MIR implementation is constant-time and alloc free so could have
         // a constant gas cost but for consistency with the protocol we use the
         // same linear model.
@@ -958,49 +998,49 @@ pub mod interpret_cost {
         (20 + (size >> 1)).as_gas_cost()
     }
 
-    pub fn int_bytes(size: usize) -> Result<u32, OutOfGas> {
+    pub fn int_bytes(size: usize) -> Result<u32, CostOverflow> {
         let size = Checked::from(size);
         (20 + ((size >> 1) + (size * 2))).as_gas_cost()
     }
 
-    pub fn nat_bytes(size: usize) -> Result<u32, OutOfGas> {
+    pub fn nat_bytes(size: usize) -> Result<u32, CostOverflow> {
         let size = Checked::from(size);
         (45 + ((size >> 1) + (size * 2))).as_gas_cost()
     }
 
-    pub fn bytes_int(int: &BigInt) -> Result<u32, OutOfGas> {
+    pub fn bytes_int(int: &BigInt) -> Result<u32, CostOverflow> {
         let size = Checked::from(int.byte_size());
         (90 + (size * 3)).as_gas_cost()
     }
 
-    pub fn bytes_nat(int: &BigUint) -> Result<u32, OutOfGas> {
+    pub fn bytes_nat(int: &BigUint) -> Result<u32, CostOverflow> {
         let size = Checked::from(int.byte_size());
         (75 + (size * 3)).as_gas_cost()
     }
 
-    pub fn unpack(bytes: &[u8]) -> Result<u32, OutOfGas> {
+    pub fn unpack(bytes: &[u8]) -> Result<u32, CostOverflow> {
         let size = Checked::from(bytes.len());
         (260 + (size >> 1)).as_gas_cost()
     }
 
-    pub fn pair_n(size: usize) -> Result<u32, OutOfGas> {
+    pub fn pair_n(size: usize) -> Result<u32, CostOverflow> {
         let size = Checked::from(size);
         let v0 = size - 2;
         (40 + ((v0 >> 2) + (v0 * 3))).as_gas_cost()
     }
 
-    pub fn unpair_n(size: usize) -> Result<u32, OutOfGas> {
+    pub fn unpair_n(size: usize) -> Result<u32, CostOverflow> {
         let size = Checked::from(size);
         let v0 = size - 2;
         (30 + (v0 * 4)).as_gas_cost()
     }
 
-    pub fn get_n(size: usize) -> Result<u32, OutOfGas> {
+    pub fn get_n(size: usize) -> Result<u32, CostOverflow> {
         let size = Checked::from(size);
         (20 + ((size >> 1) + (size >> 4))).as_gas_cost()
     }
 
-    pub fn update_n(size: usize) -> Result<u32, OutOfGas> {
+    pub fn update_n(size: usize) -> Result<u32, CostOverflow> {
         let size = Checked::from(size);
         (30 + ((size >> 5) + ((size >> 2) + size))).as_gas_cost()
     }
@@ -1020,19 +1060,19 @@ pub mod unparsing_cost {
     /// Cost for allocating a Micheline Int node: 100 mg + 25 mg/byte.
     pub fn int(i: &BigInt) -> Result<u32, OutOfGas> {
         let size = Checked::from(i.byte_size());
-        (100 + size * 25).as_gas_cost()
+        (100 + size * 25).as_gas_cost().map_err(|_| OutOfGas)
     }
 
     /// Cost for allocating a Micheline String node: 100 mg + 10 mg/byte
     pub fn string(string: &str) -> Result<u32, OutOfGas> {
         let size = Checked::from(string.len());
-        (100 + size * 10).as_gas_cost()
+        (100 + size * 10).as_gas_cost().map_err(|_| OutOfGas)
     }
 
     /// Cost for allocating a Micheline Bytes node: 100mg + 10 mg/byte
     pub fn bytes(bytes: &[u8]) -> Result<u32, OutOfGas> {
         let size = Checked::from(bytes.len());
-        (100 + size * 10).as_gas_cost()
+        (100 + size * 10).as_gas_cost().map_err(|_| OutOfGas)
     }
 
     /// Cost for allocating a Micheline annotation: 10 mg/byte. No
@@ -1040,7 +1080,7 @@ pub mod unparsing_cost {
     /// annotations are not Micheline nodes.
     pub fn annotation(annot: &Annotation) -> Result<u32, OutOfGas> {
         let size = Checked::from(annot.len());
-        (size * 10).as_gas_cost()
+        (size * 10).as_gas_cost().map_err(|_| OutOfGas)
     }
 }
 
@@ -1072,9 +1112,9 @@ mod test {
     }
 
     #[test]
-    fn overflow_to_out_of_gas() {
+    fn overflow_to_cost_overflow() {
         for n in [usize::MAX, usize::MAX / 2, usize::MAX / 4] {
-            assert_eq!(super::tc_cost::ty_eq(n, n), Err(OutOfGas));
+            assert_eq!(super::tc_cost::ty_eq(n, n), Err(CostOverflow));
         }
     }
 
@@ -1101,30 +1141,30 @@ mod test {
 
     #[test]
     fn log2i_zero_usize() {
-        assert_eq!(0usize.log2i(), Err(OutOfGas));
+        assert_eq!(0usize.log2i(), Err(CostOverflow));
     }
 
     #[test]
     fn log2i_zero_u64() {
-        assert_eq!(0u64.log2i(), Err(OutOfGas));
+        assert_eq!(0u64.log2i(), Err(CostOverflow));
     }
 
     // Inputs whose next power of two would overflow must also return
-    // OutOfGas, not panic in debug and wrap in release.
+    // CostOverflow, not panic in debug and wrap in release.
     #[test]
     fn log2i_overflow_usize() {
-        assert_eq!(usize::MAX.log2i(), Err(OutOfGas));
+        assert_eq!(usize::MAX.log2i(), Err(CostOverflow));
         // largest input whose next power of two still fits: 2^(BITS-1).
         let high = 1usize << (usize::BITS - 1);
         assert_eq!(high.log2i(), Ok(usize::BITS - 1));
-        assert_eq!((high + 1).log2i(), Err(OutOfGas));
+        assert_eq!((high + 1).log2i(), Err(CostOverflow));
     }
 
     #[test]
     fn log2i_overflow_u64() {
-        assert_eq!(u64::MAX.log2i(), Err(OutOfGas));
+        assert_eq!(u64::MAX.log2i(), Err(CostOverflow));
         let high = 1u64 << (u64::BITS - 1);
         assert_eq!(high.log2i(), Ok(u64::BITS - 1));
-        assert_eq!((high + 1).log2i(), Err(OutOfGas));
+        assert_eq!((high + 1).log2i(), Err(CostOverflow));
     }
 }
