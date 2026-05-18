@@ -27,8 +27,8 @@ elif [ $# -eq 1 ]; then
   fi
 fi
 
-# Read environment variables written by 'docker_registry_auth.sh' in
-# 'before_script'.
+# Read environment variables written by 'docker_image_names.sh'
+# (via docker_initialize.sh --image-names) in 'before_script'.
 . scripts/ci/docker.env
 
 # Install cosign

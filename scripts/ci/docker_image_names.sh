@@ -3,9 +3,13 @@ set -eu
 
 current_dir=$(cd "$(dirname "${0}")" && pwd)
 
-# Setup Docker names such that they are valid for the target registry.
-# This script write the docker.env file containing the prefix to use
-# while publishing images either on out registry or on dockerhub
+# Compute Octez distribution Docker image names and tags.
+# Writes DOCKER_IMAGE_NAME and DOCKER_IMAGE_TAG to docker.env.
+#
+# This script is ONLY needed by Octez distribution jobs that build/push
+# the end-user Docker images (debug, bare, minimal). It is called by
+# docker_initialize.sh --image-names (for distribution jobs) but NOT by
+# docker_initialize.sh without arguments (for CI/base image jobs).
 
 # Docker constraints on tags:
 # https://docs.docker.com/engine/reference/commandline/tag/

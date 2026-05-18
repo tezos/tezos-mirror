@@ -1,6 +1,16 @@
 #!/bin/sh
 
-## Sourceable file with common variables for other scripts related to docker images
+## Sourceable file with common variables for Octez Docker distribution.
+##
+## This file expands DOCKER_IMAGE_NAME (set by docker_image_names.sh
+## via docker.env) into concrete image names for the debug, bare, and
+## minimal variants. It is ONLY used by Octez distribution scripts:
+##   docker_release.sh, docker_push_all.sh, docker_merge_manifests.sh,
+##   docker_sign.sh, docker_verify_signature.sh,
+##   docker_promote_to_latest.sh, docker_promote_to_version.sh
+##
+## CI image jobs, base image jobs, and other non-distribution jobs
+## do NOT source this file.
 
 ## Docker image names
 
