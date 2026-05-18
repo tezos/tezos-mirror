@@ -7,7 +7,7 @@ use revm::primitives::hardfork::SpecId;
 use tezos_smart_rollup_host::{path::RefPath, runtime::RuntimeError, storage::StorageV1};
 
 // Path to the EVM version.
-const EVM_VERSION: RefPath = RefPath::assert_from(b"/evm/evm_version");
+const EVM_VERSION: RefPath = RefPath::assert_from(b"/evm/world_state/evm_version");
 
 #[derive(Default, Clone, Copy)]
 #[repr(u32)]
