@@ -4766,7 +4766,10 @@ let gen_kernel_migration_test ~from ~to_ ?eth_bootstrap_accounts ?chain_id
       ~sequencer:evm_setup.evm_node
       ()
   in
-  (* Verify migration v41 delete blocks *)
+  (* Verify migration v41 delete blocks. Phase 6 (V58) reorganizes the
+     EVM block-index path from [/evm/world_state/indexes/blocks/{N}] to
+     [/evm/world_state/blocks/indexes/{N}], so the [indexes] sibling of
+     [current] is expected here. *)
   let* blocks =
     Sc_rollup_node.RPC.call
       evm_setup.sc_rollup_node
@@ -4777,9 +4780,11 @@ let gen_kernel_migration_test ~from ~to_ ?eth_bootstrap_accounts ?chain_id
          ~key:"/evm/world_state/blocks"
          ()
   in
-  let expected_blocks = ["current"] in
+  let expected_blocks = ["current"; "indexes"] in
   Check.((blocks = expected_blocks) (list string))
-    ~error_msg:"Expected blocks to be deleted after migration v41, got %R" ;
+    ~error_msg:
+      "Expected only [current; indexes] under /evm/world_state/blocks after \
+       migration v41 (and V58 index reorg), got %L" ;
   scenario_after ~evm_setup ~sanity_check
 
 let test_mainnet_latest_kernel_migration =
@@ -7520,10 +7525,27 @@ let test_rpc_state_value_and_subkeys =
   let*@! world_state_subkeys = Rpc.state_subkeys evm_node "/evm/world_state" in
 
   let expected_subkeys =
-    let keys = ["indexes"; "blocks"; "fees"; "eth_accounts"; "eth_codes"] in
     match kernel with
-    | Latest | Previewnet -> keys @ ["sequencer"]
-    | Mainnet | Tezlink_shadownet -> keys
+    | Latest ->
+        (* Phase 6 (V58) moved EVM config slots [chain_id], [evm_version],
+           [maximum_gas_per_transaction] under [/evm/world_state/], and
+           reorganized the block index from [/evm/world_state/indexes/blocks/]
+           to [/evm/world_state/blocks/indexes/], so [indexes] is no longer a
+           direct child of [/evm/world_state/]. *)
+        [
+          "blocks";
+          "chain_id";
+          "eth_accounts";
+          "eth_codes";
+          "evm_version";
+          "fees";
+          "maximum_gas_per_transaction";
+          "sequencer";
+        ]
+    | Previewnet ->
+        ["indexes"; "blocks"; "fees"; "eth_accounts"; "eth_codes"; "sequencer"]
+    | Mainnet | Tezlink_shadownet ->
+        ["indexes"; "blocks"; "fees"; "eth_accounts"; "eth_codes"]
   in
   Check.(
     (List.sort String.compare world_state_subkeys
