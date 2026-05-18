@@ -25,8 +25,9 @@ Payload source — choose exactly one:
   --build-commit COMMIT             Run git checkout + build-wasm.sh on COMMIT,
                                     then use the produced WASM. Implies --kernel.
                                     Also defaults --expected-version to COMMIT.
-                                    WARNING: this checks out the commit in your
-                                    working tree (commit/stash changes first).
+                                    Checks out the commit with --detach and restores
+                                    the previous HEAD on exit (commit/stash changes
+                                    first to avoid losing them).
   --kernel WASM                     Compute root hash from a WASM file, then payload.
                                     Requires --rollup and --activation.
   --root-hash HASH                  Use a precomputed root hash, generate payload.
@@ -64,6 +65,10 @@ Preimages push (step 4 of the runbook, optional):
                                     `tar -cf - | ssh ... 'sudo -u <user> tar -xf'`.
                                     Effective only when --kernel or --build-commit
                                     actually produced preimages locally.
+                                    NOTE: remote sudo MUST be configured with
+                                    NOPASSWD for the tar command — ssh runs
+                                    without a TTY and stdin is consumed by tar,
+                                    so any password prompt will hang silently.
   --push-preimages-data-dir PATH    Remote rollup data dir containing wasm_2_0_0/
                                     [default: /opt/octez-evm-node/data_dir]
   --push-preimages-user USER        Remote user to extract as via sudo
@@ -145,6 +150,21 @@ err() {
   exit 2
 }
 log() { echo ">>> $*" >&2; }
+
+# Single EXIT trap. Each cleanup step appends to $cleanup_cmds so that
+# accumulating actions (HEAD restore, temp dir removal, ...) all run without
+# the second `trap ... EXIT` clobbering the first.
+cleanup_cmds=()
+run_cleanup() {
+  local cmd
+  # `${arr[@]+...}` guards against unbound-variable errors under `set -u`
+  # when no cleanup has been registered.
+  for cmd in ${cleanup_cmds[@]+"${cleanup_cmds[@]}"}; do
+    eval "$cmd" || true
+  done
+}
+trap run_cleanup EXIT
+add_cleanup() { cleanup_cmds+=("$1"); }
 
 # Poll the EVM JSON-RPC `tez_kernelVersion` until it matches $expected, or fail.
 verify_kernel_version() {
@@ -358,6 +378,27 @@ if [[ "$sources" -ne 1 ]]; then
   err "specify exactly one of: --build-commit / --kernel / --root-hash / --payload / --payload-file"
 fi
 
+# --preimages-dir only makes sense when preimages are produced locally
+# (i.e. with --kernel or --build-commit). With --root-hash / --payload /
+# --payload-file the script never invokes smart-rollup-installer, so a
+# --preimages-dir value would be silently dropped — error out instead of
+# leaving the user wondering why nothing got written there.
+if [[ -n "$PREIMAGES_DIR" && -z "$KERNEL" && -z "$BUILD_COMMIT" ]]; then
+  err "--preimages-dir requires --kernel or --build-commit (not --root-hash / --payload / --payload-file)"
+fi
+
+# --print-payload is a generation-only mode: it must not be combined with
+# deploy/broadcast arguments. Fail fast so the user gets clear guidance
+# instead of silently dropping --broadcast / --endpoint / etc.
+if [[ "$PRINT_PAYLOAD" == "true" ]]; then
+  if [[ "$DRY_RUN" == "false" ]]; then
+    err "--print-payload cannot be combined with --broadcast"
+  fi
+  if [[ -n "$ENDPOINT" || -n "$ADMIN_CONTRACT" || -n "$ADMIN_KEY" ]]; then
+    err "--print-payload cannot be combined with deploy args (--endpoint / --admin-contract / --admin-key)"
+  fi
+fi
+
 # Step 1 (optional): build WASM at a given commit.
 if [[ -n "$BUILD_COMMIT" ]]; then
   command -v git > /dev/null || err "git is required for --build-commit"
@@ -366,8 +407,17 @@ if [[ -n "$BUILD_COMMIT" ]]; then
   [[ -x "$repo_root/etherlink/scripts/build-wasm.sh" ]] ||
     err "$repo_root/etherlink/scripts/build-wasm.sh not found or not executable"
 
-  log "checking out $BUILD_COMMIT"
-  (cd "$repo_root" && git checkout "$BUILD_COMMIT") >&2
+  # Capture the prior HEAD so we can restore it on exit. Use `git symbolic-ref`
+  # to keep the branch name when HEAD points at one (otherwise `rev-parse HEAD`
+  # would leave the user on a detached HEAD after the script exits).
+  prev_head="$(git -C "$repo_root" symbolic-ref --quiet --short HEAD 2> /dev/null ||
+    git -C "$repo_root" rev-parse HEAD)"
+  add_cleanup "echo '>>> restoring HEAD to $prev_head' >&2; git -C '$repo_root' checkout --quiet '$prev_head'"
+
+  log "checking out $BUILD_COMMIT (detached; HEAD will be restored to $prev_head on exit)"
+  # --detach so a branch name in $BUILD_COMMIT does not move that branch as
+  # subsequent commits from the user's shell would land on the tracked branch.
+  (cd "$repo_root" && git checkout --detach "$BUILD_COMMIT") >&2
 
   log "building kernel at $BUILD_COMMIT (this can take a while)"
   (cd "$repo_root" && ./etherlink/scripts/build-wasm.sh) >&2
@@ -428,7 +478,7 @@ if [[ -n "$ROOT_HASH" ]]; then
       err "octez-client is required to register the rollup alias for octez-evm-node"
     if [[ -z "$CLIENT_DIR" ]]; then
       CLIENT_DIR="$(mktemp -d -t kernel-upgrade-client-XXXXXX)"
-      trap 'rm -rf "$CLIENT_DIR"' EXIT
+      add_cleanup "rm -rf '$CLIENT_DIR'"
     fi
     rollup_alias="kernel-upgrade-rollup-$$"
     log "registering rollup $ROLLUP as alias '$rollup_alias' in $CLIENT_DIR"
@@ -443,6 +493,14 @@ if [[ -n "$ROOT_HASH" ]]; then
 
   log "generating upgrade payload"
   raw="$("$OCTEZ_EVM_NODE_BIN" "${payload_args[@]}")"
+  # Contract: `octez-evm-node make upgrade payload ...` prints the payload as
+  # its single non-blank output line (see the printer at
+  # etherlink/bin_node/main.ml, `make_upgrade_command`: `Format.printf "'Pair
+  # ...'"` / `Printf.printf "%s"`). We pick the last non-blank line so any
+  # future leading diagnostics (e.g. the `Activation timestamp:` line emitted
+  # by --show-activation-timestamp) don't break parsing. If a future change
+  # adds *trailing* output, this will silently capture the wrong line — update
+  # this parser to match the new contract.
   PAYLOAD="$(printf '%s\n' "$raw" | awk 'NF{p=$0} END{print p}')"
   [[ -n "$PAYLOAD" ]] || err "could not parse payload from octez-evm-node output: $raw"
 
@@ -488,10 +546,16 @@ if [[ -n "$PUSH_PREIMAGES" ]]; then
     log "pushing preimages from $PREIMAGES_DIR to $PUSH_PREIMAGES:$PUSH_PREIMAGES_DATA_DIR/wasm_2_0_0/ (extract as $PUSH_PREIMAGES_USER)"
     # We deliberately want client-side expansion of $PUSH_PREIMAGES_USER and
     # $PUSH_PREIMAGES_DATA_DIR — they are local script variables, not remote.
+    # `printf %q` shell-quotes each value so spaces, globs, and shell
+    # metacharacters in custom flag values cannot fragment the remote command
+    # or be interpreted by the remote shell (potential remote code execution
+    # under sudo with malformed CLI input).
+    remote_user_q="$(printf '%q' "$PUSH_PREIMAGES_USER")"
+    remote_dir_q="$(printf '%q' "$PUSH_PREIMAGES_DATA_DIR/wasm_2_0_0")"
     # shellcheck disable=SC2029
     (cd "$PREIMAGES_DIR" && tar -cf - .) |
       ssh "$PUSH_PREIMAGES" \
-        "sudo -u $PUSH_PREIMAGES_USER tar -C $PUSH_PREIMAGES_DATA_DIR/wasm_2_0_0 -xf -"
+        "sudo -u $remote_user_q tar -C $remote_dir_q -xf -"
     log "preimages push completed"
   fi
 fi
@@ -518,7 +582,7 @@ case "$ADMIN_KEY" in
 encrypted:* | unencrypted:*)
   if [[ -z "$CLIENT_DIR" ]]; then
     CLIENT_DIR="$(mktemp -d -t kernel-upgrade-client-XXXXXX)"
-    trap 'rm -rf "$CLIENT_DIR"' EXIT
+    add_cleanup "rm -rf '$CLIENT_DIR'"
   fi
   deploy_base_dir=(--base-dir "$CLIENT_DIR")
   ADMIN_ALIAS="kernel-upgrade-admin-$$"
