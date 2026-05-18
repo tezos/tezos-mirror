@@ -273,32 +273,41 @@ end = struct
     in
     let rec loop () =
       let query_id = read_query_id input in
-      try
-        let r =
-          process_query ~query_id ~input cryptobox shards_proofs_precomputation
-        in
-        match r with
-        | Ok proved_shards_encoded ->
-            let () = reply_success ~query_id ~proved_shards_encoded ~output in
-            loop ()
-        | Error err ->
-            let (`Other err) = err in
-            let error = Format.asprintf "%a" Error_monad.pp_print_trace err in
-            (* send a reply with the error, and continue *)
-            let () = reply_error_query ~output ~query_id ~error in
-            loop ()
-      with
-      | Eio.Cancel.Cancelled _ | Amplificator_stopped ->
-          Tezos_bees.Hive.async_lwt (fun () ->
-              Event.emit_crypto_process_stopped ())
-      | exn ->
-          let error = Printexc.to_string exn in
-          let () =
+      let outcome =
+        try
+          (let r =
+             process_query
+               ~query_id
+               ~input
+               cryptobox
+               shards_proofs_precomputation
+           in
+           match r with
+           | Ok proved_shards_encoded ->
+               reply_success ~query_id ~proved_shards_encoded ~output
+           | Error err ->
+               let (`Other err) = err in
+               let error =
+                 Format.asprintf "%a" Error_monad.pp_print_trace err
+               in
+               (* send a reply with the error, and continue *)
+               reply_error_query ~output ~query_id ~error) ;
+          `Continue
+        with
+        | Eio.Cancel.Cancelled _ | Amplificator_stopped ->
             Tezos_bees.Hive.async_lwt (fun () ->
-                Event.emit_crypto_process_error ~msg:error)
-          in
-          let () = reply_error_query ~output ~query_id ~error in
-          raise exn
+                Event.emit_crypto_process_stopped ()) ;
+            `Stop
+        | exn ->
+            let error = Printexc.to_string exn in
+            let () =
+              Tezos_bees.Hive.async_lwt (fun () ->
+                  Event.emit_crypto_process_error ~msg:error)
+            in
+            let () = reply_error_query ~output ~query_id ~error in
+            raise exn
+      in
+      match outcome with `Continue -> loop () | `Stop -> ()
     in
     loop ()
 end
