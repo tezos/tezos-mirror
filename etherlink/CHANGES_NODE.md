@@ -16,6 +16,14 @@
 
 ### Storage changes
 
+- Resolve `chain_id`, `evm_version`, `maximum_gas_per_transaction`,
+  `sequencer_governance`, `sequencer_pool_address` and the
+  block-number index from their new locations under `/evm/world_state/` on
+  kernels at storage version 58 or higher, falling back to the legacy
+  `/evm/` paths otherwise. Operators must upgrade to this release before
+  running a V58+ kernel; the release stays backward-compatible with pre-V58
+  kernels. (!21911)
+
 ### Documentation changes
 
 ### Experimental features changes
