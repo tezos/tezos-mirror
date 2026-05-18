@@ -143,5 +143,3 @@ val identity_file : t -> string
 (** [peers_file config] returns the absolute path to the "peers.json"
     file of the DAL node, based on the configuration [config]. *)
 val peers_file : t -> string
-
-val legacy_network_name : string

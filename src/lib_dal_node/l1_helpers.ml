@@ -76,26 +76,8 @@ let fetch_l1_known_protocols cctxt =
     ~rpc:(fun x -> Chain_services.Protocols.list x ())
     ~requested_info:"protocols"
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/7851
-
-   The function below infers the DAL network name based on the L1 chain name and
-   the DAL node version.
-
-   - For DAL node versions <= V22, the legacy "dal-sandbox" network name is used.
-   - For versions >= V23, the new naming scheme "DAL_<L1_CHAIN_NAME>" is used.
-
-   This ensures a smooth transition during the migration period.
-
-   For the new naming scheme, the function queries the L1 node to retrieve its
-   chain name and constructs the corresponding DAL network name by prefixing
-   it with "DAL_".
-*)
 let infer_dal_network_name cctxt =
   let open Lwt_result_syntax in
-  (* Now that V23 is released and V24 is in the pipeline, we can move to the
-     second migration phase of https://gitlab.com/tezos/tezos/-/issues/7851:
-     all upcoming versions (and master) should advertise only the new DAL node
-     network naming scheme. "dal-sandbox" will no longer be advertised. *)
   let+ l1_version = fetch_l1_version_info cctxt in
   Format.sprintf "DAL_%s" (l1_version.network_version.chain_name :> string)
   |> Distributed_db_version.Name.of_string
