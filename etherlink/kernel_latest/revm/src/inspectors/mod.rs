@@ -107,6 +107,7 @@ pub struct EtherlinkHandler<CTX, ERROR, FRAME> {
     /// on the top-level frame so REVM enforces strict `STATICCALL`
     /// semantics. Used by [`TransactionOrigin::CrossRuntimeStatic`](crate::TransactionOrigin::CrossRuntimeStatic).
     is_static_top_frame: bool,
+    call_depth: usize,
     _phantom: core::marker::PhantomData<(CTX, ERROR, FRAME)>,
 }
 
@@ -116,8 +117,14 @@ impl<CTX, ERROR, FRAME> EtherlinkHandler<CTX, ERROR, FRAME> {
     pub fn new_static() -> Self {
         Self {
             is_static_top_frame: true,
+            call_depth: 0,
             _phantom: core::marker::PhantomData,
         }
+    }
+
+    pub fn with_call_depth(mut self, depth: usize) -> Self {
+        self.call_depth = depth;
+        self
     }
 }
 
@@ -180,7 +187,7 @@ where
         }
 
         Ok(FrameInit {
-            depth: 0,
+            depth: self.call_depth,
             memory,
             frame_input,
         })
@@ -191,6 +198,7 @@ impl<CTX, ERROR, FRAME> Default for EtherlinkHandler<CTX, ERROR, FRAME> {
     fn default() -> Self {
         Self {
             is_static_top_frame: false,
+            call_depth: 0,
             _phantom: core::marker::PhantomData,
         }
     }

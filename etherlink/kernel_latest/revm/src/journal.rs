@@ -754,9 +754,15 @@ where
         &mut self,
         http_request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>> {
-        self.database
-            .registry
-            .serve(self.database.host, self.journal, http_request)
+        let revm_depth = self.depth().try_into().unwrap_or(u32::MAX);
+        let saved = self.journal.evm.revm_call_depth();
+        self.journal.evm.set_revm_call_depth(Some(revm_depth));
+        let response =
+            self.database
+                .registry
+                .serve(self.database.host, self.journal, http_request);
+        self.journal.evm.set_revm_call_depth(saved);
+        response
     }
 
     fn crac_id(&self) -> String {

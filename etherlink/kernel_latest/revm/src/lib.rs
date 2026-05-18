@@ -338,6 +338,7 @@ fn execute_transaction<'a, Host, R: Registry>(
     tx: &'a TxEnv,
     transaction_hash: Option<[u8; TRANSACTION_HASH_SIZE]>,
     is_static_top_frame: bool,
+    call_depth: usize,
 ) -> Result<ExecutionResult, EVMError<EvmDbError>>
 where
     Host: StorageV1,
@@ -366,7 +367,8 @@ where
                 EtherlinkHandler::new_static()
             } else {
                 EtherlinkHandler::default()
-            };
+            }
+            .with_call_depth(call_depth);
         handler.run(evm_context)
     })
 }
@@ -394,6 +396,7 @@ where
     Host: StorageV1,
 {
     let block_env = block_env(block_constants)?;
+    let call_depth = journal.evm.revm_call_depth().unwrap_or(0) as usize;
     let tx = tx_env(
         host,
         journal,
@@ -468,7 +471,8 @@ where
                 EtherlinkHandler::new_static()
             } else {
                 EtherlinkHandler::default()
-            };
+            }
+            .with_call_depth(call_depth);
         let result = handler.inspect_run(&mut evm_context)?;
 
         if let Some(err) = evm_context.ctx.journaled_state.take_deferred_error() {
@@ -538,6 +542,7 @@ where
             &tx,
             transaction_hash,
             is_static_top_frame,
+            call_depth,
         )?;
 
         if let Some(err) = evm_context.ctx.journaled_state.take_deferred_error() {
@@ -1287,6 +1292,134 @@ mod test {
             contract_account.get_storage(&host, &U256::from(1)).unwrap();
 
         assert_eq!(storage_slot_value, U256::from(66));
+    }
+
+    /// REVM call-depth tracking via `EvmJournal::revm_call_depth`:
+    /// when an outgoing precompile-gateway CRAC stashes a non-zero
+    /// depth on the journal, the next `run_transaction` reads it,
+    /// seeds REVM's `FrameInit { depth }`, and `CALL_STACK_LIMIT`
+    /// (1024) caps the chain. Pre-set the journal slot to 1024 and
+    /// assert the first CALL inside the inner transaction is rejected
+    /// with `CallTooDeep` (CALL returns 0 on stack); pre-set to 0 and
+    /// assert the same CALL goes through (returns 1).
+    #[test]
+    fn test_revm_call_depth_caps_inner_revm_chain() {
+        // Caller bytecode: CALL into 0x3333... and RETURN the CALL
+        // result as a 32-byte word. The CALL succeeds (returns `1`)
+        // at depth 0, fails (`0`) at depth 1024 — exactly where
+        // `CALL_STACK_LIMIT` kicks in for the inner CALL frame.
+        // Reading via RETURN data (not SSTORE) because `CrossRuntime`
+        // intentionally doesn't commit the EVM journal.
+        let code_hex = concat!(
+            "60006000600060006000",
+            "73",
+            "3333333333333333333333333333333333333333",
+            "5af1",
+            "60005260206000f3",
+        );
+        let bytecode = Bytecode::new_raw(Bytes::from_hex(code_hex).unwrap());
+        let callee_bytecode = Bytecode::new_raw(Bytes::from_hex("00").unwrap());
+
+        let run_with_journal_depth = |seed_depth: Option<u32>| -> U256 {
+            let mut host = MockKernelHost::default();
+            let block_constants = BlockConstants::test_block_with_no_fees();
+            let caller =
+                Address::from_hex("1111111111111111111111111111111111111111").unwrap();
+            let contract =
+                Address::from_hex("2222222222222222222222222222222222222222").unwrap();
+            let callee =
+                Address::from_hex("3333333333333333333333333333333333333333").unwrap();
+            StorageAccount::from_address(&caller)
+                .unwrap()
+                .set_info_without_code(
+                    &mut host,
+                    AccountInfo {
+                        balance: U256::MAX,
+                        nonce: 0,
+                        code_hash: Default::default(),
+                        account_id: None,
+                        code: None,
+                    },
+                )
+                .unwrap();
+            StorageAccount::from_address(&contract)
+                .unwrap()
+                .set_info(
+                    &mut host,
+                    AccountInfo {
+                        balance: U256::ZERO,
+                        nonce: 0,
+                        code_hash: bytes_hash(bytecode.original_byte_slice()),
+                        account_id: None,
+                        code: Some(bytecode.clone()),
+                    },
+                )
+                .unwrap();
+            StorageAccount::from_address(&callee)
+                .unwrap()
+                .set_info(
+                    &mut host,
+                    AccountInfo {
+                        balance: U256::ZERO,
+                        nonce: 0,
+                        code_hash: bytes_hash(callee_bytecode.original_byte_slice()),
+                        account_id: None,
+                        code: Some(callee_bytecode.clone()),
+                    },
+                )
+                .unwrap();
+
+            let registry = Registry::new();
+            let mut journal = TezosXJournal::default();
+            // Simulate the state an outgoing precompile-gateway CRAC
+            // left on the journal before re-entering EVM through a
+            // nested `run_transaction`.
+            journal.evm.set_revm_call_depth(seed_depth);
+
+            let outcome = run_transaction(
+                &mut host,
+                &registry,
+                &mut journal,
+                DEFAULT_SPEC_ID,
+                &block_constants,
+                None,
+                caller,
+                Some(contract),
+                Bytes::new(),
+                GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
+                U256::ZERO,
+                None,
+                None,
+                false,
+                TransactionOrigin::CrossRuntime { credit: None },
+            )
+            .unwrap();
+            match outcome.result {
+                ExecutionResult::Success { output, .. } => {
+                    let bytes = output.data();
+                    assert_eq!(bytes.len(), 32, "expected 32-byte return");
+                    U256::from_be_slice(bytes)
+                }
+                other => panic!("expected success, got {other:?}"),
+            }
+        };
+
+        // No outgoing-CRAC depth recorded → handler seeds 0 → first
+        // CALL fires at REVM depth 1, well below the cap → returns 1.
+        assert_eq!(
+            run_with_journal_depth(None),
+            U256::from(1u64),
+            "with revm_call_depth=None, inner CALL should succeed"
+        );
+
+        // Recorded depth = 1024 → handler seeds 1024 → first CALL
+        // would be at REVM depth 1025, rejected with `CallTooDeep` →
+        // CALL returns 0.
+        assert_eq!(
+            run_with_journal_depth(Some(1024)),
+            U256::ZERO,
+            "with revm_call_depth=1024, REVM should reject the inner CALL"
+        );
     }
 
     #[test]
