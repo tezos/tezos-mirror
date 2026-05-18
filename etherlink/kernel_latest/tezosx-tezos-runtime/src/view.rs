@@ -22,7 +22,7 @@ use std::rc::Rc;
 use mir::ast::big_map::BigMapId;
 use mir::ast::{AddressHash, IntoMicheline, Micheline, Type, TypedValue};
 use mir::context::{CtxTrait, TypecheckingCtx};
-use mir::interpreter::InterpretError;
+use mir::interpreter::{EnshrinedViewDispatchError, InterpretError};
 use mir::parser::Parser;
 use mir::typechecker::{typecheck_value, typecheck_view, TcError};
 use tezos_crypto_rs::hash::OperationHash;
@@ -63,14 +63,27 @@ fn classify_tc_error(e: TcError) -> TezosXRuntimeError {
 }
 
 /// Classify a MIR interpreter error. Same invariant as
-/// [`classify_tc_error`]: every error must map to a catchable 4XX.
-/// `OutOfGas` (including the variant nested under `TcError`) routes to
+/// [`classify_tc_error`]: every error must map to a catchable 4XX
+/// **except** kernel-side failures surfaced via
+/// [`InterpretError::EnshrinedViewDispatch`] (alias resolution,
+/// gas-conversion overflow, request-build, unclassifiable peer
+/// response), which route to [`TezosXRuntimeError::Custom`] (→ 500).
+/// The `InvalidDestination` arm of that enum is caller-controllable
+/// (Michelson `string` allows characters that `http::Uri` rejects),
+/// so it routes to `BadRequest` instead. `OutOfGas` (including the
+/// variant nested under `TcError`) routes to
 /// [`TezosXRuntimeError::OutOfGas`]; everything else defaults to
 /// [`TezosXRuntimeError::BadRequest`].
 fn classify_interpret_error(e: InterpretError) -> TezosXRuntimeError {
     match e {
         InterpretError::OutOfGas => TezosXRuntimeError::OutOfGas,
         InterpretError::TcError(TcError::OutOfGas) => TezosXRuntimeError::OutOfGas,
+        InterpretError::EnshrinedViewDispatch(
+            err @ EnshrinedViewDispatchError::InvalidDestination { .. },
+        ) => TezosXRuntimeError::BadRequest(err.to_string()),
+        InterpretError::EnshrinedViewDispatch(err) => {
+            TezosXRuntimeError::Custom(err.to_string())
+        }
         other => TezosXRuntimeError::BadRequest(format!("{other:?}")),
     }
 }
@@ -97,6 +110,7 @@ fn classify_interpret_error(e: InterpretError) -> TezosXRuntimeError {
 /// in `X-Tezos-Gas-Consumed`.
 pub fn execute_view_call<Host>(
     chain_id: &tezos_crypto_rs::hash::ChainId,
+    registry: &impl tezosx_interfaces::Registry,
     host: &mut Host,
     journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
@@ -219,6 +233,8 @@ where
         tc_ctx: &mut tc_ctx,
         exec_ctx,
         operation_ctx: &mut operation_ctx,
+        journal: &mut *journal,
+        registry,
     };
 
     // Wrap the MIR-consuming work in an IIFE so that `consumed_milligas`
@@ -314,14 +330,11 @@ where
             })
     })();
 
-    // Always report consumed gas, regardless of MIR success/failure:
-    // `mir_ctx`'s mutable borrow ended when the IIFE returned, so the
-    // gas counter is readable again here.
-    *consumed_milligas = mir_ctx
-        .tc_ctx
-        .operation_gas
-        .total_milligas_consumed()
-        .into();
+    // Release the inner `&mut` borrow on `staticcall_bridge` (and
+    // through it on `journal`) before reading gas back from `tc_ctx`
+    // and before the outer caller writes to `journal`.
+    drop(mir_ctx);
+    *consumed_milligas = tc_ctx.operation_gas.total_milligas_consumed().into();
 
     let encoded = mir_result?;
 

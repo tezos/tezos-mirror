@@ -34,6 +34,12 @@
   `ApplyOperationError::CannotPayStorageFee` error trace,
   `SafeStorage` rolls back the batch, and `Applied` internals are
   cascade-demoted so the manager-operation tree stays L1-coherent. (!21840)
+- The MIR `VIEW` opcode can now reach a synthetic `staticcall_evm`
+  view on the TezosXGateway, letting any Michelson code — including
+  view bodies, where `TRANSFER_TOKENS` is forbidden — read EVM state
+  synchronously. The view's typed shape is
+  `pair string bytes : option bytes` (`(destination, calldata)`
+  argument, EVM response body wrapped in `Some` on success). (!21875)
 
 ### Native Atomic Composability
 

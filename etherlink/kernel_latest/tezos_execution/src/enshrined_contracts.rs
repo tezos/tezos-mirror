@@ -33,7 +33,8 @@ use tezosx_journal::TezosXJournal;
 
 use crate::account_storage::TezlinkAccount;
 use crate::mir_ctx::{
-    HasContractAccount, HasHost, HasOperationGas, HasOriginLookup, HasSourcePublicKey,
+    HasContractAccount, HasCrossRuntime, HasHost, HasOperationGas, HasOriginLookup,
+    HasSourcePublicKey,
 };
 
 /// Errors from CRAC-capable operations. The two variants have fundamentally
@@ -94,6 +95,14 @@ impl From<TransferError> for CracError {
             | TransferError::FailedToUpdateDestinationBalance
             | TransferError::FailedToComputeBalanceUpdate(_) => {
                 CracError::BlockAbort(format!("internal error during transfer: {e}"))
+            }
+            // Peer-runtime brokenness surfaced via MIR `VIEW
+            // staticcall_evm` (5xx, gas-budget translation overflow,
+            // dispatch-request build) — same EVM-runtime breakage
+            // would surface as `CracError::BlockAbort` on the
+            // gateway-HTTP entrypoint path; the view path must agree.
+            TransferError::EnshrinedViewDispatchAbort(_) => {
+                CracError::BlockAbort(format!("enshrined view dispatch: {e}"))
             }
             _ => CracError::Operation(e),
         }
@@ -192,9 +201,8 @@ pub(crate) fn execute_enshrined_contract<'a, Host>(
               + HasContractAccount
               + HasOperationGas
               + HasSourcePublicKey
-              + HasOriginLookup),
-    registry: &impl Registry,
-    journal: &mut TezosXJournal,
+              + HasOriginLookup
+              + HasCrossRuntime<Host>),
 ) -> Result<Vec<OperationInfo<'a>>, CracError>
 where
     Host: StorageV1,
@@ -211,7 +219,7 @@ where
                     .into());
                 };
                 let request = build_ethereum_request(&dest, &[])?;
-                dispatch_crac_call(registry, journal, ctx, request)?;
+                dispatch_crac_call(ctx, request)?;
                 Ok(vec![])
             } else if entrypoint.as_str() == "call_evm" {
                 charge_gateway_base_cost(ctx)?;
@@ -228,7 +236,7 @@ where
                 calldata.extend_from_slice(&selector);
                 calldata.extend_from_slice(&abi_params);
                 let request = build_ethereum_request(&dest, &calldata)?;
-                let response_body = dispatch_crac_call(registry, journal, ctx, request)?;
+                let response_body = dispatch_crac_call(ctx, request)?;
                 charge_gateway_payload(ctx, response_body.len())?;
                 dispatch_callback(ctx, callback, response_body).map_err(Into::into)
             } else if entrypoint.as_str() == "call" {
@@ -243,7 +251,7 @@ where
                             .saturating_mul(HEADER_VALIDATION_PER_HEADER_MILLIGAS),
                     )
                     .map_err(|_| TransferError::OutOfGas)?;
-                let body = dispatch_crac_call(registry, journal, ctx, request)?;
+                let body = dispatch_crac_call(ctx, request)?;
                 charge_gateway_payload(ctx, body.len())?;
                 dispatch_callback(ctx, callback, body).map_err(Into::into)
             } else if entrypoint.as_str() == "collect_result" {
@@ -280,9 +288,12 @@ where
                 ctx.operation_gas()
                     .cast_and_consume_milligas(collect_result_size_cost(payload.len()))
                     .map_err(|_| TransferError::OutOfGas)?;
-                journal.michelson.set_frame_result(payload).map_err(|e| {
-                    TransferError::GatewayError(format!("collect_result: {e}"))
-                })?;
+                ctx.journal()
+                    .michelson
+                    .set_frame_result(payload)
+                    .map_err(|e| {
+                        TransferError::GatewayError(format!("collect_result: {e}"))
+                    })?;
                 Ok(vec![])
             } else {
                 Err(TransferError::GatewayError(format!(
@@ -308,7 +319,7 @@ where
             let calldata = abi_encode_address_uint256(method_sig, &addr_bytes, &amount)?;
             charge_gateway_payload(ctx, calldata.len())?;
             let request = build_ethereum_request(&evm_contract, &calldata)?;
-            dispatch_crac_call(registry, journal, ctx, request)?;
+            dispatch_crac_call(ctx, request)?;
             Ok(vec![])
         }
     }
@@ -381,7 +392,9 @@ fn collect_result_size_cost(payload_len: usize) -> u64 {
 /// Charge the fixed per-call overhead for gateway entrypoints that
 /// cross into another runtime (HTTP request construction, header
 /// injection, response parsing).
-fn charge_gateway_base_cost(ctx: &mut impl HasOperationGas) -> Result<(), TransferError> {
+pub(crate) fn charge_gateway_base_cost(
+    ctx: &mut impl HasOperationGas,
+) -> Result<(), TransferError> {
     ctx.operation_gas()
         .cast_and_consume_milligas(TEZOSX_GATEWAY_BASE_COST_MILLIGAS)
         .map_err(|_| TransferError::OutOfGas)
@@ -390,7 +403,7 @@ fn charge_gateway_base_cost(ctx: &mut impl HasOperationGas) -> Result<(), Transf
 /// Charge `TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * bytes` for a chunk of
 /// gateway payload (outgoing body or response body). Complements the
 /// flat `charge_gateway_base_cost` with a size-proportional component.
-fn charge_gateway_payload(
+pub(crate) fn charge_gateway_payload(
     ctx: &mut impl HasOperationGas,
     bytes: usize,
 ) -> Result<(), TransferError> {
@@ -757,9 +770,8 @@ fn inject_context_headers<'a, Host>(
               + HasHost<Host>
               + HasOperationGas
               + HasSourcePublicKey
-              + HasOriginLookup),
-    journal: &mut TezosXJournal,
-    registry: &impl Registry,
+              + HasOriginLookup
+              + HasCrossRuntime<Host>),
 ) -> Result<http::Request<Vec<u8>>, TransferError>
 where
     Host: StorageV1,
@@ -833,17 +845,20 @@ where
         } else {
             None
         };
-        let (sender_alias, target_remaining) = registry
-            .ensure_alias(
-                ctx.host(),
-                journal,
-                alias_info,
-                sender_pubkey,
-                target_runtime,
-                context.clone(),
-                target_budget,
-            )
-            .map_err(|e| TransferError::GatewayError(e.to_string()))?;
+        let (sender_alias, target_remaining) = {
+            let (host, journal, registry) = ctx.cross_runtime_split();
+            registry
+                .ensure_alias(
+                    host,
+                    journal,
+                    alias_info,
+                    sender_pubkey,
+                    target_runtime,
+                    context.clone(),
+                    target_budget,
+                )
+                .map_err(|e| TransferError::GatewayError(e.to_string()))?
+        };
         let sender_target_consumed = target_budget - target_remaining;
         let sender_milligas =
             convert_gas(target_runtime, RuntimeId::Tezos, sender_target_consumed)
@@ -879,17 +894,20 @@ where
             let target_budget =
                 convert_gas(RuntimeId::Tezos, target_runtime, remaining_milligas)
                     .ok_or(TransferError::OutOfGas)?;
-            let (source_alias, target_remaining) = registry
-                .ensure_alias(
-                    ctx.host(),
-                    journal,
-                    alias_info,
-                    Some(&source_public_key),
-                    target_runtime,
-                    context,
-                    target_budget,
-                )
-                .map_err(|e| TransferError::GatewayError(e.to_string()))?;
+            let (source_alias, target_remaining) = {
+                let (host, journal, registry) = ctx.cross_runtime_split();
+                registry
+                    .ensure_alias(
+                        host,
+                        journal,
+                        alias_info,
+                        Some(&source_public_key),
+                        target_runtime,
+                        context,
+                        target_budget,
+                    )
+                    .map_err(|e| TransferError::GatewayError(e.to_string()))?
+            };
             let source_target_consumed = target_budget - target_remaining;
             let source_milligas =
                 convert_gas(target_runtime, RuntimeId::Tezos, source_target_consumed)
@@ -912,6 +930,7 @@ where
                     "http_call: Tezos gas limit overflows target runtime units".into(),
                 )
             })?;
+    let crac_id_str = ctx.journal().crac_id().to_string();
     inject_context_headers_raw(
         request.headers_mut(),
         &sender_alias,
@@ -920,12 +939,11 @@ where
         gas_limit,
         timestamp_u64,
         block_number_u32,
-        &journal.crac_id().to_string(),
+        &crac_id_str,
     )?;
     Ok(request)
 }
 
-#[allow(unused)]
 fn tezosx_resolve_source_alias_readonly(
     ctx: &impl HasOriginLookup,
     registry: &impl Registry,
@@ -1085,14 +1103,13 @@ fn build_ethereum_request(
 /// Dispatch a CRAC call: inject context headers, serve the request,
 /// classify the response, and debit the gateway balance.
 fn dispatch_crac_call<'a, Host>(
-    registry: &impl Registry,
-    journal: &mut TezosXJournal,
     ctx: &mut (impl CtxTrait<'a>
               + HasHost<Host>
               + HasContractAccount
               + HasOperationGas
               + HasSourcePublicKey
-              + HasOriginLookup),
+              + HasOriginLookup
+              + HasCrossRuntime<Host>),
     request: http::Request<Vec<u8>>,
 ) -> Result<Vec<u8>, CracError>
 where
@@ -1103,9 +1120,12 @@ where
     }
 
     let target_host = request.uri().host().map(str::to_string);
-    let request = inject_context_headers(request, ctx, journal, registry)?;
+    let request = inject_context_headers(request, ctx)?;
 
-    let response = registry.serve(ctx.host(), journal, request);
+    let response = {
+        let (host, journal, registry) = ctx.cross_runtime_split();
+        registry.serve(host, journal, request)
+    };
     let response_body = classify_and_charge_crac_response(
         response,
         target_host.as_deref(),
@@ -1133,6 +1153,159 @@ where
             .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
     }
     Ok(response_body)
+}
+
+/// Read-only counterpart to [`dispatch_crac_call`], shaped for the
+/// view-side bridge that backs the gateway's `staticcall_evm`
+/// synthetic view: build a `GET http://ethereum/<destination>`,
+/// inject the same `X-Tezos-*` context headers `dispatch_crac_call`
+/// would, fire `registry.serve`, charge `X-Tezos-Gas-Consumed` back
+/// to `operation_gas`, and classify the response.
+///
+/// - **2xx** → `Ok(Some(body))`.
+/// - **4xx** → `Ok(None)`, mirroring the standard MIR view dispatch's
+///   "view not found" outcome so the Michelson caller can `IF_NONE`.
+/// - **5xx / 1xx / 3xx** →
+///   `Err(EnshrinedViewDispatchError::UnclassifiableResponse)`. The
+///   EVM runtime's `serve()` only ever emits 200/400/500-class
+///   statuses today, so 1xx/3xx are unreachable; the typed variant
+///   surfaces the status code if that ever changes.
+///
+/// Internal failures (alias resolution, gas-unit overflow,
+/// request-build) surface as typed
+/// [`EnshrinedViewDispatchError`](mir::interpreter::EnshrinedViewDispatchError)
+/// variants; the caller (`view.rs::classify_interpret_error`) routes
+/// them to `TezosXRuntimeError::Custom` (→ 500) so they don't
+/// masquerade as caller-side `BadRequest`s.
+///
+/// The inner EVM gas limit is derived from `operation_gas.remaining`
+/// at call time, so it scales with the outer view's remaining
+/// budget rather than a hardcoded magic.
+#[allow(clippy::too_many_arguments)]
+pub fn dispatch_staticcall_evm_get<'a, Host, R, C>(
+    host: &mut Host,
+    operation_gas: &mut crate::gas::TezlinkOperationGas,
+    registry: &R,
+    journal: &mut TezosXJournal,
+    context: &C,
+    calling_kt1: &ContractKt1Hash,
+    crac_id: &str,
+    timestamp: &str,
+    block_number: &str,
+    destination: &str,
+    calldata: &[u8],
+) -> Result<Option<Vec<u8>>, mir::interpreter::InterpretError<'a>>
+where
+    Host: StorageV1,
+    R: Registry,
+    C: crate::context::Context,
+{
+    // Minimal `HasOriginLookup` adapter for the read-only alias
+    // resolution path: needs an immutable host plus the context, no
+    // operation gas / no source public key. Defined locally so the
+    // helper has no extra preconditions on its callers.
+    struct ViewOriginLookup<'a, H, C> {
+        host: &'a H,
+        context: &'a C,
+    }
+    impl<H: StorageV1, C: crate::context::Context> HasOriginLookup
+        for ViewOriginLookup<'_, H, C>
+    {
+        fn read_origin_for_address(
+            &self,
+            address: &AddressHash,
+        ) -> Result<Option<tezosx_interfaces::Origin>, tezos_storage::error::Error>
+        {
+            self.context.read_origin_for_address(self.host, address)
+        }
+    }
+
+    let sender_addr_hex = {
+        let lookup = ViewOriginLookup {
+            host: &*host,
+            context,
+        };
+        tezosx_resolve_source_alias_readonly(
+            &lookup,
+            registry,
+            &AddressHash::Kt1(calling_kt1.clone()),
+            RuntimeId::Ethereum,
+        )
+        .map_err(|_| mir::interpreter::EnshrinedViewDispatchError::AliasResolution)?
+    };
+
+    // Inner EVM gas budget derived from the view's remaining
+    // milligas. Out-of-gas surfaces as `OutOfGas`; a conversion
+    // failure (unrepresentable in EVM units) surfaces as
+    // `BudgetOverflow`. Neither is silently zeroed — silent zero
+    // would mask exhaustion as a "view target said no" 4xx.
+    let remaining_milligas = operation_gas
+        .remaining
+        .milligas()
+        .ok_or(mir::interpreter::InterpretError::OutOfGas)?
+        as u64;
+    let evm_gas_limit = tezosx_interfaces::gas::convert(
+        RuntimeId::Tezos,
+        RuntimeId::Ethereum,
+        remaining_milligas,
+    )
+    .ok_or(mir::interpreter::EnshrinedViewDispatchError::BudgetOverflow)?;
+
+    // Parse the URI up-front so a caller-supplied bad destination
+    // surfaces as `InvalidDestination` (→ 400) rather than getting
+    // lumped into the kernel-side `DispatchSetup` (→ 500). Michelson
+    // `string` allows characters that `http::Uri` rejects
+    // (e.g. spaces), so this path is reachable from caller input.
+    let url = format!("http://ethereum/{destination}");
+    let uri: http::Uri = url.parse().map_err(|_| {
+        mir::interpreter::EnshrinedViewDispatchError::InvalidDestination {
+            destination: destination.to_string(),
+        }
+    })?;
+    let request = http::Request::builder()
+        .method(http::Method::GET)
+        .uri(uri)
+        .header(tezosx_interfaces::X_TEZOS_SENDER, sender_addr_hex.as_str())
+        // Views have no separate operation source (the kernel
+        // synthesizes a null implicit account on this path); mirror
+        // sender so `dispatch_crac_call`'s state-mutating counterpart
+        // stays comparable.
+        .header(tezosx_interfaces::X_TEZOS_SOURCE, sender_addr_hex.as_str())
+        .header(tezosx_interfaces::X_TEZOS_AMOUNT, "0")
+        .header(
+            tezosx_interfaces::X_TEZOS_GAS_LIMIT,
+            evm_gas_limit.to_string(),
+        )
+        .header(tezosx_interfaces::X_TEZOS_TIMESTAMP, timestamp)
+        .header(tezosx_interfaces::X_TEZOS_BLOCK_NUMBER, block_number)
+        .header(tezosx_interfaces::X_TEZOS_CRAC_ID, crac_id)
+        .body(calldata.to_vec())
+        .map_err(|_| mir::interpreter::EnshrinedViewDispatchError::DispatchSetup)?;
+
+    let response = registry.serve(host, journal, request);
+    let status = response.status().as_u16();
+
+    // Charge the inner EVM execution cost back to the operation gas —
+    // `X-Tezos-Gas-Consumed` is mandatory on 2xx and best-effort on
+    // 4xx; mirrors `classify_and_charge_crac_response`.
+    if let Ok(consumed_milligas) = extract_gas_consumed(&response, Some("ethereum")) {
+        operation_gas
+            .cast_and_consume_milligas(consumed_milligas)
+            .map_err(|_| mir::interpreter::InterpretError::OutOfGas)?;
+    }
+
+    if (200..300).contains(&status) {
+        Ok(Some(response.into_body()))
+    } else if (400..500).contains(&status) {
+        Ok(None)
+    } else {
+        Err(
+            mir::interpreter::EnshrinedViewDispatchError::UnclassifiableResponse {
+                status,
+            }
+            .into(),
+        )
+    }
 }
 
 fn bigint_to_u256(value: &num_bigint::BigInt) -> Result<U256, TransferError> {
@@ -1391,10 +1564,8 @@ mod tests {
         calldata.extend_from_slice(&abi_params);
 
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
-        let mut ctx = MockCtx::new(&mut host, source, amount);
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
         let result = dispatch_crac_call(
-            &registry,
-            &mut journal,
             &mut ctx,
             build_ethereum_request(dest, &calldata).unwrap(),
         );
@@ -1436,13 +1607,10 @@ mod tests {
         let amount = 1000u64;
 
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
-        let mut ctx = MockCtx::new(&mut host, source, amount as i64);
-        let result = dispatch_crac_call(
-            &registry,
-            &mut journal,
-            &mut ctx,
-            build_ethereum_request(dest, &[]).unwrap(),
-        );
+        let mut ctx =
+            MockCtx::new(&mut host, &mut journal, &registry, source, amount as i64);
+        let result =
+            dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
         assert!(result.is_ok());
 
         // Verify ensure_alias was called for both sender and source
@@ -1475,27 +1643,19 @@ mod tests {
         let amount = 1000i64;
 
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
-        let mut ctx = MockCtx::new(&mut host, source, amount);
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
 
         // First transfer creates aliases (sender + source)
-        let result1 = dispatch_crac_call(
-            &registry,
-            &mut journal,
-            &mut ctx,
-            build_ethereum_request(dest, &[]).unwrap(),
-        );
+        let result1 =
+            dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
         assert!(result1.is_ok());
 
         // Second transfer calls ensure_alias again. Dedup is the
         // responsibility of ensure_alias itself (Branch 1: returns
         // early when the alias account is already classified) — it
         // is no longer the resolver's concern.
-        let result2 = dispatch_crac_call(
-            &registry,
-            &mut journal,
-            &mut ctx,
-            build_ethereum_request(dest, &[]).unwrap(),
-        );
+        let result2 =
+            dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
         assert!(result2.is_ok());
 
         let alias_calls = registry.ensure_alias_calls.borrow();
@@ -1519,15 +1679,11 @@ mod tests {
         let amount = 500i64;
 
         let mut journal = TezosXJournal::default();
-        let mut ctx = MockCtx::new(&mut host, source, amount);
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
 
         let gas_before = ctx.operation_gas().remaining.milligas().unwrap();
-        let result = dispatch_crac_call(
-            &registry,
-            &mut journal,
-            &mut ctx,
-            build_ethereum_request(dest, &[]).unwrap(),
-        );
+        let result =
+            dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
         assert!(result.is_ok());
         let gas_after = ctx.operation_gas().remaining.milligas().unwrap();
 
@@ -1558,26 +1714,18 @@ mod tests {
         let amount = 500i64;
 
         let mut journal = TezosXJournal::default();
-        let mut ctx = MockCtx::new(&mut host, source, amount);
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
 
-        let result1 = dispatch_crac_call(
-            &registry,
-            &mut journal,
-            &mut ctx,
-            build_ethereum_request(dest, &[]).unwrap(),
-        );
+        let result1 =
+            dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
         assert!(result1.is_ok());
         let gas_after_first = ctx.operation_gas().remaining.milligas().unwrap();
 
         // Second call: ensure_alias is invoked again but its idempotent
         // Branch 1 returns gas_remaining unchanged. The fixed cost
         // bounds the per-transfer overhead.
-        let result2 = dispatch_crac_call(
-            &registry,
-            &mut journal,
-            &mut ctx,
-            build_ethereum_request(dest, &[]).unwrap(),
-        );
+        let result2 =
+            dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
         assert!(result2.is_ok());
         let gas_after_second = ctx.operation_gas().remaining.milligas().unwrap();
 
@@ -1625,12 +1773,18 @@ mod tests {
     }
 
     /// Typecheck a Micheline call value into a TypedValue.
+    ///
+    /// Owns its own journal/registry — typechecking only needs the
+    /// trait bounds, not the values, so they're scoped to this call
+    /// and dropped before the result returns.
     fn typecheck_call<'a>(
         value: &Micheline<'a>,
-        host: &'a mut MockKernelHost,
+        host: &mut MockKernelHost,
     ) -> Result<TypedValue<'a>, TransferError> {
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
-        let mut ctx = MockCtx::new(host, source, 0);
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+        let mut ctx = MockCtx::new(host, &mut journal, &registry, source, 0);
         typecheck_entrypoint_value(
             EnshrinedContracts::TezosXGateway,
             &Entrypoint::try_from("call").unwrap(),
@@ -1810,13 +1964,9 @@ mod tests {
         let amount = 0i64;
 
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
-        let mut ctx = MockCtx::new(&mut host, source, amount);
-        let result = dispatch_crac_call(
-            &registry,
-            &mut journal,
-            &mut ctx,
-            build_ethereum_request(dest, &[]).unwrap(),
-        );
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
+        let result =
+            dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
         assert!(result.is_ok());
 
         let serve_calls = registry.serve_calls.borrow();
@@ -1838,13 +1988,9 @@ mod tests {
         let amount = -1i64;
 
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
-        let mut ctx = MockCtx::new(&mut host, source, amount);
-        let result = dispatch_crac_call(
-            &registry,
-            &mut journal,
-            &mut ctx,
-            build_ethereum_request(dest, &[]).unwrap(),
-        );
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
+        let result =
+            dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(
@@ -1873,7 +2019,7 @@ mod tests {
         let amount = 100_000_000i64; // 100 tez in mutez
 
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
-        let mut ctx = MockCtx::new(&mut host, source, amount);
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
 
         let entrypoint = Entrypoint::default();
         let value = Micheline::String(dest.to_string());
@@ -1883,8 +2029,6 @@ mod tests {
             &entrypoint,
             value,
             &mut ctx,
-            &registry,
-            &mut journal,
         );
         assert!(
             result.is_ok(),
@@ -1916,7 +2060,7 @@ mod tests {
         let amount = 50_000_000i64;
 
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
-        let mut ctx = MockCtx::new(&mut host, source, amount);
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
 
         let arena = typed_arena::Arena::new();
         let dest = "0x1234567890123456789012345678901234567890";
@@ -1946,8 +2090,6 @@ mod tests {
             &entrypoint,
             value,
             &mut ctx,
-            &registry,
-            &mut journal,
         );
         assert!(result.is_ok(), "call_evm entrypoint failed: {result:?}");
 
@@ -1975,13 +2117,9 @@ mod tests {
         let dest = "0x1234567890123456789012345678901234567890";
         let amount = 100i64;
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
-        let mut ctx = MockCtx::new(&mut host, source, amount);
-        let result = dispatch_crac_call(
-            &registry,
-            &mut journal,
-            &mut ctx,
-            build_ethereum_request(dest, &[]).unwrap(),
-        );
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
+        let result =
+            dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(
@@ -2007,13 +2145,9 @@ mod tests {
         let dest = "0x1234567890123456789012345678901234567890";
 
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
-        let mut ctx = MockCtx::new(&mut host, source, 0);
-        let result = dispatch_crac_call(
-            &registry,
-            &mut journal,
-            &mut ctx,
-            build_ethereum_request(dest, &[]).unwrap(),
-        );
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
+        let result =
+            dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(
@@ -2313,13 +2447,9 @@ mod tests {
         let amount = 1_000_000i64;
 
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
-        let mut ctx = MockCtx::new(&mut host, source, amount);
-        let result = dispatch_crac_call(
-            &registry,
-            &mut journal,
-            &mut ctx,
-            build_ethereum_request(dest, &[]).unwrap(),
-        );
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
+        let result =
+            dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
         assert!(result.is_ok());
 
         let serve_calls = registry.serve_calls.borrow();
@@ -2341,13 +2471,9 @@ mod tests {
         let amount = 1i64;
 
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
-        let mut ctx = MockCtx::new(&mut host, source, amount);
-        let result = dispatch_crac_call(
-            &registry,
-            &mut journal,
-            &mut ctx,
-            build_ethereum_request(dest, &[]).unwrap(),
-        );
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
+        let result =
+            dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
         assert!(result.is_ok());
 
         let serve_calls = registry.serve_calls.borrow();
@@ -2363,7 +2489,9 @@ mod tests {
     fn test_typecheck_unknown_entrypoint_returns_error() {
         let mut host = MockKernelHost::default();
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
-        let mut ctx = MockCtx::new(&mut host, source, 0);
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         let value = Micheline::String("hello".to_string());
         let result = typecheck_entrypoint_value(
             EnshrinedContracts::TezosXGateway,
@@ -2383,7 +2511,9 @@ mod tests {
     fn test_typecheck_wrong_type_for_default_entrypoint() {
         let mut host = MockKernelHost::default();
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
-        let mut ctx = MockCtx::new(&mut host, source, 0);
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         // Default entrypoint expects a string, not bytes
         let value = Micheline::Bytes(vec![0x01, 0x02]);
         let result = typecheck_entrypoint_value(
@@ -2415,7 +2545,9 @@ mod tests {
     fn test_collect_result_typechecks_bytes() {
         let mut host = MockKernelHost::default();
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
-        let mut ctx = MockCtx::new(&mut host, source, 0);
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         let value = Micheline::Bytes(vec![0xDE, 0xAD, 0xBE, 0xEF]);
         let result = typecheck_entrypoint_value(
             EnshrinedContracts::TezosXGateway,
@@ -2430,7 +2562,9 @@ mod tests {
     fn test_collect_result_rejects_non_bytes() {
         let mut host = MockKernelHost::default();
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
-        let mut ctx = MockCtx::new(&mut host, source, 0);
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         let value = Micheline::String("not bytes".to_string());
         let result = typecheck_entrypoint_value(
             EnshrinedContracts::TezosXGateway,
@@ -2456,15 +2590,13 @@ mod tests {
         // %collect_result writes to the current CRAC frame's slot, which
         // the calling EVM frame would have created.  Simulate that here.
         journal.michelson.push_external_checkpoint();
-        let mut ctx = MockCtx::new(&mut host, source, 0);
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         let value = Micheline::Bytes(vec![0xCA, 0xFE]);
         let result = execute_enshrined_contract(
             EnshrinedContracts::TezosXGateway,
             &Entrypoint::try_from("collect_result").unwrap(),
             value,
             &mut ctx,
-            &registry,
-            &mut journal,
         );
         assert!(result.is_ok());
         // No serve calls are made: %collect_result only deposits bytes.
@@ -2488,15 +2620,13 @@ mod tests {
         // %collect_result writes to the current CRAC frame's slot, which
         // the calling EVM frame would have created.  Simulate that here.
         journal.michelson.push_external_checkpoint();
-        let mut ctx = MockCtx::new(&mut host, source, 0);
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         let value = Micheline::Bytes(vec![]);
         let result = execute_enshrined_contract(
             EnshrinedContracts::TezosXGateway,
             &Entrypoint::try_from("collect_result").unwrap(),
             value,
             &mut ctx,
-            &registry,
-            &mut journal,
         );
         assert!(result.is_ok());
         assert_eq!(journal.michelson.frame_result(), Some(&[][..]));
@@ -2517,15 +2647,13 @@ mod tests {
         // outside a CRAC frame must surface the journal invariant as a
         // gateway error so the operation reverts cleanly.
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
-        let mut ctx = MockCtx::new(&mut host, source, 0);
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         let value = Micheline::Bytes(vec![0xCA, 0xFE]);
         let result = execute_enshrined_contract(
             EnshrinedContracts::TezosXGateway,
             &Entrypoint::try_from("collect_result").unwrap(),
             value,
             &mut ctx,
-            &registry,
-            &mut journal,
         );
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -2551,15 +2679,13 @@ mod tests {
         // %collect_result writes to the current CRAC frame's slot, which
         // the calling EVM frame would have created.  Simulate that here.
         journal.michelson.push_external_checkpoint();
-        let mut ctx = MockCtx::new(&mut host, source, 0);
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         // First dispatch deposits the payload.
         let first = execute_enshrined_contract(
             EnshrinedContracts::TezosXGateway,
             &Entrypoint::try_from("collect_result").unwrap(),
             Micheline::Bytes(vec![0xCA, 0xFE]),
             &mut ctx,
-            &registry,
-            &mut journal,
         );
         assert!(first.is_ok());
         // Second dispatch on the same frame must fail: the slot is
@@ -2569,8 +2695,6 @@ mod tests {
             &Entrypoint::try_from("collect_result").unwrap(),
             Micheline::Bytes(vec![0xBE, 0xEF]),
             &mut ctx,
-            &registry,
-            &mut journal,
         );
         assert!(second.is_err());
         let err = second.unwrap_err();
@@ -2601,15 +2725,13 @@ mod tests {
         journal.michelson.push_external_checkpoint();
         // Non-zero amount: %collect_result has no recipient and is not
         // a CRAC, so any positive amount must fail.
-        let mut ctx = MockCtx::new(&mut host, source, 1);
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 1);
         let value = Micheline::Bytes(vec![0xCA, 0xFE]);
         let result = execute_enshrined_contract(
             EnshrinedContracts::TezosXGateway,
             &Entrypoint::try_from("collect_result").unwrap(),
             value,
             &mut ctx,
-            &registry,
-            &mut journal,
         );
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -2640,7 +2762,7 @@ mod tests {
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
         journal.michelson.push_external_checkpoint();
-        let mut ctx = MockCtx::new(&mut host, source, 0);
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         ctx.operation_gas =
             crate::gas::TezlinkOperationGas::start_milligas(100_000).unwrap();
         let result = execute_enshrined_contract(
@@ -2648,8 +2770,6 @@ mod tests {
             &Entrypoint::try_from("collect_result").unwrap(),
             Micheline::Bytes(vec![0u8; 256]),
             &mut ctx,
-            &registry,
-            &mut journal,
         );
         assert!(result.is_ok());
         assert_eq!(ctx.operation_gas().total_milligas_consumed() as u64, 944);
@@ -2664,7 +2784,7 @@ mod tests {
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
         journal.michelson.push_external_checkpoint();
-        let mut ctx = MockCtx::new(&mut host, source, 0);
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         ctx.operation_gas = crate::gas::TezlinkOperationGas::start_milligas(
             TYPECHECK_VALUE_STEP_MILLIGAS + COLLECT_RESULT_SIZE_BASE_MILLIGAS,
         )
@@ -2674,8 +2794,6 @@ mod tests {
             &Entrypoint::try_from("collect_result").unwrap(),
             Micheline::Bytes(vec![]),
             &mut ctx,
-            &registry,
-            &mut journal,
         );
         assert!(result.is_ok());
         assert_eq!(ctx.operation_gas().remaining.milligas().unwrap(), 0);
@@ -2691,7 +2809,7 @@ mod tests {
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
         journal.michelson.push_external_checkpoint();
-        let mut ctx = MockCtx::new(&mut host, source, 0);
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         ctx.operation_gas = crate::gas::TezlinkOperationGas::start_milligas(
             TYPECHECK_VALUE_STEP_MILLIGAS,
         )
@@ -2703,8 +2821,6 @@ mod tests {
             &Entrypoint::try_from("collect_result").unwrap(),
             Micheline::Bytes(vec![]),
             &mut ctx,
-            &registry,
-            &mut journal,
         )
         .unwrap_err();
         assert!(matches!(err, CracError::Operation(TransferError::OutOfGas)));
@@ -2739,7 +2855,7 @@ mod tests {
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
         // No `push_external_checkpoint` — `set_frame_result` fails.
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
-        let mut ctx = MockCtx::new(&mut host, source, 0);
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         ctx.operation_gas =
             crate::gas::TezlinkOperationGas::start_milligas(100_000).unwrap();
         let result = execute_enshrined_contract(
@@ -2747,8 +2863,6 @@ mod tests {
             &Entrypoint::try_from("collect_result").unwrap(),
             Micheline::Bytes(vec![0u8; 256]),
             &mut ctx,
-            &registry,
-            &mut journal,
         );
         assert!(result.is_err());
         // typecheck (100) + size base (460) + 1.5 * 256 (384) = 944.
@@ -2766,7 +2880,7 @@ mod tests {
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
         journal.michelson.push_external_checkpoint();
-        let mut ctx = MockCtx::new(&mut host, source, 0);
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         ctx.operation_gas =
             crate::gas::TezlinkOperationGas::start_milligas(100_000).unwrap();
         // First deposit succeeds. 2-byte payload:
@@ -2776,8 +2890,6 @@ mod tests {
             &Entrypoint::try_from("collect_result").unwrap(),
             Micheline::Bytes(vec![0xCA, 0xFE]),
             &mut ctx,
-            &registry,
-            &mut journal,
         );
         assert!(first.is_ok());
         let after_first = ctx.operation_gas().total_milligas_consumed() as u64;
@@ -2789,8 +2901,6 @@ mod tests {
             &Entrypoint::try_from("collect_result").unwrap(),
             Micheline::Bytes(vec![0u8; 256]),
             &mut ctx,
-            &registry,
-            &mut journal,
         );
         assert!(second.is_err());
         assert_eq!(
@@ -2820,7 +2930,9 @@ mod tests {
             0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
         ])
         .unwrap();
-        let mut ctx = MockCtx::new(&mut host, source, 0);
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         let destination = make_test_address();
         let body = vec![0xDE, 0xAD];
         let ops =
@@ -2849,7 +2961,9 @@ mod tests {
             0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
         ])
         .unwrap();
-        let mut ctx = MockCtx::new(&mut host, source, 0);
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         // Drain almost all gas so there isn't enough for the callback
         let remaining = ctx.operation_gas().remaining.milligas().unwrap();
         let to_consume = remaining - 1;
@@ -2868,7 +2982,9 @@ mod tests {
             0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
         ])
         .unwrap();
-        let mut ctx = MockCtx::new(&mut host, source, 0);
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         // Simulate prior internal operations having consumed counters
         let _ = ctx.operation_counter(); // 1
         let _ = ctx.operation_counter(); // 2
@@ -2921,27 +3037,30 @@ mod tests {
         let entrypoint = Entrypoint::default();
 
         // Two gateway calls in the same tx
-        let mut ctx1 = MockCtx::new(&mut host, source.clone(), 10_000_000);
+        let mut ctx1 = MockCtx::new(
+            &mut host,
+            &mut journal,
+            &registry,
+            source.clone(),
+            10_000_000,
+        );
         let dest_a = "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
         execute_enshrined_contract(
             EnshrinedContracts::TezosXGateway,
             &entrypoint,
             Micheline::String(dest_a.to_string()),
             &mut ctx1,
-            &registry,
-            &mut journal,
         )
         .unwrap();
 
-        let mut ctx2 = MockCtx::new(&mut host, source, 10_000_000);
+        let mut ctx2 =
+            MockCtx::new(&mut host, &mut journal, &registry, source, 10_000_000);
         let dest_b = "0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
         execute_enshrined_contract(
             EnshrinedContracts::TezosXGateway,
             &entrypoint,
             Micheline::String(dest_b.to_string()),
             &mut ctx2,
-            &registry,
-            &mut journal,
         )
         .unwrap();
 
@@ -3159,7 +3278,14 @@ mod tests {
             0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
         ])
         .unwrap();
-        let ctx = MockCtx::new(&mut host, source.clone(), 10_000_000);
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let ctx = MockCtx::new(
+            &mut host,
+            &mut journal,
+            &registry,
+            source.clone(),
+            10_000_000,
+        );
         let result = tezosx_resolve_source_alias_readonly(
             &ctx,
             &registry,

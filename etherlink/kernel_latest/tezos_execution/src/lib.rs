@@ -20,7 +20,6 @@ use num_traits::ops::checked::CheckedSub;
 use num_traits::{ToPrimitive, Zero};
 use primitive_types::U256;
 use std::collections::{BTreeMap, HashMap};
-use std::vec::IntoIter;
 use tezos_crypto_rs::hash::OperationHash;
 use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeyWithHash};
 use tezos_data_encoding::types::Narith;
@@ -60,9 +59,8 @@ use crate::context::Context;
 use crate::gas::Cost;
 pub use crate::gas::TezlinkOperationGas;
 use crate::mir_ctx::{
-    clear_temporary_big_maps, convert_big_map_diff, BlockCtx, Ctx, ExecCtx,
-    HasContractAccount, HasHost, HasOperationGas, HasOriginLookup, HasSourcePublicKey,
-    OperationCtx, TcCtx,
+    clear_temporary_big_maps, convert_big_map_diff, BlockCtx, Ctx, ExecCtx, OperationCtx,
+    TcCtx,
 };
 
 /// Result of applying a single operation within a batch.
@@ -688,43 +686,60 @@ where
                 .map_err(|_| TransferError::FailedToFetchContractStorage)?;
             let exec_ctx =
                 ExecCtx::create(tc_ctx.host, sender_account, &dest_account, amount)?;
-            let mut ctx = Ctx {
-                tc_ctx,
-                exec_ctx,
-                operation_ctx,
+
+            let (internal_operations, new_storage): (Vec<OperationInfo<'a>>, Vec<u8>) = {
+                let mut ctx = Ctx {
+                    tc_ctx: &mut *tc_ctx,
+                    exec_ctx,
+                    operation_ctx: &mut *operation_ctx,
+                    journal: &mut *journal,
+                    registry,
+                };
+                let result = match code {
+                    Code::Code(code_bytes) => {
+                        let (iter, new_storage) = execute_smart_contract_originated(
+                            code_bytes, storage, entrypoint, param, parser, &mut ctx,
+                        )?;
+                        (iter.collect::<Vec<_>>(), new_storage)
+                    }
+                    Code::Enshrined(contract) => {
+                        let ops = enshrined_contracts::execute_enshrined_contract(
+                            contract, entrypoint, param, &mut ctx,
+                        )?;
+                        (ops, vec![])
+                    }
+                };
+                drop(ctx);
+                result
             };
-            let exec_result = execute_smart_contract(
-                code, storage, entrypoint, param, parser, &mut ctx, registry, journal,
-            )?;
-            let new_storage = exec_result.storage;
+
             dest_account
-                .set_storage(ctx.host(), &new_storage)
+                .set_storage(tc_ctx.host, &new_storage)
                 .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
 
             // In L1, the receipt of an operation only shows its own gas
             // consumption, i.e. it does not include that of its internal
             // operations.
-            let consumed_milligas = ctx
-                .tc_ctx
+            let consumed_milligas = tc_ctx
                 .operation_gas
                 .get_and_reset_milligas_consumed()
                 .map_err(|_| TransferError::OutOfGas)?;
             let lazy_storage_diff =
-                convert_big_map_diff(std::mem::take(&mut ctx.tc_ctx.big_map_diff));
+                convert_big_map_diff(std::mem::take(&mut tc_ctx.big_map_diff));
 
             let StorageSpace {
                 used_bytes,
                 allocated_bytes: paid_storage_size_diff,
             } = dest_account
-                .update_storage_space(ctx.host())
+                .update_storage_space(tc_ctx.host)
                 .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
 
             match execute_internal_operations(
-                ctx.tc_ctx,
-                ctx.operation_ctx,
+                tc_ctx,
+                operation_ctx,
                 registry,
                 journal,
-                exec_result.internal_operations,
+                internal_operations.into_iter(),
                 &dest_account,
                 parser,
                 all_internal_receipts,
@@ -742,9 +757,6 @@ where
                     ))
                 }
             }
-            // Append any pre-built internal operations (e.g. from
-            // enshrined gateway contracts).
-            all_internal_receipts.extend(exec_result.prebuilt_receipts);
             log!(Debug, "Transfer operation succeeded");
             Ok(TransferSuccess {
                 storage: if new_storage.is_empty() {
@@ -1215,99 +1227,6 @@ fn execute_smart_contract_originated<'a>(
         .map_err(|e| TransferError::MichelineSerializationError(e.to_string()))?;
 
     Ok((internal_operations, new_storage))
-}
-
-/// A type-unifying wrapper for internal operation iterators.
-///
-/// ### Why this exists
-/// `impl Iterator` is an opaque type resolved at compile-time. If a function
-/// needs to return iterators that _could_ have different implementation, because
-/// their type is opaque, then the typechecker refuses.
-///
-/// ### How it works
-/// This enum allows us to unify two distinct iterator types into a single named type
-/// without the overhead of dynamic dispatch (`Box<dyn Iterator>`). The `Box` solution
-/// was tried, but it involved propagating lifetimes in other modules far and wide.
-///
-/// - `Active(I)`: Wraps the complex iterator chain produced by originated contracts.
-/// - `Enshrined(IntoIter)`: Holds a vec of operations returned by enshrined contracts.
-///
-/// The lifetime `'a` is the MIR arena lifetime (see `Parser<'a>` and `TypedValue<'a>`).
-///
-/// The change is very local, as the enum doesn't need to be propagated to the
-/// rest of the code, it's hidden behind an opaque type.
-enum InternalOperationIterator<'a, I> {
-    Active(I),
-    Enshrined(IntoIter<OperationInfo<'a>>),
-}
-
-impl<'a, I> Iterator for InternalOperationIterator<'a, I>
-where
-    I: Iterator<Item = OperationInfo<'a>>,
-{
-    type Item = OperationInfo<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            Self::Active(iter) => iter.next(),
-            Self::Enshrined(iter) => iter.next(),
-        }
-    }
-}
-
-/// Result of executing a smart contract: an iterator of MIR internal
-/// operations, the new storage, and any pre-built receipt-level internal
-/// operations (e.g. CRAC events from enshrined contracts).
-struct ExecutionResult<'a, I: Iterator<Item = OperationInfo<'a>>> {
-    internal_operations: InternalOperationIterator<'a, I>,
-    storage: Vec<u8>,
-    prebuilt_receipts: Vec<InternalOperationSum>,
-}
-
-#[allow(clippy::too_many_arguments)]
-fn execute_smart_contract<'a, Host>(
-    code: account_storage::Code,
-    storage: Vec<u8>,
-    entrypoint: &Entrypoint,
-    value: Micheline<'a>,
-    parser: &'a Parser<'a>,
-    ctx: &mut (impl CtxTrait<'a>
-              + HasHost<Host>
-              + HasContractAccount
-              + HasOperationGas
-              + HasSourcePublicKey
-              + HasOriginLookup),
-    registry: &impl Registry,
-    journal: &mut TezosXJournal,
-) -> Result<ExecutionResult<'a, impl Iterator<Item = OperationInfo<'a>>>, CracError>
-where
-    Host: StorageV1,
-{
-    match code {
-        Code::Code(code) => {
-            // Parse and typecheck the contract
-            let (iter, storage) = execute_smart_contract_originated(
-                code, storage, entrypoint, value, parser, ctx,
-            )?;
-            Ok(ExecutionResult {
-                internal_operations: InternalOperationIterator::Active(iter),
-                storage,
-                prebuilt_receipts: vec![],
-            })
-        }
-        Code::Enshrined(contract) => {
-            let ops = enshrined_contracts::execute_enshrined_contract(
-                contract, entrypoint, value, ctx, registry, journal,
-            )?;
-            Ok(ExecutionResult {
-                internal_operations: InternalOperationIterator::Enshrined(
-                    ops.into_iter(),
-                ),
-                storage: vec![],
-                prebuilt_receipts: vec![],
-            })
-        }
-    }
 }
 
 pub fn get_required_da_fees(

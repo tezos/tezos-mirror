@@ -1942,6 +1942,325 @@ let test_cross_runtime_call_executes_evm_bytecode =
       ~error_msg:"Expected gateway balance 0 but got %L") ;
   unit
 
+(** L2-1259: a Michelson caller hits the gateway's generic [%call]
+    entrypoint with [method = 0] (GET). Asserts the call lands on
+    the EVM static-execution path on the other side, by targeting
+    an EVM contract whose runtime would [SSTORE] under a normal
+    POST — REVM's [is_static = true] enforcement on the top frame
+    must reject the SSTORE with [StateChangeDuringStaticCall], the
+    EVM runtime returns 4xx, the gateway surfaces it as a CRAC
+    operation error, and the post-condition is that EVM storage is
+    unchanged. Complements the synthetic [VIEW "staticcall_evm"]
+    path by covering the entrypoint-driven GET route. *)
+let test_cross_runtime_call_get_from_michelson_routes_to_static =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Cross-runtime %call GET from Michelson routes to EVM static path"
+    ~tags:["cross_runtime"; "call"; "get"; "static"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  (* Step 1: Deploy the EVM storer (`SSTORE calldataload(4) at slot 0`). *)
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* contract_address =
+    deploy_evm_contract
+      ~sequencer
+      ~sender
+      ~nonce:0
+      ~init_code:evm_storer_init_code
+      ()
+  in
+  (* Sanity: the storer is genuinely state-mutating — confirm slot 0
+     is 0 before the GET call so an unchanged 0 after is meaningful. *)
+  let*@ storage_before =
+    Rpc.get_storage_at ~address:contract_address ~pos:"0x0" sequencer
+  in
+  let zero =
+    "0x0000000000000000000000000000000000000000000000000000000000000000"
+  in
+  Check.(
+    (storage_before = zero)
+      string
+      ~error_msg:"Sanity: expected fresh EVM storage slot 0 = %R, got %L") ;
+  (* Step 2: From Michelson, hit gateway's `%call` entrypoint with
+     `method = 0` (GET). Body = 4-byte zero selector + ABI uint256(42)
+     — the calldata the storer would `SSTORE` under POST. *)
+  let source = Constant.bootstrap5 in
+  let body_hex = "00000000" ^ abi_encoded_uint256_42 in
+  let* () =
+    call_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:1
+      ~dest:gateway_address
+      ~arg_data:
+        (sf
+           {|Pair "http://ethereum/%s" (Pair {} (Pair 0x%s (Pair 0 None)))|}
+           contract_address
+           body_hex)
+      ~entrypoint:"call"
+      ()
+  in
+  (* Step 3: Storage slot 0 must still be 0 — the static-call
+     enforcement on the EVM side rejected the SSTORE. *)
+  let*@ storage_after =
+    Rpc.get_storage_at ~address:contract_address ~pos:"0x0" sequencer
+  in
+  Check.(
+    (storage_after = zero)
+      string
+      ~error_msg:
+        "Expected EVM storage slot 0 still %R after a `%%call` GET (the static \
+         path must reject SSTORE), got %L") ;
+  (* Sanity: the failed CRAC didn't leave funds on the gateway. *)
+  let* tez_client = tezos_client sequencer in
+  let* gateway_balance =
+    Client.get_balance_for ~account:gateway_address tez_client
+  in
+  Check.(
+    (Tez.to_mutez gateway_balance = 0)
+      int
+      ~error_msg:"Expected gateway balance 0 but got %L") ;
+  unit
+
+(** L2-1259: a Michelson contract reached by a regular delayed-inbox
+    call uses [VIEW "staticcall_evm"] on the TezosXGateway from
+    within its entrypoint body — not from a Michelson view body.
+    Asserts the synthetic view is reachable from any code path that
+    can issue [VIEW], not just from [callMichelsonView]-bridged view
+    bodies. *)
+let test_cross_runtime_staticcall_evm_from_on_chain_entrypoint =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"On-chain Michelson entrypoint uses VIEW staticcall_evm"
+    ~tags:["cross_runtime"; "staticcall_evm"; "view"; "on_chain"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      protocol
+    ->
+  let source = Constant.bootstrap5 in
+  (* EVM runtime always returning the 32-byte constant `0x..0042`. *)
+  let init_code = "600a80600b6000396000f3604260005260206000f3" in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* evm_contract_address =
+    deploy_evm_contract ~sequencer ~sender ~nonce:0 ~init_code ()
+  in
+  (* Originate the Michelson contract whose `default` entrypoint
+     issues `VIEW "staticcall_evm"` against the gateway. Storage
+     holds (None, evm_addr). *)
+  let init_storage_data = sf {|Pair None "%s"|} evm_contract_address in
+  let* contract_hex, kt1_address =
+    originate_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:1
+      ~script_name:["mini_scenarios"; "staticcall_evm_on_chain"]
+      ~init_storage_data
+      protocol
+  in
+  (* Trigger the entrypoint via delayed inbox. The contract's code
+     fires `VIEW "staticcall_evm"`, receives the EVM bytes back, and
+     stashes them under `%last`. *)
+  let* () =
+    call_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:2
+      ~dest:kt1_address
+      ~arg_data:"Unit"
+      ()
+  in
+  (* Verify the response bytes ended up in storage — the
+     synthetic view dispatched a real cross-runtime GET to EVM and
+     returned its 32-byte constant payload. *)
+  let expected_bytes =
+    "0000000000000000000000000000000000000000000000000000000000000042"
+  in
+  let* () =
+    check_michelson_storage_value
+      ~sc_rollup_node
+      ~contract_hex
+      ~expected:
+        (`O
+           [
+             ("prim", `String "Pair");
+             ( "args",
+               `A
+                 [
+                   `O
+                     [
+                       ("prim", `String "Some");
+                       ("args", `A [`O [("bytes", `String expected_bytes)]]);
+                     ];
+                   `O [("string", `String evm_contract_address)];
+                 ] );
+           ])
+      ()
+  in
+  (* And the gateway didn't accumulate any balance along the way. *)
+  let* tez_client = tezos_client sequencer in
+  let* gateway_balance =
+    Client.get_balance_for ~account:gateway_address tez_client
+  in
+  Check.(
+    (Tez.to_mutez gateway_balance = 0)
+      int
+      ~error_msg:"Expected gateway balance 0 but got %L") ;
+  unit
+
+(** L2-1259: nested GET CRAC exercising both directions in a single
+    EVM transaction. The EVM caller hits the gateway precompile's
+    [callMichelsonView] (outer EVM → Michelson GET, from L2-1244)
+    targeting a Michelson view whose body issues
+    [VIEW "staticcall_evm"] on the gateway address (inner Michelson
+    → EVM GET, added in this MR). The inner GET routes through the
+    new MIR [try_dispatch_enshrined_view] hook, fires a real
+    [Registry::serve] back into the EVM runtime, and the response
+    bytes propagate through the Michelson view to the EVM caller as
+    the precompile's ABI-encoded return value. *)
+let test_cross_runtime_staticcall_evm_nested_view_view =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Nested GET: callMichelsonView → Michelson VIEW staticcall_evm → EVM"
+    ~tags:["cross_runtime"; "staticcall_evm"; "get"; "nested"; "view"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      protocol
+    ->
+  let source = Constant.bootstrap5 in
+  (* EVM contract returning `msg.sender` left-padded to 32 bytes.
+     Used to verify that the inner GET reaches the EVM target with
+     `msg.sender` set to the deterministic alias of the calling
+     Michelson KT1 (i.e. that
+     `tezosx_resolve_source_alias_readonly` is wired into the
+     view-side bridge, vs. a hardcoded null sender).
+
+     Init (11B): PUSH1 9 / DUP1 / PUSH1 11 / PUSH1 0 / CODECOPY /
+       PUSH1 0 / RETURN — copies the 9-byte runtime from offset 11.
+     Runtime (9B): CALLER / PUSH1 0 / MSTORE / PUSH1 32 / PUSH1 0 /
+       RETURN — stores msg.sender at mem[0..32] and returns it. *)
+  let init_code = "600980600b6000396000f33360005260206000f3" in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* evm_contract_address =
+    deploy_evm_contract ~sequencer ~sender ~nonce:0 ~init_code ()
+  in
+  (* Originate the Michelson contract whose `read_evm` view bridges
+     to `gateway.staticcall_evm`. Storage holds just the EVM target
+     address. *)
+  let init_storage_data = sf {|"%s"|} evm_contract_address in
+  let* _contract_hex, kt1_address =
+    originate_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:1
+      ~script_name:["mini_scenarios"; "staticcall_evm_view"]
+      ~init_storage_data
+      protocol
+  in
+  (* Drive the outer call via `eth_call` so the precompile's return
+     value is surfaced directly (vs. having to dig through a tx
+     receipt). `0x030b` is the Micheline binary encoding of `Unit`:
+     `0x03` = primitive-with-no-arg tag, `0x0b` = the `Unit`
+     primitive number. *)
+  let micheline_unit = "0x030b" in
+  let* calldata =
+    Cast.calldata
+      ~args:[kt1_address; "read_evm"; micheline_unit]
+      "callMichelsonView(string,string,bytes)"
+  in
+  let eth_call_with_gas ~to_ ~data =
+    let* response =
+      Evm_node.(
+        call_evm_rpc
+          sequencer
+          {
+            method_ = "eth_call";
+            parameters =
+              `A
+                [
+                  `O
+                    [
+                      ("to", `String to_);
+                      ("data", `String data);
+                      ("gas", `String "0xf4240");
+                    ];
+                  `String "latest";
+                ];
+          })
+    in
+    return (response |> Evm_node.extract_result |> JSON.as_string)
+  in
+  let* call_return =
+    eth_call_with_gas ~to_:evm_gateway_address ~data:calldata
+  in
+  (* `callMichelsonView` ABI-encodes its return as `(bytes,)`:
+     32-byte offset word (`0x20`), then a 32-byte length word, then
+     the payload right-padded to a 32-byte boundary. The Michelson
+     view returned the raw EVM response (32 bytes carrying
+     `msg.sender` left-padded) wrapped in a Micheline `Bytes`
+     literal — tag `0x0a`, 4-byte big-endian length `0x00000020`,
+     then the 32 payload bytes — for a total Micheline length of 37
+     bytes (`0x25`). *)
+  let hex = String.sub call_return 2 (String.length call_return - 2) in
+  let length_word = String.sub hex 64 64 in
+  Check.(
+    (length_word
+   = "0000000000000000000000000000000000000000000000000000000000000025")
+      string
+      ~error_msg:
+        "Expected ABI length word for the 37-byte Micheline bytes: %R, got %L") ;
+  let body_hex = String.sub hex 128 (37 * 2) in
+  (* The expected `msg.sender` on the EVM side is the deterministic
+     alias the Michelson KT1 gets when first crossed read-only into
+     the EVM runtime: `keccak256(kt1_base58_ascii)[..20]`. The
+     gateway view's bridge resolves this via
+     `tezosx_resolve_source_alias_readonly`. EVM `MSTORE` of the
+     20-byte address left-pads it with 12 zero bytes inside the
+     32-byte word. *)
+  let expected_alias_bytes =
+    Tezos_crypto.Hacl.Hash.Keccak_256.digest (Bytes.of_string kt1_address)
+  in
+  let expected_alias_hex =
+    Hex.show (Hex.of_bytes (Bytes.sub expected_alias_bytes 0 20))
+  in
+  let expected_body_hex =
+    "0a00000020" ^ String.make 24 '0' ^ expected_alias_hex
+  in
+  Check.(
+    (body_hex = expected_body_hex)
+      string
+      ~error_msg:
+        "Expected Micheline-encoded `Bytes <KT1 alias>` payload: %R, got %L") ;
+  let* tez_client = tezos_client sequencer in
+  let* gateway_balance =
+    Client.get_balance_for ~account:gateway_address tez_client
+  in
+  Check.(
+    (Tez.to_mutez gateway_balance = 0)
+      int
+      ~error_msg:"Expected gateway balance 0 but got %L") ;
+  unit
+
 let test_cross_runtime_transfer_from_evm_to_kt1 =
   Setup.register_fullstack_test
     ~time_between_blocks:Nothing
@@ -4945,6 +5264,9 @@ let () =
   test_cross_runtime_transfer_to_evm_via_call [Alpha] ;
   test_cross_runtime_transfer_to_evm_via_call_evm [Alpha] ;
   test_cross_runtime_call_executes_evm_bytecode [Alpha] ;
+  test_cross_runtime_call_get_from_michelson_routes_to_static [Alpha] ;
+  test_cross_runtime_staticcall_evm_from_on_chain_entrypoint [Alpha] ;
+  test_cross_runtime_staticcall_evm_nested_view_view [Alpha] ;
   test_cross_runtime_transfer_from_evm_to_kt1 [Alpha] ;
   test_cross_runtime_call_failwith [Alpha] ;
   test_cross_runtime_call_from_evm_to_michelson [Alpha] ;
