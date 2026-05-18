@@ -73,6 +73,19 @@ type common_setup = {
 
 type mode_setup = Sequencer of {evm_node : Evm_node.t} | Proxy
 
+type migration_setup = {
+  admin : Account.key;
+  evm_node : Evm_node.t;
+  client : Client.t;
+  sc_rollup_node : Sc_rollup_node.t;
+  sc_rollup_address : string;
+  produce_block : unit -> (int, Rpc.error) result Lwt.t;
+  l1_contracts : l1_contracts option;
+  read_value : string -> string option Lwt.t;
+  read_subkeys : string -> string list Lwt.t;
+  upgrade_params : common_setup * mode_setup;
+}
+
 type full_evm_setup = {
   node : Node.t;
   client : Client.t;
@@ -362,7 +375,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     let ticketer = Option.map (fun {exchanger; _} -> exchanger) l1_contracts in
     let administrator =
       if with_administrator then
-        Option.map (fun {admin; _} -> admin) l1_contracts
+        Option.map (fun ({admin; _} : l1_contracts) -> admin) l1_contracts
       else None
     in
     let kernel_governance =
@@ -562,6 +575,82 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
         in
         let* () = Evm_node.run evm_node in
         return (common_setup, Sequencer {evm_node})
+
+(** Boot the FarfadetR2 mainnet kernel under a sequencer with a fixed
+    genesis timestamp and zero DA fee — the proven recipe from
+    [gen_kernel_migration_test] that keeps the rollup-node/sequencer
+    pair in sync while the V46->V57 migration ladder runs.
+
+    [additional_config] seeds durable-storage paths before the first
+    kernel tick (default: empty).  [sequencer_admin] is required when
+    the test needs to originate a sequencer-governance L1 contract
+    (V50 only; other tests omit it). *)
+let gen_mainnet_migration_setup ?additional_config ?sequencer_admin protocol =
+  let admin = Constant.bootstrap5 in
+  let* evm_setup =
+    setup_evm_kernel
+      ~kernel:Kernel.Mainnet
+      ?additional_config
+      ~da_fee_per_byte:Wei.zero
+      ~minimum_base_fee_per_gas:(Wei.of_string "21000")
+      ~setup_mode:
+        (Setup_sequencer
+           {
+             return_sequencer = true;
+             time_between_blocks = Some Nothing;
+             sequencer = admin;
+             max_blueprints_ahead = None;
+             genesis_timestamp =
+               Some (At (Option.get @@ Ptime.of_date (2018, 7, 1)));
+           })
+      ~admin:(Some admin)
+      ?sequencer_admin
+      protocol
+  in
+  let common_setup, mode = evm_setup in
+  let {
+    client;
+    sc_rollup_node;
+    sc_rollup_address;
+    produce_block;
+    l1_contracts;
+    _;
+  } : common_setup =
+    common_setup
+  in
+  let evm_node =
+    match mode with Sequencer {evm_node} -> evm_node | Proxy -> assert false
+  in
+  let* () =
+    bake_until_sync
+      ~timeout:90.
+      ~timeout_in_blocks:40
+      ~sc_rollup_node
+      ~client
+      ~sequencer:evm_node
+      ()
+  in
+  let read_value path =
+    let*@ v = Rpc.state_value evm_node path in
+    return v
+  in
+  let read_subkeys path =
+    let*@ v = Rpc.state_subkeys evm_node path in
+    return (Option.value ~default:[] v)
+  in
+  return
+    {
+      admin;
+      evm_node;
+      client;
+      sc_rollup_node;
+      sc_rollup_address;
+      produce_block;
+      l1_contracts;
+      read_value;
+      read_subkeys;
+      upgrade_params = evm_setup;
+    }
 
 let register_test ~title ~tags ?(kernels = Kernel.etherlink_all)
     ?additional_config ?admin ?(additional_uses = []) ?commitment_period
@@ -2424,7 +2513,8 @@ let test_preinitialized_evm_kernel =
       found_administrator_key_hex
   in
   Check.(
-    (Option.map (fun l -> l.admin) l1_contracts = found_administrator_key)
+    (Option.map (fun (l : l1_contracts) -> l.admin) l1_contracts
+    = found_administrator_key)
       (option string))
     ~error_msg:
       (sf "Expected to read %%L as administrator key, but found %%R instead") ;
@@ -2837,6 +2927,29 @@ let gen_test_kernel_upgrade ?setup_kernel_root_hash ?admin_contract ?timestamp
       kernel_boot_wasm_before_upgrade,
       root_hash,
       produce_block )
+
+(** Trigger the kernel upgrade to [evm_kernel] (Latest) and wait for
+    the sequencer to be back in sync.  Call after all pre-upgrade
+    assertions and data captures are done. *)
+let gen_mainnet_migration_upgrade
+    {admin; evm_node; client; sc_rollup_node; produce_block; upgrade_params; _}
+    protocol =
+  let* _ =
+    gen_test_kernel_upgrade
+      ~evm_setup:upgrade_params
+      ~installee:Constant.WASM.evm_kernel
+      ~admin
+      protocol
+  in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  let*@ _ = produce_block () in
+  bake_until_sync
+    ~timeout:90.
+    ~timeout_in_blocks:40
+    ~sc_rollup_node
+    ~client
+    ~sequencer:evm_node
+    ()
 
 let test_kernel_upgrade_evm_to_evm =
   Protocol.register_test
@@ -3503,6 +3616,680 @@ let test_v57_michelson_runtime_paths_migration =
     ~error_msg:
       "Post-upgrade: /evm/michelson_runtime must have no subkeys after V57, \
        got %L" ;
+  unit
+
+(* Phase V50: two sister paths move into the EVM safe-storage root.
+
+   - [/evm/sequencer]         -> [/evm/world_state/sequencer]
+   - [/evm/sequencer_upgrade] -> [/evm/world_state/sequencer_upgrade]
+
+   Both moves use [store_move] under [allow_path_not_found]. The
+   mainnet kernel (kernel_compat = FarfadetR2) still writes them at
+   the legacy paths; this test upgrades to the latest kernel and
+   asserts both moves relocated their bytes intact and wiped the
+   legacy locations.
+
+   Seeding strategy for [/evm/sequencer_upgrade]: a fresh test rollup
+   has no pending sequencer upgrade, so we send a real L1
+   sequencer-upgrade message with a far-future activation timestamp.
+   The pre-upgrade kernel ingests it, RLP-encodes it, and writes the
+   bytes at [/evm/sequencer_upgrade]; the activation date is in 2099
+   so the kernel's [possible_sequencer_upgrade] reads it on every
+   block but never fires it. This gives us guaranteed-valid bytes to
+   verify byte-preservation across the V50 migration. *)
+let test_v50_migration_sequencer_paths =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "migration"; "upgrade"; "mainnet"; "v50"; "sequencer"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.mainnet_kernel;
+        Constant.WASM.evm_kernel;
+      ])
+    ~title:
+      "V50 moves /evm/sequencer{,_upgrade} under /evm/world_state/ (mainnet -> \
+       latest)"
+  @@ fun protocol ->
+  (* [gen_mainnet_migration_setup] with [~sequencer_admin] so that
+     [setup_l1_contracts] originates the sequencer-governance contract —
+     needed below to send a real L1 sequencer-upgrade message. *)
+  let sequencer_admin = Constant.bootstrap2 in
+  let new_sequencer_key = Constant.bootstrap3 in
+  let* mig = gen_mainnet_migration_setup ~sequencer_admin protocol in
+  let {
+    evm_node;
+    client;
+    sc_rollup_node;
+    sc_rollup_address;
+    l1_contracts;
+    read_value;
+    _;
+  } =
+    mig
+  in
+  let l1_contracts = Option.get l1_contracts in
+  let sequencer_governance_contract =
+    Option.get l1_contracts.sequencer_governance
+  in
+  let legacy_sequencer = "/evm/sequencer" in
+  let new_sequencer = "/evm/world_state/sequencer" in
+  let legacy_sequencer_upgrade = "/evm/sequencer_upgrade" in
+  let new_sequencer_upgrade = "/evm/world_state/sequencer_upgrade" in
+  (* ---- Queue a real sequencer upgrade so [/evm/sequencer_upgrade]
+     holds valid RLP bytes the kernel itself wrote. Far-future
+     activation timestamp keeps the upgrade pending forever (well
+     past any test run). ---- *)
+  let upgrade_event = Evm_node.wait_for_evm_event Sequencer_upgrade evm_node in
+  let* () =
+    Test_helpers.sequencer_upgrade
+      ~sc_rollup_address
+      ~sequencer_admin:sequencer_admin.alias
+      ~sequencer_governance_contract
+      ~pool_address:Eth_account.bootstrap_accounts.(0).address
+      ~client
+      ~upgrade_to:new_sequencer_key.alias
+      ~activation_timestamp:"2099-12-31T23:59:59Z"
+  in
+  let* () =
+    repeat 2 (fun () ->
+        let* _ = Rollup.next_rollup_node_level ~client ~sc_rollup_node in
+        unit)
+  and* _ = upgrade_event in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node () in
+  (* ---- Pre-upgrade: legacy paths populated, new paths absent. ---- *)
+  let* pre_new_sequencer_before = read_value new_sequencer in
+  Check.((pre_new_sequencer_before = None) (option string))
+    ~error_msg:
+      "Pre-upgrade: /evm/world_state/sequencer should be absent before V50, \
+       got %L" ;
+  let* pre_new_sequencer_upgrade_before = read_value new_sequencer_upgrade in
+  Check.((pre_new_sequencer_upgrade_before = None) (option string))
+    ~error_msg:
+      "Pre-upgrade: /evm/world_state/sequencer_upgrade should be absent before \
+       V50, got %L" ;
+  let* pre_sequencer = read_value legacy_sequencer in
+  Check.((Option.is_some pre_sequencer = true) bool)
+    ~error_msg:
+      (Printf.sprintf
+         "Pre-upgrade: %s should hold the installer-written sequencer public \
+          key, got %%L"
+         legacy_sequencer) ;
+  let* pre_sequencer_upgrade = read_value legacy_sequencer_upgrade in
+  Check.((Option.is_some pre_sequencer_upgrade = true) bool)
+    ~error_msg:
+      (Printf.sprintf
+         "Pre-upgrade: %s should hold the queued sequencer upgrade RLP bytes \
+          written by the mainnet kernel, got %%L"
+         legacy_sequencer_upgrade) ;
+  (* ---- Trigger the upgrade to the latest kernel (V50 runs in the
+     V46->V57 migration ladder). ---- *)
+  let* () = gen_mainnet_migration_upgrade mig protocol in
+  (* ---- Post-upgrade: both legacy paths gone, both new paths carry
+     the same bytes. ---- *)
+  let* post_legacy_sequencer = read_value legacy_sequencer in
+  Check.((post_legacy_sequencer = None) (option string))
+    ~error_msg:
+      "Post-upgrade: legacy /evm/sequencer must be empty after V50, got %L" ;
+  let* post_new_sequencer = read_value new_sequencer in
+  Check.((post_new_sequencer = pre_sequencer) (option string))
+    ~error_msg:
+      "Post-upgrade: /evm/world_state/sequencer should carry the original \
+       bytes %R, got %L" ;
+  let* post_legacy_sequencer_upgrade = read_value legacy_sequencer_upgrade in
+  Check.((post_legacy_sequencer_upgrade = None) (option string))
+    ~error_msg:
+      "Post-upgrade: legacy /evm/sequencer_upgrade must be empty after V50, \
+       got %L" ;
+  let* post_new_sequencer_upgrade = read_value new_sequencer_upgrade in
+  Check.((post_new_sequencer_upgrade = pre_sequencer_upgrade) (option string))
+    ~error_msg:
+      "Post-upgrade: /evm/world_state/sequencer_upgrade should carry the \
+       original RLP bytes %R, got %L" ;
+  unit
+
+(* Phase V51 (Phase 1 of the durable-storage reorg): four root-level IPC
+   paths and one V23 cleanup artifact.
+
+   - [/__evm_node], [/__delayed_input], [/__backup_kernel],
+     [/__tmp]   move to [/base/...] (subtree moves for the two with
+     children).
+   - [/__tmp_next_blueprint_path]   deleted outright (dead V23 artifact,
+     no destination).
+
+   Coverage strategy:
+
+   - [/__delayed_input] (leaf) and [/__tmp/seed] (subtree leaf) are
+     seeded with sentinels and get full byte-preservation checks.
+   - [/__evm_node] is NOT seeded (seeding flips the kernel into "EVM
+     node" mode via [evm_node_flag] in [runtime.rs], breaking the
+     rollup/sequencer sync). We still verify post-V51 that legacy
+     [/__evm_node] is empty — proves the [store_move] line was not
+     silently dropped from the migration.
+   - [/__backup_kernel/*] is NOT seeded (the kernel-upgrade flow
+     itself writes [boot.wasm] / [root_hash] into the subtree as the
+     fallback kernel, so seeded bytes would be overwritten). We still
+     verify the recursive move worked: post-V51 the legacy subtree is
+     empty and [/base/__backup_kernel] is non-empty (the upgrade wrote
+     the fallback there). *)
+let test_v51_migration_ipc_paths =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "migration"; "upgrade"; "mainnet"; "v51"; "ipc"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.mainnet_kernel;
+        Constant.WASM.evm_kernel;
+      ])
+    ~title:
+      "V51 moves /__delayed_input and /__tmp/* under /base/ and drops \
+       /__tmp_next_blueprint_path (mainnet -> latest)"
+  @@ fun protocol ->
+  (* Distinct sentinels so a mis-routed move surfaces as a value
+     mismatch rather than a coincidental match. *)
+  let delayed_input_sentinel = "aa00aa00aa00aa00aa00aa00aa00aa00aa00aa00aa" in
+  let tmp_leaf_sentinel = "dd03dd03dd03dd03dd03dd03dd03" in
+  let tmp_next_blueprint_sentinel = "ee04ee04ee04ee04ee04ee04ee04ee04" in
+  let additional_config =
+    Sc_rollup_helpers.Installer_kernel_config.
+      [
+        Set {value = delayed_input_sentinel; to_ = "/__delayed_input"};
+        Set {value = tmp_leaf_sentinel; to_ = "/__tmp/seed"};
+        Set
+          {
+            value = tmp_next_blueprint_sentinel;
+            to_ = "/__tmp_next_blueprint_path";
+          };
+      ]
+  in
+  let* mig = gen_mainnet_migration_setup ~additional_config protocol in
+  let {read_value; read_subkeys; _} = mig in
+  let moves =
+    [
+      ("/__delayed_input", "/base/__delayed_input", delayed_input_sentinel);
+      ("/__tmp/seed", "/base/__tmp/seed", tmp_leaf_sentinel);
+    ]
+  in
+  (* ---- Pre-upgrade: every legacy path carries its sentinel. ---- *)
+  let* () =
+    Lwt_list.iter_s
+      (fun (legacy, _new_, sentinel) ->
+        let* pre_legacy = read_value legacy in
+        Check.((pre_legacy = Some sentinel) (option string))
+          ~error_msg:
+            (Printf.sprintf
+               "Pre-upgrade: %s should hold the seeded sentinel %%R, got %%L"
+               legacy) ;
+        unit)
+      moves
+  in
+  let* pre_tmp_next_blueprint = read_value "/__tmp_next_blueprint_path" in
+  Check.(
+    (pre_tmp_next_blueprint = Some tmp_next_blueprint_sentinel) (option string))
+    ~error_msg:
+      "Pre-upgrade: /__tmp_next_blueprint_path should hold the seeded sentinel \
+       %R, got %L" ;
+  (* ---- Trigger the upgrade. ---- *)
+  let* () = gen_mainnet_migration_upgrade mig protocol in
+  (* ---- Post-upgrade: every legacy path gone, every new path carries
+     the original bytes; the dead V23 artifact is gone with no
+     replacement. ---- *)
+  let* () =
+    Lwt_list.iter_s
+      (fun (legacy, new_, sentinel) ->
+        let* post_legacy = read_value legacy in
+        Check.((post_legacy = None) (option string))
+          ~error_msg:
+            (Printf.sprintf
+               "Post-upgrade: legacy %s must be empty after V51, got %%L"
+               legacy) ;
+        let* post_new = read_value new_ in
+        Check.((post_new = Some sentinel) (option string))
+          ~error_msg:
+            (Printf.sprintf
+               "Post-upgrade: %s should carry the original bytes %%R, got %%L"
+               new_) ;
+        unit)
+      moves
+  in
+  let* post_tmp_next_blueprint = read_value "/__tmp_next_blueprint_path" in
+  Check.((post_tmp_next_blueprint = None) (option string))
+    ~error_msg:
+      "Post-upgrade: /__tmp_next_blueprint_path must be deleted (no \
+       destination) after V51, got %L" ;
+  (* The legacy /__tmp parent must be empty — [store_move] on the
+     parent is recursive, so no leftover subtree should remain at the
+     root. *)
+  let* legacy_tmp_subkeys = read_subkeys "/__tmp" in
+  Check.((legacy_tmp_subkeys = []) (list string))
+    ~error_msg:"Post-upgrade: /__tmp must have no subkeys after V51, got %L" ;
+  (* Structural checks for the two un-seeded migration paths.
+     [/__evm_node] is never written by the mainnet kernel on a test
+     rollup (seeding it would flip the kernel into EVM-node mode), so
+     the path is absent before and after the migration regardless —
+     the check below is a no-regression guard but does NOT prove the
+     [store_move] line is present in the migration code.
+     [/__backup_kernel] is the genuinely meaningful check: the
+     FarfadetR2 kernel calls [backup_current_kernel] (writing
+     [/__backup_kernel/boot.wasm] and [/__backup_kernel/root_hash])
+     before yielding to the new kernel, so the non-empty-destination
+     assertion on [/base/__backup_kernel] below does prove the
+     [store_move] relocated real content. *)
+  let* post_evm_node_value = read_value "/__evm_node" in
+  Check.((post_evm_node_value = None) (option string))
+    ~error_msg:
+      "Post-upgrade: legacy /__evm_node must be empty after V51, got %L" ;
+  let* post_evm_node_subkeys = read_subkeys "/__evm_node" in
+  Check.((post_evm_node_subkeys = []) (list string))
+    ~error_msg:
+      "Post-upgrade: legacy /__evm_node must have no subkeys after V51, got %L" ;
+  let* post_legacy_backup = read_subkeys "/__backup_kernel" in
+  Check.((post_legacy_backup = []) (list string))
+    ~error_msg:
+      "Post-upgrade: legacy /__backup_kernel must have no subkeys after V51, \
+       got %L" ;
+  (* And the destination must have inherited the fallback the upgrade
+     wrote — proves the recursive move actually relocated content. *)
+  let* post_new_backup = read_subkeys "/base/__backup_kernel" in
+  Check.((List.length post_new_backup >= 1) int)
+    ~error_msg:
+      "Post-upgrade: /base/__backup_kernel should hold the fallback kernel \
+       moved by V51, got %L subkeys" ;
+  unit
+
+(* Phase V53 (Phase 2 of the durable-storage reorg): 24 [/evm/...] paths
+   move under [/base/...] (governance, blueprints, delayed inbox, DAL,
+   chain configs, etc.) and the [events]/[keep_events] subtree+flag are
+   renamed to [rollup_events]/[keep_rollup_events] along the way.
+
+   Mirrors the full list in [migration.rs::StorageVersion::V53].
+   [/evm/messages] is included as [`Cleanup_only] for completeness:
+   [kernel_latest] never reads [/base/messages], the path is always
+   empty on a test rollup, and the move is therefore always a no-op —
+   but the cleanup invariant (legacy path empty post-migration) is
+   still worth asserting.
+
+   Verification strategy per path:
+
+   - [`Preserve_bytes] — for installer-written config scalars that
+     [kernel_latest] reads from [/base/] but does not rewrite on its
+     first post-migration boot, we capture the pre-upgrade bytes at the
+     legacy location and assert the new location holds exactly the same
+     bytes post-upgrade. This is the only check that distinguishes a
+     correct [store_move] from a buggy [store_delete]. Seven of these
+     paths ([maximum_allowed_ticks], [delayed_inbox_timeout],
+     [delayed_inbox_min_levels], [max_blueprint_lookahead_in_seconds],
+     [max_delayed_inbox_blueprint_length], [delayed_bridge], [dal_slots])
+     are seeded via [additional_config]; [max_blueprint_lookahead_in_seconds],
+     [admin], [kernel_governance], and [kernel_security_governance] are
+     always written by the installer and need no extra seeding.
+     [delayed_bridge] is seeded as raw ASCII bytes of a KT1 address (the
+     kernel only reads it when processing L1 bridge transactions, which
+     this test never sends). [dal_slots] is seeded as two slot indices
+     [0; 1]; without a DAL node the kernel finds no attestations and
+     continues normally.
+   - [`Cleanup_only] — for paths [kernel_latest] rewrites on every
+     boot or block (kernel_version, l1_level, current_block_header,
+     info_per_level, blueprints), for the events subtree (cleared every
+     block when [keep_events] is unset, so always empty pre-upgrade),
+     for keep_events (a one-shot presence flag consumed on first block
+     production), and for [chain_configurations] (only written by the
+     installer for L2/multichain deployments — absent on standard
+     single-EVM Etherlink mainnet and therefore always empty here), we
+     only assert the legacy path is empty post-V53.
+
+   With this classification the migration is verified bytewise on every
+   path whose bytes are stable and accessible — and the cleanup
+   invariant is verified everywhere. *)
+let test_v53_migration_evm_to_base_paths =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "migration"; "upgrade"; "mainnet"; "v53"; "base"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.mainnet_kernel;
+        Constant.WASM.evm_kernel;
+      ])
+    ~title:
+      "V53 moves /evm/ governance/sequencing paths under /base/ + renames \
+       events->rollup_events (mainnet -> latest)"
+  @@ fun protocol ->
+  (* Five config scalars are absent from the mainnet installer config in
+     this test setup (the corresponding CLI flags are optional and the
+     test does not pass them). Seed them via [additional_config] with
+     their kernel-default values encoded as little-endian bytes so that
+     the [`Preserve_bytes] checks below have something real to compare.
+     The seeded values match the kernel's hard-coded defaults precisely,
+     so booting the mainnet kernel with these bytes is identical to
+     booting it with the paths absent.
+     - maximum_allowed_ticks = 30_000_000_000 (MAX_TICKS), LE u64
+     - delayed_inbox_timeout = 43_200 (12 h default), LE u64
+     - delayed_inbox_min_levels = 720 (default), LE u32
+     - max_blueprint_lookahead_in_seconds: always written by the
+       installer; no extra seeding needed.
+     - max_delayed_inbox_blueprint_length = 1_000 (default), LE u16 *)
+  let additional_config =
+    Sc_rollup_helpers.Installer_kernel_config.
+      [
+        Set {value = "00ac23fc06000000"; to_ = "/evm/maximum_allowed_ticks"};
+        Set {value = "c0a8000000000000"; to_ = "/evm/delayed_inbox_timeout"};
+        Set {value = "d0020000"; to_ = "/evm/delayed_inbox_min_levels"};
+        Set {value = "e803"; to_ = "/evm/max_delayed_inbox_blueprint_length"};
+        (* KT1WvzYHCNBvDSdwafTHv7nJ1dWmZ8GZL3uD as raw ASCII bytes (hex).
+           The delayed bridge is a KT1 address stored as 36 ASCII bytes;
+           the kernel only reads it when processing L1 bridge transactions,
+           which this test never sends, so seeding it is safe. *)
+        Set
+          {
+            value =
+              "4b543157767a5948434e4276445364776166544876376e4a3164576d5a38475a4c337544";
+            to_ = "/evm/delayed_bridge";
+          };
+        (* DAL slot indices stored as raw bytes: slots [0; 1].
+           The mainnet kernel reads dal_slots to know which DAL slots to
+           watch; without a DAL node it simply finds no attestations for
+           those slots and continues, so seeding them is safe. *)
+        Set {value = "0001"; to_ = "/evm/dal_slots"};
+      ]
+  in
+  (* The migration list, mirrored from [migration.rs::V53]. [`Scalar]
+     means the migration applies to a single value; [`Subtree] means
+     [store_move] is recursive over children. The 4th tuple element is
+     this test's expectation for that path (see header comment). *)
+  let moves =
+    [
+      (`Subtree, "/evm/blueprints", "/base/blueprints", `Cleanup_only);
+      ( `Scalar,
+        "/evm/max_blueprint_lookahead_in_seconds",
+        "/base/max_blueprint_lookahead_in_seconds",
+        `Preserve_bytes );
+      ( `Scalar,
+        "/evm/max_delayed_inbox_blueprint_length",
+        "/base/max_delayed_inbox_blueprint_length",
+        `Preserve_bytes );
+      (`Scalar, "/evm/kernel_version", "/base/kernel_version", `Cleanup_only);
+      (`Scalar, "/evm/kernel_root_hash", "/base/kernel_root_hash", `Cleanup_only);
+      (`Scalar, "/evm/kernel_upgrade", "/base/kernel_upgrade", `Cleanup_only);
+      ( `Scalar,
+        "/evm/logging_verbosity",
+        "/base/logging_verbosity",
+        `Cleanup_only );
+      (`Scalar, "/evm/l1_level", "/base/l1_level", `Cleanup_only);
+      (* Dead path: kernel_latest never reads /base/messages; always
+         empty on a test rollup. Included for list completeness. *)
+      (`Scalar, "/evm/messages", "/base/messages", `Cleanup_only);
+      (`Scalar, "/evm/admin", "/base/admin", `Preserve_bytes);
+      ( `Scalar,
+        "/evm/kernel_governance",
+        "/base/kernel_governance",
+        `Preserve_bytes );
+      ( `Scalar,
+        "/evm/kernel_security_governance",
+        "/base/kernel_security_governance",
+        `Preserve_bytes );
+      (`Scalar, "/evm/delayed_bridge", "/base/delayed_bridge", `Preserve_bytes);
+      (`Scalar, "/evm/remove_whitelist", "/base/remove_whitelist", `Cleanup_only);
+      ( `Scalar,
+        "/evm/maximum_allowed_ticks",
+        "/base/maximum_allowed_ticks",
+        `Preserve_bytes );
+      (`Scalar, "/evm/dal_slots", "/base/dal_slots", `Preserve_bytes);
+      ( `Scalar,
+        "/evm/dal_publishers_whitelist",
+        "/base/dal_publishers_whitelist",
+        `Cleanup_only );
+      ( `Scalar,
+        "/evm/delayed_inbox_timeout",
+        "/base/delayed_inbox_timeout",
+        `Preserve_bytes );
+      ( `Scalar,
+        "/evm/delayed_inbox_min_levels",
+        "/base/delayed_inbox_min_levels",
+        `Preserve_bytes );
+      ( `Scalar,
+        "/evm/current_block_header",
+        "/base/current_block_header",
+        `Cleanup_only );
+      (`Subtree, "/evm/delayed-inbox", "/base/delayed-inbox", `Cleanup_only);
+      (`Subtree, "/evm/info_per_level", "/base/info_per_level", `Cleanup_only);
+      ( `Subtree,
+        "/evm/chain_configurations",
+        "/base/chain_configurations",
+        `Cleanup_only );
+      (* renamed: events -> rollup_events, keep_events -> keep_rollup_events.
+         keep_events is a one-shot presence flag consumed (deleted) on the
+         first call to clear_events, so it is absent by the time of the
+         pre-upgrade capture and cannot be byte-preserved. *)
+      (`Subtree, "/evm/events", "/base/rollup_events", `Cleanup_only);
+      (`Scalar, "/evm/keep_events", "/base/keep_rollup_events", `Cleanup_only);
+    ]
+  in
+  let* mig = gen_mainnet_migration_setup ~additional_config protocol in
+  let {read_value; read_subkeys; _} = mig in
+  (* Captures for byte-preservation paths: keyed by legacy path so the
+     post-upgrade pass can look up the expected bytes. *)
+  let pre_bytes : (string, string option) Hashtbl.t = Hashtbl.create 8 in
+  (* ---- Pre-upgrade: capture the bytes/subkeys for every path that
+     calls for preservation. ---- *)
+  let* () =
+    Lwt_list.iter_s
+      (fun (kind, legacy, _new_, expectation) ->
+        match (kind, expectation) with
+        | `Scalar, `Preserve_bytes ->
+            let* pre = read_value legacy in
+            Check.((Option.is_some pre = true) bool)
+              ~error_msg:
+                (Printf.sprintf
+                   "Pre-upgrade: %s should be installer-written (the V53 test \
+                    relies on its bytes for preservation), got %%L"
+                   legacy) ;
+            Hashtbl.replace pre_bytes legacy pre ;
+            unit
+        | _, `Cleanup_only -> unit
+        | _ ->
+            Test.fail
+              "V53 test: unsupported (kind, expectation) combination for %s"
+              legacy)
+      moves
+  in
+  (* ---- Trigger the upgrade. ---- *)
+  let* () = gen_mainnet_migration_upgrade mig protocol in
+  (* ---- Post-upgrade pass: cleanup invariant for every path, plus
+     bytes / subkey-set preservation for the paths that called for
+     it. ---- *)
+  let* () =
+    Lwt_list.iter_s
+      (fun (kind, legacy, new_, expectation) ->
+        let* () =
+          match kind with
+          | `Scalar ->
+              let* post_legacy = read_value legacy in
+              Check.((post_legacy = None) (option string))
+                ~error_msg:
+                  (Printf.sprintf
+                     "Post-upgrade: %s must be empty after V53, got %%L"
+                     legacy) ;
+              unit
+          | `Subtree ->
+              let* post_legacy_subkeys = read_subkeys legacy in
+              Check.((post_legacy_subkeys = []) (list string))
+                ~error_msg:
+                  (Printf.sprintf
+                     "Post-upgrade: %s must have no subkeys after V53, got %%L"
+                     legacy) ;
+              unit
+        in
+        match (kind, expectation) with
+        | `Scalar, `Preserve_bytes ->
+            let expected = Hashtbl.find pre_bytes legacy in
+            let* post_new = read_value new_ in
+            Check.((post_new = expected) (option string))
+              ~error_msg:
+                (Printf.sprintf
+                   "Post-upgrade: %s should carry the original %s bytes %%R, \
+                    got %%L"
+                   new_
+                   legacy) ;
+            unit
+        | _, `Cleanup_only -> unit
+        | _ -> assert false)
+      moves
+  in
+  unit
+
+(* Phase V54 (Phase 3 of the durable-storage reorg): consolidate every
+   feature flag under [/base/feature_flags/]. The migration
+
+   - moves the [/evm/feature_flags] subtree wholesale to
+     [/base/feature_flags] (preserves the 5 flags the kernel still
+     reads), and
+   - deletes three dead flags under [/evm/world_state/feature_flags/]
+     ([enable_revm], [enable_fast_withdrawal], [enable_fast_fa_withdrawal])
+     since the kernel ignores them and there is nothing to migrate.
+
+   Strategy:
+
+   - For the kept flags we do NOT seed per-flag sentinels. The
+     migration is a wholesale subtree [store_move], so there is no
+     per-flag wiring that distinct sentinels could surface — but
+     non-empty bytes at [/evm/feature_flags/enable_*] would flip the
+     pre-upgrade FarfadetR2 kernel into "feature on" mode (the
+     kernel reads via [store_has]), which then changes control flow
+     for V55/V56/V57 conditional branches downstream. Instead we ask
+     the EVM node for the subkey list at [/evm/feature_flags] before
+     the upgrade and require the same sorted list at
+     [/base/feature_flags] after — that proves the whole subtree
+     moved without any side effect on the pre-upgrade kernel boot.
+   - The 3 dead flags are kernel-ignored even in FarfadetR2, so
+     seeding them is safe and lets us verify the deletes ran. *)
+let test_v54_migration_feature_flags =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "migration"; "upgrade"; "mainnet"; "v54"; "feature_flags"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.mainnet_kernel;
+        Constant.WASM.evm_kernel;
+      ])
+    ~title:
+      "V54 moves /evm/feature_flags under /base/feature_flags and drops dead \
+       /evm/world_state/feature_flags/{enable_revm,enable_fast_withdrawal,enable_fast_fa_withdrawal} \
+       (mainnet -> latest)"
+  @@ fun protocol ->
+  (* Sentinels for the 3 dead flags only. The kernel never reads
+     these world-state paths so the byte values are inert and let us
+     prove the deletes ran. *)
+  let dead_enable_revm_sentinel = "dead0001" in
+  let dead_enable_fast_withdrawal_sentinel = "dead0002" in
+  let dead_enable_fast_fa_withdrawal_sentinel = "dead0003" in
+  (* Seed the 5 kept flags with empty bytes — that is the natural
+     "presence-only" layout the mainnet installer writes. Any of the
+     5 names would do for our subkey-set check; covering all 5 makes
+     the test resilient to the kernel team adding/removing live flags
+     before V54 ships. *)
+  let kept_flag_names =
+    [
+      "enable_multichain";
+      "enable_tezos_runtime";
+      "enable_dal";
+      "disable_legacy_dal_signals";
+      "enable_fa_bridge";
+    ]
+  in
+  let additional_config =
+    Sc_rollup_helpers.Installer_kernel_config.(
+      List.map
+        (fun name -> Set {value = ""; to_ = "/evm/feature_flags/" ^ name})
+        kept_flag_names
+      @ [
+          Set
+            {
+              value = dead_enable_revm_sentinel;
+              to_ = "/evm/world_state/feature_flags/enable_revm";
+            };
+          Set
+            {
+              value = dead_enable_fast_withdrawal_sentinel;
+              to_ = "/evm/world_state/feature_flags/enable_fast_withdrawal";
+            };
+          Set
+            {
+              value = dead_enable_fast_fa_withdrawal_sentinel;
+              to_ = "/evm/world_state/feature_flags/enable_fast_fa_withdrawal";
+            };
+        ])
+  in
+  let* mig = gen_mainnet_migration_setup ~additional_config protocol in
+  let {read_value; read_subkeys; _} = mig in
+  let dead_flags =
+    [
+      ("enable_revm", dead_enable_revm_sentinel);
+      ("enable_fast_withdrawal", dead_enable_fast_withdrawal_sentinel);
+      ("enable_fast_fa_withdrawal", dead_enable_fast_fa_withdrawal_sentinel);
+    ]
+  in
+  (* ---- Pre-upgrade: capture the sorted subkey list at the legacy
+     feature-flags subtree, and assert the dead flags carry the
+     seeded sentinels. ---- *)
+  let* pre_legacy_subkeys = read_subkeys "/evm/feature_flags" in
+  let pre_legacy_sorted = List.sort compare pre_legacy_subkeys in
+  Check.((List.length pre_legacy_sorted >= List.length kept_flag_names) int)
+    ~error_msg:
+      "Pre-upgrade: /evm/feature_flags should hold at least %R seeded flags, \
+       got %L" ;
+  let* () =
+    Lwt_list.iter_s
+      (fun (flag, sentinel) ->
+        let path = "/evm/world_state/feature_flags/" ^ flag in
+        let* pre = read_value path in
+        Check.((pre = Some sentinel) (option string))
+          ~error_msg:
+            (Printf.sprintf
+               "Pre-upgrade: %s should hold the seeded sentinel %%R, got %%L"
+               path) ;
+        unit)
+      dead_flags
+  in
+  (* ---- Trigger the upgrade. ---- *)
+  let* () = gen_mainnet_migration_upgrade mig protocol in
+  (* ---- Post-upgrade: legacy /evm/feature_flags has no subkeys;
+     /base/feature_flags has the exact same sorted subkey list we
+     captured pre-upgrade; dead flags are gone. ---- *)
+  let* legacy_parent_subkeys = read_subkeys "/evm/feature_flags" in
+  Check.((legacy_parent_subkeys = []) (list string))
+    ~error_msg:
+      "Post-upgrade: /evm/feature_flags must have no subkeys after V54, got %L" ;
+  let* post_new_subkeys = read_subkeys "/base/feature_flags" in
+  let post_new_sorted = List.sort compare post_new_subkeys in
+  Check.((post_new_sorted = pre_legacy_sorted) (list string))
+    ~error_msg:
+      "Post-upgrade: /base/feature_flags subkey list must equal the \
+       pre-upgrade /evm/feature_flags subkey list %R, got %L" ;
+  let* () =
+    Lwt_list.iter_s
+      (fun (flag, _) ->
+        let path = "/evm/world_state/feature_flags/" ^ flag in
+        let* post = read_value path in
+        Check.((post = None) (option string))
+          ~error_msg:
+            (Printf.sprintf
+               "Post-upgrade: dead flag %s must be deleted (no destination) \
+                after V54, got %%L"
+               path) ;
+        unit)
+      dead_flags
+  in
   unit
 
 (* Previewnet counterpart of [test_kernel_storage_version_matches_constant] in
@@ -6838,6 +7625,10 @@ let register_evm_node ~protocols =
   test_kernel_upgrade_via_kernel_security_governance protocols ;
   test_kernel_upgrade_activates_michelson_runtime protocols ;
   test_v57_michelson_runtime_paths_migration protocols ;
+  test_v50_migration_sequencer_paths protocols ;
+  test_v51_migration_ipc_paths protocols ;
+  test_v53_migration_evm_to_base_paths protocols ;
+  test_v54_migration_feature_flags protocols ;
   test_previewnet_storage_version_matches_constant protocols ;
   test_sequencer_and_kernel_upgrade_via_kernel_admin protocols ;
   test_rpc_sendRawTransaction protocols ;

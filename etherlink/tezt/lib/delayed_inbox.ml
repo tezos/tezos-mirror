@@ -131,7 +131,10 @@ let send_deposit_to_delayed_inbox ?(rlp = false) ~amount ~bridge ~depositor
       ~burn_cap:Tez.one
       client
   in
-  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  let* l1_level = Client.bake_for_and_wait_level ~keys:[] client in
+  let* _ =
+    Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node l1_level
+  in
   unit
 
 let send_tezos_operation_to_delayed_inbox ?(amount = Tez.one) ?expect_failure

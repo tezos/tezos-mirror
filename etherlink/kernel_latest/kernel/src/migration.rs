@@ -1324,6 +1324,52 @@ mod tests {
         assert_eq!(host.store_read_all(&new_sunrise).unwrap(), sunrise_bytes);
     }
 
+    /// Phase 1 of the durable-storage reorg: V51 must move the EVM-node
+    /// flag from [/__evm_node] to [/base/__evm_node].
+    ///
+    /// This is only testable at the unit level: seeding [/__evm_node] in
+    /// an E2E test would flip the mainnet kernel into EVM-node mode
+    /// (the runtime checks both paths as a legacy fallback — see
+    /// [evm_node_flag] in runtime/src/runtime.rs).  The mock host has no
+    /// such side effect, so we can seed and verify freely here.
+    #[test]
+    fn v51_migration_moves_evm_node_flag() {
+        let mut host = MockKernelHost::default();
+        let legacy = RefPath::assert_from(b"/__evm_node");
+        let new = RefPath::assert_from(b"/base/__evm_node");
+
+        host.store_write_all(&legacy, b"evm_node_sentinel").unwrap();
+
+        let status = migrate_to(&mut host, StorageVersion::V51).unwrap();
+        assert!(matches!(status, MigrationStatus::Done));
+
+        // Source must be gone.
+        assert!(host.store_has(&legacy).unwrap().is_none());
+        // Destination must carry the original bytes.
+        assert_eq!(host.store_read_all(&new).unwrap(), b"evm_node_sentinel");
+    }
+
+    /// V51 must tolerate a missing [/__evm_node] (the path is absent on
+    /// rollup-node sequencers that never set the flag) — the
+    /// [allow_path_not_found] wrapper must not propagate the error.
+    #[test]
+    fn v51_migration_is_safe_when_evm_node_flag_absent() {
+        let mut host = MockKernelHost::default();
+
+        let status = migrate_to(&mut host, StorageVersion::V51).unwrap();
+        assert!(matches!(status, MigrationStatus::Done));
+
+        // Nothing created as a side-effect.
+        assert!(host
+            .store_has(&RefPath::assert_from(b"/__evm_node"))
+            .unwrap()
+            .is_none());
+        assert!(host
+            .store_has(&RefPath::assert_from(b"/base/__evm_node"))
+            .unwrap()
+            .is_none());
+    }
+
     /// Phase 5.5: V57 is a no-op on non-TezosX networks (mainnet has
     /// never written these paths).
     #[test]
