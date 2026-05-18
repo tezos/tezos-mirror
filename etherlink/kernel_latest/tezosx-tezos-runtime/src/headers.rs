@@ -9,8 +9,8 @@
 //! caller; absent or malformed headers produce a `HeaderError`.
 
 pub use tezosx_interfaces::{
-    X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_ID, X_TEZOS_GAS_LIMIT,
-    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
+    X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_DEPTH, X_TEZOS_CRAC_ID,
+    X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
 };
 
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
@@ -18,7 +18,8 @@ use tezos_data_encoding::types::Narith;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezosx_interfaces::headers::{
-    parse_str, parse_tez_to_mutez, require_i64, require_str, require_u32, require_u64,
+    parse_str, parse_tez_to_mutez, parse_u32_default, require_i64, require_str,
+    require_u32, require_u64,
 };
 use tezosx_interfaces::TezosXRuntimeError;
 
@@ -43,6 +44,7 @@ pub struct MichelsonHeaders {
     /// Kept as a raw string; verified by `journal.verify_crac_id()`.
     /// `None` if the header is absent (non-CRAC request).
     pub crac_id: Option<String>,
+    pub crac_depth: u32,
 }
 
 /// Parse `X-Tezos-*` headers from `headers`.
@@ -62,6 +64,7 @@ pub fn parse_request_headers(
         .and_then(|s| ContractKt1Hash::from_b58check(s).ok());
 
     let crac_id = parse_str(headers, X_TEZOS_CRAC_ID)?;
+    let crac_depth = parse_u32_default(headers, X_TEZOS_CRAC_DEPTH, 0)?;
 
     Ok(MichelsonHeaders {
         amount: Narith(
@@ -73,6 +76,7 @@ pub fn parse_request_headers(
         sender: require_kt1(headers, X_TEZOS_SENDER)?,
         crac_origin_contract,
         crac_id,
+        crac_depth,
     })
 }
 

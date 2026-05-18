@@ -77,6 +77,24 @@ pub fn require_u32(
     })
 }
 
+/// Extract an optional `u32` header, returning `default` when the
+/// header is absent. Parse failure (header present but malformed)
+/// surfaces as `HeaderError`.
+pub fn parse_u32_default(
+    headers: &http::HeaderMap,
+    name: &str,
+    default: u32,
+) -> Result<u32, TezosXRuntimeError> {
+    match parse_str(headers, name)? {
+        Some(s) => s.parse::<u32>().map_err(|_| {
+            TezosXRuntimeError::HeaderError(format!(
+                "Invalid {name} header value: expected u32, got {s:?}"
+            ))
+        }),
+        None => Ok(default),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // TEZ decimal-string formatting and parsing
 // ---------------------------------------------------------------------------

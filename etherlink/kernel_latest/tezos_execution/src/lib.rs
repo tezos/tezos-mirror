@@ -1601,6 +1601,7 @@ where
                 now: block_ctx.now,
                 chain_id: block_ctx.chain_id,
                 source_public_key,
+                crac_chain_depth: 0,
             };
             let transfer_result = transfer_external(
                 &mut tc_ctx,

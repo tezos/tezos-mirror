@@ -330,7 +330,9 @@ where
 
 /// Run the EVM transaction. Routes through [`EtherlinkHandler`]
 /// (not REVM's stock `transact_one`) so the `first_frame_input`
-/// override actually fires when `is_static_top_frame` is set.
+/// override actually fires when `is_static_top_frame` is set, and so
+/// the starting REVM call depth can be seeded from the cross-runtime
+/// chain depth carried on `TezosXJournal`.
 fn execute_transaction<'a, Host, R: Registry>(
     evm_context: &mut EvmContext<'a, Host, R>,
     tx: &'a TxEnv,

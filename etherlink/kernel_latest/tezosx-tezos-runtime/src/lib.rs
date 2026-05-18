@@ -692,6 +692,7 @@ where
         now: &hdrs.timestamp,
         chain_id,
         source_public_key: &[],
+        crac_chain_depth: hdrs.crac_depth,
     };
     let parser = mir::parser::Parser::new();
 

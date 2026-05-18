@@ -634,6 +634,12 @@ pub trait CrossRuntimeCall {
     /// Get the CRAC-ID for the current transaction.
     fn crac_id(&self) -> String;
 
+    /// Cross-runtime chain depth read from the inbound `X-Tezos-CRAC-Depth`
+    /// header on the current EVM transaction. Counts CRAC hops only;
+    /// outgoing CRACs from precompiles stamp `crac_chain_depth() + 1`
+    /// so the receiver sees the same counter shape Michelson would.
+    fn crac_chain_depth(&self) -> u32;
+
     /// Originating runtime of the current top-level transaction.
     fn crac_origin_runtime(&self) -> RuntimeId;
 
@@ -755,6 +761,10 @@ where
 
     fn crac_id(&self) -> String {
         self.journal.crac_id().to_string()
+    }
+
+    fn crac_chain_depth(&self) -> u32 {
+        self.journal.evm.crac_chain_depth()
     }
 
     fn crac_origin_runtime(&self) -> RuntimeId {

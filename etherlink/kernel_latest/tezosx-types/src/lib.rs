@@ -23,6 +23,7 @@ pub const X_TEZOS_GAS_CONSUMED: &str = "X-Tezos-Gas-Consumed";
 pub const X_TEZOS_TIMESTAMP: &str = "X-Tezos-Timestamp";
 pub const X_TEZOS_BLOCK_NUMBER: &str = "X-Tezos-Block-Number";
 pub const X_TEZOS_CRAC_ID: &str = "X-Tezos-CRAC-ID";
+pub const X_TEZOS_CRAC_DEPTH: &str = "X-Tezos-CRAC-Depth";
 
 pub const ERR_FORBIDDEN_TEZOS_HEADER: &str =
     "user-supplied X-Tezos-* headers are forbidden";

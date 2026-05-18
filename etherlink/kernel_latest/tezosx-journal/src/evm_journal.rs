@@ -78,6 +78,7 @@ pub struct EvmJournal {
     /// `tx().caller()` would be the alias of the Michelson contract,
     /// not the original source.
     original_source: Option<OriginalSource>,
+    crac_chain_depth: u32,
 }
 
 impl EvmJournal {
@@ -88,6 +89,7 @@ impl EvmJournal {
             access_list: None,
             crac_tx_info: None,
             original_source: None,
+            crac_chain_depth: 0,
         }
     }
 }
@@ -100,6 +102,15 @@ impl EvmJournal {
         self.crac_tx_info = None;
         self.access_list = None;
         self.original_source = None;
+        self.crac_chain_depth = 0;
+    }
+
+    pub fn crac_chain_depth(&self) -> u32 {
+        self.crac_chain_depth
+    }
+
+    pub fn set_crac_chain_depth(&mut self, depth: u32) {
+        self.crac_chain_depth = depth;
     }
 
     pub fn original_source(&self) -> Option<&OriginalSource> {

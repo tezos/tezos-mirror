@@ -62,6 +62,7 @@ pub struct OperationCtx<'operation, A: TezosImplicitAccount> {
     pub chain_id: &'operation ChainId,
     /// Raw bytes of the source account's public key (from validation).
     pub source_public_key: &'operation [u8],
+    pub crac_chain_depth: u32,
 }
 
 pub struct ExecCtx {
@@ -520,6 +521,7 @@ impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry>
         let operation_gas: &mut crate::gas::TezlinkOperationGas =
             self.tc_ctx.operation_gas;
         let context: &C = self.tc_ctx.context;
+        let crac_chain_depth = self.operation_ctx.crac_chain_depth;
         let result = crate::enshrined_contracts::dispatch_staticcall_evm_get(
             host,
             operation_gas,
@@ -530,6 +532,7 @@ impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry>
             &crac_id_str,
             &timestamp_str,
             &block_number_str,
+            crac_chain_depth,
             destination,
             calldata,
         );
@@ -563,6 +566,10 @@ pub trait HasOperationGas {
 
 pub trait HasSourcePublicKey {
     fn source_public_key(&self) -> &[u8];
+}
+
+pub trait HasCracChainDepth {
+    fn crac_chain_depth(&self) -> u32;
 }
 
 /// Read the runtime classification record for an address.
@@ -686,6 +693,14 @@ impl<Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> HasSourcePubli
 {
     fn source_public_key(&self) -> &[u8] {
         self.operation_ctx.source_public_key
+    }
+}
+
+impl<Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> HasCracChainDepth
+    for Ctx<'_, '_, Host, C, R>
+{
+    fn crac_chain_depth(&self) -> u32 {
+        self.operation_ctx.crac_chain_depth
     }
 }
 
@@ -1597,6 +1612,7 @@ pub mod tests {
             now: &now,
             chain_id: &chain_id,
             source_public_key: &source_public_key,
+            crac_chain_depth: 0,
         };
 
         let exec_ctx = ExecCtx {
@@ -2174,6 +2190,7 @@ pub mod tests {
             now: &now,
             chain_id: &chain_id,
             source_public_key: &source_public_key,
+            crac_chain_depth: 0,
         };
 
         let exec_ctx = ExecCtx {
@@ -2301,6 +2318,7 @@ pub(crate) mod mock {
         pub contract_account: TezlinkOriginatedAccount,
         pub operation_counter: u128,
         pub context: crate::context::TezlinkContext,
+        pub crac_chain_depth: u32,
     }
 
     impl<'h, 'j, 'r, Host: StorageV1, R: tezosx_interfaces::Registry>
@@ -2329,7 +2347,16 @@ pub(crate) mod mock {
                     kt1: ContractKt1Hash::from([0u8; 20]),
                 },
                 context: crate::context::TezlinkContext::init_context(),
+                crac_chain_depth: 0,
             }
+        }
+    }
+
+    impl<'h, 'j, 'r, Host: StorageV1, R: tezosx_interfaces::Registry> HasCracChainDepth
+        for MockCtx<'h, 'j, 'r, Host, R>
+    {
+        fn crac_chain_depth(&self) -> u32 {
+            self.crac_chain_depth
         }
     }
 

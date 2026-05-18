@@ -281,6 +281,7 @@ where
             })
             .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
     }
+    journal.evm.set_crac_chain_depth(hdrs.crac_depth);
 
     let context = CrossRuntimeContext {
         gas_limit: hdrs.gas_limit,
@@ -381,6 +382,7 @@ where
             })
             .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
     }
+    journal.evm.set_crac_chain_depth(hdrs.crac_depth);
 
     let context = CrossRuntimeContext {
         gas_limit: hdrs.gas_limit,
