@@ -92,8 +92,11 @@ fn read_sequencer_pool_address(host: &impl StorageV1) -> Option<primitive_types:
 /// Execution results are mapped to HTTP status codes:
 /// - `Success` → 200
 /// - `Revert` → 400 (the contract rejected the call)
-/// - `Halt(OutOfGas)` → 429 (OOG)
-/// - `Halt(other)` → 500 (invalid opcode, stack overflow, etc.)
+/// - `Halt(OutOfGas)` → 429 (OOG, special-cased so the gateway can
+///   distinguish gas exhaustion from other deterministic halts)
+/// - `Halt(other)` → 400 (every other halt is a property of the user-
+///   supplied bytecode and tx inputs, so it must be a catchable
+///   operation-level failure — see L2-1341)
 ///
 /// Pre-execution errors are mapped as:
 /// - `BadRequest` → 400
@@ -121,14 +124,43 @@ fn build_response(
                     (StatusCode::BAD_REQUEST, output.to_vec(), gas)
                 }
                 ExecutionResult::Halt { reason, .. } => {
+                    // Every `HaltReason` variant is a deterministic property
+                    // of EVM execution (bytecode + tx inputs), so it MUST be
+                    // surfaced as a catchable op-level failure (4xx). Any
+                    // 5xx here would be classified as `CracError::BlockAbort`
+                    // by the gateway and abort the whole block — a
+                    // user-triggerable channel that lost adjacent
+                    // delayed-bridge deposits in the forced inbox path
+                    // (L2-1341). True infrastructure failures arrive via
+                    // `Err(...)` from `run_transaction`, mapped to 5xx in
+                    // the catch-all arm below — not through this halt
+                    // branch.
+                    //
+                    // The match is intentionally exhaustive (no `_ =>`):
+                    // a new REVM `HaltReason` variant must fail to compile
+                    // so a human classifies it instead of silently
+                    // defaulting to 500 again.
                     let status = match reason {
                         HaltReason::OutOfGas(_) => StatusCode::TOO_MANY_REQUESTS,
-                        // STATICCALL violation on the read-only entry
-                        // (HTTP `GET`): catchable client error.
-                        HaltReason::StateChangeDuringStaticCall => {
-                            StatusCode::BAD_REQUEST
-                        }
-                        _ => StatusCode::INTERNAL_SERVER_ERROR,
+                        HaltReason::OpcodeNotFound
+                        | HaltReason::InvalidFEOpcode
+                        | HaltReason::InvalidJump
+                        | HaltReason::NotActivated
+                        | HaltReason::StackUnderflow
+                        | HaltReason::StackOverflow
+                        | HaltReason::OutOfOffset
+                        | HaltReason::CreateCollision
+                        | HaltReason::PrecompileError
+                        | HaltReason::PrecompileErrorWithContext(_)
+                        | HaltReason::NonceOverflow
+                        | HaltReason::CreateContractSizeLimit
+                        | HaltReason::CreateContractStartingWithEF
+                        | HaltReason::CreateInitCodeSizeLimit
+                        | HaltReason::OverflowPayment
+                        | HaltReason::StateChangeDuringStaticCall
+                        | HaltReason::CallNotAllowedInsideStatic
+                        | HaltReason::OutOfFunds
+                        | HaltReason::CallTooDeep => StatusCode::BAD_REQUEST,
                     };
                     (
                         status,
@@ -989,18 +1021,50 @@ mod tests {
             assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
         }
 
+        /// Every non-OOG halt must surface as a catchable 400 (L2-1341).
+        /// A 5xx here would be reclassified as `CracError::BlockAbort` by
+        /// the gateway, aborting the whole block and (in the forced
+        /// delayed-inbox path) dropping adjacent bridge deposits.
         #[test]
-        fn halt_other_returns_500() {
-            let outcome = ExecutionOutcome {
-                result: ExecutionResult::Halt {
-                    reason: HaltReason::StackOverflow,
-                    logs: vec![],
-                    gas: ResultGas::new(u64::MAX, 21000, 0, 0, 0),
-                },
-                withdrawals: vec![],
-            };
-            let resp = build_response(Ok(outcome));
-            assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        fn user_triggerable_halts_return_400() {
+            let user_triggerable = [
+                HaltReason::OpcodeNotFound,
+                HaltReason::InvalidFEOpcode,
+                HaltReason::InvalidJump,
+                HaltReason::NotActivated,
+                HaltReason::StackUnderflow,
+                HaltReason::StackOverflow,
+                HaltReason::OutOfOffset,
+                HaltReason::CreateCollision,
+                HaltReason::PrecompileError,
+                HaltReason::PrecompileErrorWithContext("ctx".into()),
+                HaltReason::NonceOverflow,
+                HaltReason::CreateContractSizeLimit,
+                HaltReason::CreateContractStartingWithEF,
+                HaltReason::CreateInitCodeSizeLimit,
+                HaltReason::OverflowPayment,
+                HaltReason::StateChangeDuringStaticCall,
+                HaltReason::CallNotAllowedInsideStatic,
+                HaltReason::OutOfFunds,
+                HaltReason::CallTooDeep,
+            ];
+            for reason in user_triggerable {
+                let outcome = ExecutionOutcome {
+                    result: ExecutionResult::Halt {
+                        reason: reason.clone(),
+                        logs: vec![],
+                        gas: ResultGas::new(u64::MAX, 21000, 0, 0, 0),
+                    },
+                    withdrawals: vec![],
+                };
+                let resp = build_response(Ok(outcome));
+                assert_eq!(
+                    resp.status(),
+                    StatusCode::BAD_REQUEST,
+                    "halt reason {reason:?} should map to 400, not {}",
+                    resp.status()
+                );
+            }
         }
 
         #[test]
