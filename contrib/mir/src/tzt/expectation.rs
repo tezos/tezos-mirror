@@ -3,8 +3,25 @@
 // SPDX-License-Identifier: MIT
 
 use crate::ast::IntoMicheline;
+use crate::gas::CompareError;
 
 use super::*;
+
+/// Resource-exhaustion `TcError`s, mirroring the kernel's
+/// `classify_tc_error` (etherlink `view.rs`). Every one of these is
+/// classified as out-of-gas at the live runtime boundary, so a TZT
+/// typecheck-error expectation pinned to the out-of-gas message must
+/// accept any of them — not only the bare `TcError::OutOfGas` whose
+/// `Display` happens to be that message. Without this the matcher and
+/// the kernel would disagree on a (typecheck-time) cost overflow.
+fn tc_is_resource_exhaustion(e: &TcError) -> bool {
+    matches!(
+        e,
+        TcError::OutOfGas(_)
+            | TcError::CostOverflow(_)
+            | TcError::CompareError(CompareError::Cost(_))
+    )
+}
 
 fn check_error_expectation<'a>(
     ctx: &mut Ctx<'a>,
@@ -20,6 +37,15 @@ fn check_error_expectation<'a>(
 
         (Ex::TypecheckerError(Some(tc_exp)), Er::TypecheckerError(tc_real))
             if tc_real.to_string() == tc_exp =>
+        {
+            Ok(())
+        }
+        // Mirror `classify_tc_error`: any resource-exhaustion `TcError`
+        // answers an out-of-gas typecheck expectation, even though only
+        // bare `OutOfGas` `Display`s as that message.
+        (Ex::TypecheckerError(Some(tc_exp)), Er::TypecheckerError(tc_real))
+            if tc_exp == TcError::OutOfGas(crate::gas::OutOfGas).to_string()
+                && tc_is_resource_exhaustion(&tc_real) =>
         {
             Ok(())
         }
@@ -77,8 +103,124 @@ fn unify_interpreter_error<'a>(
         (MutezOverflow(_, _), InterpretError::MutezOverflow) => true,
         (Overflow, InterpretError::Overflow) => true,
         (GeneralOverflow(_, _), _) => todo!("General overflow is unsupported on interpreter"),
-        (OutOfGas, InterpretError::OutOfGas) => true,
+        // Mirror the kernel's `classify_interpret_error` (view.rs): every
+        // flavour of resource exhaustion answers an `OutOfGas` expectation
+        // — direct budget exhaustion, the nested-`TcError` forms, a
+        // cost-arithmetic overflow, and the comparison-cost path. Keeping
+        // this in sync with the kernel classifier avoids a TZT conformance
+        // test and the live runtime disagreeing on the same failure.
+        // `CompareError::Incomparable` is a deterministic type failure and
+        // is intentionally excluded.
+        (
+            OutOfGas,
+            InterpretError::OutOfGas
+            | InterpretError::CostOverflow(_)
+            | InterpretError::CompareError(CompareError::Cost(_))
+            | InterpretError::TcError(TcError::OutOfGas(_))
+            | InterpretError::TcError(TcError::CostOverflow(_))
+            | InterpretError::TcError(TcError::CompareError(CompareError::Cost(_))),
+        ) => true,
         (_, _) => false, //Some error that we didn't expect happened.
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::gas::{CompareError, CostOverflow};
+    use InterpreterErrorExpectation::OutOfGas as OutOfGasExp;
+
+    /// Real gas exhaustion still surfaces as the bare `InterpretError::OutOfGas`
+    /// (it always comes from the outer `ctx.gas().consume(..)?`, never from a
+    /// cost helper), so a TZT test expecting `OutOfGas` keeps matching.
+    #[test]
+    fn bare_out_of_gas_still_unifies() {
+        let mut ctx = Ctx::default();
+        assert!(unify_interpreter_error(
+            &mut ctx,
+            &OutOfGasExp,
+            &InterpretError::OutOfGas,
+        ));
+    }
+
+    /// A cost-arithmetic overflow used to surface as `OutOfGas`
+    /// (`as_gas_cost`/`log2i` returned `OutOfGas`); it now surfaces as
+    /// `CostOverflow`. The kernel HTTP classifier (`view.rs`) keeps mapping
+    /// that to `OutOfGas`, and this TZT matcher must agree — otherwise a TZT
+    /// conformance test and the live runtime would classify the same failure
+    /// differently. This guards that symmetry.
+    #[test]
+    fn cost_overflow_unifies_with_out_of_gas() {
+        let mut ctx = Ctx::default();
+        assert!(unify_interpreter_error(
+            &mut ctx,
+            &OutOfGasExp,
+            &InterpretError::CostOverflow(CostOverflow),
+        ));
+        assert!(unify_interpreter_error(
+            &mut ctx,
+            &OutOfGasExp,
+            &InterpretError::CompareError(CompareError::Cost(CostOverflow)),
+        ));
+    }
+
+    /// `CompareError::Incomparable` is a deterministic type failure, not
+    /// resource exhaustion, so it must NOT answer an `OutOfGas` expectation
+    /// (kept in sync with `view.rs`, which routes it to `BadRequest`).
+    #[test]
+    fn incomparable_does_not_unify_with_out_of_gas() {
+        let mut ctx = Ctx::default();
+        assert!(!unify_interpreter_error(
+            &mut ctx,
+            &OutOfGasExp,
+            &InterpretError::CompareError(CompareError::Incomparable),
+        ));
+    }
+
+    /// tc-side symmetry with the kernel's `classify_tc_error`.
+    ///
+    /// The interpreter half of this matcher already mirrors
+    /// `classify_interpret_error`; `check_error_expectation` now mirrors
+    /// `classify_tc_error` too. A typecheck-time cost overflow surfaces as
+    /// `TcError::CostOverflow` (Display `"arithmetic overflow in cost
+    /// computation"`), which the kernel classifies as out-of-gas. A TZT
+    /// typecheck-error expectation pinned to the out-of-gas message must
+    /// therefore accept it, exactly as the kernel does — while a genuine
+    /// type failure (`CompareError::Incomparable`) must still be rejected.
+    #[test]
+    fn tc_side_cost_overflow_unifies_with_out_of_gas() {
+        let mut ctx = Ctx::default();
+        let oog = || {
+            ErrorExpectation::TypecheckerError(Some(
+                TcError::OutOfGas(crate::gas::OutOfGas).to_string(),
+            ))
+        };
+
+        // Positive control: a genuine typecheck OOG matches.
+        assert!(check_error_expectation(
+            &mut ctx,
+            oog(),
+            TestError::TypecheckerError(TcError::OutOfGas(crate::gas::OutOfGas)),
+        )
+        .is_ok());
+
+        // Resolved: a cost-overflow (kernel-classified as OutOfGas) is now
+        // accepted against the out-of-gas typecheck expectation.
+        assert!(check_error_expectation(
+            &mut ctx,
+            oog(),
+            TestError::TypecheckerError(TcError::CostOverflow(CostOverflow)),
+        )
+        .is_ok());
+
+        // Negative control: `Incomparable` is a deterministic type failure
+        // (kernel → BadRequest), so it must NOT answer the OOG expectation.
+        assert!(check_error_expectation(
+            &mut ctx,
+            oog(),
+            TestError::TypecheckerError(TcError::CompareError(CompareError::Incomparable)),
+        )
+        .is_err());
     }
 }
 
