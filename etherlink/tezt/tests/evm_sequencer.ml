@@ -2520,6 +2520,7 @@ let test_init_from_rollup_node_with_delayed_inbox =
       sc_rollup_node
   in
   let* () = Evm_node.run observer in
+  let* () = Evm_node.wait_for_drift_monitor_ready observer in
   let* () = Delayed_inbox.assert_empty (Evm_node observer) in
 
   (* Finally produce a block to clear the delayed inbox. *)
