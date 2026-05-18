@@ -16,12 +16,6 @@
 
 ### Storage changes
 
-- Resolve `/michelson_runtime/{,target_}sunrise_level` from
-  `/tez/world_state/` on kernels at storage version 57 or higher,
-  falling back to the legacy `/evm/` paths otherwise. Operators must
-  upgrade to this release before running a V57+ TezosX kernel; the
-  release stays backward-compatible with pre-V57 kernels. (!21851)
-
 ### Documentation changes
 
 ### Experimental features changes
@@ -30,6 +24,37 @@
 features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.59 (2026-05-18)
+
+This release adds compatibility with the newly activated `farfadet-r3` kernel
+(Etherlink 6.3, Farfadet third revision). RPC providers are strongly encouraged
+to upgrade, as this release addresses a few regressions in some key RPCs.
+
+This release will not apply any migration to the node’s store (version 24),
+meaning it is possible to downgrade to previous version).
+
+### RPCs
+
+- Address several regressions in `debug_traceTransaction` and its companion
+  RPCs. (!21909)
+
+### Command-line interface changes
+
+- `download kernel` now accepts `farfadet-r3` as a valid named argument.
+  (!21909)
+
+### Execution changes
+
+- Add support for Etherlink 6.3 native execution. (!21909)
+
+### Storage changes
+
+- Resolve `/michelson_runtime/{,target_}sunrise_level` from `/tez/world_state/`
+  on kernels at storage version 57 or higher, falling back to the legacy
+  `/evm/` paths otherwise. Operators must upgrade to this release before
+  running a V57+ Tezos X kernel; the release stays backward-compatible with
+  pre-V57 kernels. (!21851)
 
 ## Version 0.58 (2026-05-06)
 
