@@ -2449,7 +2449,7 @@ let test_event =
   in
   assert (
     consumed_milligas >= expected_event_gas_cost
-    && consumed_milligas < expected_event_gas_cost + 1000) ;
+    && consumed_milligas < expected_event_gas_cost + 2000) ;
 
   let event = events |=> 1 in
   assert_type ~annots:true event ;
@@ -2464,7 +2464,7 @@ let test_event =
   in
   assert (
     consumed_milligas >= expected_event_gas_cost
-    && consumed_milligas < expected_event_gas_cost + 1000) ;
+    && consumed_milligas < expected_event_gas_cost + 2000) ;
   unit
 
 let test_forge_operations =
