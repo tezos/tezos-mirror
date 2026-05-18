@@ -439,9 +439,20 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
   in
   let governance_in_base = newer_than_farfadet_r2 in
   let feature_flags_in_base = newer_than_farfadet_r2 in
+  (* Phase 6 (V58) moves EVM config scalars from /evm/ to /evm/world_state/.
+     This ships in [Latest] only — kernels strictly newer than [FarfadetR3]. *)
+  let evm_config_in_world_state =
+    Constants.(kernel_is_newer ~than:FarfadetR3 kernel_compat)
+  in
   let base_or_evm_prefix = if governance_in_base then ["base"] else ["evm"] in
+  let evm_config_prefix =
+    if evm_config_in_world_state then ["evm"; "world_state"] else ["evm"]
+  in
   let make_governance_instr ?convert arg =
     make_instr ?convert ~path_prefix:base_or_evm_prefix arg
+  in
+  let make_evm_config_instr ?convert arg =
+    make_instr ?convert ~path_prefix:evm_config_prefix arg
   in
   (* Path prefix for feature flags according to the target kernel's version. *)
   let feature_flag_prefix_base = ["base"; "feature_flags"] in
@@ -502,7 +513,7 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
     @ make_governance_instr
         ~convert:(fun s -> Hex.to_bytes_exn (`Hex s) |> Bytes.to_string)
         kernel_root_hash
-    @ make_instr ~convert:parse_z_to_padded_32_le_int_bytes chain_id
+    @ make_evm_config_instr ~convert:parse_z_to_padded_32_le_int_bytes chain_id
     @ make_instr
         ~path_prefix:["tez"; "world_state"]
         (Option.map
@@ -514,10 +525,10 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
            michelson_runtime_chain_id)
     @ make_governance_instr delayed_bridge
     @ make_governance_instr admin
-    @ make_instr sequencer_governance
+    @ make_evm_config_instr sequencer_governance
     @ make_governance_instr kernel_governance
     @ make_governance_instr kernel_security_governance
-    @ make_instr evm_version
+    @ make_evm_config_instr evm_version
     @ make_instr
         ~path_prefix:["evm"; "world_state"; "fees"]
         ~convert:parse_z_to_padded_32_le_int_bytes
@@ -532,14 +543,14 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
         da_fee_per_byte
     @ make_governance_instr ~convert:le_int64_bytes delayed_inbox_timeout
     @ make_governance_instr ~convert:le_int64_bytes delayed_inbox_min_levels
-    @ make_instr
+    @ make_evm_config_instr
         ~convert:(fun addr ->
           match Misc.normalize_hex addr with
           | Ok hex -> Hex.to_bytes_exn hex |> String.of_bytes
           | Error _ -> raise (Invalid_argument "sequencer_pool_address"))
         sequencer_pool_address
     @ make_governance_instr ~convert:le_int64_bytes maximum_allowed_ticks
-    @ make_instr ~convert:le_int64_bytes maximum_gas_per_transaction
+    @ make_evm_config_instr ~convert:le_int64_bytes maximum_gas_per_transaction
     @ make_governance_instr
         ~convert:le_int64_bytes
         max_blueprint_lookahead_in_seconds
