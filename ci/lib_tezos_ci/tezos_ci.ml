@@ -1662,13 +1662,8 @@ module Images = struct
     (* [debian-rust-trixie] *)
     (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2481391601
        which contains libclang for building rocksdb in CI.
-
-       When the common_version is updated to a more recent commit this value can
-       be reverted to [common_version] and this comment removed. *)
-
-    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
        May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
-       https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines *)
+       https://gitlab.com/tezos/tezos/-/commit/8afd610a/pipelines *)
     let debian_rust_trixie = make_img "debian-rust:trixie" "master-8afd610a"
 
     (* [ci-release] *)
