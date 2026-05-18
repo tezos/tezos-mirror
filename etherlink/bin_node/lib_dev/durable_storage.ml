@@ -298,11 +298,11 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
           encode = Bytes.to_string;
         }
   | Chain_id ->
-      static_ro
-        {
-          path = Durable_storage_path.chain_id;
-          decode = infallible_decode L2_types.Chain_id.decode_le;
-        }
+      versioned_ro (fun ~storage_version ->
+          {
+            path = Durable_storage_path.chain_id ~storage_version;
+            decode = infallible_decode L2_types.Chain_id.decode_le;
+          })
   | Michelson_runtime_chain_id ->
       static_ro
         {
@@ -426,12 +426,16 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
         }
   | Block_index (chain_family, block_number) ->
       let root = Durable_storage_path.root_of_chain_family chain_family in
-      Static
-        (Delete_only
-           {
-             path =
-               Durable_storage_path.Indexes.block_by_number ~root block_number;
-           })
+      Versioned
+        (fun ~storage_version ->
+          Delete_only
+            {
+              path =
+                Durable_storage_path.Indexes.block_by_number
+                  ~storage_version
+                  ~root
+                  block_number;
+            })
   | Tezosx_tezos_current_block ->
       static_ro
         (block_ro_codec
@@ -460,18 +464,21 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
   | Da_fee_per_byte ->
       static_ro (qty_le_ro_codec ~path:Durable_storage_path.da_fee_per_byte)
   | Maximum_gas_per_transaction ->
-      static_ro
-        (qty_le_ro_codec ~path:Durable_storage_path.maximum_gas_per_transaction)
+      versioned_ro (fun ~storage_version ->
+          qty_le_ro_codec
+            ~path:
+              (Durable_storage_path.maximum_gas_per_transaction
+                 ~storage_version))
   | Michelson_to_evm_gas_multiplier ->
       static_ro
         (int64_le_ro_codec
            ~path:Durable_storage_path.michelson_to_evm_gas_multiplier)
   | Sequencer_pool_address ->
-      static_ro
-        {
-          path = Durable_storage_path.sequencer_pool_address;
-          decode = infallible_decode Ethereum_types.decode_address;
-        }
+      versioned_ro (fun ~storage_version ->
+          {
+            path = Durable_storage_path.sequencer_pool_address ~storage_version;
+            decode = infallible_decode Ethereum_types.decode_address;
+          })
   | Evm_legacy_account_balance address ->
       static_rw
         {
@@ -536,14 +543,15 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
           decode = Tezosx.Tezos_runtime.decode_account_info;
         }
   | Evm_block_hash_by_number number ->
-      static_ro
-        {
-          path =
-            Durable_storage_path.Indexes.block_by_number
-              ~root:Durable_storage_path.etherlink_root
-              number;
-          decode = infallible_decode Ethereum_types.decode_block_hash;
-        }
+      versioned_ro (fun ~storage_version ->
+          {
+            path =
+              Durable_storage_path.Indexes.block_by_number
+                ~storage_version
+                ~root:Durable_storage_path.etherlink_root
+                number;
+            decode = infallible_decode Ethereum_types.decode_block_hash;
+          })
   | Evm_transaction_receipt_by_hash (tx_hash, block_hash) ->
       static_ro
         {

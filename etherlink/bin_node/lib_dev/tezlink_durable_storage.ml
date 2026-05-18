@@ -191,10 +191,14 @@ let big_map_value_type state id =
 let nth_block state n =
   let open Lwt_result_syntax in
   let level = n in
+  let* storage_version = Durable_storage.storage_version state in
   let* block_hash_opt =
     Durable_storage.inspect_durable_and_decode_opt
       state
-      (Durable_storage_path.Indexes.block_by_number ~root (Nth level))
+      (Durable_storage_path.Indexes.block_by_number
+         ~storage_version
+         ~root
+         (Nth level))
       Ethereum_types.decode_block_hash
   in
   match block_hash_opt with
@@ -213,10 +217,12 @@ let nth_block state n =
       | Some block -> return block)
 
 let nth_block_hash state n =
+  let open Lwt_result_syntax in
   let number = Durable_storage_path.Block.(Nth n) in
+  let* storage_version = Durable_storage.storage_version state in
   Durable_storage.inspect_durable_and_decode_opt
     state
-    (Durable_storage_path.Indexes.block_by_number ~root number)
+    (Durable_storage_path.Indexes.block_by_number ~storage_version ~root number)
     Ethereum_types.decode_block_hash
 
 let da_fee_per_byte_mutez state =

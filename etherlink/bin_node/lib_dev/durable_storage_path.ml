@@ -116,7 +116,10 @@ let root_of_chain_family (type f) (chain_family : f L2_types.chain_family) =
      and [BlockInProgress::finalize_and_store]. *)
   | L2_types.Michelson -> tezosx_tezos_blocks_root
 
-let chain_id = EVM.make "/chain_id"
+let chain_id ~storage_version =
+  if Storage_version.evm_config_moved_to_world_state ~storage_version then
+    World_state.make "/chain_id"
+  else EVM.make "/chain_id"
 
 let michelson_runtime_chain_id = TEZ.World_state.make "/chain_id"
 
@@ -165,7 +168,10 @@ let delayed_inbox ~storage_version =
     BASE.make "/delayed-inbox"
   else EVM.make "/delayed-inbox"
 
-let sequencer_pool_address = EVM.make "/sequencer_pool_address"
+let sequencer_pool_address ~storage_version =
+  if Storage_version.evm_config_moved_to_world_state ~storage_version then
+    World_state.make "/sequencer_pool_address"
+  else EVM.make "/sequencer_pool_address"
 
 let sequencer_key_legacy = EVM.make "/sequencer"
 
@@ -178,7 +184,10 @@ let sequencer_key ~storage_version =
   then sequencer_key_world_state
   else sequencer_key_legacy
 
-let maximum_gas_per_transaction = EVM.make "/maximum_gas_per_transaction"
+let maximum_gas_per_transaction ~storage_version =
+  if Storage_version.evm_config_moved_to_world_state ~storage_version then
+    World_state.make "/maximum_gas_per_transaction"
+  else EVM.make "/maximum_gas_per_transaction"
 
 let michelson_runtime_sunrise_level ~storage_version =
   if
@@ -333,18 +342,27 @@ module BlockHeader = struct
 end
 
 module Indexes = struct
-  let indexes ~root = root ^ "/indexes"
+  (* Phase 6 (V58) reorganized the block-index path from
+     [<world_state>/indexes/blocks/{N}] to
+     [<world_state>/blocks/indexes/{N}]. This applies to every root
+     (EVM and Michelson alike): block_storage.rs uses the new layout
+     unconditionally for all chains. *)
 
-  let blocks = "/blocks"
+  let legacy_blocks ~root = root ^ "/indexes/blocks"
 
-  let blocks ~root = indexes ~root ^ blocks
+  let new_blocks ~root = root ^ "/blocks/indexes"
+
+  let blocks ~storage_version ~root =
+    if Storage_version.evm_config_moved_to_world_state ~storage_version then
+      new_blocks ~root
+    else legacy_blocks ~root
 
   let number_to_string = function
     | Block.Current -> "current"
     | Nth i -> Z.to_string i
 
-  let block_by_number ~root number =
-    blocks ~root ^ "/" ^ number_to_string number
+  let block_by_number ~storage_version ~root number =
+    blocks ~storage_version ~root ^ "/" ^ number_to_string number
 end
 
 module Transaction_receipt = struct
