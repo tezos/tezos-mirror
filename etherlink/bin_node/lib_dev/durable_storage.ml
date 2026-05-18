@@ -98,23 +98,23 @@ type ro = [`Read]
 
 type ('a, 'cap) path =
   | Raw_path : string -> (bytes, rw) path
-  | Chain_id : (L2_types.chain_id, rw) path
-  | Michelson_runtime_chain_id : (L2_types.chain_id, rw) path
-  | Kernel_version : (string, rw) path
-  | Kernel_root_hash : (Ethereum_types.hex, rw) path
-  | Multichain_flag : (unit, rw) path
-  | Sequencer_key : (Signature.Public_key.t, rw) path
+  | Chain_id : (L2_types.chain_id, ro) path
+  | Michelson_runtime_chain_id : (L2_types.chain_id, ro) path
+  | Kernel_version : (string, ro) path
+  | Kernel_root_hash : (Ethereum_types.hex, ro) path
+  | Multichain_flag : (unit, ro) path
+  | Sequencer_key : (Signature.Public_key.t, ro) path
   | Chain_config_family :
       L2_types.chain_id
-      -> (L2_types.ex_chain_family, rw) path
-  | Tezosx_feature_flag : Tezosx.runtime -> (unit, rw) path
-  | Michelson_runtime_sunrise_level : (Ethereum_types.quantity, rw) path
+      -> (L2_types.ex_chain_family, ro) path
+  | Tezosx_feature_flag : Tezosx.runtime -> (unit, ro) path
+  | Michelson_runtime_sunrise_level : (Ethereum_types.quantity, ro) path
   | Current_block_number :
       _ L2_types.chain_family
-      -> (Ethereum_types.quantity, rw) path
+      -> (Ethereum_types.quantity, ro) path
   | Current_block_hash :
       _ L2_types.chain_family
-      -> (Ethereum_types.block_hash, rw) path
+      -> (Ethereum_types.block_hash, ro) path
   | Evm_node_flag : (unit, rw) path
   | Blueprint_chunk : {
       blueprint_number : Z.t;
@@ -212,6 +212,11 @@ let infallible_decode decode bytes = Ok (decode bytes)
 let unit_flag_codec ~path : (unit, rw) read_resolved =
   Read_write {path; decode = (fun _bytes -> Ok ()); encode = (fun () -> "")}
 
+(** Read-only sibling of {!unit_flag_codec} for presence flags the EVM node
+    only checks but never writes. *)
+let unit_flag_ro_codec ~path : (unit, ro) read_resolved =
+  Read_only {path; decode = (fun _bytes -> Ok ())}
+
 (** Little-endian [int64]-backed kernel-owned scalars stored via
     [Data_encoding.Little_endian.int64]. Read-only — the EVM node never
     writes these. *)
@@ -224,19 +229,8 @@ let int64_le_ro_codec ~path : (int64, ro) read_resolved =
           Data_encoding.(Binary.of_bytes_exn Little_endian.int64);
     }
 
-(** Little-endian [Z.t]-backed quantities stored via [Z.{to,of}_bits]. *)
-let qty_le_codec ~path : (Ethereum_types.quantity, rw) read_resolved =
-  Read_write
-    {
-      path;
-      decode =
-        infallible_decode (fun bytes ->
-            Ethereum_types.Qty (Bytes.to_string bytes |> Z.of_bits));
-      encode = (fun (Ethereum_types.Qty z) -> Z.to_bits z);
-    }
-
-(** Read-only sibling of {!qty_le_codec} for kernel-owned quantity scalars
-    that the EVM node never writes. *)
+(** Little-endian [Z.t]-backed quantities stored via [Z.{to,of}_bits].
+    Read-only — the EVM node never writes these. *)
 let qty_le_ro_codec ~path : (Ethereum_types.quantity, ro) read_resolved =
   Read_only
     {
@@ -287,86 +281,77 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
            })
   | Chain_id ->
       static_read
-        (Read_write
+        (Read_only
            {
              path = Durable_storage_path.chain_id;
              decode = infallible_decode L2_types.Chain_id.decode_le;
-             encode = L2_types.Chain_id.encode_le;
            })
   | Michelson_runtime_chain_id ->
       static_read
-        (Read_write
+        (Read_only
            {
              path = Durable_storage_path.michelson_runtime_chain_id;
              decode = infallible_decode L2_types.Chain_id.decode_be;
-             encode = L2_types.Chain_id.encode_be;
            })
   | Kernel_version ->
       versioned_read (fun ~storage_version ->
-          Read_write
+          Read_only
             {
               path = Durable_storage_path.kernel_version ~storage_version;
               decode = infallible_decode Bytes.to_string;
-              encode = Fun.id;
             })
   | Kernel_root_hash ->
       versioned_read (fun ~storage_version ->
-          Read_write
+          Read_only
             {
               path = Durable_storage_path.kernel_root_hash ~storage_version;
               decode =
                 (fun bytes ->
                   let (`Hex s) = Hex.of_bytes bytes in
                   Ok (Ethereum_types.Hex s));
-              encode = Ethereum_types.hex_to_string;
             })
   | Multichain_flag ->
       static_read
-        (unit_flag_codec ~path:Durable_storage_path.Feature_flags.multichain)
+        (unit_flag_ro_codec ~path:Durable_storage_path.Feature_flags.multichain)
   | Sequencer_key ->
       versioned_read (fun ~storage_version ->
-          Read_write
+          Read_only
             {
               path = Durable_storage_path.sequencer_key ~storage_version;
               decode =
                 (fun bytes ->
                   Signature.Public_key.of_b58check (Bytes.to_string bytes));
-              encode = (fun pk -> Signature.Public_key.to_b58check pk);
             })
   | Chain_config_family cid ->
       versioned_read (fun ~storage_version ->
-          Read_write
+          Read_only
             {
               path =
                 Durable_storage_path.Chain_configuration.chain_family
                   ~storage_version
                   cid;
               decode = L2_types.Chain_family.of_bytes;
-              encode =
-                (fun (L2_types.Ex_chain_family cf) ->
-                  L2_types.Chain_family.to_string cf);
             })
   | Tezosx_feature_flag runtime ->
-      static_read (unit_flag_codec ~path:(Tezosx.feature_flag runtime))
+      static_read (unit_flag_ro_codec ~path:(Tezosx.feature_flag runtime))
   | Michelson_runtime_sunrise_level ->
       versioned_read (fun ~storage_version ->
-          qty_le_codec
+          qty_le_ro_codec
             ~path:
               (Durable_storage_path.michelson_runtime_sunrise_level
                  ~storage_version))
   | Current_block_number chain_family ->
       let root = Durable_storage_path.root_of_chain_family chain_family in
       static_read
-        (qty_le_codec ~path:(Durable_storage_path.Block.current_number ~root))
+        (qty_le_ro_codec
+           ~path:(Durable_storage_path.Block.current_number ~root))
   | Current_block_hash chain_family ->
       let root = Durable_storage_path.root_of_chain_family chain_family in
       static_read
-        (Read_write
+        (Read_only
            {
              path = Durable_storage_path.Block.current_hash ~root;
              decode = infallible_decode Ethereum_types.decode_block_hash;
-             encode =
-               (fun h -> Bytes.to_string (Ethereum_types.encode_block_hash h));
            })
   | Evm_node_flag ->
       versioned_read (fun ~storage_version ->
