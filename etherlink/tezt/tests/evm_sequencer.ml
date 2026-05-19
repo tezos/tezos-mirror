@@ -9710,22 +9710,37 @@ let test_observer_finalized_view =
 
   let target_finalized = 2l in
 
-  (* Ensure blueprints are finalized by baking two more blocks *)
-  let* _l1_lvl =
-    repeat 2 (fun () ->
-        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
-        unit)
+  (* Arm both event listeners before baking to avoid races. *)
+  let wait_observer_finalized =
+    Evm_node.wait_for_observer_finalized_level
+      observer
+      (Int32.to_int target_finalized)
   in
-
-  (* Check the finalized blueprint is indeed the expected one *)
-  let*@ sequencer_finalized_head =
-    Rpc.get_block_by_number ~block:"finalized" sequencer
+  (* Bake L1 blocks until the sequencer emits the blueprint-finalized event.
+     Running baking and waiting concurrently avoids the race between the rollup
+     node processing an L1 block and the sequencer updating its finalized level. *)
+  let rec bake_until_sequencer_finalized ?(remaining_attempts = 6) () =
+    if remaining_attempts <= 0 then
+      Test.fail "Sequencer did not finalize blueprint %ld" target_finalized
+    else
+      Lwt.catch
+        (fun () ->
+          let* _ =
+            Evm_node.wait_for_blueprint_finalized
+              ~timeout:5.
+              sequencer
+              (Int32.to_int target_finalized)
+          and* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+          unit)
+        (fun _ ->
+          bake_until_sequencer_finalized
+            ~remaining_attempts:(remaining_attempts - 1)
+            ())
   in
-  Check.(
-    (sequencer_finalized_head.number = target_finalized)
-      int32
-      ~error_msg:"Expected sequencer finalized level %R, got %L") ;
-
+  let* () = bake_until_sequencer_finalized () in
+  (* Wait for the observer to finish processing the Finalized_levels broadcast
+     via the sequencer's /evm/messages stream. *)
+  let* () = wait_observer_finalized in
   (* Check the finalized blueprint is the same for the observer and
      the sequencer. *)
   let* () =
