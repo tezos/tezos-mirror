@@ -7672,8 +7672,7 @@ let test_rpc_state_value_and_subkeys =
         ]
     | Previewnet ->
         ["indexes"; "blocks"; "fees"; "eth_accounts"; "eth_codes"; "sequencer"]
-    | Mainnet | Tezlink_shadownet ->
-        ["indexes"; "blocks"; "fees"; "eth_accounts"; "eth_codes"]
+    | Mainnet -> ["indexes"; "blocks"; "fees"; "eth_accounts"; "eth_codes"]
   in
   Check.(
     (List.sort String.compare world_state_subkeys

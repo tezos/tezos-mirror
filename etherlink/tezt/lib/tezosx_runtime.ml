@@ -14,8 +14,7 @@ let feature_flag kernel = function
       match kernel with
       | Kernel.Latest | Kernel.Previewnet ->
           "/base/feature_flags/enable_tezos_runtime"
-      | Kernel.Mainnet | Kernel.Tezlink_shadownet ->
-          "/evm/feature_flags/enable_tezos_runtime")
+      | Kernel.Mainnet -> "/evm/feature_flags/enable_tezos_runtime")
 
 (* V57 moved both paths under /tez/world_state/. Dispatch on the kernel's
    baked-in storage version (rather than its variant) so this stays correct
