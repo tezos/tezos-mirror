@@ -41,6 +41,31 @@ use tezosx_journal::TezosXJournal;
 use crate::context::TezosRuntimeContext;
 use crate::{headers, url, NULL_PKH, TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH};
 
+/// Resource-exhaustion `TcError`s that must route to
+/// [`TezosXRuntimeError::OutOfGas`]: direct budget exhaustion, a
+/// cost-arithmetic overflow ("the cost is unrepresentably large",
+/// catchable like OOG), and the comparison-cost path.
+/// `CompareError::Incomparable` is a deterministic type failure and is
+/// deliberately excluded.
+///
+/// Single-sourced so [`classify_tc_error`] and the nested-`TcError` arm
+/// of [`classify_interpret_error`] cannot drift apart — the realistic
+/// failure mode, since the two used to duplicate this set by hand. The
+/// non-OOG side intentionally keeps a wildcard rather than enumerating
+/// `TcError`'s ~40 deterministic variants (which would duplicate the
+/// enum and add churn on every MIR change); a new *resource-exhaustion*
+/// variant is the only thing that needs adding here, and that is a
+/// reviewed, deliberate act.
+fn tc_error_is_oog(e: &TcError) -> bool {
+    use mir::gas::CompareError;
+    matches!(
+        e,
+        TcError::OutOfGas(_)
+            | TcError::CostOverflow(_)
+            | TcError::CompareError(CompareError::Cost(_))
+    )
+}
+
 /// Classify a MIR typechecker error into the right HTTP-surface error.
 ///
 /// The invariant here is that **every** error must map to a catchable
@@ -50,23 +75,17 @@ use crate::{headers, url, NULL_PKH, TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH};
 /// storage/view types and force an uncatchable failure during
 /// `parse_ty`.
 ///
-/// `OutOfGas` is the one variant that needs specific routing
+/// `OutOfGas` (and the other resource-exhaustion shapes, see
+/// [`tc_error_is_oog`]) needs specific routing
 /// (→ [`TezosXRuntimeError::OutOfGas`], catchable 429). Every other
 /// `TcError` is a deterministic, caller-visible failure (malformed
 /// input, type mismatch, unknown entrypoint, ...) and maps to
 /// [`TezosXRuntimeError::BadRequest`] (→ 400).
 fn classify_tc_error(e: TcError) -> TezosXRuntimeError {
-    use mir::gas::CompareError;
-    match e {
-        // Resource exhaustion in any form (direct budget exhaustion, a
-        // cost helper running out of gas, or a cost-arithmetic overflow
-        // — which is "the cost is unrepresentably large", catchable like
-        // OOG) maps to OutOfGas. `CompareError::Incomparable` is a
-        // deterministic type failure and falls through to BadRequest.
-        TcError::OutOfGas(_)
-        | TcError::CostOverflow(_)
-        | TcError::CompareError(CompareError::Cost(_)) => TezosXRuntimeError::OutOfGas,
-        other => TezosXRuntimeError::BadRequest(format!("{other:?}")),
+    if tc_error_is_oog(&e) {
+        TezosXRuntimeError::OutOfGas
+    } else {
+        TezosXRuntimeError::BadRequest(format!("{e:?}"))
     }
 }
 
@@ -86,16 +105,17 @@ fn classify_interpret_error(e: InterpretError) -> TezosXRuntimeError {
     use mir::gas::CompareError;
     match e {
         // All flavours of resource exhaustion → OutOfGas: direct
-        // interpreter budget exhaustion, the nested-TcError forms, a
-        // cost helper failing (gas or arithmetic overflow), and the
-        // comparison-cost path. `CompareError::Incomparable` (a
+        // interpreter budget exhaustion, a cost helper overflowing, the
+        // comparison-cost path, and the nested-`TcError` forms (routed
+        // through the shared `tc_error_is_oog` so this cannot drift from
+        // `classify_tc_error`). `CompareError::Incomparable` (a
         // deterministic type failure) falls through to BadRequest.
         InterpretError::OutOfGas
         | InterpretError::CostOverflow(_)
-        | InterpretError::CompareError(CompareError::Cost(_))
-        | InterpretError::TcError(TcError::OutOfGas(_))
-        | InterpretError::TcError(TcError::CostOverflow(_))
-        | InterpretError::TcError(TcError::CompareError(CompareError::Cost(_))) => {
+        | InterpretError::CompareError(CompareError::Cost(_)) => {
+            TezosXRuntimeError::OutOfGas
+        }
+        InterpretError::TcError(ref tc) if tc_error_is_oog(tc) => {
             TezosXRuntimeError::OutOfGas
         }
         InterpretError::EnshrinedViewDispatch(
@@ -418,6 +438,58 @@ mod tests {
     fn classify_interpret_error_other_is_bad_request() {
         assert!(matches!(
             classify_interpret_error(InterpretError::MutezOverflow),
+            TezosXRuntimeError::BadRequest(_)
+        ));
+    }
+
+    #[test]
+    fn classify_tc_error_cost_overflow_and_compare_cost_are_oog() {
+        use mir::gas::{CompareError, CostOverflow};
+        assert!(matches!(
+            classify_tc_error(TcError::CostOverflow(CostOverflow)),
+            TezosXRuntimeError::OutOfGas
+        ));
+        assert!(matches!(
+            classify_tc_error(TcError::CompareError(CompareError::Cost(CostOverflow))),
+            TezosXRuntimeError::OutOfGas
+        ));
+    }
+
+    #[test]
+    fn classify_tc_error_incomparable_is_bad_request() {
+        use mir::gas::CompareError;
+        assert!(matches!(
+            classify_tc_error(TcError::CompareError(CompareError::Incomparable)),
+            TezosXRuntimeError::BadRequest(_)
+        ));
+    }
+
+    #[test]
+    fn classify_interpret_error_cost_overflow_and_nested_tc_are_oog() {
+        use mir::gas::{CompareError, CostOverflow};
+        assert!(matches!(
+            classify_interpret_error(InterpretError::CostOverflow(CostOverflow)),
+            TezosXRuntimeError::OutOfGas
+        ));
+        assert!(matches!(
+            classify_interpret_error(InterpretError::CompareError(CompareError::Cost(
+                CostOverflow
+            ))),
+            TezosXRuntimeError::OutOfGas
+        ));
+        // Nested TcError OOG goes through the shared `tc_error_is_oog`.
+        assert!(matches!(
+            classify_interpret_error(InterpretError::TcError(TcError::CostOverflow(
+                CostOverflow
+            ))),
+            TezosXRuntimeError::OutOfGas
+        ));
+    }
+
+    #[test]
+    fn classify_interpret_error_nested_tc_non_oog_is_bad_request() {
+        assert!(matches!(
+            classify_interpret_error(InterpretError::TcError(TcError::FailNotInTail)),
             TezosXRuntimeError::BadRequest(_)
         ));
     }
