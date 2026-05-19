@@ -32,6 +32,17 @@ pub enum Micheline<'a> {
     Seq(&'a [Micheline<'a>]),
 }
 
+/* *** Note: Carbonation of allocations ***
+
+Micheline nodes may be allocated either in the heap or in the arena;
+we use gas to bound these allocations. Gas is consumed when the
+Micheline nodes are constructed so it is already charged when the
+nodes are allocated in the arena. For this reason, the constructors of
+the Micheline enum type should be avoided and the public methods
+defined in this file are the recommended way to build Micheline nodes.
+
+ */
+
 /* *** Note: alloc_extend ***
 
 Arena has an unfortunate pothole related to alloc_extend: if the iterator
