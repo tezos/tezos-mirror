@@ -94,7 +94,7 @@ module Contract = struct
   module Big_map_store = struct
     let prg = contract_prg ["mini_scenarios"; "big_map_store"]
 
-    let originate () = Client.originate_contract ~init:"{}" ~prg
+    let originate ?(init = "{}") () = Client.originate_contract ~init ~prg
 
     let call address = Client.transfer ~arg:"Unit" ~receiver:address
   end
@@ -1186,6 +1186,90 @@ let test_big_map_nonempty_promotion_burns_content () =
          variable_burn) ;
   unit
 
+(** Originating with a non-empty initial big-map bills the inherited
+    content; replacing that big-map with a fresh [EMPTY_BIG_MAP] in a
+    follow-up call refunds the content symmetrically. *)
+let test_big_map_replacement_nonempty_burns_content () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~title:
+      "big_map replacement: non-empty initial big-map billed at origination, \
+       content burned on replacement"
+    ~tags:["transfer"; "big_map"; "receipt"; "origination"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun evm_node ->
+  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
+  let* tez_client = tezlink_client_from_evm_node evm_node () in
+
+  let* _kt1_empty =
+    Contract.Big_map_store.originate
+      ~alias:"big_map_store_empty"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~burn_cap:Tez.one
+      ()
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block evm_node in
+  let* empty_origination_storage_size =
+    let* content = get_first_manager_operations_content ~tez_endpoint in
+    return (Tezos_JSON.get_operation_content_storage_size content)
+  in
+
+  let* kt1 =
+    Contract.Big_map_store.originate
+      ~init:"{ Elt 1 1 }"
+      ~alias:"big_map_store_nonempty"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~burn_cap:Tez.one
+      ()
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block evm_node in
+  let* nonempty_origination_storage_size =
+    let* content = get_first_manager_operations_content ~tez_endpoint in
+    return (Tezos_JSON.get_operation_content_storage_size content)
+  in
+
+  (* The 33-byte big-map slot forfait is present in both originations
+     and cancels in the delta; only the per-entry forfait (65) and the
+     encoded size of [nat 1] (2 bytes) remain. *)
+  let lazy_entry_delta = 65 + 2 in
+  Check.(
+    (nonempty_origination_storage_size - empty_origination_storage_size
+    = lazy_entry_delta)
+      int
+      ~error_msg:"Expected nonempty origination storage_size delta = %R, got %L") ;
+
+  let net_delta = -(33 + (65 + 2)) + 33 in
+  let* () =
+    Contract.Big_map_store.call
+      ~amount:Tez.zero
+      ~fee:Tez.one
+      ~giver:Constant.bootstrap1.alias
+      ~burn_cap:Tez.one
+      kt1
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block evm_node in
+
+  let* content = get_first_manager_operations_content ~tez_endpoint in
+  let paid_storage_size_diff =
+    Tezos_JSON.get_operation_content_paid_storage_size_diff content
+  in
+  let storage_size = Tezos_JSON.get_operation_content_storage_size content in
+  Check.(
+    (paid_storage_size_diff = 0)
+      int
+      ~error_msg:"Expected paid_storage_size_diff = 0, got %L") ;
+  Check.(
+    (storage_size = nonempty_origination_storage_size + net_delta)
+      int
+      ~error_msg:"Expected storage_size = %R, got %L") ;
+  unit
+
 let () =
   test_origination_receipt_exposes_storage_fields () ;
   test_transfer_with_growth_exposes_delta () ;
@@ -1197,4 +1281,5 @@ let () =
   test_big_map_update_insert_overwrite_delete () ;
   test_temp_big_map_dropped_no_charge () ;
   test_big_map_replacement_symmetric () ;
-  test_big_map_nonempty_promotion_burns_content ()
+  test_big_map_nonempty_promotion_burns_content () ;
+  test_big_map_replacement_nonempty_burns_content ()
