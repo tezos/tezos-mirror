@@ -66,7 +66,7 @@ Components follow consistent structural conventions:
 | `scripts/` | Component-specific scripts |
 | `contrib/` | Additional tools and utilities |
 
-When working on a specific component, check for a `README.md` in the component's root directory for component-specific guidelines and build instructions.
+When working on a specific component, check for a `README.md` or `CLAUDE.md` in the component's root directory for component-specific guidelines and build instructions.
 
 ### Key Executables
 
