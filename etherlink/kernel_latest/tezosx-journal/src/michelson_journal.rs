@@ -9,7 +9,9 @@ use tezos_smart_rollup_host::{
 };
 use tezos_tezlink::{
     block::AppliedOperation,
-    operation_result::{OperationDataAndMetadata, OperationResultSum},
+    operation_result::{
+        InternalOperationSum, OperationDataAndMetadata, OperationResultSum,
+    },
 };
 
 /// Walk an `AppliedOperation` and transform every `Applied` result —
@@ -114,6 +116,20 @@ pub struct MichelsonJournal {
     /// shared across pending, failed, and backtracked lists so that
     /// merging them recovers execution order.
     next_receipt_seq: u64,
+    /// Internal `Origination` ops produced by alias-forwarder
+    /// materialization (`ensure_alias` branch 3) that have not yet
+    /// been folded into a CRAC receipt. The Tezos runtime's
+    /// `execute_entrypoint_call` drains this list at the start of
+    /// each cross-runtime call it serves, so each CRAC receipt only
+    /// picks up the aliases the gateway precompile materialized for
+    /// IT (the aliases of its sender and source). Nested CRACs
+    /// work naturally: each inner call drains the entries pushed
+    /// for its own precompile invocation, leaving any outer-CRAC
+    /// entries that were drained at the outer's entry point alone.
+    /// Nonces here are 0 placeholders; `renumber_nonces` rewrites
+    /// them block-wide from the flat list order at block
+    /// finalization.
+    pending_alias_origination_internals: Vec<InternalOperationSum>,
 }
 
 impl MichelsonJournal {
@@ -151,6 +167,29 @@ impl MichelsonJournal {
     pub fn push_failed_crac_receipt(&mut self, receipt: AppliedOperation) {
         let seq = self.claim_receipt_seq();
         self.failed_crac_receipts.push((seq, receipt));
+    }
+
+    /// Record an internal `Origination` op produced by alias-forwarder
+    /// materialization. The Tezos runtime drains this list at the
+    /// start of each cross-runtime call and folds the entries into
+    /// the CRAC receipt that call eventually emits.
+    pub fn push_pending_alias_origination_internal(
+        &mut self,
+        internal: InternalOperationSum,
+    ) {
+        self.pending_alias_origination_internals.push(internal);
+    }
+
+    /// Drain the pending alias-forwarder origination internal ops in
+    /// FIFO order. Called by the Tezos runtime at the entry of every
+    /// cross-runtime call it serves, so each CRAC receipt only
+    /// inherits the aliases its gateway precompile materialized for
+    /// it. Drain-on-entry is what scopes outer-CRAC aliases out of
+    /// any inner CRAC the outer call may spawn.
+    pub fn take_pending_alias_origination_internals(
+        &mut self,
+    ) -> Vec<InternalOperationSum> {
+        std::mem::take(&mut self.pending_alias_origination_internals)
     }
 }
 

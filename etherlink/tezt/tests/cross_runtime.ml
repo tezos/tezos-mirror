@@ -5585,6 +5585,40 @@ let check_crac_event ~prefix ~expected_crac_id ?expected_status iop =
           ~error_msg:(sf "%s: Expected event status %%R, got %%L" prefix))
   | None -> ()
 
+(** Verify that [iop] is a valid alias-forwarder origination internal:
+    kind = "origination", source = handler (NULL_PKH), and the
+    receipt's [originated_contracts] singleton matches
+    [expected_alias_kt1]. Used to assert the per-CRAC alias
+    materializations the kernel splices in just before the synthetic
+    transfer (one per fresh sender/source alias). *)
+let check_crac_internal_alias_origination ~prefix ~expected_nonce
+    ~expected_alias_kt1 ~expected_status iop =
+  Check.(
+    (JSON.(iop |-> "kind" |> as_string) = "origination")
+      string
+      ~error_msg:(sf "%s: Expected kind %%R, got %%L" prefix)) ;
+  Check.(
+    (JSON.(iop |-> "source" |> as_string) = handler_address)
+      string
+      ~error_msg:
+        (sf "%s: Expected origination source = handler (%%R), got %%L" prefix)) ;
+  Check.(
+    (JSON.(iop |-> "nonce" |> as_int) = expected_nonce)
+      int
+      ~error_msg:(sf "%s: Expected nonce %%R, got %%L" prefix)) ;
+  let originated =
+    JSON.(iop |-> "result" |-> "originated_contracts" |> as_list)
+    |> List.map JSON.as_string
+  in
+  Check.(
+    (originated = [expected_alias_kt1])
+      (list string)
+      ~error_msg:(sf "%s: Expected originated_contracts %%R, got %%L" prefix)) ;
+  Check.(
+    (JSON.(iop |-> "result" |-> "status" |> as_string) = expected_status)
+      string
+      ~error_msg:(sf "%s: Expected status %%R, got %%L" prefix))
+
 (** Verify that [iop] is a valid internal transaction with the given fields. *)
 let check_crac_internal_transaction ~prefix ~expected_nonce ~expected_source
     ~expected_destination ~expected_entrypoint ~expected_status iop =
@@ -5666,35 +5700,55 @@ let test_crac_evm_to_tez_receipt =
       ~expected_status:"applied"
       top
   in
-  (* RFC Example 2: 3 internal ops — event, alias→tez_runner, self-call *)
+  (* RFC Example 2 + alias materialization:
+     5 internal ops — event, origination(alias(E_1)),
+     origination(alias(E_0)), alias→tez_runner, self-call.
+     The two `origination` internals are inserted by the kernel just
+     before the synthetic transfer; they record that the gateway
+     precompile materialized the Tezos-side aliases for sender (E_1)
+     and source (E_0) as a precondition of the cross-runtime call. *)
   Check.(
-    (List.length internals = 3)
+    (List.length internals = 5)
       int
-      ~error_msg:"Expected 3 internal operations, got %L") ;
+      ~error_msg:"Expected 5 internal operations, got %L") ;
   (* ── Internal #0: CRAC event ────────────────────────────────── *)
   check_crac_event
     ~prefix
     ~expected_crac_id:"1-0"
     ~expected_status:"applied"
     (List.nth internals 0) ;
-  (* ── Internal #1: alias(E_1) → tez_runner (%run) ───────────── *)
-  check_crac_internal_transaction
+  (* ── Internal #1: origination of alias(E_1) = evm_bridge_alias ── *)
+  check_crac_internal_alias_origination
     ~prefix
     ~expected_nonce:1
+    ~expected_alias_kt1:evm_bridge_alias
+    ~expected_status:"applied"
+    (List.nth internals 1) ;
+  (* ── Internal #2: origination of alias(E_0) = sender_alias ───── *)
+  check_crac_internal_alias_origination
+    ~prefix
+    ~expected_nonce:2
+    ~expected_alias_kt1:sender_alias
+    ~expected_status:"applied"
+    (List.nth internals 2) ;
+  (* ── Internal #3: alias(E_1) → tez_runner (%run) ───────────── *)
+  check_crac_internal_transaction
+    ~prefix
+    ~expected_nonce:3
     ~expected_source:evm_bridge_alias
     ~expected_destination:tez_runner_kt1
     ~expected_entrypoint:"run"
     ~expected_status:"applied"
-    (List.nth internals 1) ;
-  (* ── Internal #2: tez_runner → tez_runner (%_incrementWitness) ─ *)
+    (List.nth internals 3) ;
+  (* ── Internal #4: tez_runner → tez_runner (%_incrementWitness) ─ *)
   check_crac_internal_transaction
     ~prefix
-    ~expected_nonce:2
+    ~expected_nonce:4
     ~expected_source:tez_runner_kt1
     ~expected_destination:tez_runner_kt1
     ~expected_entrypoint:"_incrementWitness"
     ~expected_status:"applied"
-    (List.nth internals 2) ;
+    (List.nth internals 4) ;
   unit
 
 (** Regression test: a user [EMIT] op executed by a Michelson contract
@@ -6528,56 +6582,81 @@ let test_crac_receipt_two_independent =
       ~expected_status:"applied"
       top
   in
-  (* RFC Example 5: 5 internal ops — event, then two pairs of
-     alias(bridge) → tez_runner (%run) + tez_runner → tez_runner
-     (%_incrementWitness), in execution order (tez_1 before tez_2). *)
+  (* RFC Example 5, with alias materializations inserted:
+     8 internal ops — event, then for CRAC #1 the bridge_1 and
+     sender (EOA) alias originations + transfer + self-call, then
+     for CRAC #2 ONLY the bridge_2 alias origination + transfer +
+     self-call (the EOA alias was materialized for CRAC #1 and is
+     cached on CRAC #2). Execution order: tez_1 before tez_2. *)
   Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
   Check.(
-    (List.length internals = 5)
+    (List.length internals = 8)
       int
-      ~error_msg:"Expected 5 internal operations (RFC Example 5), got %L") ;
+      ~error_msg:"Expected 8 internal operations, got %L") ;
   (* ── Internal #0: CRAC event ────────────────────────────────── *)
   check_crac_event
     ~prefix
     ~expected_crac_id:"1-0"
     ~expected_status:"applied"
     (List.nth internals 0) ;
-  (* ── Internal #1: alias(bridge_1) → tez_1 (%run) ──────────── *)
-  check_crac_internal_transaction
+  (* ── Internal #1: origination of alias(bridge_1) ───────────── *)
+  check_crac_internal_alias_origination
     ~prefix
     ~expected_nonce:1
+    ~expected_alias_kt1:bridge_1_alias
+    ~expected_status:"applied"
+    (List.nth internals 1) ;
+  (* ── Internal #2: origination of alias(EOA = sender) ───────── *)
+  check_crac_internal_alias_origination
+    ~prefix
+    ~expected_nonce:2
+    ~expected_alias_kt1:sender_alias
+    ~expected_status:"applied"
+    (List.nth internals 2) ;
+  (* ── Internal #3: alias(bridge_1) → tez_1 (%run) ──────────── *)
+  check_crac_internal_transaction
+    ~prefix
+    ~expected_nonce:3
     ~expected_source:bridge_1_alias
     ~expected_destination:tez_1_kt1
     ~expected_entrypoint:"run"
     ~expected_status:"applied"
-    (List.nth internals 1) ;
-  (* ── Internal #2: tez_1 → tez_1 (%_incrementWitness) ──────── *)
+    (List.nth internals 3) ;
+  (* ── Internal #4: tez_1 → tez_1 (%_incrementWitness) ──────── *)
   check_crac_internal_transaction
     ~prefix
-    ~expected_nonce:2
+    ~expected_nonce:4
     ~expected_source:tez_1_kt1
     ~expected_destination:tez_1_kt1
     ~expected_entrypoint:"_incrementWitness"
     ~expected_status:"applied"
-    (List.nth internals 2) ;
-  (* ── Internal #3: alias(bridge_2) → tez_2 (%run) ──────────── *)
+    (List.nth internals 4) ;
+  (* ── Internal #5: origination of alias(bridge_2). The EOA
+        alias is cached from CRAC #1 so it does not re-originate. ── *)
+  check_crac_internal_alias_origination
+    ~prefix
+    ~expected_nonce:5
+    ~expected_alias_kt1:bridge_2_alias
+    ~expected_status:"applied"
+    (List.nth internals 5) ;
+  (* ── Internal #6: alias(bridge_2) → tez_2 (%run) ──────────── *)
   check_crac_internal_transaction
     ~prefix
-    ~expected_nonce:3
+    ~expected_nonce:6
     ~expected_source:bridge_2_alias
     ~expected_destination:tez_2_kt1
     ~expected_entrypoint:"run"
     ~expected_status:"applied"
-    (List.nth internals 3) ;
-  (* ── Internal #4: tez_2 → tez_2 (%_incrementWitness) ──────── *)
+    (List.nth internals 6) ;
+  (* ── Internal #7: tez_2 → tez_2 (%_incrementWitness) ──────── *)
   check_crac_internal_transaction
     ~prefix
-    ~expected_nonce:4
+    ~expected_nonce:7
     ~expected_source:tez_2_kt1
     ~expected_destination:tez_2_kt1
     ~expected_entrypoint:"_incrementWitness"
     ~expected_status:"applied"
-    (List.nth internals 4) ;
+    (List.nth internals 7) ;
   unit
 
 (* Two truly independent EVM→TEZ CRACs from SEPARATE EVM transactions
@@ -6669,9 +6748,15 @@ let test_crac_receipt_separate_tx_two_cracs =
   Check.(
     (List.length op_list = 2) int ~error_msg:"Expected 2 operations, got %L") ;
   (* Verify each operation has correct CRAC structure:
-     event + bridge_alias → tez (%run) + tez → tez (%_incrementWitness) *)
+     event + <alias originations…> + bridge_alias → tez (%run) +
+     tez → tez (%_incrementWitness). `aliases` lists the alias
+     KT1s materialized by THIS op's gateway precompile invocation
+     (sender first, then source, only those NOT already in
+     storage). For two separate EVM txs in the same block, tx 1
+     materializes both sender alias and source (EOA) alias; tx 2
+     only materializes its sender (the EOA alias is now cached). *)
   let check_op ~prefix ~expected_destination ~expected_bridge_alias
-      ~expected_dest ~expected_crac_id ~nonce_offset op =
+      ~expected_dest ~expected_crac_id ~aliases ~nonce_offset op =
     let top = JSON.(op |-> "contents" |=> 0) in
     let internals =
       check_crac_top_level
@@ -6680,51 +6765,72 @@ let test_crac_receipt_separate_tx_two_cracs =
         ~expected_status:"applied"
         top
     in
+    let n_aliases = List.length aliases in
+    let expected_count = 3 + n_aliases in
     Check.(
-      (List.length internals = 3)
+      (List.length internals = expected_count)
         int
-        ~error_msg:(sf "%s: expected 3 internal operations, got %%L" prefix)) ;
+        ~error_msg:
+          (sf
+             "%s: expected %d internal operations, got %%L"
+             prefix
+             expected_count)) ;
+    (* Internal operation nonces are block-global (L1 semantics):
+       event gets nonce_offset, aliases get nonce_offset+1..+k,
+       transfer gets nonce_offset+1+k, post-self-call gets +2+k. *)
     check_crac_event
       ~prefix
       ~expected_crac_id
       ~expected_status:"applied"
       (List.nth internals 0) ;
-    (* Internal operation nonces are block-global (L1 semantics):
-       event gets nonce_offset, first tx gets nonce_offset+1, etc. *)
+    List.iteri
+      (fun i alias_kt1 ->
+        check_crac_internal_alias_origination
+          ~prefix:(sf "%s/alias#%d" prefix i)
+          ~expected_nonce:(nonce_offset + 1 + i)
+          ~expected_alias_kt1:alias_kt1
+          ~expected_status:"applied"
+          (List.nth internals (1 + i)))
+      aliases ;
     check_crac_internal_transaction
       ~prefix
-      ~expected_nonce:(nonce_offset + 1)
+      ~expected_nonce:(nonce_offset + 1 + n_aliases)
       ~expected_source:expected_bridge_alias
       ~expected_destination:expected_dest
       ~expected_entrypoint:"run"
       ~expected_status:"applied"
-      (List.nth internals 1) ;
+      (List.nth internals (1 + n_aliases)) ;
     check_crac_internal_transaction
       ~prefix
-      ~expected_nonce:(nonce_offset + 2)
+      ~expected_nonce:(nonce_offset + 2 + n_aliases)
       ~expected_source:expected_dest
       ~expected_destination:expected_dest
       ~expected_entrypoint:"_incrementWitness"
       ~expected_status:"applied"
-      (List.nth internals 2)
+      (List.nth internals (2 + n_aliases))
   in
-  (* First operation: nonces 0,1,2 (event=0, run=1, _incrementWitness=2) *)
+  (* First EVM tx: materializes alias(bridge_1) and alias(EOA = sender)
+     fresh. 5 internals, nonces 0..4. *)
   check_op
     ~prefix:(prefix ^ "#0")
     ~expected_destination:sender_alias
     ~expected_bridge_alias:bridge_1_alias
     ~expected_dest:tez_1_kt1
     ~expected_crac_id:"1-0"
+    ~aliases:[bridge_1_alias; sender_alias]
     ~nonce_offset:0
     JSON.(ops |=> 0) ;
-  (* Second operation: nonces continue at 3,4,5 (block-global counter) *)
+  (* Second EVM tx: alias(EOA) was just materialized by the first
+     tx and is now in storage, so only alias(bridge_2) is fresh.
+     4 internals, nonces continue at 5..8. *)
   check_op
     ~prefix:(prefix ^ "#1")
     ~expected_destination:sender_alias
     ~expected_bridge_alias:bridge_2_alias
     ~expected_dest:tez_2_kt1
     ~expected_crac_id:"1-1"
-    ~nonce_offset:3
+    ~aliases:[bridge_2_alias]
+    ~nonce_offset:5
     JSON.(ops |=> 1) ;
   unit
 
@@ -6783,48 +6889,50 @@ let test_crac_receipt_evm_tez_evm =
       ~expected_status:"applied"
       top
   in
-  (* RFC Example 3: 5 internal ops — event, alias(evm_bridge) → tez_bridge (%run),
+  (* RFC Example 3, with alias materializations inserted before
+     the synthetic transfer:
+     7 internal ops — event, origination(alias(evm_bridge)),
+     origination(alias(EOA)), alias(evm_bridge) → tez_bridge (%run),
      tez_bridge → tez_bridge (%_incrementWitness) (pre),
-     tez_bridge → GW_M (%call_evm), tez_bridge → tez_bridge (%_incrementWitness) (post). *)
+     tez_bridge → GW_M (%call_evm),
+     tez_bridge → tez_bridge (%_incrementWitness) (post).
+     The TEZ→EVM re-entrant leg materializes aliases on the EVM
+     side, which do not surface in the Michelson receipt. *)
   Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
   Check.(
-    (List.length internals = 5)
+    (List.length internals = 7)
       int
-      ~error_msg:"Expected 5 internal operations (RFC Example 3), got %L") ;
+      ~error_msg:"Expected 7 internal operations, got %L") ;
   (* ── Internal #0: CRAC event ────────────────────────────────── *)
   check_crac_event
     ~prefix
     ~expected_crac_id:"1-0"
     ~expected_status:"applied"
     (List.nth internals 0) ;
-  (* ── Internal #1: alias(evm_bridge) → tez_bridge (%run) ────── *)
-  check_crac_internal_transaction
+  (* ── Internal #1: origination of alias(evm_bridge) ─────────── *)
+  check_crac_internal_alias_origination
     ~prefix
     ~expected_nonce:1
+    ~expected_alias_kt1:evm_bridge_alias
+    ~expected_status:"applied"
+    (List.nth internals 1) ;
+  (* ── Internal #2: origination of alias(EOA = sender) ───────── *)
+  check_crac_internal_alias_origination
+    ~prefix
+    ~expected_nonce:2
+    ~expected_alias_kt1:sender_alias
+    ~expected_status:"applied"
+    (List.nth internals 2) ;
+  (* ── Internal #3: alias(evm_bridge) → tez_bridge (%run) ────── *)
+  check_crac_internal_transaction
+    ~prefix
+    ~expected_nonce:3
     ~expected_source:evm_bridge_alias
     ~expected_destination:tez_bridge_kt1
     ~expected_entrypoint:"run"
     ~expected_status:"applied"
-    (List.nth internals 1) ;
-  (* ── Internal #2: tez_bridge → tez_bridge (%_incrementWitness) (pre) *)
-  check_crac_internal_transaction
-    ~prefix
-    ~expected_nonce:2
-    ~expected_source:tez_bridge_kt1
-    ~expected_destination:tez_bridge_kt1
-    ~expected_entrypoint:"_incrementWitness"
-    ~expected_status:"applied"
-    (List.nth internals 2) ;
-  (* ── Internal #3: tez_bridge → GW_M (%call_evm) ─────────────── *)
-  check_crac_internal_transaction
-    ~prefix
-    ~expected_nonce:3
-    ~expected_source:tez_bridge_kt1
-    ~expected_destination:gateway_address
-    ~expected_entrypoint:"call_evm"
-    ~expected_status:"applied"
     (List.nth internals 3) ;
-  (* ── Internal #4: tez_bridge → tez_bridge (%_incrementWitness) (post) *)
+  (* ── Internal #4: tez_bridge → tez_bridge (%_incrementWitness) (pre) *)
   check_crac_internal_transaction
     ~prefix
     ~expected_nonce:4
@@ -6833,6 +6941,24 @@ let test_crac_receipt_evm_tez_evm =
     ~expected_entrypoint:"_incrementWitness"
     ~expected_status:"applied"
     (List.nth internals 4) ;
+  (* ── Internal #5: tez_bridge → GW_M (%call_evm) ─────────────── *)
+  check_crac_internal_transaction
+    ~prefix
+    ~expected_nonce:5
+    ~expected_source:tez_bridge_kt1
+    ~expected_destination:gateway_address
+    ~expected_entrypoint:"call_evm"
+    ~expected_status:"applied"
+    (List.nth internals 5) ;
+  (* ── Internal #6: tez_bridge → tez_bridge (%_incrementWitness) (post) *)
+  check_crac_internal_transaction
+    ~prefix
+    ~expected_nonce:6
+    ~expected_source:tez_bridge_kt1
+    ~expected_destination:tez_bridge_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 6) ;
   (* ── EVM side: re-entrant TEZ→EVM leg ─────────────────────── *)
   (* Per RFC principle 6, the re-entrant EVM execution appears as
      internal transactions under the ORIGINAL EVM transaction, not as
@@ -6911,19 +7037,23 @@ let test_crac_receipt_tez_evm_tez =
       ~error_msg:"Expected top-level status %R, got %L") ;
   let internals = JSON.(metadata |-> "internal_operation_results" |> as_list) in
   Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
-  (* Expected internal ops (all transactions, no CRAC event):
+  (* Expected internal ops (no synthetic CRAC event because origin is
+     TEZ; alias materialization for evm_bridge happens on the
+     re-entrant EVM→TEZ leg and is spliced before the re-entrant
+     transfer):
      #0: tez_main → tez_main (%_incrementWitness)
      #1: tez_main → tez_outer_bridge (%run)
      #2: tez_outer_bridge → tez_outer_bridge (%_incrementWitness) (pre)
      #3: tez_outer_bridge → GW_M (%call_evm)
-     #4: alias(evm_bridge) → tez_inner (%run)          (re-entrant)
-     #5: tez_inner → tez_inner (%_incrementWitness)     (re-entrant)
-     #6: tez_outer_bridge → tez_outer_bridge (%_incrementWitness) (post)
-     #7: tez_main → tez_main (%_incrementWitness) (final) *)
+     #4: origination alias(evm_bridge)                  (re-entrant)
+     #5: alias(evm_bridge) → tez_inner (%run)           (re-entrant)
+     #6: tez_inner → tez_inner (%_incrementWitness)      (re-entrant)
+     #7: tez_outer_bridge → tez_outer_bridge (%_incrementWitness) (post)
+     #8: tez_main → tez_main (%_incrementWitness) (final) *)
   Check.(
-    (List.length internals = 8)
+    (List.length internals = 9)
       int
-      ~error_msg:"Expected 8 internal operations, got %L") ;
+      ~error_msg:"Expected 9 internal operations, got %L") ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#0")
     ~expected_nonce:0
@@ -6956,38 +7086,44 @@ let test_crac_receipt_tez_evm_tez =
     ~expected_entrypoint:"call_evm"
     ~expected_status:"applied"
     (List.nth internals 3) ;
-  check_crac_internal_transaction
+  check_crac_internal_alias_origination
     ~prefix:(prefix ^ "#4")
     ~expected_nonce:4
-    ~expected_source:evm_bridge_alias
-    ~expected_destination:tez_inner_kt1
-    ~expected_entrypoint:"run"
+    ~expected_alias_kt1:evm_bridge_alias
     ~expected_status:"applied"
     (List.nth internals 4) ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#5")
     ~expected_nonce:5
-    ~expected_source:tez_inner_kt1
+    ~expected_source:evm_bridge_alias
     ~expected_destination:tez_inner_kt1
-    ~expected_entrypoint:"_incrementWitness"
+    ~expected_entrypoint:"run"
     ~expected_status:"applied"
     (List.nth internals 5) ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#6")
     ~expected_nonce:6
-    ~expected_source:tez_outer_bridge_kt1
-    ~expected_destination:tez_outer_bridge_kt1
+    ~expected_source:tez_inner_kt1
+    ~expected_destination:tez_inner_kt1
     ~expected_entrypoint:"_incrementWitness"
     ~expected_status:"applied"
     (List.nth internals 6) ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#7")
     ~expected_nonce:7
+    ~expected_source:tez_outer_bridge_kt1
+    ~expected_destination:tez_outer_bridge_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 7) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#8")
+    ~expected_nonce:8
     ~expected_source:tez_main_kt1
     ~expected_destination:tez_main_kt1
     ~expected_entrypoint:"_incrementWitness"
     ~expected_status:"applied"
-    (List.nth internals 7) ;
+    (List.nth internals 8) ;
   unit
 
 (* EVM→TEZ→EVM→TEZ triple crossing — nested CRAC that re-enters TEZ.
@@ -7059,72 +7195,97 @@ let test_crac_receipt_evm_tez_evm_tez =
       ~expected_status:"applied"
       top
   in
-  (* EVM→TEZ→EVM→TEZ: 7 internal ops — event + 6 transactions.
+  (* EVM→TEZ→EVM→TEZ with alias materializations: 10 internal ops.
+     The outer EVM→TEZ adds two aliases (evm_bridge_1 + EOA). The
+     re-entrant inner EVM→TEZ (inside the %call_evm leg) adds one
+     more alias (evm_bridge_2; EOA is cached). All three appear in
+     execution order:
      #0: event (CRAC-ID "1-0")
-     #1: alias(evm_bridge_1) → tez_bridge (%run)
-     #2: tez_bridge → tez_bridge (%_incrementWitness) (pre)
-     #3: tez_bridge → GW_M (%call_evm)
-     #4: alias(evm_bridge_2) → tez_inner (%run)          (re-entrant)
-     #5: tez_inner → tez_inner (%_incrementWitness)       (re-entrant)
-     #6: tez_bridge → tez_bridge (%_incrementWitness) (post) *)
+     #1: origination alias(evm_bridge_1)
+     #2: origination alias(EOA = sender)
+     #3: alias(evm_bridge_1) → tez_bridge (%run)
+     #4: tez_bridge → tez_bridge (%_incrementWitness) (pre)
+     #5: tez_bridge → GW_M (%call_evm)
+     #6: origination alias(evm_bridge_2)                (re-entrant)
+     #7: alias(evm_bridge_2) → tez_inner (%run)          (re-entrant)
+     #8: tez_inner → tez_inner (%_incrementWitness)       (re-entrant)
+     #9: tez_bridge → tez_bridge (%_incrementWitness) (post) *)
   Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
   Check.(
-    (List.length internals = 7)
+    (List.length internals = 10)
       int
-      ~error_msg:"Expected 7 internal operations, got %L") ;
+      ~error_msg:"Expected 10 internal operations, got %L") ;
   check_crac_event
     ~prefix
     ~expected_crac_id:"1-0"
     ~expected_status:"applied"
     (List.nth internals 0) ;
-  check_crac_internal_transaction
+  check_crac_internal_alias_origination
     ~prefix:(prefix ^ "#1")
     ~expected_nonce:1
-    ~expected_source:evm_bridge_1_alias
-    ~expected_destination:tez_bridge_kt1
-    ~expected_entrypoint:"run"
+    ~expected_alias_kt1:evm_bridge_1_alias
     ~expected_status:"applied"
     (List.nth internals 1) ;
-  check_crac_internal_transaction
+  check_crac_internal_alias_origination
     ~prefix:(prefix ^ "#2")
     ~expected_nonce:2
-    ~expected_source:tez_bridge_kt1
-    ~expected_destination:tez_bridge_kt1
-    ~expected_entrypoint:"_incrementWitness"
+    ~expected_alias_kt1:sender_alias
     ~expected_status:"applied"
     (List.nth internals 2) ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#3")
     ~expected_nonce:3
-    ~expected_source:tez_bridge_kt1
-    ~expected_destination:gateway_address
-    ~expected_entrypoint:"call_evm"
+    ~expected_source:evm_bridge_1_alias
+    ~expected_destination:tez_bridge_kt1
+    ~expected_entrypoint:"run"
     ~expected_status:"applied"
     (List.nth internals 3) ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#4")
     ~expected_nonce:4
-    ~expected_source:evm_bridge_2_alias
-    ~expected_destination:tez_inner_kt1
-    ~expected_entrypoint:"run"
+    ~expected_source:tez_bridge_kt1
+    ~expected_destination:tez_bridge_kt1
+    ~expected_entrypoint:"_incrementWitness"
     ~expected_status:"applied"
     (List.nth internals 4) ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#5")
     ~expected_nonce:5
+    ~expected_source:tez_bridge_kt1
+    ~expected_destination:gateway_address
+    ~expected_entrypoint:"call_evm"
+    ~expected_status:"applied"
+    (List.nth internals 5) ;
+  check_crac_internal_alias_origination
+    ~prefix:(prefix ^ "#6")
+    ~expected_nonce:6
+    ~expected_alias_kt1:evm_bridge_2_alias
+    ~expected_status:"applied"
+    (List.nth internals 6) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#7")
+    ~expected_nonce:7
+    ~expected_source:evm_bridge_2_alias
+    ~expected_destination:tez_inner_kt1
+    ~expected_entrypoint:"run"
+    ~expected_status:"applied"
+    (List.nth internals 7) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#8")
+    ~expected_nonce:8
     ~expected_source:tez_inner_kt1
     ~expected_destination:tez_inner_kt1
     ~expected_entrypoint:"_incrementWitness"
     ~expected_status:"applied"
-    (List.nth internals 5) ;
+    (List.nth internals 8) ;
   check_crac_internal_transaction
-    ~prefix:(prefix ^ "#6")
-    ~expected_nonce:6
+    ~prefix:(prefix ^ "#9")
+    ~expected_nonce:9
     ~expected_source:tez_bridge_kt1
     ~expected_destination:tez_bridge_kt1
     ~expected_entrypoint:"_incrementWitness"
     ~expected_status:"applied"
-    (List.nth internals 6) ;
+    (List.nth internals 9) ;
   (* ── EVM side ──────────────────────────────────────────────── *)
   (* 1 original EVM tx; re-entrant TEZ→EVM leg is internal per RFC principle 6 *)
   let* _block =
@@ -7184,12 +7345,16 @@ let test_crac_receipt_evm_to_tez_revert =
       ~expected_status:"failed"
       top
   in
-  (* 3 internal ops: CRAC event + alias→reverter call + reverter's
-     internal _revert call (RFC Example 4: all sub-calls are shown) *)
+  (* 5 internal ops: CRAC event + alias materializations
+     (sender + source) + alias→reverter call + reverter's
+     internal _revert call. The aliases were materialized
+     successfully in storage BEFORE the body failed; their receipt
+     status is "applied" because they did succeed, while the
+     downstream synthetic transfer and its sub-call are "failed". *)
   Check.(
-    (List.length internals = 3)
+    (List.length internals = 5)
       int
-      ~error_msg:"Expected 3 internal operations, got %L") ;
+      ~error_msg:"Expected 5 internal operations, got %L") ;
   (* ── Internal #0: CRAC event (always emitted, even on failure;
      status is "backtracked" because the downstream transfer
      failed — matching real Tezos protocol backtracking semantics) ── *)
@@ -7198,25 +7363,39 @@ let test_crac_receipt_evm_to_tez_revert =
     ~expected_crac_id:"1-0"
     ~expected_status:"backtracked"
     (List.nth internals 0) ;
-  (* ── Internal #1: alias(E_bridge) → tez_reverter (%run) — failed *)
-  check_crac_internal_transaction
+  (* ── Internal #1: origination of alias(evm_bridge) ─────────── *)
+  check_crac_internal_alias_origination
     ~prefix
     ~expected_nonce:1
+    ~expected_alias_kt1:evm_bridge_alias
+    ~expected_status:"applied"
+    (List.nth internals 1) ;
+  (* ── Internal #2: origination of alias(EOA = sender) ───────── *)
+  check_crac_internal_alias_origination
+    ~prefix
+    ~expected_nonce:2
+    ~expected_alias_kt1:sender_alias
+    ~expected_status:"applied"
+    (List.nth internals 2) ;
+  (* ── Internal #3: alias(E_bridge) → tez_reverter (%run) — failed *)
+  check_crac_internal_transaction
+    ~prefix
+    ~expected_nonce:3
     ~expected_source:evm_bridge_alias
     ~expected_destination:tez_reverter_kt1
     ~expected_entrypoint:"run"
     ~expected_status:"failed"
-    (List.nth internals 1) ;
-  (* ── Internal #2: tez_reverter → tez_reverter (%_revert) — failed
+    (List.nth internals 3) ;
+  (* ── Internal #4: tez_reverter → tez_reverter (%_revert) — failed
      The reverter contract's internal call that triggers the failure. *)
   check_crac_internal_transaction
     ~prefix
-    ~expected_nonce:2
+    ~expected_nonce:4
     ~expected_source:tez_reverter_kt1
     ~expected_destination:tez_reverter_kt1
     ~expected_entrypoint:"_revert"
     ~expected_status:"failed"
-    (List.nth internals 2) ;
+    (List.nth internals 4) ;
   unit
 
 (* Two failing EVM->TEZ CRACs from the SAME EVM transaction, each caught
@@ -7291,53 +7470,77 @@ let test_crac_receipt_two_failed_independent =
       top
   in
   Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
-  (* 5 internal ops: event + (run failed, _revert failed) for each bridge. *)
+  (* 8 internal ops: event + (alias materializations + run failed +
+     _revert failed) for each bridge. CRAC #1 materializes
+     alias(bridge_1) AND alias(EOA = sender); CRAC #2 only
+     materializes alias(bridge_2) (EOA cached after CRAC #1). *)
   Check.(
-    (List.length internals = 5)
+    (List.length internals = 8)
       int
-      ~error_msg:"Expected 5 internal operations, got %L") ;
+      ~error_msg:"Expected 8 internal operations, got %L") ;
   (* ── Internal #0: CRAC event — single event for the merged top-level. *)
   check_crac_event
     ~prefix
     ~expected_crac_id:"1-0"
     ~expected_status:"backtracked"
     (List.nth internals 0) ;
-  (* ── Internal #1: alias(bridge_1) → tez_reverter_1 (%run) — failed *)
-  check_crac_internal_transaction
+  (* ── Internal #1: origination alias(bridge_1) ────────────── *)
+  check_crac_internal_alias_origination
     ~prefix
     ~expected_nonce:1
+    ~expected_alias_kt1:bridge_1_alias
+    ~expected_status:"applied"
+    (List.nth internals 1) ;
+  (* ── Internal #2: origination alias(EOA = sender) ────────── *)
+  check_crac_internal_alias_origination
+    ~prefix
+    ~expected_nonce:2
+    ~expected_alias_kt1:sender_alias
+    ~expected_status:"applied"
+    (List.nth internals 2) ;
+  (* ── Internal #3: alias(bridge_1) → tez_reverter_1 (%run) — failed *)
+  check_crac_internal_transaction
+    ~prefix
+    ~expected_nonce:3
     ~expected_source:bridge_1_alias
     ~expected_destination:tez_reverter_1_kt1
     ~expected_entrypoint:"run"
     ~expected_status:"failed"
-    (List.nth internals 1) ;
-  (* ── Internal #2: tez_reverter_1 → tez_reverter_1 (%_revert) — failed *)
+    (List.nth internals 3) ;
+  (* ── Internal #4: tez_reverter_1 → tez_reverter_1 (%_revert) — failed *)
   check_crac_internal_transaction
     ~prefix
-    ~expected_nonce:2
+    ~expected_nonce:4
     ~expected_source:tez_reverter_1_kt1
     ~expected_destination:tez_reverter_1_kt1
     ~expected_entrypoint:"_revert"
     ~expected_status:"failed"
-    (List.nth internals 2) ;
-  (* ── Internal #3: alias(bridge_2) → tez_reverter_2 (%run) — failed *)
+    (List.nth internals 4) ;
+  (* ── Internal #5: origination alias(bridge_2) ────────────── *)
+  check_crac_internal_alias_origination
+    ~prefix
+    ~expected_nonce:5
+    ~expected_alias_kt1:bridge_2_alias
+    ~expected_status:"applied"
+    (List.nth internals 5) ;
+  (* ── Internal #6: alias(bridge_2) → tez_reverter_2 (%run) — failed *)
   check_crac_internal_transaction
     ~prefix
-    ~expected_nonce:3
+    ~expected_nonce:6
     ~expected_source:bridge_2_alias
     ~expected_destination:tez_reverter_2_kt1
     ~expected_entrypoint:"run"
     ~expected_status:"failed"
-    (List.nth internals 3) ;
-  (* ── Internal #4: tez_reverter_2 → tez_reverter_2 (%_revert) — failed *)
+    (List.nth internals 6) ;
+  (* ── Internal #7: tez_reverter_2 → tez_reverter_2 (%_revert) — failed *)
   check_crac_internal_transaction
     ~prefix
-    ~expected_nonce:4
+    ~expected_nonce:7
     ~expected_source:tez_reverter_2_kt1
     ~expected_destination:tez_reverter_2_kt1
     ~expected_entrypoint:"_revert"
     ~expected_status:"failed"
-    (List.nth internals 4) ;
+    (List.nth internals 7) ;
   unit
 
 (* Interleaved successful + failed CRACs from the SAME EVM tx, with the
@@ -7438,64 +7641,92 @@ let test_crac_receipt_interleaved_failed_pending =
       top
   in
   Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
-  (* 1 event + 4*(ok pair) + 4*(fail pair) = 1 + 16 = 17 internals. *)
-  let expected_internals = 1 + (4 * n_pairs) in
+  (* 1 event + 3 alias originations (bridge_ok + sender for the
+     first S, bridge_fail for the first F; subsequent S/F pairs
+     reuse cached aliases) + 4*n_pairs transactional internals. *)
+  let n_alias_internals = 3 in
+  let expected_internals = 1 + n_alias_internals + (4 * n_pairs) in
   Check.(
     (List.length internals = expected_internals)
       int
       ~error_msg:
         (sf "Expected %d internal operations, got %%L" expected_internals)) ;
-  (* ── Internal #0: CRAC event.  First-executed receipt in the sort is
-        a success, so the event comes from `build_crac_receipt` with
-        `Applied` status (in contrast to the all-failed case, where it
-        would be `Backtracked` from `build_failed_crac_receipt`). *)
-  check_crac_event
-    ~prefix
-    ~expected_crac_id:"1-0"
-    ~expected_status:"applied"
-    (List.nth internals 0) ;
-  (* ── Each S/F pair contributes 4 internals, in execution order.
-        Block-global nonce starts at 1 (the event takes nonce 0). *)
-  List.iter
-    (fun pair_ix ->
-      let base_nonce = 1 + (pair_ix * 4) in
-      (* S: alias(bridge_ok) → tez_ok (%run, applied)
-         followed by tez_ok self-call (%_incrementWitness, applied). *)
-      check_crac_internal_transaction
-        ~prefix
-        ~expected_nonce:base_nonce
-        ~expected_source:bridge_ok_alias
-        ~expected_destination:tez_ok_kt1
-        ~expected_entrypoint:"run"
-        ~expected_status:"applied"
-        (List.nth internals base_nonce) ;
-      check_crac_internal_transaction
-        ~prefix
-        ~expected_nonce:(base_nonce + 1)
-        ~expected_source:tez_ok_kt1
-        ~expected_destination:tez_ok_kt1
-        ~expected_entrypoint:"_incrementWitness"
-        ~expected_status:"applied"
-        (List.nth internals (base_nonce + 1)) ;
-      (* F: alias(bridge_fail) → tez_reverter (%run, failed)
-         followed by tez_reverter self-call (%_revert, failed). *)
-      check_crac_internal_transaction
-        ~prefix
-        ~expected_nonce:(base_nonce + 2)
-        ~expected_source:bridge_fail_alias
-        ~expected_destination:tez_reverter_kt1
-        ~expected_entrypoint:"run"
-        ~expected_status:"failed"
-        (List.nth internals (base_nonce + 2)) ;
-      check_crac_internal_transaction
-        ~prefix
-        ~expected_nonce:(base_nonce + 3)
-        ~expected_source:tez_reverter_kt1
-        ~expected_destination:tez_reverter_kt1
-        ~expected_entrypoint:"_revert"
-        ~expected_status:"failed"
-        (List.nth internals (base_nonce + 3)))
-    (List.init n_pairs Fun.id) ;
+  (* Order matters here: this test exists to catch the
+     `drain_pending_crac_receipts` bug where failed CRACs were
+     emitted before pending ones rather than in execution order.
+     The key includes [originated_contracts] (for originations) and
+     [destination] (for transactions) so positions are
+     disambiguated even when several internals share the same
+     (kind, source, status). *)
+  let key iop =
+    let kind = JSON.(iop |-> "kind" |> as_string) in
+    let source = JSON.(iop |-> "source" |> as_string) in
+    let status = JSON.(iop |-> "result" |-> "status" |> as_string) in
+    match kind with
+    | "event" -> sf "event/%s/%s" source status
+    | "origination" ->
+        let originated =
+          JSON.(iop |-> "result" |-> "originated_contracts" |> as_list)
+          |> List.map JSON.as_string |> String.concat ","
+        in
+        sf "origination/%s/%s/[%s]" source status originated
+    | "transaction" ->
+        let destination = JSON.(iop |-> "destination" |> as_string) in
+        let entrypoint =
+          try JSON.(iop |-> "parameters" |-> "entrypoint" |> as_string)
+          with _ -> ""
+        in
+        sf "transaction/%s->%s/%s/%s" source destination entrypoint status
+    | other -> sf "<unknown:%s>" other
+  in
+  let observed = List.map key internals in
+  let event_key = sf "event/%s/applied" handler_address in
+  let orig_key alias = sf "origination/%s/applied/[%s]" handler_address alias in
+  let tx_key ~src ~dst ~ep ~status =
+    sf "transaction/%s->%s/%s/%s" src dst ep status
+  in
+  let s_pair_txs =
+    [
+      tx_key ~src:bridge_ok_alias ~dst:tez_ok_kt1 ~ep:"run" ~status:"applied";
+      tx_key
+        ~src:tez_ok_kt1
+        ~dst:tez_ok_kt1
+        ~ep:"_incrementWitness"
+        ~status:"applied";
+    ]
+  in
+  let f_pair_txs =
+    [
+      tx_key
+        ~src:bridge_fail_alias
+        ~dst:tez_reverter_kt1
+        ~ep:"run"
+        ~status:"failed";
+      tx_key
+        ~src:tez_reverter_kt1
+        ~dst:tez_reverter_kt1
+        ~ep:"_revert"
+        ~status:"failed";
+    ]
+  in
+  (* Execution order: event ; (S₁ → orig bridge_ok, orig sender, run,
+     incr) ; (F₁ → orig bridge_fail, run, revert) ; then [n_pairs - 1]
+     more (S, F) pairs whose aliases are cached, contributing only
+     their four transactional internals each. *)
+  let expected =
+    (event_key :: [orig_key bridge_ok_alias; orig_key sender_alias])
+    @ s_pair_txs
+    @ (orig_key bridge_fail_alias :: f_pair_txs)
+    @ List.concat (List.init (n_pairs - 1) (fun _ -> s_pair_txs @ f_pair_txs))
+  in
+  Check.(
+    (observed = expected)
+      (list string)
+      ~error_msg:
+        (sf
+           "%s: observed internal-op sequence does not match expected \
+            execution order — expected %%R, got %%L"
+           prefix)) ;
   unit
 
 (* CRAC at tx_index > 0: inject a dummy ETH transfer into the mempool
@@ -7558,32 +7789,46 @@ let test_crac_receipt_evm_not_first_tx =
       ~expected_status:"applied"
       top
   in
-  (* Same structure as simple EVM→TEZ: 3 internal ops *)
+  (* Same structure as simple EVM→TEZ, with two alias
+     materializations inserted before the synthetic transfer:
+     5 internal ops total. *)
   Check.(
-    (List.length internals = 3)
+    (List.length internals = 5)
       int
-      ~error_msg:"Expected 3 internal operations, got %L") ;
+      ~error_msg:"Expected 5 internal operations, got %L") ;
   check_crac_event
     ~prefix
     ~expected_crac_id:"1-1"
     ~expected_status:"applied"
     (List.nth internals 0) ;
-  check_crac_internal_transaction
+  check_crac_internal_alias_origination
     ~prefix
     ~expected_nonce:1
+    ~expected_alias_kt1:evm_bridge_alias
+    ~expected_status:"applied"
+    (List.nth internals 1) ;
+  check_crac_internal_alias_origination
+    ~prefix
+    ~expected_nonce:2
+    ~expected_alias_kt1:sender_alias
+    ~expected_status:"applied"
+    (List.nth internals 2) ;
+  check_crac_internal_transaction
+    ~prefix
+    ~expected_nonce:3
     ~expected_source:evm_bridge_alias
     ~expected_destination:tez_runner_kt1
     ~expected_entrypoint:"run"
     ~expected_status:"applied"
-    (List.nth internals 1) ;
+    (List.nth internals 3) ;
   check_crac_internal_transaction
     ~prefix
-    ~expected_nonce:2
+    ~expected_nonce:4
     ~expected_source:tez_runner_kt1
     ~expected_destination:tez_runner_kt1
     ~expected_entrypoint:"_incrementWitness"
     ~expected_status:"applied"
-    (List.nth internals 2) ;
+    (List.nth internals 4) ;
   unit
 
 (* TEZ→EVM CRAC at tx_index > 0: inject a dummy Michelson transfer and
@@ -7911,22 +8156,26 @@ let test_crac_receipt_tez_evm_tez_evm =
       string
       ~error_msg:"Expected top-level status %R, got %L") ;
   let internals = JSON.(metadata |-> "internal_operation_results" |> as_list) in
-  (* No CRAC event in the originating runtime. 10 internal transactions:
+  (* No CRAC event in the originating runtime. 11 internal
+     transactions (the re-entrant EVM→TEZ leg materializes
+     alias(evm_bridge) on the Tezos side; the trailing EVM→TEZ
+     leg's source/sender resolution does not need a new alias):
      #0: tez_main → tez_main (%_incrementWitness)
      #1: tez_main → tez_outer_bridge (%run)
      #2: tez_outer_bridge → tez_outer_bridge (%_incrementWitness) (pre)
      #3: tez_outer_bridge → GW_M (%call_evm)
-     #4: alias(evm_bridge) → tez_inner_bridge (%run)       (re-entrant)
-     #5: tez_inner_bridge → tez_inner_bridge (%_incrementWitness) (pre, re-ent)
-     #6: tez_inner_bridge → GW_M (%call_evm)               (re-entrant)
-     #7: tez_inner_bridge → tez_inner_bridge (%_incrementWitness) (post, re-ent)
-     #8: tez_outer_bridge → tez_outer_bridge (%_incrementWitness) (post)
-     #9: tez_main → tez_main (%_incrementWitness) (final) *)
+     #4: origination alias(evm_bridge)                     (re-entrant)
+     #5: alias(evm_bridge) → tez_inner_bridge (%run)      (re-entrant)
+     #6: tez_inner_bridge → tez_inner_bridge (%_incrementWitness) (pre, re-ent)
+     #7: tez_inner_bridge → GW_M (%call_evm)               (re-entrant)
+     #8: tez_inner_bridge → tez_inner_bridge (%_incrementWitness) (post, re-ent)
+     #9: tez_outer_bridge → tez_outer_bridge (%_incrementWitness) (post)
+     #10: tez_main → tez_main (%_incrementWitness) (final) *)
   Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
   Check.(
-    (List.length internals = 10)
+    (List.length internals = 11)
       int
-      ~error_msg:"Expected 10 internal operations, got %L") ;
+      ~error_msg:"Expected 11 internal operations, got %L") ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#0")
     ~expected_nonce:0
@@ -7959,54 +8208,60 @@ let test_crac_receipt_tez_evm_tez_evm =
     ~expected_entrypoint:"call_evm"
     ~expected_status:"applied"
     (List.nth internals 3) ;
-  check_crac_internal_transaction
+  check_crac_internal_alias_origination
     ~prefix:(prefix ^ "#4")
     ~expected_nonce:4
-    ~expected_source:evm_bridge_alias
-    ~expected_destination:tez_inner_bridge_kt1
-    ~expected_entrypoint:"run"
+    ~expected_alias_kt1:evm_bridge_alias
     ~expected_status:"applied"
     (List.nth internals 4) ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#5")
     ~expected_nonce:5
-    ~expected_source:tez_inner_bridge_kt1
+    ~expected_source:evm_bridge_alias
     ~expected_destination:tez_inner_bridge_kt1
-    ~expected_entrypoint:"_incrementWitness"
+    ~expected_entrypoint:"run"
     ~expected_status:"applied"
     (List.nth internals 5) ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#6")
     ~expected_nonce:6
     ~expected_source:tez_inner_bridge_kt1
-    ~expected_destination:gateway_address
-    ~expected_entrypoint:"call_evm"
+    ~expected_destination:tez_inner_bridge_kt1
+    ~expected_entrypoint:"_incrementWitness"
     ~expected_status:"applied"
     (List.nth internals 6) ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#7")
     ~expected_nonce:7
     ~expected_source:tez_inner_bridge_kt1
-    ~expected_destination:tez_inner_bridge_kt1
-    ~expected_entrypoint:"_incrementWitness"
+    ~expected_destination:gateway_address
+    ~expected_entrypoint:"call_evm"
     ~expected_status:"applied"
     (List.nth internals 7) ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#8")
     ~expected_nonce:8
-    ~expected_source:tez_outer_bridge_kt1
-    ~expected_destination:tez_outer_bridge_kt1
+    ~expected_source:tez_inner_bridge_kt1
+    ~expected_destination:tez_inner_bridge_kt1
     ~expected_entrypoint:"_incrementWitness"
     ~expected_status:"applied"
     (List.nth internals 8) ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#9")
     ~expected_nonce:9
+    ~expected_source:tez_outer_bridge_kt1
+    ~expected_destination:tez_outer_bridge_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 9) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#10")
+    ~expected_nonce:10
     ~expected_source:tez_main_kt1
     ~expected_destination:tez_main_kt1
     ~expected_entrypoint:"_incrementWitness"
     ~expected_status:"applied"
-    (List.nth internals 9) ;
+    (List.nth internals 10) ;
   (* ── EVM side: fake CRAC transaction ───────────────────────── *)
   (* 1 fake CRAC tx; re-entrant legs are internal per RFC principle 6 *)
   let* block =
@@ -8084,115 +8339,145 @@ let test_crac_receipt_evm_5_crossing_chain =
       ~expected_status:"applied"
       top
   in
-  (* 11 internal ops: event + 10 transactions.
-     Per RFC Example 8, internal operations follow execution order:
-     outermost CRAC first, re-entrant ops interleaved at gateway call
-     sites, post-gateway ops resume after the inner chain returns.
-     #0: event (CRAC-ID "1-0")
-     #1: alias(evm_a) → tez_b (%run) [outermost CRAC]
-     #2: tez_b → tez_b (%_incrementWitness) [pre]
-     #3: tez_b → GW_M (%call_evm) [outgoing to evm_c]
-     #4: alias(evm_c) → tez_d (%run) [middle CRAC, interleaved]
-     #5: tez_d → tez_d (%_incrementWitness) [pre]
-     #6: tez_d → GW_M (%call_evm) [outgoing to evm_e]
-     #7: alias(evm_e) → tez_leaf (%run) [deepest CRAC, interleaved]
-     #8: tez_leaf → tez_leaf (%_incrementWitness)
-     #9: tez_d → tez_d (%_incrementWitness) [post, resumes after GW]
-     #10: tez_b → tez_b (%_incrementWitness) [post, resumes after GW] *)
+  (* 15 internal ops: event + 4 alias originations + 10 transactions.
+     Aliases for evm_a + EOA are materialized by the outermost CRAC.
+     Each re-entrant CRAC materializes only its own EVM-sender alias
+     (the EOA / source is cached after the outermost). The aliases
+     are spliced just before each CRAC's synthetic transfer at its
+     entry point in the flat list.
+     #0:  event (CRAC-ID "1-0")
+     #1:  origination alias(evm_a)
+     #2:  origination alias(EOA = sender)
+     #3:  alias(evm_a) → tez_b (%run)              [outermost CRAC]
+     #4:  tez_b → tez_b (%_incrementWitness) [pre]
+     #5:  tez_b → GW_M (%call_evm)                  [outgoing → evm_c]
+     #6:  origination alias(evm_c)                  [middle CRAC]
+     #7:  alias(evm_c) → tez_d (%run)              [middle CRAC]
+     #8:  tez_d → tez_d (%_incrementWitness) [pre]
+     #9:  tez_d → GW_M (%call_evm)                  [outgoing → evm_e]
+     #10: origination alias(evm_e)                  [deepest CRAC]
+     #11: alias(evm_e) → tez_leaf (%run)           [deepest CRAC]
+     #12: tez_leaf → tez_leaf (%_incrementWitness)
+     #13: tez_d → tez_d (%_incrementWitness) [post]
+     #14: tez_b → tez_b (%_incrementWitness) [post] *)
   Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
   Check.(
-    (List.length internals = 11)
+    (List.length internals = 15)
       int
-      ~error_msg:"Expected 11 internal operations, got %L") ;
+      ~error_msg:"Expected 15 internal operations, got %L") ;
   check_crac_event
     ~prefix
     ~expected_crac_id:"1-0"
     ~expected_status:"applied"
     (List.nth internals 0) ;
-  (* ── Outermost CRAC: evm_a → tez_b ────────────────────────── *)
-  check_crac_internal_transaction
+  check_crac_internal_alias_origination
     ~prefix:(prefix ^ "#1")
     ~expected_nonce:1
+    ~expected_alias_kt1:evm_a_alias
+    ~expected_status:"applied"
+    (List.nth internals 1) ;
+  check_crac_internal_alias_origination
+    ~prefix:(prefix ^ "#2")
+    ~expected_nonce:2
+    ~expected_alias_kt1:sender_alias
+    ~expected_status:"applied"
+    (List.nth internals 2) ;
+  (* ── Outermost CRAC: evm_a → tez_b ────────────────────────── *)
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#3")
+    ~expected_nonce:3
     ~expected_source:evm_a_alias
     ~expected_destination:tez_b_kt1
     ~expected_entrypoint:"run"
     ~expected_status:"applied"
-    (List.nth internals 1) ;
-  check_crac_internal_transaction
-    ~prefix:(prefix ^ "#2")
-    ~expected_nonce:2
-    ~expected_source:tez_b_kt1
-    ~expected_destination:tez_b_kt1
-    ~expected_entrypoint:"_incrementWitness"
-    ~expected_status:"applied"
-    (List.nth internals 2) ;
-  check_crac_internal_transaction
-    ~prefix:(prefix ^ "#3")
-    ~expected_nonce:3
-    ~expected_source:tez_b_kt1
-    ~expected_destination:gateway_address
-    ~expected_entrypoint:"call_evm"
-    ~expected_status:"applied"
     (List.nth internals 3) ;
-  (* ── Middle CRAC: evm_c → tez_d (interleaved at GW call site) *)
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#4")
     ~expected_nonce:4
-    ~expected_source:evm_c_alias
-    ~expected_destination:tez_d_kt1
-    ~expected_entrypoint:"run"
+    ~expected_source:tez_b_kt1
+    ~expected_destination:tez_b_kt1
+    ~expected_entrypoint:"_incrementWitness"
     ~expected_status:"applied"
     (List.nth internals 4) ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#5")
     ~expected_nonce:5
-    ~expected_source:tez_d_kt1
-    ~expected_destination:tez_d_kt1
-    ~expected_entrypoint:"_incrementWitness"
-    ~expected_status:"applied"
-    (List.nth internals 5) ;
-  check_crac_internal_transaction
-    ~prefix:(prefix ^ "#6")
-    ~expected_nonce:6
-    ~expected_source:tez_d_kt1
+    ~expected_source:tez_b_kt1
     ~expected_destination:gateway_address
     ~expected_entrypoint:"call_evm"
     ~expected_status:"applied"
+    (List.nth internals 5) ;
+  (* ── Middle CRAC: evm_c → tez_d (interleaved at GW call site) *)
+  check_crac_internal_alias_origination
+    ~prefix:(prefix ^ "#6")
+    ~expected_nonce:6
+    ~expected_alias_kt1:evm_c_alias
+    ~expected_status:"applied"
     (List.nth internals 6) ;
-  (* ── Deepest CRAC: evm_e → tez_leaf (interleaved at GW call site) *)
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#7")
     ~expected_nonce:7
-    ~expected_source:evm_e_alias
-    ~expected_destination:tez_leaf_kt1
+    ~expected_source:evm_c_alias
+    ~expected_destination:tez_d_kt1
     ~expected_entrypoint:"run"
     ~expected_status:"applied"
     (List.nth internals 7) ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#8")
     ~expected_nonce:8
-    ~expected_source:tez_leaf_kt1
-    ~expected_destination:tez_leaf_kt1
-    ~expected_entrypoint:"_incrementWitness"
-    ~expected_status:"applied"
-    (List.nth internals 8) ;
-  (* ── Post-gateway continuations (stack unwinding order) ─────── *)
-  check_crac_internal_transaction
-    ~prefix:(prefix ^ "#9")
-    ~expected_nonce:9
     ~expected_source:tez_d_kt1
     ~expected_destination:tez_d_kt1
     ~expected_entrypoint:"_incrementWitness"
     ~expected_status:"applied"
-    (List.nth internals 9) ;
+    (List.nth internals 8) ;
   check_crac_internal_transaction
+    ~prefix:(prefix ^ "#9")
+    ~expected_nonce:9
+    ~expected_source:tez_d_kt1
+    ~expected_destination:gateway_address
+    ~expected_entrypoint:"call_evm"
+    ~expected_status:"applied"
+    (List.nth internals 9) ;
+  (* ── Deepest CRAC: evm_e → tez_leaf (interleaved at GW call site) *)
+  check_crac_internal_alias_origination
     ~prefix:(prefix ^ "#10")
     ~expected_nonce:10
+    ~expected_alias_kt1:evm_e_alias
+    ~expected_status:"applied"
+    (List.nth internals 10) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#11")
+    ~expected_nonce:11
+    ~expected_source:evm_e_alias
+    ~expected_destination:tez_leaf_kt1
+    ~expected_entrypoint:"run"
+    ~expected_status:"applied"
+    (List.nth internals 11) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#12")
+    ~expected_nonce:12
+    ~expected_source:tez_leaf_kt1
+    ~expected_destination:tez_leaf_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 12) ;
+  (* ── Post-gateway continuations (stack unwinding order) ─────── *)
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#13")
+    ~expected_nonce:13
+    ~expected_source:tez_d_kt1
+    ~expected_destination:tez_d_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 13) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#14")
+    ~expected_nonce:14
     ~expected_source:tez_b_kt1
     ~expected_destination:tez_b_kt1
     ~expected_entrypoint:"_incrementWitness"
     ~expected_status:"applied"
-    (List.nth internals 10) ;
+    (List.nth internals 14) ;
   (* ── EVM side ──────────────────────────────────────────────── *)
   (* 1 original EVM tx; re-entrant TEZ→EVM legs are internal per RFC principle 6 *)
   let* _block =
@@ -8266,10 +8551,11 @@ let test_crac_receipt_tez_mixed_calls_with_crac =
       string
       ~error_msg:"Expected top-level status %R, got %L") ;
   let internals = JSON.(metadata |-> "internal_operation_results" |> as_list) in
-  (* No CRAC event in the originating runtime.  14 internal transactions.
+  (* No CRAC event in the originating runtime.  15 internal transactions.
      Operations appear in call order (parent call first, then sub-ops),
-     matching the RFC examples.  Re-entrant CRAC ops are correctly
-     interleaved after the gateway call.
+     matching the RFC examples.  The re-entrant EVM→TEZ leg
+     materializes alias(evm_bridge) on the Tezos side just before
+     its synthetic transfer.
      #0: tez_main → tez_main (%_incrementWitness) [before 1st callee]
      #1: tez_main → tez_inner (%run) [1st callee call]
      #2: tez_inner → tez_inner (%_incrementWitness) [sub-op of 1st callee]
@@ -8277,18 +8563,19 @@ let test_crac_receipt_tez_mixed_calls_with_crac =
      #4: tez_main → tez_bridge (%run) [2nd callee call]
      #5: tez_bridge → tez_bridge (%_incrementWitness) [sub-op: pre]
      #6: tez_bridge → GW_M (%call_evm) [sub-op: outgoing CRAC]
-     #7: alias(evm_bridge) → tez_inner (%run) [re-entrant CRAC]
-     #8: tez_inner → tez_inner (%_incrementWitness) [re-entrant sub-op]
-     #9: tez_bridge → tez_bridge (%_incrementWitness) [sub-op: post]
-     #10: tez_main → tez_main (%_incrementWitness) [before 3rd callee]
-     #11: tez_main → tez_inner (%run) [3rd callee call]
-     #12: tez_inner → tez_inner (%_incrementWitness) [sub-op of 3rd callee]
-     #13: tez_main → tez_main (%_incrementWitness) [final] *)
+     #7: origination alias(evm_bridge) [re-entrant alias materialization]
+     #8: alias(evm_bridge) → tez_inner (%run) [re-entrant CRAC]
+     #9: tez_inner → tez_inner (%_incrementWitness) [re-entrant sub-op]
+     #10: tez_bridge → tez_bridge (%_incrementWitness) [sub-op: post]
+     #11: tez_main → tez_main (%_incrementWitness) [before 3rd callee]
+     #12: tez_main → tez_inner (%run) [3rd callee call]
+     #13: tez_inner → tez_inner (%_incrementWitness) [sub-op of 3rd callee]
+     #14: tez_main → tez_main (%_incrementWitness) [final] *)
   Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
   Check.(
-    (List.length internals = 14)
+    (List.length internals = 15)
       int
-      ~error_msg:"Expected 14 internal operations, got %L") ;
+      ~error_msg:"Expected 15 internal operations, got %L") ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#0")
     ~expected_nonce:0
@@ -8345,35 +8632,33 @@ let test_crac_receipt_tez_mixed_calls_with_crac =
     ~expected_entrypoint:"call_evm"
     ~expected_status:"applied"
     (List.nth internals 6) ;
-  check_crac_internal_transaction
+  check_crac_internal_alias_origination
     ~prefix:(prefix ^ "#7")
     ~expected_nonce:7
-    ~expected_source:evm_bridge_alias
-    ~expected_destination:tez_inner_kt1
-    ~expected_entrypoint:"run"
+    ~expected_alias_kt1:evm_bridge_alias
     ~expected_status:"applied"
     (List.nth internals 7) ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#8")
     ~expected_nonce:8
-    ~expected_source:tez_inner_kt1
+    ~expected_source:evm_bridge_alias
     ~expected_destination:tez_inner_kt1
-    ~expected_entrypoint:"_incrementWitness"
+    ~expected_entrypoint:"run"
     ~expected_status:"applied"
     (List.nth internals 8) ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#9")
     ~expected_nonce:9
-    ~expected_source:tez_bridge_kt1
-    ~expected_destination:tez_bridge_kt1
+    ~expected_source:tez_inner_kt1
+    ~expected_destination:tez_inner_kt1
     ~expected_entrypoint:"_incrementWitness"
     ~expected_status:"applied"
     (List.nth internals 9) ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#10")
     ~expected_nonce:10
-    ~expected_source:tez_main_kt1
-    ~expected_destination:tez_main_kt1
+    ~expected_source:tez_bridge_kt1
+    ~expected_destination:tez_bridge_kt1
     ~expected_entrypoint:"_incrementWitness"
     ~expected_status:"applied"
     (List.nth internals 10) ;
@@ -8381,26 +8666,34 @@ let test_crac_receipt_tez_mixed_calls_with_crac =
     ~prefix:(prefix ^ "#11")
     ~expected_nonce:11
     ~expected_source:tez_main_kt1
-    ~expected_destination:tez_inner_kt1
-    ~expected_entrypoint:"run"
+    ~expected_destination:tez_main_kt1
+    ~expected_entrypoint:"_incrementWitness"
     ~expected_status:"applied"
     (List.nth internals 11) ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#12")
     ~expected_nonce:12
-    ~expected_source:tez_inner_kt1
+    ~expected_source:tez_main_kt1
     ~expected_destination:tez_inner_kt1
-    ~expected_entrypoint:"_incrementWitness"
+    ~expected_entrypoint:"run"
     ~expected_status:"applied"
     (List.nth internals 12) ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#13")
     ~expected_nonce:13
+    ~expected_source:tez_inner_kt1
+    ~expected_destination:tez_inner_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 13) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#14")
+    ~expected_nonce:14
     ~expected_source:tez_main_kt1
     ~expected_destination:tez_main_kt1
     ~expected_entrypoint:"_incrementWitness"
     ~expected_status:"applied"
-    (List.nth internals 13) ;
+    (List.nth internals 14) ;
   (* ── EVM side: fake CRAC transaction ───────────────────────── *)
   let* block =
     check_evm_block_tx_count ~prefix ~expected_tx_count:1 sequencer
