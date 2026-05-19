@@ -96,6 +96,8 @@ type rw = [`Read | `Write | `Delete]
 
 type ro = [`Read]
 
+type read_delete = [`Read | `Delete]
+
 type ('a, 'cap) path =
   | Raw_path : string -> (bytes, rw) path
   | Chain_id : (L2_types.chain_id, ro) path
@@ -131,7 +133,7 @@ type ('a, 'cap) path =
   | Block_by_hash :
       _ L2_types.chain_family * Ethereum_types.block_hash
       -> ( Ethereum_types.legacy_transaction_object L2_types.block,
-           [`Read | `Delete] )
+           read_delete )
          path
   | Block_index :
       _ L2_types.chain_family * Durable_storage_path.Block.number
@@ -182,32 +184,27 @@ type ('a, 'cap) path =
       Ethereum_types.block_hash
       -> (Ethereum_types.legacy_transaction_object list, ro) path
 
+type 'a ro_resolved = {path : string; decode : bytes -> 'a tzresult}
+
+type 'a rw_resolved = {
+  path : string;
+  decode : bytes -> 'a tzresult;
+  encode : 'a -> string;
+}
+
 (** Read-capable resolution variants. [Delete_only] is intentionally absent
     here — it lives directly in {!resolved}, so [path_and_decode] can
     pattern-match exhaustively without an [assert false] on an impossible
     case. *)
-type ('a, 'cap) read_resolved =
-  | Read_write : {
-      path : string;
-      decode : bytes -> 'a tzresult;
-      encode : 'a -> string;
-    }
-      -> ('a, rw) read_resolved
-  | Read_only : {
-      path : string;
-      decode : bytes -> 'a tzresult;
-    }
-      -> ('a, ro) read_resolved
-  | Read_delete : {
-      path : string;
-      decode : bytes -> 'a tzresult;
-    }
-      -> ('a, [`Read | `Delete]) read_resolved
+type ('a, 'cap) readable_resolved =
+  | Read_write : 'a rw_resolved -> ('a, rw) readable_resolved
+  | Read_only : 'a ro_resolved -> ('a, ro) readable_resolved
+  | Read_delete : 'a ro_resolved -> ('a, read_delete) readable_resolved
 
 (** A resolved path: either read-capable (and optionally writable / deletable),
     or delete-only. *)
 type ('a, 'cap) resolved =
-  | Readable : ('a, 'cap) read_resolved -> ('a, 'cap) resolved
+  | Readable : ('a, 'cap) readable_resolved -> ('a, 'cap) resolved
   | Delete_only : {path : string} -> (unit, [`Delete]) resolved
 
 let path_of : type a cap. (a, cap) resolved -> string = function
@@ -224,214 +221,209 @@ let infallible_decode decode bytes = Ok (decode bytes)
 
 (** Empty-body presence flags: the value on disk is an (empty) marker; we only
     care about existence. *)
-let unit_flag_codec ~path : (unit, rw) read_resolved =
-  Read_write {path; decode = (fun _bytes -> Ok ()); encode = (fun () -> "")}
+let unit_flag_codec ~path : unit rw_resolved =
+  {path; decode = (fun _bytes -> Ok ()); encode = (fun () -> "")}
 
 (** Read-only sibling of {!unit_flag_codec} for presence flags the EVM node
     only checks but never writes. *)
-let unit_flag_ro_codec ~path : (unit, ro) read_resolved =
-  Read_only {path; decode = (fun _bytes -> Ok ())}
+let unit_flag_ro_codec ~path : unit ro_resolved =
+  {path; decode = (fun _bytes -> Ok ())}
 
 (** Little-endian [int64]-backed kernel-owned scalars stored via
     [Data_encoding.Little_endian.int64]. Read-only — the EVM node never
     writes these. *)
-let int64_le_ro_codec ~path : (int64, ro) read_resolved =
-  Read_only
-    {
-      path;
-      decode =
-        infallible_decode
-          Data_encoding.(Binary.of_bytes_exn Little_endian.int64);
-    }
+let int64_le_ro_codec ~path : int64 ro_resolved =
+  {
+    path;
+    decode =
+      infallible_decode Data_encoding.(Binary.of_bytes_exn Little_endian.int64);
+  }
 
 (** Little-endian [Z.t]-backed quantities stored via [Z.{to,of}_bits].
     Read-only — the EVM node never writes these. *)
-let qty_le_ro_codec ~path : (Ethereum_types.quantity, ro) read_resolved =
-  Read_only
-    {
-      path;
-      decode =
-        infallible_decode (fun bytes ->
-            Ethereum_types.Qty (Bytes.to_string bytes |> Z.of_bits));
-    }
+let qty_le_ro_codec ~path : Ethereum_types.quantity ro_resolved =
+  {
+    path;
+    decode =
+      infallible_decode (fun bytes ->
+          Ethereum_types.Qty (Bytes.to_string bytes |> Z.of_bits));
+  }
 
 (** RLP-encoded values stored as bytes. *)
-let rlp_codec ~path : (Rlp.item, rw) read_resolved =
-  Read_write
-    {
-      path;
-      decode = Rlp.decode;
-      encode = (fun item -> Bytes.to_string (Rlp.encode item));
-    }
+let rlp_codec ~path : Rlp.item rw_resolved =
+  {
+    path;
+    decode = Rlp.decode;
+    encode = (fun item -> Bytes.to_string (Rlp.encode item));
+  }
 
 (** Kernel-owned typed block stored under [path]; read-only, decoded via
     [L2_types.block_from_bytes] for the given [chain_family]. *)
 let block_ro_codec (type f) ~path ~(chain_family : f L2_types.chain_family) :
-    (Ethereum_types.legacy_transaction_object L2_types.block, ro) read_resolved
-    =
-  Read_only
-    {
-      path;
-      decode = (fun bytes -> Ok (L2_types.block_from_bytes ~chain_family bytes));
-    }
+    Ethereum_types.legacy_transaction_object L2_types.block ro_resolved =
+  {
+    path;
+    decode = (fun bytes -> Ok (L2_types.block_from_bytes ~chain_family bytes));
+  }
 
-(** Smart constructors for [resolve] arms — wrap a [read_resolved]
-    into a [resolution], hiding the [Readable] layer that every read-side
-    arm would otherwise have to spell out. *)
-let static_read : type a cap. (a, cap) read_resolved -> (a, cap) resolution =
- fun r -> Static (Readable r)
+(** Smart constructors for [resolve] arms — wrap the [ro_resolved] /
+    [rw_resolved] records into a [resolution], hiding the
+    [Readable]/[Read_write]/[Read_only]/[Read_delete] layers that every
+    read-side arm would otherwise have to spell out. *)
+let static_rw : type a. a rw_resolved -> (a, rw) resolution =
+ fun r -> Static (Readable (Read_write r))
 
-let versioned_read : type a cap.
-    (storage_version:int -> (a, cap) read_resolved) -> (a, cap) resolution =
- fun f -> Versioned (fun ~storage_version -> Readable (f ~storage_version))
+let static_ro : type a. a ro_resolved -> (a, ro) resolution =
+ fun r -> Static (Readable (Read_only r))
+
+let static_read_delete : type a. a ro_resolved -> (a, read_delete) resolution =
+ fun r -> Static (Readable (Read_delete r))
+
+let versioned_rw : type a.
+    (storage_version:int -> a rw_resolved) -> (a, rw) resolution =
+ fun f ->
+  Versioned (fun ~storage_version -> Readable (Read_write (f ~storage_version)))
+
+let versioned_ro : type a.
+    (storage_version:int -> a ro_resolved) -> (a, ro) resolution =
+ fun f ->
+  Versioned (fun ~storage_version -> Readable (Read_only (f ~storage_version)))
 
 let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
   | Raw_path key ->
-      static_read
-        (Read_write
-           {
-             path = key;
-             decode = infallible_decode Fun.id;
-             encode = Bytes.to_string;
-           })
+      static_rw
+        {
+          path = key;
+          decode = infallible_decode Fun.id;
+          encode = Bytes.to_string;
+        }
   | Chain_id ->
-      static_read
-        (Read_only
-           {
-             path = Durable_storage_path.chain_id;
-             decode = infallible_decode L2_types.Chain_id.decode_le;
-           })
+      static_ro
+        {
+          path = Durable_storage_path.chain_id;
+          decode = infallible_decode L2_types.Chain_id.decode_le;
+        }
   | Michelson_runtime_chain_id ->
-      static_read
-        (Read_only
-           {
-             path = Durable_storage_path.michelson_runtime_chain_id;
-             decode = infallible_decode L2_types.Chain_id.decode_be;
-           })
+      static_ro
+        {
+          path = Durable_storage_path.michelson_runtime_chain_id;
+          decode = infallible_decode L2_types.Chain_id.decode_be;
+        }
   | Kernel_version ->
-      versioned_read (fun ~storage_version ->
-          Read_only
-            {
-              path = Durable_storage_path.kernel_version ~storage_version;
-              decode = infallible_decode Bytes.to_string;
-            })
+      versioned_ro (fun ~storage_version ->
+          {
+            path = Durable_storage_path.kernel_version ~storage_version;
+            decode = infallible_decode Bytes.to_string;
+          })
   | Kernel_root_hash ->
-      versioned_read (fun ~storage_version ->
-          Read_only
-            {
-              path = Durable_storage_path.kernel_root_hash ~storage_version;
-              decode =
-                (fun bytes ->
-                  let (`Hex s) = Hex.of_bytes bytes in
-                  Ok (Ethereum_types.Hex s));
-            })
+      versioned_ro (fun ~storage_version ->
+          {
+            path = Durable_storage_path.kernel_root_hash ~storage_version;
+            decode =
+              (fun bytes ->
+                let (`Hex s) = Hex.of_bytes bytes in
+                Ok (Ethereum_types.Hex s));
+          })
   | Multichain_flag ->
-      static_read
+      static_ro
         (unit_flag_ro_codec ~path:Durable_storage_path.Feature_flags.multichain)
   | Sequencer_key ->
-      versioned_read (fun ~storage_version ->
-          Read_only
-            {
-              path = Durable_storage_path.sequencer_key ~storage_version;
-              decode =
-                (fun bytes ->
-                  Signature.Public_key.of_b58check (Bytes.to_string bytes));
-            })
+      versioned_ro (fun ~storage_version ->
+          {
+            path = Durable_storage_path.sequencer_key ~storage_version;
+            decode =
+              (fun bytes ->
+                Signature.Public_key.of_b58check (Bytes.to_string bytes));
+          })
   | Chain_config_family cid ->
-      versioned_read (fun ~storage_version ->
-          Read_only
-            {
-              path =
-                Durable_storage_path.Chain_configuration.chain_family
-                  ~storage_version
-                  cid;
-              decode = L2_types.Chain_family.of_bytes;
-            })
+      versioned_ro (fun ~storage_version ->
+          {
+            path =
+              Durable_storage_path.Chain_configuration.chain_family
+                ~storage_version
+                cid;
+            decode = L2_types.Chain_family.of_bytes;
+          })
   | Tezosx_feature_flag runtime ->
-      static_read (unit_flag_ro_codec ~path:(Tezosx.feature_flag runtime))
+      static_ro (unit_flag_ro_codec ~path:(Tezosx.feature_flag runtime))
   | Michelson_runtime_sunrise_level ->
-      versioned_read (fun ~storage_version ->
+      versioned_ro (fun ~storage_version ->
           qty_le_ro_codec
             ~path:
               (Durable_storage_path.michelson_runtime_sunrise_level
                  ~storage_version))
   | Current_block_number chain_family ->
       let root = Durable_storage_path.root_of_chain_family chain_family in
-      static_read
+      static_ro
         (qty_le_ro_codec
            ~path:(Durable_storage_path.Block.current_number ~root))
   | Current_block_hash chain_family ->
       let root = Durable_storage_path.root_of_chain_family chain_family in
-      static_read
-        (Read_only
-           {
-             path = Durable_storage_path.Block.current_hash ~root;
-             decode = infallible_decode Ethereum_types.decode_block_hash;
-           })
+      static_ro
+        {
+          path = Durable_storage_path.Block.current_hash ~root;
+          decode = infallible_decode Ethereum_types.decode_block_hash;
+        }
   | Evm_node_flag ->
-      versioned_read (fun ~storage_version ->
+      versioned_rw (fun ~storage_version ->
           unit_flag_codec
             ~path:(Durable_storage_path.evm_node_flag ~storage_version))
   | Blueprint_chunk {blueprint_number; chunk_index} ->
-      versioned_read (fun ~storage_version ->
-          Read_write
-            {
-              path =
-                Durable_storage_path.Blueprint.chunk
-                  ~storage_version
-                  ~blueprint_number
-                  ~chunk_index;
-              decode = infallible_decode Fun.id;
-              encode = Bytes.to_string;
-            })
+      versioned_rw (fun ~storage_version ->
+          {
+            path =
+              Durable_storage_path.Blueprint.chunk
+                ~storage_version
+                ~blueprint_number
+                ~chunk_index;
+            decode = infallible_decode Fun.id;
+            encode = Bytes.to_string;
+          })
   | Blueprint_nb_chunks blueprint_number ->
-      versioned_read (fun ~storage_version ->
-          Read_write
-            {
-              path =
-                Durable_storage_path.Blueprint.nb_chunks
-                  ~storage_version
-                  ~blueprint_number;
-              decode =
-                infallible_decode (fun bytes ->
-                    Helpers.decode_z_le bytes |> Z.to_int);
-              encode = (fun n -> Z.to_bits (Z.of_int n));
-            })
+      versioned_rw (fun ~storage_version ->
+          {
+            path =
+              Durable_storage_path.Blueprint.nb_chunks
+                ~storage_version
+                ~blueprint_number;
+            decode =
+              infallible_decode (fun bytes ->
+                  Helpers.decode_z_le bytes |> Z.to_int);
+            encode = (fun n -> Z.to_bits (Z.of_int n));
+          })
   | Blueprint_generation blueprint_number ->
-      versioned_read (fun ~storage_version ->
-          Read_write
-            {
-              path =
-                Durable_storage_path.Blueprint.generation
-                  ~storage_version
-                  ~blueprint_number;
-              decode = infallible_decode Ethereum_types.decode_number_le;
-              encode =
-                (fun qty -> Bytes.to_string (Ethereum_types.encode_u256_le qty));
-            })
+      versioned_rw (fun ~storage_version ->
+          {
+            path =
+              Durable_storage_path.Blueprint.generation
+                ~storage_version
+                ~blueprint_number;
+            decode = infallible_decode Ethereum_types.decode_number_le;
+            encode =
+              (fun qty -> Bytes.to_string (Ethereum_types.encode_u256_le qty));
+          })
   | Single_tx_input ->
-      versioned_read (fun ~storage_version ->
+      versioned_rw (fun ~storage_version ->
           rlp_codec
             ~path:(Durable_storage_path.Single_tx.input_tx ~storage_version))
   | Assemble_block_input ->
-      versioned_read (fun ~storage_version ->
+      versioned_rw (fun ~storage_version ->
           rlp_codec
             ~path:(Durable_storage_path.Assemble_block.input ~storage_version))
   | Current_block chain_family ->
       let root = Durable_storage_path.root_of_chain_family chain_family in
-      static_read
+      static_ro
         (block_ro_codec
            ~path:(Durable_storage_path.Block.current_block ~root)
            ~chain_family)
   | Block_by_hash (chain_family, block_hash) ->
       let root = Durable_storage_path.root_of_chain_family chain_family in
-      static_read
-        (Read_delete
-           {
-             path = Durable_storage_path.Block.by_hash ~root block_hash;
-             decode =
-               (fun bytes -> Ok (L2_types.block_from_bytes ~chain_family bytes));
-           })
+      static_read_delete
+        {
+          path = Durable_storage_path.Block.by_hash ~root block_hash;
+          decode =
+            (fun bytes -> Ok (L2_types.block_from_bytes ~chain_family bytes));
+        }
   | Block_index (chain_family, block_number) ->
       let root = Durable_storage_path.root_of_chain_family chain_family in
       Static
@@ -441,196 +433,170 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
                Durable_storage_path.Indexes.block_by_number ~root block_number;
            })
   | Tezosx_tezos_current_block ->
-      static_read
+      static_ro
         (block_ro_codec
            ~path:
              (Durable_storage_path.Block.current_block
                 ~root:Durable_storage_path.tezosx_tezos_blocks_root)
            ~chain_family:Michelson)
   | Current_receipts ->
-      static_read
-        (Read_only
-           {
-             path =
-               Durable_storage_path.Block.current_receipts
-                 ~root:Durable_storage_path.etherlink_safe_root;
-             decode =
-               infallible_decode
-                 (Transaction_receipt.decode_last_from_list
-                    Ethereum_types.(Block_hash (Hex (String.make 64 '0'))));
-           })
-  | Backlog ->
-      static_read (int64_le_ro_codec ~path:Durable_storage_path.backlog)
+      static_ro
+        {
+          path =
+            Durable_storage_path.Block.current_receipts
+              ~root:Durable_storage_path.etherlink_safe_root;
+          decode =
+            infallible_decode
+              (Transaction_receipt.decode_last_from_list
+                 Ethereum_types.(Block_hash (Hex (String.make 64 '0'))));
+        }
+  | Backlog -> static_ro (int64_le_ro_codec ~path:Durable_storage_path.backlog)
   | Minimum_base_fee_per_gas ->
-      static_read
-        (Read_only
-           {
-             path = Durable_storage_path.minimum_base_fee_per_gas;
-             decode = infallible_decode Helpers.decode_z_le;
-           })
+      static_ro
+        {
+          path = Durable_storage_path.minimum_base_fee_per_gas;
+          decode = infallible_decode Helpers.decode_z_le;
+        }
   | Da_fee_per_byte ->
-      static_read (qty_le_ro_codec ~path:Durable_storage_path.da_fee_per_byte)
+      static_ro (qty_le_ro_codec ~path:Durable_storage_path.da_fee_per_byte)
   | Maximum_gas_per_transaction ->
-      static_read
+      static_ro
         (qty_le_ro_codec ~path:Durable_storage_path.maximum_gas_per_transaction)
   | Michelson_to_evm_gas_multiplier ->
-      static_read
+      static_ro
         (int64_le_ro_codec
            ~path:Durable_storage_path.michelson_to_evm_gas_multiplier)
   | Sequencer_pool_address ->
-      static_read
-        (Read_only
-           {
-             path = Durable_storage_path.sequencer_pool_address;
-             decode = infallible_decode Ethereum_types.decode_address;
-           })
+      static_ro
+        {
+          path = Durable_storage_path.sequencer_pool_address;
+          decode = infallible_decode Ethereum_types.decode_address;
+        }
   | Evm_legacy_account_balance address ->
-      static_read
-        (Read_write
-           {
-             path = Durable_storage_path.Accounts.balance address;
-             decode = infallible_decode Ethereum_types.decode_number_le;
-             encode =
-               (fun q -> Bytes.to_string (Ethereum_types.encode_u256_le q));
-           })
+      static_rw
+        {
+          path = Durable_storage_path.Accounts.balance address;
+          decode = infallible_decode Ethereum_types.decode_number_le;
+          encode = (fun q -> Bytes.to_string (Ethereum_types.encode_u256_le q));
+        }
   | Evm_legacy_account_nonce address ->
-      static_read
-        (Read_write
-           {
-             path = Durable_storage_path.Accounts.nonce address;
-             decode = infallible_decode Ethereum_types.decode_number_le;
-             encode =
-               (fun q -> Bytes.to_string (Ethereum_types.encode_u64_le q));
-           })
+      static_rw
+        {
+          path = Durable_storage_path.Accounts.nonce address;
+          decode = infallible_decode Ethereum_types.decode_number_le;
+          encode = (fun q -> Bytes.to_string (Ethereum_types.encode_u64_le q));
+        }
   | Evm_legacy_account_code address ->
-      static_read
-        (Read_write
-           {
-             path = Durable_storage_path.Accounts.code address;
-             decode =
-               infallible_decode (fun bytes ->
-                   Hex.of_bytes bytes |> Hex.show
-                   |> Ethereum_types.hex_of_string);
-             encode = Ethereum_types.hex_to_bytes;
-           })
+      static_rw
+        {
+          path = Durable_storage_path.Accounts.code address;
+          decode =
+            infallible_decode (fun bytes ->
+                Hex.of_bytes bytes |> Hex.show |> Ethereum_types.hex_of_string);
+          encode = Ethereum_types.hex_to_bytes;
+        }
   | Evm_legacy_account_code_hash address ->
-      static_read
-        (Read_only
-           {
-             path = Durable_storage_path.Accounts.code_hash address;
-             decode =
-               infallible_decode (fun bytes ->
-                   Hex.of_bytes bytes |> Hex.show
-                   |> Ethereum_types.hash_of_string);
-           })
+      static_ro
+        {
+          path = Durable_storage_path.Accounts.code_hash address;
+          decode =
+            infallible_decode (fun bytes ->
+                Hex.of_bytes bytes |> Hex.show |> Ethereum_types.hash_of_string);
+        }
   | Evm_code_by_hash hash ->
-      static_read
-        (Read_write
-           {
-             path = Durable_storage_path.Code.code hash;
-             decode =
-               infallible_decode (fun bytes ->
-                   Hex.of_bytes bytes |> Hex.show
-                   |> Ethereum_types.hex_of_string);
-             encode = Ethereum_types.hex_to_bytes;
-           })
+      static_rw
+        {
+          path = Durable_storage_path.Code.code hash;
+          decode =
+            infallible_decode (fun bytes ->
+                Hex.of_bytes bytes |> Hex.show |> Ethereum_types.hex_of_string);
+          encode = Ethereum_types.hex_to_bytes;
+        }
   | Evm_account_storage (addr, idx) ->
-      static_read
-        (Read_write
-           {
-             path = Durable_storage_path.Accounts.storage addr idx;
-             decode =
-               infallible_decode (fun bytes ->
-                   Bytes.to_string bytes |> Hex.of_string |> Hex.show
-                   |> Ethereum_types.hex_of_string);
-             encode = Ethereum_types.hex_to_bytes;
-           })
+      static_rw
+        {
+          path = Durable_storage_path.Accounts.storage addr idx;
+          decode =
+            infallible_decode (fun bytes ->
+                Bytes.to_string bytes |> Hex.of_string |> Hex.show
+                |> Ethereum_types.hex_of_string);
+          encode = Ethereum_types.hex_to_bytes;
+        }
   | Evm_account_info address ->
-      static_read
-        (Read_write
-           {
-             path = Durable_storage_path.Accounts.info address;
-             decode = infallible_decode EVM_account_info.decode_exn;
-             encode =
-               (fun info -> Bytes.to_string (EVM_account_info.encode info));
-           })
+      static_rw
+        {
+          path = Durable_storage_path.Accounts.info address;
+          decode = infallible_decode EVM_account_info.decode_exn;
+          encode = (fun info -> Bytes.to_string (EVM_account_info.encode info));
+        }
   | Tezos_account_info pkh ->
-      static_read
-        (Read_only
-           {
-             path = Tezosx.Durable_storage_path.Accounts.Tezos.info pkh;
-             decode = Tezosx.Tezos_runtime.decode_account_info;
-           })
+      static_ro
+        {
+          path = Tezosx.Durable_storage_path.Accounts.Tezos.info pkh;
+          decode = Tezosx.Tezos_runtime.decode_account_info;
+        }
   | Evm_block_hash_by_number number ->
-      static_read
-        (Read_only
-           {
-             path =
-               Durable_storage_path.Indexes.block_by_number
-                 ~root:Durable_storage_path.etherlink_root
-                 number;
-             decode = infallible_decode Ethereum_types.decode_block_hash;
-           })
+      static_ro
+        {
+          path =
+            Durable_storage_path.Indexes.block_by_number
+              ~root:Durable_storage_path.etherlink_root
+              number;
+          decode = infallible_decode Ethereum_types.decode_block_hash;
+        }
   | Evm_transaction_receipt_by_hash (tx_hash, block_hash) ->
-      static_read
-        (Read_only
-           {
-             path = Durable_storage_path.Transaction_receipt.receipt tx_hash;
-             decode =
-               infallible_decode (Transaction_receipt.of_rlp_bytes block_hash);
-           })
+      static_ro
+        {
+          path = Durable_storage_path.Transaction_receipt.receipt tx_hash;
+          decode =
+            infallible_decode (Transaction_receipt.of_rlp_bytes block_hash);
+        }
   | Evm_transaction_object_by_hash (tx_hash, block_hash) ->
-      static_read
-        (Read_only
-           {
-             path = Durable_storage_path.Transaction_object.object_ tx_hash;
-             decode =
-               infallible_decode
-                 (Ethereum_types.legacy_transaction_object_from_rlp block_hash);
-           })
+      static_ro
+        {
+          path = Durable_storage_path.Transaction_object.object_ tx_hash;
+          decode =
+            infallible_decode
+              (Ethereum_types.legacy_transaction_object_from_rlp block_hash);
+        }
   | Evm_current_block_receipts block_hash ->
-      static_read
-        (Read_only
-           {
-             path =
-               Durable_storage_path.Block.current_receipts
-                 ~root:Durable_storage_path.etherlink_root;
-             decode =
-               infallible_decode (fun bytes ->
-                   match Rlp.decode bytes with
-                   | Ok (Rlp.List receipts_rlp) ->
-                       List.map
-                         (fun rlp ->
-                           Transaction_receipt.of_rlp_item block_hash rlp)
-                         receipts_rlp
-                   | _ ->
-                       raise
-                         (Invalid_argument
-                            "Transaction receipts should be a list"));
-           })
+      static_ro
+        {
+          path =
+            Durable_storage_path.Block.current_receipts
+              ~root:Durable_storage_path.etherlink_root;
+          decode =
+            infallible_decode (fun bytes ->
+                match Rlp.decode bytes with
+                | Ok (Rlp.List receipts_rlp) ->
+                    List.map
+                      (fun rlp ->
+                        Transaction_receipt.of_rlp_item block_hash rlp)
+                      receipts_rlp
+                | _ ->
+                    raise
+                      (Invalid_argument "Transaction receipts should be a list"));
+        }
   | Evm_current_block_transactions_objects block_hash ->
-      static_read
-        (Read_only
-           {
-             path =
-               Durable_storage_path.Block.current_transactions_objects
-                 ~root:Durable_storage_path.etherlink_root;
-             decode =
-               infallible_decode (fun bytes ->
-                   match Rlp.decode bytes with
-                   | Ok (Rlp.List objects_rlp) ->
-                       List.map
-                         (fun rlp ->
-                           Ethereum_types
-                           .legacy_transaction_object_from_rlp_item
-                             (Some block_hash)
-                             rlp)
-                         objects_rlp
-                   | _ ->
-                       raise
-                         (Invalid_argument
-                            "Transaction objects should be a list"));
-           })
+      static_ro
+        {
+          path =
+            Durable_storage_path.Block.current_transactions_objects
+              ~root:Durable_storage_path.etherlink_root;
+          decode =
+            infallible_decode (fun bytes ->
+                match Rlp.decode bytes with
+                | Ok (Rlp.List objects_rlp) ->
+                    List.map
+                      (fun rlp ->
+                        Ethereum_types.legacy_transaction_object_from_rlp_item
+                          (Some block_hash)
+                          rlp)
+                      objects_rlp
+                | _ ->
+                    raise
+                      (Invalid_argument "Transaction objects should be a list"));
+        }
 
 let storage_version state =
   let open Lwt_result_syntax in
@@ -662,7 +628,7 @@ let resolve_with_state : type a cap.
       return (Some sv, f ~storage_version:sv)
 
 let path_and_decode : type a cap.
-    (a, cap) read_resolved -> string * (bytes -> a tzresult) = function
+    (a, cap) readable_resolved -> string * (bytes -> a tzresult) = function
   | Read_write {path; decode; _} -> (path, decode)
   | Read_only {path; decode} -> (path, decode)
   | Read_delete {path; decode} -> (path, decode)
