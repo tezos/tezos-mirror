@@ -11596,14 +11596,17 @@ let crac_orig_child_kt1s_for_callees ~prefix ~op_list ~callee_kt1s =
 (* Register a test exposing the raw [sequencer_setup] (we need direct
    access to [sc_rollup_address] / [sc_rollup_node] / [client] /
    [l1_contracts] to originate Michelson contracts via the delayed
-   inbox, which the CRAC runner wrapper hides). *)
-let crac_orig_register ~title ~tags body =
+   inbox, which the CRAC runner wrapper hides).
+
+   Tag-neutral base. The [tags] argument is appended verbatim to the
+   default [tezosx; <runtime>; crac] tags so callers control the
+   per-test classification (e.g., origination-only, stack_overflow,
+   oog). [crac_orig_register] below builds on top with the
+   origination-specific tags. *)
+let crac_register ~title ~tags body =
   let with_runtimes = Tezosx_runtime.[Tezos] in
   let tags =
-    ["tezosx"]
-    @ List.map Tezosx_runtime.tag with_runtimes
-    @ ["crac"; "origination"; "l2_1366"]
-    @ tags
+    ["tezosx"] @ List.map Tezosx_runtime.tag with_runtimes @ ["crac"] @ tags
   in
   Setup.register_test
     ~__FILE__
@@ -11653,6 +11656,11 @@ let crac_orig_register ~title ~tags body =
     ~evm_nonce
     ~tez_counter
     protocol
+
+(* Origination-flavoured wrapper used by tests tracking the L2-1366
+   origination-collision ticket. *)
+let crac_orig_register ~title ~tags body =
+  crac_register ~title ~tags:(["origination"; "l2_1366"] @ tags) body
 
 (* Originate the Michelson callee fixture: a parameterless %run that
    performs exactly one CREATE_CONTRACT. *)
@@ -12155,6 +12163,160 @@ let test_crac_orig_two_cracs_one_tx =
          KT1 (%L).") ;
   unit
 
+(* EVM recurses through a chain of nested [this.recurse] calls, then at the
+   deepest frame invokes a diverging Michelson lambda. The depth is kept
+   moderate on purpose: each external [this.recurse] hop forwards at most
+   63/64 of the remaining gas, so at depth 1023 only ~(63/64)^1023 ≈ 1e-7 of
+   the budget survives to the deepest frame — exhausted by the gateway base
+   cost before the Michelson call is ever dispatched. A depth that leaves
+   enough budget guarantees the diverging lambda is actually reached, so the
+   test exercises the Michelson OOG path (not pure EVM self-recursion). The
+   transaction must fail (Michelson runs out of gas) without trapping the
+   kernel: a kernel trap produces no receipt, which [craft_and_send_transaction]
+   turns into [Test.fail], so [~expected_status:false] only passes on a clean
+   OOG. *)
+let crac_evm_recurse_depth = 50
+
+let test_crac_evm_deep_recurse_then_michelson_oog =
+  crac_register
+    ~title:
+      "CRAC: deep EVM recursion then Michelson diverging lambda returns OOG"
+    ~tags:["stack_overflow"; "oog"]
+  @@
+  fun ~sc_rollup_address
+      ~sc_rollup_node
+      ~l1_contracts
+      ~sequencer
+      ~client
+      ~evm_version
+      ~sender
+      ~source
+      ~evm_nonce
+      ~tez_counter
+      protocol
+    ->
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Originate diverging_lambda Michelson contract" ;
+  let* _lambda_hex, lambda_kt1 =
+    TezContract.originate_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:(tez_counter ())
+      ~script_name:["mini_scenarios"; "diverging_lambda"]
+      ~init_storage_data:"0"
+      protocol
+  in
+  Log.debug ~prefix "Deploy DeepRecurseThenMichelson EVM contract" ;
+  let* contract_addr =
+    EvmContract.deploy_solidity_contract
+      ~evm_version
+      ~sequencer
+      ~sender
+      ~nonce:(evm_nonce ())
+      ~contract:Solidity_contracts.deep_recurse_then_michelson
+      ()
+  in
+  Log.debug ~prefix "Initialize with Michelson contract address" ;
+  let* _ =
+    EvmContract.craft_and_send_transaction
+      ~sequencer
+      ~sender
+      ~nonce:(evm_nonce ())
+      ~value:Wei.zero
+      ~address:contract_addr
+      ~abi_signature:"initialize(string)"
+      ~arguments:[lambda_kt1]
+      ()
+  in
+  Log.debug
+    ~prefix
+    "Call recurse(%d) with block gas limit, expect tx failure"
+    crac_evm_recurse_depth ;
+  let recurse_gas_limit = 30_000_000 in
+  let* recurse_receipt =
+    EvmContract.craft_and_send_transaction
+      ~sequencer
+      ~sender
+      ~nonce:(evm_nonce ())
+      ~value:Wei.zero
+      ~address:contract_addr
+      ~abi_signature:"recurse(uint256)"
+      ~arguments:[string_of_int crac_evm_recurse_depth]
+      ~gas:recurse_gas_limit
+      ~expected_status:false
+      ()
+  in
+  (* `expected_status:false` alone is satisfied by any tx failure
+     — clean OOG (what we want), EVM-side revert before reaching
+     the gateway dispatch (would mean the budget didn't survive the
+     50 self-recursions to MIR), or a kernel trap that the apply
+     pipeline catches and turns into a synthetic failed receipt
+     with a cheap-looking gas profile.
+
+     Worth understanding what gas a clean deep-OOG actually
+     consumes: EIP-150 caps each external `this.recurse()` hop's
+     forwarded budget at 63/64 of the caller's remaining. After
+     50 hops only `(63/64)^50 ≈ 45.5%` of the 30M EVM gas limit
+     survives to the deepest frame; the remaining ~54.5% sits
+     unspent across the outer frames' 1/64 reserves. When the
+     deepest frame OOGs cleanly through MIR the outer frames
+     return without ever consuming their reserves, so the
+     receipt-level `gas_used` is bounded above by roughly
+     `G * (1 - (63/64)^N) ≈ 16M` EVM gas — *not* anywhere near
+     the 30M limit. Observed value is ~13.5M.
+
+     The threshold here is a generous lower bound chosen to
+     distinguish a deep-recursion OOG from cheap EVM failures
+     (revert before gateway dispatch, ABI mismatch, intrinsic-cost
+     rejection) which all consume well under 1M gas. 5M gives a
+     ~10× margin over any cheap-failure path while staying well
+     under the ~13.5M a successful deep-OOG actually burns. *)
+  let gas_used = Int64.to_int recurse_receipt.gasUsed in
+  let min_gas_used = 5_000_000 in
+  Check.(
+    (gas_used >= min_gas_used)
+      int
+      ~error_msg:
+        (Printf.sprintf
+           "expected the recurse(%d) call to consume >= %d EVM gas (a deep \
+            recursion that survived to MIR and OOGed cleanly should burn ~13M \
+            of the 30M limit; cheap EVM-side failures consume <1M), got %%L — \
+            the divergent Michelson lambda is not being exercised"
+           crac_evm_recurse_depth
+           min_gas_used)) ;
+  (* `expected_status:false` also cannot tell a graceful OOG from a
+     kernel trap or reboot. Prove the kernel is still alive by
+     landing a follow-up successful call (any cheap entrypoint that
+     re-runs `initialize` is enough), reading the receipt back, and
+     asserting status. *)
+  Log.debug ~prefix "Follow-up: kernel-liveness probe via initialize()" ;
+  let* _ =
+    EvmContract.craft_and_send_transaction
+      ~sequencer
+      ~sender
+      ~nonce:(evm_nonce ())
+      ~value:Wei.zero
+      ~address:contract_addr
+      ~abi_signature:"initialize(string)"
+      ~arguments:[lambda_kt1]
+      ~expected_status:true
+      ()
+  in
+  (* Re-execute every blueprint (including the diverging-lambda
+     block) through the rollup-node PVM. The PVM runs the kernel on
+     the small consensus stack, not the large-stack sequencer Wasmer
+     runtime, so a recursive walker that overflowed only on the
+     small stack would stall this sync. *)
+  Log.debug ~prefix "PVM replay via bake_until_sync" ;
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  unit
+
 let () =
   test_crac_evm_to_tez [Alpha] ;
   test_crac_evm_multiple_independent_crossings [Alpha] ;
@@ -12274,4 +12436,5 @@ let () =
   test_crac_evm_to_tez_high_gas [Alpha] ;
   test_crac_orig_two_txs_one_block [Alpha] ;
   test_crac_orig_two_txs_two_blocks [Alpha] ;
-  test_crac_orig_two_cracs_one_tx [Alpha]
+  test_crac_orig_two_cracs_one_tx [Alpha] ;
+  test_crac_evm_deep_recurse_then_michelson_oog [Alpha]

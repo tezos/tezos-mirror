@@ -265,6 +265,15 @@ let recursive =
     ~label:"recursive"
     ~contract:"Recursive"
 
+(** The info for the "deep_recurse_then_michelson.sol" contract.
+    Recurses to a configurable EVM depth then invokes a Michelson
+    contract via the CRAC gateway precompile. *)
+let deep_recurse_then_michelson =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/deep_recurse_then_michelson.sol")
+    ~label:"deep_recurse_then_michelson"
+    ~contract:"DeepRecurseThenMichelson"
+
 (** The info for the "error.sol" contract. *)
 let error =
   compile_contract
