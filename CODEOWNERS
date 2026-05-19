@@ -15,7 +15,7 @@
 # Insert code owner declarations here!
 # ************************************
 
-/etherlink/tezt                       @jtcoolen @hantang.sun @m-kus
+/etherlink/tezt                       @jtcoolen @m-kus
 /brassaia                    @mattiasdrp
 
 /irmin                    @mattiasdrp
@@ -29,7 +29,6 @@
 # in the following paths.
 #
 # @emturner = Emma Turner
-# @ole.kruger = Ole Krüger
 # @lthms = Thomas Letan
 # @rodibozman = Rodi-Can Bozman
 # @spalmer25 = Palmer Sébastien
@@ -47,7 +46,6 @@
 # @dianegalloiswong = Diane Gallois-Wong
 # @emturner = Emma Turner
 # @eugenz = Eugen Zalinescu
-# @felix.puscasu1 = Felix Puscasu
 # @iguerNL = Mohamed Iguernlala
 # @jobjo = Joel Bjornson
 # @julien.sagot.nl = Julien Sagot
@@ -61,7 +59,6 @@
 # @murbard = Arthur B.
 # @naih = Nicolas Ayache
 # @NicVolanschi = Nic Volanschi
-# @ole.kruger = Ole Krüger
 # @pe.cornilleau = Pierre-Emmanuel Cornilleau
 # @phink = Paul Lafourge
 # @picdc = Pierrick Couderc
@@ -69,9 +66,9 @@
 # @rafoo_ = Raphaël Cauderlier
 # @rodibozman = Rodi-Can Bozman
 # @romain.nl = Romain
-# @ryan.tan3 = Ryan Tan
 # @Saroupille = François Thiré
 # @sribaroud = Sylvain R.
+# @thomas.athorne = Thomas Athorne 
 # @vch9 = Valentin Chaboche
 # @vect0r = Victor Allombert
 # @victor-dumitrescu = Victor Dumitrescu
@@ -79,7 +76,7 @@
 # @4dam = Adam Allombert-Goget
 # @gabriel.moise = Gabriel Moise
 #
-* @abate @ACoquereau @onurb @dianegalloiswong @emturner @eugenz @felix.puscasu1 @iguerNL @jobjo @julien.sagot.nl @julien.t @Killian-Delarue @lrand @lthms @MBourgoin @mattiasdrp @mebsout @murbard @naih @NicVolanschi @ole.kruger @pe.cornilleau @phink @picdc @polubelova @rafoo_ @rodibozman @romain.nl @ryan.tan3 @Saroupille @sribaroud @vch9 @vect0r @victor-dumitrescu @yrg @4dam @gabriel.moise
+* @abate @ACoquereau @onurb @dianegalloiswong @emturner @eugenz @iguerNL @jobjo @julien.sagot.nl @julien.t @Killian-Delarue @lrand @lthms @MBourgoin @mattiasdrp @mebsout @murbard @naih @NicVolanschi @pe.cornilleau @phink @picdc @polubelova @rafoo_ @rodibozman @romain.nl @Saroupille @sribaroud @thomas.athorne @vch9 @vect0r @victor-dumitrescu @yrg @4dam @gabriel.moise
 
 # CODEOWNERS Owners
 #
