@@ -1125,6 +1125,53 @@ where
                 Ok(MigrationStatus::None)
             }
         }
+        StorageVersion::V58 => {
+            // Phase 6 of the durable storage reorganization: move the
+            // remaining EVM config scalars under /evm/world_state/, and
+            // reorganize the block-index path so /evm/world_state/indexes/
+            // disappears.
+            //
+            // /evm/sequencer_key_change is already at /evm/world_state/.
+            // /evm/simulation_result and /evm/trace are not migrated here —
+            // they remain at their legacy paths.
+            let moves: &[(&[u8], &[u8])] = &[
+                (b"/evm/chain_id", b"/evm/world_state/chain_id"),
+                (b"/evm/evm_version", b"/evm/world_state/evm_version"),
+                (
+                    b"/evm/sequencer_governance",
+                    b"/evm/world_state/sequencer_governance",
+                ),
+                (
+                    b"/evm/sequencer_pool_address",
+                    b"/evm/world_state/sequencer_pool_address",
+                ),
+                (
+                    b"/evm/maximum_gas_per_transaction",
+                    b"/evm/world_state/maximum_gas_per_transaction",
+                ),
+                // Internal reorg: move the contents of indexes/blocks/
+                // under blocks/indexes/. We move /evm/world_state/indexes/blocks
+                // (not /evm/world_state/indexes) to avoid an extra blocks/
+                // nesting at the destination.
+                (
+                    b"/evm/world_state/indexes/blocks",
+                    b"/evm/world_state/blocks/indexes",
+                ),
+            ];
+            for (old, new) in moves {
+                allow_path_not_found(
+                    host.store_move(
+                        &RefPath::assert_from(old),
+                        &RefPath::assert_from(new),
+                    ),
+                )?;
+            }
+            // Drop the now-empty /evm/world_state/indexes parent.
+            allow_path_not_found(
+                host.store_delete(&RefPath::assert_from(b"/evm/world_state/indexes")),
+            )?;
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 
@@ -1398,5 +1445,110 @@ mod tests {
             .store_has(&RefPath::assert_from(b"/tez/world_state/michelson_runtime"))
             .unwrap()
             .is_none());
+    }
+
+    /// Phase 6 (V58): EVM config scalars and block-index are moved under
+    /// /evm/world_state/.
+    #[test]
+    fn v58_migration_moves_evm_config_paths() {
+        let mut host = MockKernelHost::default();
+
+        let old_paths: &[&[u8]] = &[
+            b"/evm/chain_id",
+            b"/evm/evm_version",
+            b"/evm/sequencer_governance",
+            b"/evm/sequencer_pool_address",
+            b"/evm/maximum_gas_per_transaction",
+        ];
+        let new_paths: &[&[u8]] = &[
+            b"/evm/world_state/chain_id",
+            b"/evm/world_state/evm_version",
+            b"/evm/world_state/sequencer_governance",
+            b"/evm/world_state/sequencer_pool_address",
+            b"/evm/world_state/maximum_gas_per_transaction",
+        ];
+        for (i, old) in old_paths.iter().enumerate() {
+            host.store_write_all(&RefPath::assert_from(old), &[i as u8; 4])
+                .unwrap();
+        }
+
+        // Seed indexes subtree.
+        let old_index = RefPath::assert_from(b"/evm/world_state/indexes/blocks/0");
+        host.store_write_all(&old_index, b"block_hash_0").unwrap();
+
+        // Simulate the pre-existing blocks/current subtree that the kernel always
+        // writes before this migration runs (block_storage.rs writes current/number
+        // and current/hash). The indexes move must land as a sibling, not clobber it.
+        let current_number =
+            RefPath::assert_from(b"/evm/world_state/blocks/current/number");
+        host.store_write_all(&current_number, b"\x00\x00\x00\x01")
+            .unwrap();
+
+        let status = migrate_to(&mut host, StorageVersion::V58).unwrap();
+        assert!(matches!(status, MigrationStatus::Done));
+
+        // Legacy paths are gone.
+        for old in old_paths {
+            assert!(
+                host.store_has(&RefPath::assert_from(old))
+                    .unwrap()
+                    .is_none(),
+                "legacy path {} should be empty after V58",
+                std::str::from_utf8(old).unwrap()
+            );
+        }
+        // New paths have the values.
+        for (i, new) in new_paths.iter().enumerate() {
+            assert_eq!(
+                host.store_read_all(&RefPath::assert_from(new)).unwrap(),
+                vec![i as u8; 4],
+                "new path {} should hold the migrated value",
+                std::str::from_utf8(new).unwrap()
+            );
+        }
+        // Block-index reorganized.
+        let new_index = RefPath::assert_from(b"/evm/world_state/blocks/indexes/0");
+        assert_eq!(
+            host.store_read_all(&new_index).unwrap(),
+            b"block_hash_0",
+            "new index path should hold the migrated value"
+        );
+        assert!(
+            host.store_has(&old_index).unwrap().is_none(),
+            "legacy index path {} should be empty after V58",
+            "/evm/world_state/indexes/blocks/0"
+        );
+        // The empty /evm/world_state/indexes parent is removed.
+        assert!(host
+            .store_has(&RefPath::assert_from(b"/evm/world_state/indexes"))
+            .unwrap()
+            .is_none());
+        // The pre-existing blocks/current subtree is untouched — indexes landed as a
+        // sibling, not a replacement.
+        assert_eq!(
+            host.store_read_all(&current_number).unwrap(),
+            b"\x00\x00\x00\x01",
+            "blocks/current/number must survive the indexes move"
+        );
+        assert!(
+            host.store_has(&RefPath::assert_from(b"/evm/world_state/blocks/current"))
+                .unwrap()
+                .is_some(),
+            "blocks/current subtree must still exist after migration"
+        );
+        assert!(
+            host.store_has(&RefPath::assert_from(b"/evm/world_state/blocks/indexes"))
+                .unwrap()
+                .is_some(),
+            "blocks/indexes subtree must exist after migration"
+        );
+    }
+
+    /// Phase 6 (V58) migration is idempotent on a host with no legacy paths.
+    #[test]
+    fn v58_migration_is_safe_when_paths_are_absent() {
+        let mut host = MockKernelHost::default();
+        let status = migrate_to(&mut host, StorageVersion::V58).unwrap();
+        assert!(matches!(status, MigrationStatus::Done));
     }
 }

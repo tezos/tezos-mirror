@@ -31,7 +31,7 @@ mod path {
         RefPath::assert_from(b"/blocks/current/number");
     const EVM_CURRENT_BLOCK_HASH_PATH: RefPath =
         RefPath::assert_from(b"/blocks/current/hash");
-    const INDEXES_PATH: RefPath = RefPath::assert_from(b"/indexes/blocks");
+    const INDEXES_PATH: RefPath = RefPath::assert_from(b"/blocks/indexes");
 
     pub fn current_number(root: &impl Path) -> Result<OwnedPath, PathError> {
         concat(root, &EVM_CURRENT_BLOCK_NUMBER_PATH)

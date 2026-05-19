@@ -57,6 +57,11 @@
 
 ### Storage versions
 
+- `chain_id`, `evm_version`, `maximum_gas_per_transaction`,
+  `sequencer_governance`, `sequencer_pool_address` subtree move from `/evm/` to `/evm/world_state/`;
+  the block-number index moves from `/evm/world_state/indexes/blocks/` to
+  `/evm/world_state/blocks/indexes/` (storage version 58). (!21911)
+
 - `/evm/michelson_runtime/sunrise_level` and
   `/evm/michelson_runtime/target_sunrise_level` move under
   `/tez/world_state/michelson_runtime/` (storage version 57). (!21851)

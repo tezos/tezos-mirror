@@ -4766,7 +4766,10 @@ let gen_kernel_migration_test ~from ~to_ ?eth_bootstrap_accounts ?chain_id
       ~sequencer:evm_setup.evm_node
       ()
   in
-  (* Verify migration v41 delete blocks *)
+  (* Verify migration v41 delete blocks. Phase 6 (V58) reorganizes the
+     EVM block-index path from [/evm/world_state/indexes/blocks/{N}] to
+     [/evm/world_state/blocks/indexes/{N}], so the [indexes] sibling of
+     [current] is expected here. *)
   let* blocks =
     Sc_rollup_node.RPC.call
       evm_setup.sc_rollup_node
@@ -4777,9 +4780,11 @@ let gen_kernel_migration_test ~from ~to_ ?eth_bootstrap_accounts ?chain_id
          ~key:"/evm/world_state/blocks"
          ()
   in
-  let expected_blocks = ["current"] in
+  let expected_blocks = ["current"; "indexes"] in
   Check.((blocks = expected_blocks) (list string))
-    ~error_msg:"Expected blocks to be deleted after migration v41, got %R" ;
+    ~error_msg:
+      "Expected only [current; indexes] under /evm/world_state/blocks after \
+       migration v41 (and V58 index reorg), got %L" ;
   scenario_after ~evm_setup ~sanity_check
 
 let test_mainnet_latest_kernel_migration =
@@ -5427,9 +5432,137 @@ let test_kernel_root_hash_after_upgrade =
     ~error_msg:"Found incorrect kernel root hash (expected %L, got %R)" ;
   unit
 
+let test_v58_migration_evm_config_world_state =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "migration"; "upgrade"; "mainnet"; "v58"; "world_state"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.mainnet_kernel;
+        Constant.WASM.evm_kernel;
+      ])
+    ~title:
+      "Ensures V58 migration moves EVM config scalars under /evm/world_state/ \
+       and reorganizes the block index (mainnet -> latest)"
+  @@ fun protocol ->
+  (* scenario_prior: verify the pre-V58 layout on the Mainnet kernel and
+     capture values from legacy paths so we can check byte-preservation
+     after the upgrade. *)
+  let scenario_prior ~evm_setup =
+    (* Produce a block so the Mainnet kernel has had a chance to write its
+       default values (evm_version, maximum_gas_per_transaction, …). *)
+    let* _ = evm_setup.produce_block () in
+    let read path =
+      let*@ v = Rpc.state_value evm_setup.evm_node path in
+      return v
+    in
+    let* pre_chain_id = read "/evm/chain_id" in
+    let* pre_evm_version = read "/evm/evm_version" in
+    let* pre_max_gas = read "/evm/maximum_gas_per_transaction" in
+    (* chain_id is always written by the installer — it must be present. *)
+    Check.(
+      (pre_chain_id <> None)
+        (option string)
+        ~error_msg:"Pre-upgrade /evm/chain_id must be present before V58") ;
+    (* Before V58 the block-number index lives under
+       /evm/world_state/indexes/blocks/{N}. *)
+    let*@ pre_indexes =
+      Rpc.state_subkeys evm_setup.evm_node "/evm/world_state/indexes"
+    in
+    Check.(
+      (pre_indexes = Some ["blocks"])
+        (option (list string))
+        ~error_msg:
+          "Pre-upgrade /evm/world_state/indexes must have exactly [blocks] \
+           before V58, got %L") ;
+    return (pre_chain_id, pre_evm_version, pre_max_gas)
+  in
+  (* scenario_after: verify that V58 moved each config scalar and
+     reorganized the block index. *)
+  let scenario_after ~evm_setup
+      ~sanity_check:(pre_chain_id, pre_evm_version, pre_max_gas) =
+    let read path =
+      let*@ v = Rpc.state_value evm_setup.evm_node path in
+      return v
+    in
+    (* For each moved scalar: assert the legacy path is gone and, if a
+       value was present before migration, that it survived byte-for-byte. *)
+    let check_moved key pre =
+      let* legacy = read (sf "/evm/%s" key) in
+      Check.(
+        (legacy = None)
+          (option string)
+          ~error_msg:
+            (sf "Post-upgrade /evm/%s must be absent after V58, got %%L" key)) ;
+      match pre with
+      | None ->
+          (* Path was absent before migration; migration was a no-op for it. *)
+          unit
+      | Some _ ->
+          let* new_v = read (sf "/evm/world_state/%s" key) in
+          Check.(
+            (new_v = pre)
+              (option string)
+              ~error_msg:
+                (sf
+                   "Post-upgrade /evm/world_state/%s must carry the \
+                    pre-upgrade value after V58, got %%L"
+                   key)) ;
+          unit
+    in
+    let* () = check_moved "chain_id" pre_chain_id in
+    let* () = check_moved "evm_version" pre_evm_version in
+    let* () = check_moved "maximum_gas_per_transaction" pre_max_gas in
+    (* V58 moves /evm/world_state/indexes/blocks/{N} to
+       /evm/world_state/blocks/indexes/{N}, then deletes the now-empty
+       /evm/world_state/indexes subtree. *)
+    let*@ post_indexes =
+      Rpc.state_subkeys evm_setup.evm_node "/evm/world_state/indexes"
+    in
+    Check.(
+      (Option.value ~default:[] post_indexes = [])
+        (list string)
+        ~error_msg:
+          "Post-upgrade /evm/world_state/indexes must have no subkeys after \
+           V58, got %L") ;
+    (* /evm/world_state/blocks now exposes both [current] (current-block
+       pointer) and [indexes] (the relocated block-number index). *)
+    let*@ post_blocks =
+      Rpc.state_subkeys evm_setup.evm_node "/evm/world_state/blocks"
+    in
+    Check.(
+      (List.sort String.compare (Option.value ~default:[] post_blocks)
+      = ["current"; "indexes"])
+        (list string)
+        ~error_msg:
+          "Post-upgrade /evm/world_state/blocks must have [current; indexes] \
+           after V58, got %L") ;
+    (* Produce a block and resolve it by number to exercise the new
+       /evm/world_state/blocks/indexes/{N} index path end-to-end. *)
+    let*@ _ = evm_setup.produce_block () in
+    let*@ block = Rpc.get_block_by_number ~block:"latest" evm_setup.evm_node in
+    Check.(
+      (block.number > 0l)
+        int32
+        ~error_msg:
+          "eth_getBlockByNumber must return a positive block number after V58 \
+           index reorg, got %L") ;
+    unit
+  in
+  gen_kernel_migration_test
+    ~from:Mainnet
+    ~to_:Latest
+    ~scenario_prior
+    ~scenario_after
+    protocol
+
 let register_evm_migration ~protocols =
   test_latest_kernel_migration protocols ;
   test_mainnet_latest_kernel_migration protocols ;
+  test_v58_migration_evm_config_world_state protocols ;
   test_v50_migration_without_sequencer_key protocols ;
   test_latest_fa_bridge_non_regression_migration protocols ;
   test_deposit_before_and_after_migration protocols
@@ -7520,10 +7653,27 @@ let test_rpc_state_value_and_subkeys =
   let*@! world_state_subkeys = Rpc.state_subkeys evm_node "/evm/world_state" in
 
   let expected_subkeys =
-    let keys = ["indexes"; "blocks"; "fees"; "eth_accounts"; "eth_codes"] in
     match kernel with
-    | Latest | Previewnet -> keys @ ["sequencer"]
-    | Mainnet | Tezlink_shadownet -> keys
+    | Latest ->
+        (* Phase 6 (V58) moved EVM config slots [chain_id], [evm_version],
+           [maximum_gas_per_transaction] under [/evm/world_state/], and
+           reorganized the block index from [/evm/world_state/indexes/blocks/]
+           to [/evm/world_state/blocks/indexes/], so [indexes] is no longer a
+           direct child of [/evm/world_state/]. *)
+        [
+          "blocks";
+          "chain_id";
+          "eth_accounts";
+          "eth_codes";
+          "evm_version";
+          "fees";
+          "maximum_gas_per_transaction";
+          "sequencer";
+        ]
+    | Previewnet ->
+        ["indexes"; "blocks"; "fees"; "eth_accounts"; "eth_codes"; "sequencer"]
+    | Mainnet | Tezlink_shadownet ->
+        ["indexes"; "blocks"; "fees"; "eth_accounts"; "eth_codes"]
   in
   Check.(
     (List.sort String.compare world_state_subkeys

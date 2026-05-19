@@ -68,7 +68,7 @@ let supports_revm = function
    the single source of truth when picking storage-version-gated paths in
    tezt. *)
 let storage_version = function
-  | Latest -> 57
+  | Latest -> 58
   | Previewnet -> 56
   | Mainnet -> 45
   | Tezlink_shadownet -> 44

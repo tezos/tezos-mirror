@@ -94,6 +94,7 @@ pub enum StorageVersion {
     V55,
     V56,
     V57,
+    V58,
 }
 
 impl From<StorageVersion> for u64 {
@@ -108,7 +109,7 @@ impl StorageVersion {
     }
 }
 
-pub const STORAGE_VERSION: StorageVersion = StorageVersion::V57;
+pub const STORAGE_VERSION: StorageVersion = StorageVersion::V58;
 
 pub const PRIVATE_FLAG_PATH: RefPath = RefPath::assert_from(b"/base/remove_whitelist");
 
@@ -120,7 +121,7 @@ const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/base/kernel_version
 
 pub const ADMIN: RefPath = RefPath::assert_from(b"/base/admin");
 pub const SEQUENCER_GOVERNANCE: RefPath =
-    RefPath::assert_from(b"/evm/sequencer_governance");
+    RefPath::assert_from(b"/evm/world_state/sequencer_governance");
 pub const KERNEL_GOVERNANCE: RefPath = RefPath::assert_from(b"/base/kernel_governance");
 pub const KERNEL_SECURITY_GOVERNANCE: RefPath =
     RefPath::assert_from(b"/base/kernel_security_governance");
@@ -130,7 +131,7 @@ pub const MAXIMUM_ALLOWED_TICKS: RefPath =
     RefPath::assert_from(b"/base/maximum_allowed_ticks");
 
 pub const MAXIMUM_GAS_PER_TRANSACTION: RefPath =
-    RefPath::assert_from(b"/evm/maximum_gas_per_transaction");
+    RefPath::assert_from(b"/evm/world_state/maximum_gas_per_transaction");
 
 // Path to the block in progress, used between reboots
 const EVM_BLOCK_IN_PROGRESS: RefPath =
@@ -144,7 +145,7 @@ pub const EVM_TRANSACTIONS_RECEIPTS: RefPath =
 pub const EVM_TRANSACTIONS_OBJECTS: RefPath =
     RefPath::assert_from(b"/evm/world_state/transactions_objects");
 
-const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/evm/chain_id");
+const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/evm/world_state/chain_id");
 
 const MICHELSON_RUNTIME_CHAIN_ID: RefPath =
     RefPath::assert_from(b"/tez/world_state/chain_id");
@@ -190,7 +191,7 @@ const BACKLOG_TIMESTAMP_PATH: RefPath =
 /// This may be updated by the governance mechanism over time. If it is not set, the data-availability
 /// fees are instead burned.
 pub const SEQUENCER_POOL_PATH: RefPath =
-    RefPath::assert_from(b"/evm/sequencer_pool_address");
+    RefPath::assert_from(b"/evm/world_state/sequencer_pool_address");
 
 /// Path to the last L1 level seen.
 const EVM_L1_LEVEL: RefPath = RefPath::assert_from(b"/base/l1_level");

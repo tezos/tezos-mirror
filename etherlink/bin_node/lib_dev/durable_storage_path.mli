@@ -46,7 +46,7 @@ end
 
 val evm_node_flag : storage_version:int -> path
 
-val chain_id : path
+val chain_id : storage_version:int -> path
 
 val michelson_runtime_chain_id : path
 
@@ -74,7 +74,7 @@ val sequencer_upgrade : storage_version:int -> path
 
 val delayed_inbox : storage_version:int -> path
 
-val sequencer_pool_address : path
+val sequencer_pool_address : storage_version:int -> path
 
 val sequencer_key_legacy : path
 
@@ -82,7 +82,7 @@ val sequencer_key_world_state : path
 
 val sequencer_key : storage_version:int -> path
 
-val maximum_gas_per_transaction : path
+val maximum_gas_per_transaction : storage_version:int -> path
 
 val michelson_runtime_sunrise_level : storage_version:int -> path
 
@@ -209,8 +209,14 @@ end
 
 (** Can't be used if storage version >= 41 *)
 module Indexes : sig
-  (** Make the path to the indexed block hash. *)
-  val block_by_number : root:path -> Block.number -> path
+  (** Make the path to the indexed block hash.
+
+      Phase 6 (V58) reorganized the EVM block-index path from
+      [<root>/indexes/blocks/{N}] to [<root>/blocks/indexes/{N}].
+      Only the EVM world-state root is affected; for the Michelson
+      block root [/tez/world_state/tez_blocks] we keep the legacy
+      layout. *)
+  val block_by_number : storage_version:int -> root:path -> Block.number -> path
 end
 
 (** Can't be used if storage version >= 41 *)

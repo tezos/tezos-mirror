@@ -12,7 +12,7 @@ use crate::error::EvmDbError;
 pub const BLOCKS_STORED: u64 = 256;
 
 fn to_block_hash_path(block_number: u64) -> Result<OwnedPath, EvmDbError> {
-    let path: Vec<u8> = format!("/evm/world_state/indexes/blocks/{block_number}").into();
+    let path: Vec<u8> = format!("/evm/world_state/blocks/indexes/{block_number}").into();
     Ok(OwnedPath::try_from(path)?)
 }
 
