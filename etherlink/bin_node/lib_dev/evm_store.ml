@@ -1130,19 +1130,29 @@ let make_register
 
 let init (type f) ?max_conn_reuse_count ?sqlite_compression
     ~(chain_family : f L2_types.chain_family) ~data_dir ~perm () =
-  let open Lwt_result_syntax in
   let path = data_dir // sqlite_file_name in
   let read_only = match perm with Read_only _ -> true | Read_write -> false in
   let migration = make_migration ~read_only ~chain_family in
   let register = make_register sqlite_compression in
-  let open_store () =
-    Sqlite.init ?max_conn_reuse_count ~register ~path ~perm migration
-  in
+  Sqlite.init ?max_conn_reuse_count ~register ~path ~perm migration
+
+let compress_store (type f) ~sqlite_compression
+    ~(chain_family : f L2_types.chain_family) ~data_dir () =
+  let open Lwt_result_syntax in
+  let path = data_dir // sqlite_file_name in
+  let migration = make_migration ~read_only:false ~chain_family in
+  let register = make_register (Some sqlite_compression) in
+  let open_store () = Sqlite.init ~register ~path ~perm:Read_write migration in
   let* store = open_store () in
-  match (sqlite_compression, perm) with
-  | Some cfg, Read_write ->
-      Sqlite_compression_migration.run_if_needed ~store ~path ~open_store cfg
-  | _ -> return store
+  let* store =
+    Sqlite_compression_migration.run_if_needed
+      ~store
+      ~path
+      ~open_store
+      sqlite_compression
+  in
+  let*! () = Sqlite.close store in
+  return_unit
 
 module Context_hashes = struct
   let store store number hash =

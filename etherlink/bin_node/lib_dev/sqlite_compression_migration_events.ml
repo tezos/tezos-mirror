@@ -104,7 +104,8 @@ let vacuum_failed =
     ~name:"sqlite_compression_migration_vacuum_failed"
     ~msg:
       "VACUUM INTO failed after row compression: {error}. Migration state is \
-       preserved and will be retried on the next startup."
+       preserved and will be retried on the next invocation of 'compress \
+       store'."
     ~level:Error
     ("error", Data_encoding.string)
 

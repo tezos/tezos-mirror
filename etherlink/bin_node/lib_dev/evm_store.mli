@@ -25,6 +25,17 @@ val init :
   unit ->
   t tzresult Lwt.t
 
+(** [compress_store ~sqlite_compression ~chain_family ~data_dir ()]
+    opens the store located under [data_dir] in read-write mode, runs
+    the zstd compression migration on legacy uncompressed rows, then
+    closes the store. The node must not be running. *)
+val compress_store :
+  sqlite_compression:Configuration.sqlite_compression_config ->
+  chain_family:_ L2_types.chain_family ->
+  data_dir:string ->
+  unit ->
+  unit tzresult Lwt.t
+
 (** name of the sqlite file *)
 val sqlite_file_name : string
 
