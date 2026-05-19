@@ -67,7 +67,7 @@ Docker Images
 - The release Docker images (``tezos/tezos``, ``tezos/tezos-bare``,
   ``tezos/tezos-debug``) now ship the ``octez-teztale-snitch``,
   ``octez-teztale-archiver`` and ``octez-teztale-server`` binaries, which were
-  previously only present in the ``master`` images. (MR :gl:`!MRNUM`)
+  previously only present in the ``master`` images. (MR :gl:`!21917`)
 
 Packaging
 ---------
