@@ -302,6 +302,11 @@ fn interpret_one<'a>(
     use Instruction as I;
     use TypedValue as V;
 
+    // Two macros: `pop_rc!` keeps the `Rc<TypedValue>`, `pop!` calls
+    // `unwrap_rc` on it. Prefer `pop_rc!` for read-only / forwarding
+    // access (no risk of deep-cloning a shared collection); use `pop!`
+    // only when the value is consumed by value.
+    //
     // helper to reduce boilerplate. Usage:
     // `pop!()` force-pops the top elements from the stack (panics if nothing to
     // pop), returning it
@@ -1282,8 +1287,8 @@ fn interpret_one<'a>(
             stack.push(V::new_option(None));
         }
         I::Compare => {
-            let l = pop!();
-            let r = pop!();
+            let l = pop_rc!();
+            let r = pop_rc!();
             ctx.gas().consume(interpret_cost::compare(&l, &r)?)?;
             let cmp = l.partial_cmp(&r).expect("comparison failed") as i8;
             stack.push(V::Int(cmp.into()));
@@ -1323,12 +1328,13 @@ fn interpret_one<'a>(
                 stack.push(V::Bytes(bs1))
             }
             overloads::Concat::ListOfStrings => {
-                let list = pop!(V::List);
+                let list_rc = pop_rc!();
+                let list = irrefutable_match!(&*list_rc; V::List);
                 ctx.gas()
                     .consume(interpret_cost::concat_list_precheck(list.len())?)?;
 
                 let mut total_len = Checked::zero();
-                for val in &list {
+                for val in list {
                     let s = match val.as_ref() {
                         V::String(s) => s,
                         _ => unreachable_state(),
@@ -1349,12 +1355,13 @@ fn interpret_one<'a>(
                 stack.push(V::String(result))
             }
             overloads::Concat::ListOfBytes => {
-                let list = pop!(V::List);
+                let list_rc = pop_rc!();
+                let list = irrefutable_match!(&*list_rc; V::List);
                 ctx.gas()
                     .consume(interpret_cost::concat_list_precheck(list.len())?)?;
 
                 let mut total_len = Checked::zero();
-                for val in &list {
+                for val in list {
                     let bs = match val.as_ref() {
                         V::Bytes(bs) => bs,
                         _ => unreachable_state(),
@@ -1365,7 +1372,7 @@ fn interpret_one<'a>(
                     .consume(interpret_cost::concat_bytes_list(total_len)?)?;
 
                 let mut result = Vec::with_capacity(total_len.ok_or(OutOfGas)?);
-                for val in &list {
+                for val in list {
                     let bs = match val.as_ref() {
                         V::Bytes(bs) => bs,
                         _ => unreachable_state(),
@@ -1391,47 +1398,52 @@ fn interpret_one<'a>(
         }
         I::Mem(overload) => match overload {
             overloads::Mem::Set => {
-                let key = pop!();
-                let set = pop!(V::Set);
+                let key_rc = pop_rc!();
+                let set_rc = pop_rc!();
+                let set = irrefutable_match!(&*set_rc; V::Set);
                 ctx.gas()
-                    .consume(interpret_cost::set_mem(&key, set.len())?)?;
-                let result = set.contains(&key);
+                    .consume(interpret_cost::set_mem(&key_rc, set.len())?)?;
+                let result = set.contains(&*key_rc);
                 stack.push(V::Bool(result));
             }
             overloads::Mem::Map => {
-                let key = pop!();
-                let map = pop!(V::Map);
+                let key_rc = pop_rc!();
+                let map_rc = pop_rc!();
+                let map = irrefutable_match!(&*map_rc; V::Map);
                 ctx.gas()
-                    .consume(interpret_cost::map_mem(&key, map.len())?)?;
-                let result = map.contains_key(&key);
+                    .consume(interpret_cost::map_mem(&key_rc, map.len())?)?;
+                let result = map.contains_key(&*key_rc);
                 stack.push(V::Bool(result));
             }
             overloads::Mem::BigMap => {
-                let key = pop!();
-                let map = pop!(V::BigMap);
+                let key_rc = pop_rc!();
+                let map_rc = pop_rc!();
+                let map = irrefutable_match!(&*map_rc; V::BigMap);
                 let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
-                ctx.gas().consume(interpret_cost::map_mem(&key, len)?)?;
-                let result = map.mem(&key, *ctx.lazy_storage())?;
+                ctx.gas().consume(interpret_cost::map_mem(&key_rc, len)?)?;
+                let result = map.mem(&key_rc, *ctx.lazy_storage())?;
                 stack.push(V::Bool(result));
             }
         },
         I::Get(overload) => match overload {
             overloads::Get::Map => {
-                let key = pop!();
-                let map = pop!(V::Map);
+                let key_rc = pop_rc!();
+                let map_rc = pop_rc!();
+                let map = irrefutable_match!(&*map_rc; V::Map);
                 ctx.gas()
-                    .consume(interpret_cost::map_get(&key, map.len())?)?;
-                let result = map.get(&key);
+                    .consume(interpret_cost::map_get(&key_rc, map.len())?)?;
+                let result = map.get(&*key_rc);
                 stack.push(V::new_option_rc(result.cloned()));
             }
             overloads::Get::BigMap => {
-                let key = pop!();
-                let map = pop!(V::BigMap);
+                let key_rc = pop_rc!();
+                let map_rc = pop_rc!();
+                let map = irrefutable_match!(&*map_rc; V::BigMap);
                 let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
-                ctx.gas().consume(interpret_cost::map_get(&key, len)?)?;
-                let result = map.get(arena, &key, *ctx.lazy_storage())?;
+                ctx.gas().consume(interpret_cost::map_get(&key_rc, len)?)?;
+                let result = map.get(arena, &key_rc, *ctx.lazy_storage())?;
                 stack.push(V::new_option(result));
             }
         },
@@ -1443,26 +1455,26 @@ fn interpret_one<'a>(
         }
         I::Update(overload) => match overload {
             overloads::Update::Set => {
-                let key = pop!();
+                let key_rc = pop_rc!();
                 let new_present = pop!(V::Bool);
                 let set = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Set);
                 ctx.gas()
-                    .consume(interpret_cost::set_update(&key, set.len())?)?;
+                    .consume(interpret_cost::set_update(&key_rc, set.len())?)?;
                 if new_present {
-                    set.insert(Rc::new(key))
+                    set.insert(key_rc)
                 } else {
-                    set.remove(&key)
+                    set.remove(&*key_rc)
                 };
             }
             overloads::Update::Map => {
-                let key = pop!();
+                let key_rc = pop_rc!();
                 let opt_new_val = pop!(V::Option);
                 let map = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Map);
                 ctx.gas()
-                    .consume(interpret_cost::map_update(&key, map.len())?)?;
+                    .consume(interpret_cost::map_update(&key_rc, map.len())?)?;
                 match opt_new_val {
-                    None => map.remove(&key),
-                    Some(val) => map.insert(Rc::new(key), val),
+                    None => map.remove(&*key_rc),
+                    Some(val) => map.insert(key_rc, val),
                 };
             }
             overloads::Update::BigMap => {
@@ -1477,17 +1489,16 @@ fn interpret_one<'a>(
         },
         I::GetAndUpdate(overload) => match overload {
             overloads::GetAndUpdate::Map => {
-                let key = pop!();
+                let key_rc = pop_rc!();
                 let opt_new_val = pop!(V::Option);
                 let map = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Map);
                 ctx.gas()
-                    .consume(interpret_cost::map_get_and_update(&key, map.len())?)?;
+                    .consume(interpret_cost::map_get_and_update(&key_rc, map.len())?)?;
                 let opt_old_val = match opt_new_val {
-                    None => map.remove(&key),
-                    Some(val) => map.insert(Rc::new(key), val),
+                    None => map.remove(&*key_rc),
+                    Some(val) => map.insert(key_rc, val),
                 };
-                let opt_old_val = opt_old_val.map(TypedValue::unwrap_rc);
-                stack.push(V::new_option(opt_old_val));
+                stack.push(V::new_option_rc(opt_old_val));
             }
             overloads::GetAndUpdate::BigMap => {
                 let key = pop!();
@@ -1882,7 +1893,8 @@ fn interpret_one<'a>(
         }
         #[cfg(feature = "bls")]
         I::PairingCheck => {
-            let list = pop!(V::List);
+            let list_rc = pop_rc!();
+            let list = irrefutable_match!(&*list_rc; V::List);
             ctx.gas()
                 .consume(interpret_cost::pairing_check(list.len())?)?;
             let it = list.iter().map(|elt| {
