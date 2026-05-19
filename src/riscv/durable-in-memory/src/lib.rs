@@ -31,7 +31,6 @@ use octez_riscv_api_common::bytes::BytesWrapper;
 use octez_riscv_api_common::move_semantics::MutableState;
 use octez_riscv_api_common::safe_pointer::SafePointer;
 use octez_riscv_data::hash::Hash;
-use octez_riscv_data::mode::Normal;
 use octez_riscv_data::mode::utils::NotFound;
 use octez_riscv_durable_storage::errors as ds_errors;
 use octez_riscv_durable_storage::storage::in_memory::InMemoryKeyValueStore;
@@ -52,7 +51,7 @@ impl GcNames for InMemoryGcNames {
 
 /// In-memory durable storage registry, exposed as an OCaml custom block.
 #[ocaml::sig]
-pub type Registry = MutableState<RegistryState<InMemoryKeyValueStore, InMemoryGcNames, Normal>>;
+pub type Registry = MutableState<RegistryState<InMemoryKeyValueStore, InMemoryGcNames>>;
 
 /// Stub registry for proof generation. See TZX-113.
 // TODO (TZX-113): implement registry prove

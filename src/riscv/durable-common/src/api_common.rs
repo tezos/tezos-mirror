@@ -13,7 +13,6 @@ use octez_riscv_api_common::safe_pointer::SafePointer;
 use octez_riscv_data::foldable::Foldable;
 use octez_riscv_data::hash::Hash;
 use octez_riscv_data::hash::HashFold;
-use octez_riscv_data::mode::Normal;
 use octez_riscv_durable_storage::errors as ds_errors;
 use octez_riscv_durable_storage::key::Key;
 use octez_riscv_durable_storage::registry as ds_registry;
@@ -27,7 +26,7 @@ use crate::registry::RegistryState;
 use crate::split_ds_errors;
 
 /// Type alias for a mutable registry state backed by a generic key-value store.
-pub type DsRegistry<KV, G> = MutableState<RegistryState<KV, G, Normal>>;
+pub type DsRegistry<KV, G> = MutableState<RegistryState<KV, G>>;
 
 /// Compute the hash of the registry state.
 #[inline(always)]
