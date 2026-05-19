@@ -242,12 +242,6 @@ impl Micheline<'_> {
     }
 }
 
-impl BinWriter for Micheline<'_> {
-    fn bin_write(&self, out: &mut Vec<u8>) -> BinResult {
-        encode_micheline(self, out)
-    }
-}
-
 #[cfg(test)]
 mod test_encoding {
     use super::*;
