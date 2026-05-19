@@ -33,6 +33,7 @@ use octez_riscv_api_common::bytes::BytesWrapper;
 use octez_riscv_api_common::move_semantics::MutableState;
 use octez_riscv_api_common::safe_pointer::SafePointer;
 use octez_riscv_data::hash::Hash;
+use octez_riscv_data::mode::Prove;
 use octez_riscv_data::mode::utils::NotFound;
 use octez_riscv_durable_storage::commit::CommitId;
 use octez_riscv_durable_storage::errors as ds_errors;
@@ -42,6 +43,7 @@ use octez_riscv_durable_storage::repo::DirectoryManager;
 use octez_riscv_durable_storage_common::BytesParam;
 use octez_riscv_durable_storage_common::KeyParam;
 use octez_riscv_durable_storage_common::api_common;
+use octez_riscv_durable_storage_common::registry::BackgroundRegistry;
 use octez_riscv_durable_storage_common::registry::GcNames;
 use octez_riscv_durable_storage_common::registry::RegistryState;
 
@@ -63,11 +65,17 @@ pub type Registry = MutableState<RegistryState<PersistenceLayer, OnDiskGcNames>>
 pub struct Repo(DirectoryManager);
 ocaml::custom!(Repo);
 
-/// Stub registry for proof generation. See TZX-113.
-// TODO (TZX-113): implement registry prove
+/// OCaml GC names for the on-disk registry state (prove).
+pub struct OnDiskProveGcNames;
+
+impl GcNames for OnDiskProveGcNames {
+    const IMMUTABLE_NAME: &'static str = "riscv.imm.registry_state.on_disk.prove";
+    const MUTABLE_NAME: &'static str = "riscv.mut.registry_state.on_disk.prove";
+}
+
+/// On-disk prove-mode durable storage registry.
 #[ocaml::sig]
-pub struct RegistryProve;
-ocaml::custom!(RegistryProve);
+pub type RegistryProve = BackgroundRegistry<PersistenceLayer, OnDiskProveGcNames, Prove<'static>>;
 
 /// Stub registry for proof verification. See TZX-114.
 // TODO (TZX-114 wire-up verify mode): implement registry verify
@@ -610,10 +618,9 @@ pub fn octez_riscv_durable_on_disk_verify_database_hash(
 #[ocaml::func]
 #[ocaml::sig("registry -> registry_prove")]
 pub fn octez_riscv_durable_on_disk_start_proof(
-    _state: SafePointer<Registry>,
-) -> SafePointer<RegistryProve> {
-    // TODO (TZX-113): wire-up proof mode
-    SafePointer::from(RegistryProve)
+    state: SafePointer<Registry>,
+) -> OcamlFallible<SafePointer<RegistryProve>> {
+    api_common::start_proof(&*state).map(SafePointer::from)
 }
 
 #[ocaml::func]
