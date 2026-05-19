@@ -73,7 +73,7 @@ pub trait TypecheckingCtx<'a> {
     fn gas(&mut self) -> &mut Gas;
 
     fn lookup_entrypoints(
-        &self,
+        &mut self,
         address: &AddressHash,
     ) -> Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>>;
 
@@ -98,7 +98,7 @@ impl<'a, 'b> TypecheckingCtx<'a> for PushableTypecheckingContext<'b> {
     }
 
     fn lookup_entrypoints(
-        &self,
+        &mut self,
         _address: &AddressHash,
     ) -> Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>> {
         None
@@ -357,7 +357,7 @@ impl<'a> TypecheckingCtx<'a> for Ctx<'a> {
     }
 
     fn lookup_entrypoints(
-        &self,
+        &mut self,
         address: &AddressHash,
     ) -> Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>> {
         self.lookup_entrypoints.get(address).cloned()

@@ -141,7 +141,7 @@ impl<'a, Host: StorageV1, C: Context> TypecheckingCtx<'a> for TcCtx<'a, Host, C>
     }
 
     fn lookup_entrypoints(
-        &self,
+        &mut self,
         address: &AddressHash,
     ) -> Option<std::collections::HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
         get_contract_entrypoint(self.host, self.context, address)
@@ -192,7 +192,7 @@ impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> Typechecki
     }
 
     fn lookup_entrypoints(
-        &self,
+        &mut self,
         address: &AddressHash,
     ) -> Option<std::collections::HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
         self.tc_ctx.lookup_entrypoints(address)
@@ -2408,7 +2408,7 @@ pub(crate) mod mock {
         }
 
         fn lookup_entrypoints(
-            &self,
+            &mut self,
             _address: &AddressHash,
         ) -> Option<HashMap<Entrypoint, Type>> {
             None
