@@ -37,7 +37,9 @@ fn check_error_expectation<'a>(
 /// paritaly-applied lambdas, as those are represented quite differently from Micheline internally.
 fn compare_typed_values(v1: TypedValue, v2: TypedValue) -> bool {
     let arena = typed_arena::Arena::new();
-    v1.into_micheline_optimized_legacy(&arena) == v2.into_micheline_optimized_legacy(&arena)
+    let mut gas = Gas::default();
+    v1.into_micheline_optimized_legacy(&arena, &mut gas)
+        == v2.into_micheline_optimized_legacy(&arena, &mut gas)
 }
 
 /// Compare two typed stacks by comparing types and values. Values are compared using

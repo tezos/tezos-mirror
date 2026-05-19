@@ -2438,9 +2438,18 @@ let test_event =
   let tag = event |-> "tag" |> as_string in
   assert (tag = "tag1") ;
   assert (event |-> "result" |-> "status" |> as_string = "applied") ;
-  assert (
+  (* Event gas cost is a bit larger than
+     Michelson_v1_gas.manager_operation_int because a few hundred
+     milligas are spent on allocating the event type in Micheline. We
+     don't want to track this too precisely in this test to avoid the
+     need to patch it when the gas model changes so we allow for up to
+     one gas unit over the constant cost of the manager operation. *)
+  let consumed_milligas =
     event |-> "result" |-> "consumed_milligas" |> as_int
-    = expected_event_gas_cost) ;
+  in
+  assert (
+    consumed_milligas >= expected_event_gas_cost
+    && consumed_milligas < expected_event_gas_cost + 1000) ;
 
   let event = events |=> 1 in
   assert_type ~annots:true event ;
@@ -2450,9 +2459,12 @@ let test_event =
   let tag = event |-> "tag" |> as_string in
   assert (tag = "tag2") ;
   assert (event |-> "result" |-> "status" |> as_string = "applied") ;
-  assert (
+  let consumed_milligas =
     event |-> "result" |-> "consumed_milligas" |> as_int
-    = expected_event_gas_cost) ;
+  in
+  assert (
+    consumed_milligas >= expected_event_gas_cost
+    && consumed_milligas < expected_event_gas_cost + 1000) ;
   unit
 
 let test_forge_operations =

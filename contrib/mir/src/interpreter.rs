@@ -223,10 +223,10 @@ impl<'a> ContractScript<'a> {
             for direction in annotation_path.iter().rev() {
                 match direction {
                     Direction::Left => {
-                        result = Micheline::prim1(arena, Prim::Left, result);
+                        result = Micheline::prim1(arena, Prim::Left, result, ctx.gas())?;
                     }
                     Direction::Right => {
-                        result = Micheline::prim1(arena, Prim::Right, result);
+                        result = Micheline::prim1(arena, Prim::Right, result, ctx.gas())?;
                     }
                 }
             }
@@ -1553,9 +1553,7 @@ fn interpret_one<'a>(
             let arena = Arena::new();
             // In the Tezos implementation they also charge gas for the pass
             // that strips locations. We don't have it.
-            let mich = v.into_micheline_optimized_legacy(&arena);
-            ctx.gas()
-                .consume(interpret_cost::micheline_encoding(&mich)?)?;
+            let mich = v.into_micheline_optimized_legacy(&arena, ctx.gas())?;
             let encoded = mich.encode_for_pack()?;
             stack.push(V::Bytes(encoded));
         }
@@ -1965,9 +1963,11 @@ fn interpret_one<'a>(
             };
 
             let storage_ty = view_storage_ty.parse_ty(ctx.gas())?;
+            let storage_ty_micheline =
+                storage_ty.into_micheline_optimized_legacy(arena, ctx.gas())?;
 
             let storage = Micheline::decode_raw(arena, &view_storage)?
-                .typecheck_value(ctx, &storage_ty.into_micheline_optimized_legacy(arena))?;
+                .typecheck_value(ctx, &storage_ty_micheline)?;
 
             let input_type = view.input_type.parse_ty(ctx.gas())?;
             let output_type = view.output_type.parse_ty(ctx.gas())?;

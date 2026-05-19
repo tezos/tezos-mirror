@@ -83,7 +83,7 @@ MichelineAtomic: Micheline<'a> = {
   number => Micheline::Int(<>),
   string => Micheline::String(<>),
   bytes => Micheline::Bytes(<>),
-  Prim => Micheline::prim0(<>),
+  Prim => Micheline::prim0_uncarbonated(<>),
   macro =>? expand_macro(arena, &<>, MacroArgs::NoArgs).map_err(Into::into),
 }
 

@@ -124,3 +124,22 @@ implementation, which copies the value, thus incurring O(n) cost for things like
 pairs and lists. Until we have a proper gas model for MIR and a benchmarking
 set-up, this is left as is -- in any case, gas model will need some adjustments
 later.
+
+##### Gas-bounded `IntoMicheline`
+
+`TypedValue` shares composite children via `Rc`, so a `(list (list (list
+unit)))` value with `1000^3` virtual entries can be built in `O(1000)` gas
+through `DUP`. Converting such a value to `Micheline` (e.g. for `PACK` or
+`FAILWITH`) loses sharing and walks the unshared expansion.
+
+`IntoMicheline::into_micheline_optimized_legacy` therefore takes `&mut Gas`
+and charges per-node gas eagerly during traversal, matching the formula in
+`interpret_cost::micheline_encoding` (100 mgas per node, plus `25 *
+zarith_byte_size` for `Int`, `10 * len` for `String`/`Bytes`, and `10 *
+str_byte` for annotations). This way, gas exhausts before allocation runs
+the WASM heap into its 4 GiB ceiling. `PACK` no longer post-charges
+`micheline_encoding`; the eager per-node charges already account for it.
+
+This also allows to not charge any gas when Micheline trees are reused
+without being re-allocated; in particular for lambda bodies, and
+CREATE_CONTRACT scripts.

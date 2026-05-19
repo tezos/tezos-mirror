@@ -24,6 +24,7 @@ use crate::{
     transaction::Transaction,
 };
 use mir::ast::{Entrypoint, IntoMicheline, Type};
+use mir::gas::Gas;
 use mir::parser::Parser;
 use primitive_types::{H160, H256, U256};
 use rlp::{Rlp, RlpStream};
@@ -508,8 +509,9 @@ fn handle_query_entrypoints_to<Host, R>(
 /// enforced structurally.
 fn encode_entrypoints_result(
     entrypoints_opt: Option<HashMap<Entrypoint, Type>>,
-) -> Result<Vec<u8>, tezos_data_encoding::enc::BinError> {
+) -> anyhow::Result<Vec<u8>> {
     let parser = Parser::new();
+    let mut gas = Gas::default();
     // Pre-encode all entries up front so encoding errors can be surfaced
     // to the caller (the RLP stream API does not let us return errors
     // from inside the encode closure).
@@ -521,11 +523,12 @@ fn encode_entrypoints_result(
                     let name_bytes = name.to_string().into_bytes();
                     // NB: into_micheline_optimized_legacy linearizes right-comb pairs,
                     // producing multi-arg pairs (equivalent to L1 normalize_types=true).
-                    let type_bytes =
-                        ty.into_micheline_optimized_legacy(&parser.arena).encode()?;
+                    let type_bytes = ty
+                        .into_micheline_optimized_legacy(&parser.arena, &mut gas)?
+                        .encode()?;
                     Ok((name_bytes, type_bytes))
                 })
-                .collect::<Result<Vec<_>, tezos_data_encoding::enc::BinError>>()
+                .collect::<anyhow::Result<Vec<_>>>()
         })
         .transpose()?;
     // Sort entries by name before encoding: see the "Determinism

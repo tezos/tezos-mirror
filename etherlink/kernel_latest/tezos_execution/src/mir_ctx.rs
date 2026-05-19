@@ -19,6 +19,7 @@ use mir::{
         AddressHash, IntoMicheline, Micheline, PublicKeyHash, Type, TypedValue,
     },
     context::{CtxTrait, TypecheckingCtx},
+    gas::Gas,
 };
 use num_bigint::BigUint;
 use tezos_crypto_rs::blake2b::digest_256;
@@ -265,7 +266,7 @@ impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> CtxTrait<'
     }
 
     fn lookup_view_storage_balance(
-        &self,
+        &mut self,
         contract: &ContractKt1Hash,
         view_name: &str,
         arena: &'a Arena<Micheline<'a>>,
@@ -745,10 +746,11 @@ fn storage_error_to_lazy(e: tezos_storage::error::Error) -> LazyStorageError {
 /// See [hash_micheline_expr] for details on the hashing format.
 fn hash_key(
     key: TypedValue<'_>,
-) -> Result<ScriptExprHash, tezos_data_encoding::enc::BinError> {
+    gas: &mut Gas,
+) -> Result<ScriptExprHash, LazyStorageError> {
     let parser = Parser::new();
-    let key_micheline = key.into_micheline_optimized_legacy(&parser.arena);
-    hash_micheline_expr(&key_micheline)
+    let key_micheline = key.into_micheline_optimized_legacy(&parser.arena, gas)?;
+    Ok(hash_micheline_expr(&key_micheline)?)
 }
 
 /// Function to convert a BtreeMap that represent the lazy_storage_diff
@@ -877,7 +879,8 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         id: &BigMapId,
         key: &TypedValue,
     ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
-        let value_path = value_path(self.context, id, &hash_key(key.clone())?)?;
+        let value_path =
+            value_path(self.context, id, &hash_key(key.clone(), self.gas())?)?;
         if self.host.store_has(&value_path)?.is_none() {
             return Ok(None);
         }
@@ -896,7 +899,7 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         id: &BigMapId,
         key: &TypedValue,
     ) -> Result<bool, LazyStorageError> {
-        let path = value_path(self.context, id, &hash_key(key.clone())?)?;
+        let path = value_path(self.context, id, &hash_key(key.clone(), self.gas())?)?;
         Ok(self.host.store_has(&path)?.is_some())
     }
 
@@ -907,7 +910,8 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         value: Option<TypedValue<'a>>,
     ) -> Result<(), LazyStorageError> {
         let parser = Parser::new();
-        let micheline_expr = key.into_micheline_optimized_legacy(&parser.arena);
+        let micheline_expr =
+            key.into_micheline_optimized_legacy(&parser.arena, self.gas())?;
         // key_encoded: raw Micheline encoding (no 0x05 prefix), used in big_map_diff receipts
         let key_encoded = micheline_expr.encode()?;
         // key_hashed: hash of packed encoding (with 0x05 prefix), used for storage path
@@ -927,7 +931,9 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
             }
             Some(v) => {
                 let arena = Arena::new();
-                let encoded = v.into_micheline_optimized_legacy(&arena).encode()?;
+                let encoded = v
+                    .into_micheline_optimized_legacy(&arena, self.gas())?
+                    .encode()?;
                 if self.host.store_has(&value_path)?.is_none() {
                     // We should write the key in the list only if it's an add in the big_map not an update
                     BigMapKeys::add_key(self.host, self.context, id, &key_hashed)?;
@@ -957,10 +963,11 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         let id = self.generate_id(temporary)?;
         let key_type_path = key_type_path(self.context, &id)?;
         let value_type_path = value_type_path(self.context, &id)?;
-        let key_type_encoded =
-            key_type.into_micheline_optimized_legacy(&arena).encode()?;
+        let key_type_encoded = key_type
+            .into_micheline_optimized_legacy(&arena, self.gas())?
+            .encode()?;
         let value_type_encoded = value_type
-            .into_micheline_optimized_legacy(&arena)
+            .into_micheline_optimized_legacy(&arena, self.gas())?
             .encode()?;
         self.host
             .store_write_all(&value_type_path, &value_type_encoded)?;
@@ -1277,7 +1284,7 @@ pub mod tests {
 
         // Ensure that the big_map has been removed
         let removed_keys = BigMapKeys {
-            keys: vec![hash_key(key).unwrap()],
+            keys: vec![hash_key(key, storage.gas()).unwrap()],
         };
         assert_big_map_removed(&storage, &map_id, &removed_keys);
 
@@ -1336,10 +1343,13 @@ pub mod tests {
     // except such an order.
     #[test]
     fn test_convert_big_map_diff_order() {
-        let key_type = mir::ast::Micheline::prim0(mir::lexer::Prim::nat)
+        let mut gas = Gas::default();
+        let key_type = mir::ast::Micheline::prim0(mir::lexer::Prim::nat, &mut gas)
+            .unwrap()
             .encode()
             .unwrap();
-        let value_type = mir::ast::Micheline::prim0(mir::lexer::Prim::unit)
+        let value_type = mir::ast::Micheline::prim0(mir::lexer::Prim::unit, &mut gas)
+            .unwrap()
             .encode()
             .unwrap();
         let alloc_0 = StorageDiff::Alloc(Alloc {
@@ -1487,7 +1497,7 @@ pub mod tests {
         let mut journal =
             tezosx_journal::TezosXJournal::new(tezosx_journal::CracId::new(1, 0));
         let registry = StubRegistry;
-        let ctx = Ctx {
+        let mut ctx = Ctx {
             tc_ctx: &mut tc_ctx,
             exec_ctx,
             operation_ctx: &mut operation_ctx,
@@ -1734,7 +1744,7 @@ pub(crate) mod mock {
         }
 
         fn lookup_view_storage_balance(
-            &self,
+            &mut self,
             _contract: &ContractKt1Hash,
             _name: &str,
             _arena: &'a Arena<Micheline<'a>>,

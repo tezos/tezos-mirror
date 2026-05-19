@@ -19,6 +19,7 @@ use tezos_smart_rollup_host::{path::PathError, runtime::RuntimeError};
 use typed_arena::Arena;
 
 use super::{Micheline, Type, TypedValue};
+use crate::gas::OutOfGas;
 use crate::serializer::DecodeError;
 use crate::typechecker::TcError;
 
@@ -258,6 +259,9 @@ pub enum LazyStorageError {
     /// The requested big_map id was not found in the lazy storage.
     #[error("big map with ID {0} not found in the lazy storage")]
     BigMapNotFound(BigMapId),
+    /// Gas exhaustion while serializing a key.
+    #[error("{0}")]
+    OutOfGasError(#[from] OutOfGas),
 }
 
 impl From<tezos_data_encoding::enc::BinError> for LazyStorageError {

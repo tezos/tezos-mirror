@@ -4,6 +4,7 @@
 
 use http::StatusCode;
 use mir::ast::big_map::BigMapId;
+use mir::gas::OutOfGas;
 use primitive_types::U256;
 use std::collections::BTreeMap;
 use tezos_crypto_rs::{
@@ -721,7 +722,7 @@ where
             // — see `enshrined_contracts.rs:56-`. They never appear here as
             // CracError::Operation, so this match doesn't enumerate them.
             let rt_err = match &error {
-                CracError::Operation(TransferError::OutOfGas) => {
+                CracError::Operation(TransferError::OutOfGas(OutOfGas)) => {
                     TezosXRuntimeError::OutOfGas
                 }
                 CracError::Operation(e) => TezosXRuntimeError::BadRequest(e.to_string()),

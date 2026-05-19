@@ -11,7 +11,7 @@ use crate::ast::michelson_address::AddressHash;
 use crate::ast::Entrypoints;
 use crate::ast::{Micheline, View};
 use crate::ast::{Type, TypedValue};
-use crate::gas::Gas;
+use crate::gas::{Gas, OutOfGas};
 use crate::typechecker::MichelineView;
 use num_bigint::{BigInt, BigUint};
 use std::collections::HashMap;
@@ -57,6 +57,9 @@ pub enum LookupViewError {
     /// The contract's balance does not fit in `i64`.
     #[error("contract balance overflows i64")]
     BalanceOverflow,
+    /// Gas exhaustion.
+    #[error("{0}")]
+    OutOfGas(#[from] OutOfGas),
 }
 
 impl From<tezos_data_encoding::enc::BinError> for LookupViewError {
@@ -158,7 +161,7 @@ pub trait CtxTrait<'a>: TypecheckingCtx<'a> {
     /// into [`Ok(None)`], as that would silently impersonate a
     /// missing view.
     fn lookup_view_storage_balance(
-        &self,
+        &mut self,
         contract: &ContractKt1Hash,
         name: &str,
         arena: &'a Arena<Micheline<'a>>,
@@ -435,7 +438,7 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
     }
 
     fn lookup_view_storage_balance(
-        &self,
+        &mut self,
         contract: &ContractKt1Hash,
         view_name: &str,
         arena: &'a Arena<Micheline<'a>>,
@@ -448,17 +451,19 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
         let view = MichelineView {
             input_type: contract_view
                 .input_type
-                .into_micheline_optimized_legacy(arena),
+                .into_micheline_optimized_legacy(arena, &mut self.gas)?,
             output_type: contract_view
                 .output_type
-                .into_micheline_optimized_legacy(arena),
+                .into_micheline_optimized_legacy(arena, &mut self.gas)?,
             code: contract_view.code.clone(),
         };
         let Some((storage_ty, storage)) = self.storage.get(&addr) else {
             return Ok(None);
         };
-        let mich_storage_ty = storage_ty.into_micheline_optimized_legacy(arena);
-        let mich_storage = storage.clone().into_micheline_optimized_legacy(arena);
+        let mich_storage_ty = storage_ty.into_micheline_optimized_legacy(arena, &mut self.gas)?;
+        let mich_storage = storage
+            .clone()
+            .into_micheline_optimized_legacy(arena, &mut self.gas)?;
         let view_balance = self.balances.get(contract).cloned().unwrap_or(0);
         let encoded = mich_storage.encode()?;
         Ok(Some((view, mich_storage_ty, encoded, view_balance)))
