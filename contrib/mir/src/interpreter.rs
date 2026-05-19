@@ -7530,17 +7530,13 @@ mod interpreter_tests {
     // -- Conversion impls for the formerly-panicking error paths --
 
     #[test]
-    fn stack_oob_converts_to_internal_tc_error_via_tc_error() {
+    fn stack_oob_converts_to_stack_oob_via_tc_error() {
         // StackOob does not convert to InterpretError directly. The
         // idiomatic path is StackOob → TcError → InterpretError; callers
-        // do this with `.map_err(TcError::from)?`.
+        // do this with `.map_err(TcError::from)?`. It stays a structured
+        // variant the whole way (no stringly flattening).
         let err: InterpretError = TcError::from(StackOob).into();
-        assert_eq!(
-            err,
-            InterpretError::TcError(TcError::InternalError(
-                "stack index out of bounds".to_owned()
-            ))
-        );
+        assert_eq!(err, InterpretError::TcError(TcError::StackOob(StackOob)));
     }
 
     #[test]

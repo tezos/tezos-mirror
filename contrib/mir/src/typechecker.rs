@@ -187,9 +187,12 @@ pub enum TcError {
     /// See https://octez.tezos.com/docs/active/views.html
     #[error("{0} is forbidden in view context")]
     ForbiddenInView(Prim),
-    /// Internal invariant violation. This should be unreachable for valid Micheline.
-    #[error("internal typechecker error: {0}")]
-    InternalError(String),
+    /// A stack access went out of bounds. Unreachable for valid Micheline
+    /// (the typechecker fixes the stack shape before access); kept as a
+    /// structured variant so the error is resolved at the right depth
+    /// rather than flattened into a stringly error.
+    #[error(transparent)]
+    StackOob(#[from] StackOob),
 }
 
 impl From<TryFromBigIntError<()>> for TcError {
@@ -201,12 +204,6 @@ impl From<TryFromBigIntError<()>> for TcError {
 impl From<ByteReprError> for TcError {
     fn from(value: ByteReprError) -> Self {
         Self::ByteReprError(Type::Bytes, value)
-    }
-}
-
-impl From<StackOob> for TcError {
-    fn from(_: StackOob) -> Self {
-        TcError::InternalError("stack index out of bounds".to_owned())
     }
 }
 
@@ -9220,12 +9217,9 @@ mod typecheck_tests {
     // -- Conversion impls for the formerly-panicking error paths --
 
     #[test]
-    fn stack_oob_converts_to_internal_error() {
+    fn stack_oob_converts_to_stack_oob_variant() {
         let err: TcError = StackOob.into();
-        assert_eq!(
-            err,
-            TcError::InternalError("stack index out of bounds".to_owned())
-        );
+        assert_eq!(err, TcError::StackOob(StackOob));
     }
 
     #[test]
