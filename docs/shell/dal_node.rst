@@ -153,6 +153,19 @@ The amount of storage space a DAL node needs depends on how long it keeps the da
 
 You can set how long the node stores data with the ``--history-mode`` option.
 
+The ``--history-mode`` option accepts three forms:
+
+- ``full`` — never delete shards;
+- ``auto`` — use the profile's default retention period (about 3 months for operators, a small multiple of the attestation lag for attesters and observers);
+- a positive integer ``N`` — keep shards for ``N`` past levels.
+
+When an explicit ``N`` is given, the DAL node checks at startup that ``N`` is large enough for the active profile. The minimum is:
+
+- the attestation lag, for profiles that do not support refutation games (attesters and plain observers);
+- the profile's full retention period (as returned by ``auto``), for profiles that support refutation games (operators, and observers configured with refutation support).
+
+If ``N`` is below this minimum, the node refuses to start with a ``dal.node.not_enough_history`` error indicating both the configured value and the required minimum. The forms ``auto`` and ``full`` always satisfy this check.
+
 L1 monitoring
 ^^^^^^^^^^^^^
 
