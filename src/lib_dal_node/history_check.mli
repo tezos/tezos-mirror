@@ -34,13 +34,16 @@ val check_history_mode :
   Types.proto_parameters ->
   unit tzresult Lwt.t
 
-(** [check_l1_history_mode profile_ctxt cctxt proto_parameters ~head_level
-    ~first_seen_level] verifies that the L1 node retains enough past levels for
-    the DAL node to function correctly, based on the storage period determined
-    from the profile. It computes the minimal number of L1 cycles needed and
-    compares it to what the L1 node provides. Raises [Not_enough_l1_history] if
-    insufficient. *)
+(** [check_l1_history_mode ?ignore_l1_check profile_ctxt cctxt proto_parameters
+    ~head_level ~first_seen_level] verifies that the L1 node retains enough past
+    levels for the DAL node to function correctly, based on the storage period
+    determined from the profile. It computes the minimal number of L1 cycles
+    needed and compares it to what the L1 node provides. Raises
+    [Not_enough_l1_history] if insufficient, unless [ignore_l1_check] is set
+    (defaults to [false]), in which case the function emits a warning event
+    and proceeds. *)
 val check_l1_history_mode :
+  ?ignore_l1_check:bool ->
   Profile_manager.t ->
   Rpc_context.t ->
   Types.proto_parameters ->
