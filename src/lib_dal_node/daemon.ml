@@ -709,6 +709,15 @@ let run ?(disable_shard_validation = false) ?(ignore_l1_history_check = false)
     | None -> Store.First_seen_level.save first_seen_level_store head_level
     | Some _ -> return_unit
   in
+  let* ignore_l1_history_check =
+    if
+      ignore_l1_history_check
+      && Chain_id.equal current_chain_id Constants.mainnet_chain_id
+    then
+      let*! () = Event.emit_ignore_l1_history_check_refused_on_mainnet () in
+      return_false
+    else return ignore_l1_history_check
+  in
   let* () =
     History_check.check_l1_history_mode
       ~ignore_l1_check:ignore_l1_history_check

@@ -1449,6 +1449,17 @@ open struct
       ~level:Warning
       ("stored_cycles", Data_encoding.int31)
       ("minimal_cycles", Data_encoding.int31)
+
+  let ignore_l1_history_check_refused_on_mainnet =
+    declare_0
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"ignore_l1_history_check_refused_on_mainnet"
+      ~msg:
+        "--ignore-l1-history-check was set but is not honored on mainnet; the \
+         L1 history check will be enforced as usual"
+      ~level:Warning
+      ()
 end
 
 (* DAL node event emission functions *)
@@ -1865,3 +1876,6 @@ let emit_closing_store_failed errs = emit closing_store_failed errs
 
 let emit_l1_history_check_bypassed ~stored_cycles ~minimal_cycles =
   emit l1_history_check_bypassed (stored_cycles, minimal_cycles)
+
+let emit_ignore_l1_history_check_refused_on_mainnet () =
+  emit ignore_l1_history_check_refused_on_mainnet ()

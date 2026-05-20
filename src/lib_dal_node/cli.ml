@@ -407,8 +407,9 @@ module Term = struct
          where the operator does not control the L1 node and cannot recompile \
          the DAL node (for instance when running official Docker images). \
          Bypassing this check may result in the DAL node behaving incorrectly \
-         if it needs to fetch data from levels the L1 node has already pruned; \
-         on a mainnet this may translate into missed attestations and lost \
+         if it needs to fetch data from levels the L1 node has already pruned. \
+         This flag is not honored on mainnet: on mainnet, the L1 history check \
+         is always enforced as an error to avoid missed attestations and lost \
          rewards."
       "ignore-l1-history-check"
 
