@@ -182,6 +182,15 @@ When an explicit ``N`` is given, the DAL node checks at startup that ``N`` is la
 
 If ``N`` is below this minimum, the node refuses to start with a ``dal.node.not_enough_history`` error indicating both the configured value and the required minimum. The forms ``auto`` and ``full`` always satisfy this check.
 
+L1 history requirement
+~~~~~~~~~~~~~~~~~~~~~~
+
+In addition to checking its own ``--history-mode`` setting, the DAL node also checks at startup that the L1 node it connects to keeps enough block data in the past. The DAL node needs to fetch the protocol parameters and, for refutation-supporting profiles, the skip-list cells for every level it covers; if the L1 node has already pruned those levels, the DAL node cannot operate correctly.
+
+The minimum required L1 history is computed from the DAL node's retention period (in levels) and the protocol's ``blocks_per_cycle``, rounded up to a whole number of cycles. For refutation-supporting profiles, an extra ``attestation_lag + 1`` levels are added. If the L1 node runs in ``archive`` mode, the check trivially passes; otherwise the DAL node compares the result against the number of cycles the L1 node retains (its ``--history-mode`` ``additional_cycles`` plus the protocol's ``blocks_preservation_cycles``).
+
+If the L1 node retains fewer cycles than required, the DAL node refuses to start with a ``dal.node.not_enough_l1_history`` error, which also suggests the ``--history-mode rolling:N`` setting to put on the **L1** side. See :doc:`L1 history modes <../user/history_modes>` for details on configuring the L1 node.
+
 L1 monitoring
 ^^^^^^^^^^^^^
 
