@@ -433,6 +433,10 @@ impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> CtxTrait<'
                 crate::enshrined_contracts::EnshrinedContracts::TezosXGateway,
                 "staticcall_evm",
             ) => self.dispatch_staticcall_evm_view(input, return_type),
+            (
+                crate::enshrined_contracts::EnshrinedContracts::TezosXGateway,
+                "originOf",
+            ) => self.dispatch_origin_of_view(input, return_type),
             _ => unreachable!(
                 "synthetic view {name:?} on {contract:?} is enumerated in \
                  enshrined_synthetic_views but has no dispatch arm in \
@@ -480,6 +484,64 @@ pub fn enshrined_synthetic_views(
 impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry>
     Ctx<'_, 'a, Host, C, R>
 {
+    /// Body of the `originOf` arm of
+    /// [`try_dispatch_enshrined_view`](CtxTrait::try_dispatch_enshrined_view).
+    ///
+    /// Input shape: `pair string nat` — `(addr_str, source_runtime_nat)`.
+    /// Return type: `or unit (or nat (pair nat string))`.
+    ///
+    /// Gas: only `Registry::read_origin`'s `consumed` is charged (alias
+    /// lookup + optional EVM code-presence back-stop) via
+    /// `classify_origin_for_view`. No flat per-call constant —
+    /// see [`crate::enshrined_contracts::charge_gateway_base_cost`].
+    ///
+    /// On an invalid `source_runtime` nat, returns
+    /// `Err(InterpretError::FailedWith(...))` with the Michelson payload
+    /// `(Pair "INVALID_RUNTIME_ID" received_nat)` — standard Michelson
+    /// FAILWITH semantics, causing the operation to revert with that value.
+    fn dispatch_origin_of_view(
+        &mut self,
+        input: &TypedValue<'a>,
+        return_type: &Type,
+    ) -> Option<Result<Option<TypedValue<'a>>, mir::interpreter::InterpretError<'a>>>
+    {
+        // Return-type guard: `or unit (or nat (pair nat string))`.
+        if !matches!(
+            return_type,
+            Type::Or(rc) if matches!(
+                rc.as_ref(),
+                (Type::Unit, Type::Or(inner))
+                    if matches!(
+                        inner.as_ref(),
+                        (Type::Nat, Type::Pair(inner2))
+                            if matches!(inner2.as_ref(), (Type::Nat, Type::String))
+                    )
+            )
+        ) {
+            return Some(Ok(None));
+        }
+        // Input shape: `pair string nat`.
+        let (addr_str, source_runtime_nat) = match input {
+            TypedValue::Pair(a, b) => match (a.as_ref(), b.as_ref()) {
+                (TypedValue::String(a), TypedValue::Nat(b)) => (a.as_str(), b),
+                _ => return Some(Ok(None)),
+            },
+            _ => return Some(Ok(None)),
+        };
+        // Distinct-field borrows.
+        let host: &Host = self.tc_ctx.host;
+        let operation_gas: &mut crate::gas::TezlinkOperationGas =
+            self.tc_ctx.operation_gas;
+        let result = crate::enshrined_contracts::dispatch_origin_of_get(
+            host,
+            operation_gas,
+            self.registry,
+            addr_str,
+            source_runtime_nat,
+        );
+        Some(result.map(Some))
+    }
+
     /// Body of the `staticcall_evm` arm of
     /// [`try_dispatch_enshrined_view`](CtxTrait::try_dispatch_enshrined_view).
     /// Type-checks `return_type == bytes`, destructures the

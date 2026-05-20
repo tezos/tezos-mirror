@@ -200,6 +200,22 @@
 - Reject `STATICCALL` on the runtime gateway precompile's
   state-mutating selectors. (!21905)
 
+- Add a `originOf` synthetic read-only view on the TezosXGateway
+  enshrined contract, callable via the Michelson `VIEW` opcode:
+  `originOf :: (pair string nat) -> (or unit (or nat (pair nat string)))`
+  — Given `(address, source_runtime)`, returns `Left Unit` for an
+  unknown address, `Right (Left nat)` with the source runtime id for a
+  native address, or `Right (Right (Pair nat string))` with the alias's
+  home runtime and native address string for an aliased address. For
+  EVM sources with no `/origin` record, a code-presence back-stop is
+  applied: non-empty bytecode (`code_hash != KECCAK_EMPTY`) is treated
+  as `Native`. Invalid runtime ids FAILWITH
+  `(Pair "INVALID_RUNTIME_ID" received_nat)`. The view is read-only and
+  `STATICCALL`-compatible: no journal writes, no log emission. Gas
+  model: `ALIAS_LOOKUP_MILLIGAS = 210 000` (origin read) plus the
+  milligas equivalent of `CODE_BACKSTOP_COST` (conditional, charged
+  only when the EVM code-presence back-stop path executes).
+
 ### Storage versions
 
 - `/evm/michelson_runtime/sunrise_level` and
