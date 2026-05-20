@@ -2767,12 +2767,18 @@ module Handlers = struct
         let ctxt = Worker.state self in
         State.Transaction.run ctxt @@ fun ctxt conn ->
         ctxt.session.finalized_number <- end_l2_level ;
-        State.store_finalized_levels
-          ctxt
-          conn
-          ~l1_level
-          ~start_l2_level
-          ~end_l2_level
+        let* () =
+          State.store_finalized_levels
+            ctxt
+            conn
+            ~l1_level
+            ~start_l2_level
+            ~end_l2_level
+        in
+        let*! () =
+          Evm_context_events.observer_applied_finalized_levels end_l2_level
+        in
+        return_unit
     | Next_block_info {timestamp; number} ->
         let ctxt = Worker.state self in
         State.Transaction.run ctxt @@ fun ctxt conn ->
