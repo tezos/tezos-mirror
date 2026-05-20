@@ -1119,8 +1119,8 @@ fn interpret_one<'a>(
         }
         I::Bytes(overload) => match overload {
             overloads::Bytes::Nat => {
-                let i = pop!(V::Nat);
-                ctx.gas().consume(interpret_cost::bytes_nat(&i)?)?;
+                pop_ref!(i, Nat);
+                ctx.gas().consume(interpret_cost::bytes_nat(i)?)?;
                 stack.push(V::Bytes(if i.is_zero() {
                     Vec::new() // empty
                 } else {
@@ -1128,8 +1128,8 @@ fn interpret_one<'a>(
                 }));
             }
             overloads::Bytes::Int => {
-                let i = pop!(V::Int);
-                ctx.gas().consume(interpret_cost::bytes_int(&i)?)?;
+                pop_ref!(i, Int);
+                ctx.gas().consume(interpret_cost::bytes_int(i)?)?;
                 stack.push(V::Bytes(if i.is_zero() {
                     Vec::new() // empty
                 } else {
