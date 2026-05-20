@@ -8,15 +8,17 @@
 use bytes::Bytes;
 use octez_riscv_api_common::OcamlFallible;
 use octez_riscv_api_common::bytes::BytesWrapper;
+use octez_riscv_data::components::vector::VectorMode;
 use octez_riscv_data::foldable::Foldable;
 use octez_riscv_data::hash::Hash;
 use octez_riscv_data::hash::HashFold;
 use octez_riscv_data::mode::Mode;
-use octez_riscv_data::mode::Normal;
+use octez_riscv_durable_storage::database::DatabaseMode;
 use octez_riscv_durable_storage::errors as ds_errors;
 use octez_riscv_durable_storage::errors::OperationalError;
 use octez_riscv_durable_storage::registry as ds_registry;
 use octez_riscv_durable_storage::registry::Registry;
+use octez_riscv_durable_storage::registry::RegistryMode;
 use octez_riscv_durable_storage::storage::KeyValueStore;
 use trait_set::trait_set;
 
@@ -73,12 +75,12 @@ macro_rules! key_from {
 
 /// Compute the hash of the registry state.
 #[inline(always)]
-pub fn registry_hash<KV>(
-    state: &impl RegistryApply<KV, Normal>,
-) -> OcamlFallible<BytesWrapper<Hash>>
+pub fn registry_hash<KV, M>(state: &impl RegistryApply<KV, M>) -> OcamlFallible<BytesWrapper<Hash>>
 where
     KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
+    M: Mode,
+    ds_registry::Registry<KV, M>: Foldable<HashFold>,
 {
     let hash = state.apply_ro(move |registry| registry.fold(HashFold))?;
 
@@ -87,10 +89,11 @@ where
 
 /// Return the number of databases in the registry.
 #[inline(always)]
-pub fn registry_size<KV>(state: &impl RegistryApply<KV, Normal>) -> OcamlFallible<u64>
+pub fn registry_size<KV, M>(state: &impl RegistryApply<KV, M>) -> OcamlFallible<u64>
 where
     KV: BackgroundKeyValueStore,
     KV::Repo: Send + Sync,
+    M: VectorMode + 'static,
 {
     let size: usize = state.apply_ro(ds_registry::Registry::len)?;
 
@@ -99,14 +102,15 @@ where
 
 /// Resize the registry to the given number of databases.
 #[inline(always)]
-pub fn registry_resize<KV, Err>(
-    state: &impl RegistryApply<KV, Normal>,
+pub fn registry_resize<KV, Err, M>(
+    state: &impl RegistryApply<KV, M>,
     size: u64,
 ) -> SplitDsResult<(), Err>
 where
     KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     Err: From<ds_errors::InvalidArgumentError>,
+    M: RegistryMode + VectorMode,
 {
     let size = usize::try_from(size)?;
     let res = state.apply(move |registry| registry.resize_tick(size))?;
@@ -116,8 +120,8 @@ where
 
 /// Copy the database at `src_index` to `dst_index`.
 #[inline(always)]
-pub fn registry_copy<KV, Err>(
-    state: &impl RegistryApply<KV, Normal>,
+pub fn registry_copy<KV, Err, M>(
+    state: &impl RegistryApply<KV, M>,
     src_index: u64,
     dst_index: u64,
 ) -> SplitDsResult<(), Err>
@@ -125,6 +129,7 @@ where
     KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     Err: From<ds_errors::InvalidArgumentError>,
+    M: RegistryMode + VectorMode,
 {
     let src_index = usize::try_from(src_index)?;
     let dst_index = usize::try_from(dst_index)?;
@@ -136,8 +141,8 @@ where
 
 /// Move the database at `src_index` to `dst_index`.
 #[inline(always)]
-pub fn registry_move<KV, Err>(
-    state: &impl RegistryApply<KV, Normal>,
+pub fn registry_move<KV, Err, M>(
+    state: &impl RegistryApply<KV, M>,
     src_index: u64,
     dst_index: u64,
 ) -> SplitDsResult<(), Err>
@@ -145,6 +150,7 @@ where
     KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     Err: From<ds_errors::InvalidArgumentError>,
+    M: RegistryMode + VectorMode,
 {
     let src_index = usize::try_from(src_index)?;
     let dst_index = usize::try_from(dst_index)?;
@@ -156,14 +162,15 @@ where
 
 /// Clear all entries from the database at `db_index`.
 #[inline(always)]
-pub fn registry_clear<KV, Err>(
-    state: &impl RegistryApply<KV, Normal>,
+pub fn registry_clear<KV, Err, M>(
+    state: &impl RegistryApply<KV, M>,
     db_index: u64,
 ) -> SplitDsResult<(), Err>
 where
     KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     Err: From<ds_errors::InvalidArgumentError>,
+    M: RegistryMode + VectorMode,
 {
     let db_index = usize::try_from(db_index)?;
 
@@ -174,8 +181,8 @@ where
 
 /// Check whether `key` exists in the database at `db_index`.
 #[inline(always)]
-pub fn database_exists<KV, Err>(
-    state: &impl RegistryApply<KV, Normal>,
+pub fn database_exists<KV, Err, M>(
+    state: &impl RegistryApply<KV, M>,
     db_index: u64,
     key: KeyParam,
 ) -> SplitDsResult<bool, Err>
@@ -183,6 +190,7 @@ where
     KV: BackgroundKeyValueStore,
     KV::Repo: Send + Sync,
     Err: From<ds_errors::InvalidArgumentError>,
+    M: VectorMode + DatabaseMode,
 {
     let db_index = usize::try_from(db_index)?;
     let key = key_from!(key, Err);
@@ -198,8 +206,8 @@ where
 
 /// Set the value for `key` in the database at `db_index`.
 #[inline(always)]
-pub fn database_set<KV, Err>(
-    state: &impl RegistryApply<KV, Normal>,
+pub fn database_set<KV, Err, M>(
+    state: &impl RegistryApply<KV, M>,
     db_index: u64,
     key: KeyParam,
     value: BytesParam,
@@ -208,6 +216,7 @@ where
     KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     Err: From<ds_errors::InvalidArgumentError>,
+    M: VectorMode + DatabaseMode,
 {
     let db_index = usize::try_from(db_index)?;
     let key = key_from!(key, Err);
@@ -226,8 +235,8 @@ where
 ///
 /// Returns the new total length of the value.
 #[inline(always)]
-pub fn database_write<KV, Err>(
-    state: &impl RegistryApply<KV, Normal>,
+pub fn database_write<KV, Err, M>(
+    state: &impl RegistryApply<KV, M>,
     db_index: u64,
     key: KeyParam,
     offset: u64,
@@ -237,6 +246,7 @@ where
     KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     Err: From<ds_errors::InvalidArgumentError>,
+    M: VectorMode + DatabaseMode,
 {
     let db_index = usize::try_from(db_index)?;
     let offset = usize::try_from(offset)?;
@@ -255,8 +265,8 @@ where
 
 /// Read `len` bytes starting at `offset` from `key`'s value in the database at `db_index`.
 #[inline(always)]
-pub fn database_read<KV, Err>(
-    state: &impl RegistryApply<KV, Normal>,
+pub fn database_read<KV, Err, M>(
+    state: &impl RegistryApply<KV, M>,
     db_index: u64,
     key: KeyParam,
     offset: u64,
@@ -266,6 +276,7 @@ where
     KV: BackgroundKeyValueStore,
     KV::Repo: Send + Sync,
     Err: From<ds_errors::InvalidArgumentError>,
+    M: VectorMode + DatabaseMode,
 {
     let db_index = usize::try_from(db_index)?;
     let offset = usize::try_from(offset)?;
@@ -294,8 +305,8 @@ where
 
 /// Return the byte length of `key`'s value in the database at `db_index`.
 #[inline(always)]
-pub fn value_length<KV, Err>(
-    state: &impl RegistryApply<KV, Normal>,
+pub fn value_length<KV, Err, M>(
+    state: &impl RegistryApply<KV, M>,
     db_index: u64,
     key: KeyParam,
 ) -> SplitDsResult<u64, Err>
@@ -303,6 +314,7 @@ where
     KV: BackgroundKeyValueStore,
     KV::Repo: Send + Sync,
     Err: From<ds_errors::InvalidArgumentError>,
+    M: VectorMode + DatabaseMode,
 {
     let db_index = usize::try_from(db_index)?;
     let key = key_from!(key, Err);
@@ -319,8 +331,8 @@ where
 
 /// Delete `key` from the database at `db_index`.
 #[inline(always)]
-pub fn database_delete<KV, Err>(
-    state: &impl RegistryApply<KV, Normal>,
+pub fn database_delete<KV, Err, M>(
+    state: &impl RegistryApply<KV, M>,
     db_index: u64,
     key: KeyParam,
 ) -> SplitDsResult<(), Err>
@@ -328,6 +340,7 @@ where
     KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     Err: From<ds_errors::InvalidArgumentError>,
+    M: VectorMode + DatabaseMode,
 {
     let db_index = usize::try_from(db_index)?;
     let key = key_from!(key, Err);
@@ -343,14 +356,15 @@ where
 
 /// Compute the Merkle hash of the database at `db_index`.
 #[inline(always)]
-pub fn database_hash<KV, Err>(
-    state: &impl RegistryApply<KV, Normal>,
+pub fn database_hash<KV, Err, M>(
+    state: &impl RegistryApply<KV, M>,
     db_index: u64,
 ) -> SplitDsResult<BytesWrapper<Hash>, Err>
 where
     KV: BackgroundKeyValueStore,
     KV::Repo: Send + Sync,
     Err: From<ds_errors::InvalidArgumentError>,
+    M: VectorMode + DatabaseMode,
 {
     let db_index = usize::try_from(db_index)?;
 
