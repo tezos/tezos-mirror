@@ -130,3 +130,5 @@ let time_to_join_new_topics_in_levels ~minimal_block_delay =
    shards for about 10 minutes. 150 blocks is 10 minutes on Ghostnet, 20 minutes
    on Mainnet. *)
 let shard_retention_period_in_levels = 150
+
+let mainnet_chain_id = Chain_id.of_b58check_exn "NetXdQprcVkpaWU"
