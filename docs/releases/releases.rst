@@ -104,10 +104,6 @@ The packaged forms are updated from the source as follows:
      - Release images: at each release, including release candidates
      - Master images: at each merge commit (after each merge request is merged)
    - Available on `DockerHub <https://hub.docker.com/r/tezos/tezos>`_
--  :ref:`OPAM packages<install_opam_packages>`:
-
-   - Updated at each stable release
-   - Published on `the Tezos fork of the opam repository <https://github.com/tezos/opam-repository>`_
 -  :ref:`APT and DNF binary packages<installing_deb>`:
 
    - Updated at each release and release candidate
