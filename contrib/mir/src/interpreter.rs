@@ -1658,16 +1658,14 @@ fn interpret_one<'a>(
             let length = pop!(V::Nat);
             let result = match overload {
                 overloads::Slice::String => {
-                    let str = pop!(V::String);
-
+                    pop_ref!(str, String);
                     ctx.gas().consume(interpret_cost::slice(str.len())?)?;
                     validate_bounds(offset, length, str.len())
                         .and_then(|range| str.get(range))
                         .map(|str| V::String(str.to_string()))
                 }
                 overloads::Slice::Bytes => {
-                    let bytes = pop!(V::Bytes);
-
+                    pop_ref!(bytes, Bytes);
                     ctx.gas().consume(interpret_cost::slice(bytes.len())?)?;
                     validate_bounds(offset, length, bytes.len())
                         .and_then(|range| bytes.get(range))
