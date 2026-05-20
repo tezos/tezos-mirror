@@ -107,12 +107,6 @@ let michelson_ledger_root = "/tez/tez_accounts/tezosx"
 
 let tez_world_state_root = TEZ.World_state.root
 
-let tez_world_state_safe_root = "/tmp" ^ TEZ.World_state.root
-
-let evm_eth_accounts_root = EVM_ETH_ACCOUNTS.root
-
-let evm_eth_accounts_safe_root = "/tmp" ^ EVM_ETH_ACCOUNTS.root
-
 (** TezosX: Tezos blocks live in the Michelson world-state keyspace. *)
 let tezosx_tezos_blocks_root = TEZ.World_state.make "/tez_blocks"
 

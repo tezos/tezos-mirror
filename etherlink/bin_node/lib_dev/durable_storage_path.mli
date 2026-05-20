@@ -28,16 +28,6 @@ val michelson_ledger_root : path
 (** Root of the Michelson world-state keyspace ([/tez/world_state]). *)
 val tez_world_state_root : path
 
-(** Shadow root of the Michelson world-state keyspace
-    ([/tmp/tez/world_state]). *)
-val tez_world_state_safe_root : path
-
-(** Root of the EVM account state keyspace ([/evm/eth_accounts]). *)
-val evm_eth_accounts_root : path
-
-(** Shadow root of the EVM account state keyspace ([/tmp/evm/eth_accounts]). *)
-val evm_eth_accounts_safe_root : path
-
 (** TezosX: root for Tezos blocks stored under the Michelson world state
     ([/tez/world_state/tez_blocks]). *)
 val tezosx_tezos_blocks_root : path
