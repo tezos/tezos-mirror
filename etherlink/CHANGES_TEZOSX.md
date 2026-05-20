@@ -4,22 +4,34 @@
 
 ### EVM Runtime
 
+### Michelson Runtime
+
+- Aliases originated as part of a native atomic calls are now surfaced via
+  dedicated receipts. (!21904)
+
+### Native Atomic Composability
+
+### Storage versions
+
+- `chain_id`, `evm_version`, `maximum_gas_per_transaction`,
+  `sequencer_governance`, `sequencer_pool_address` subtree move from `/evm/` to `/evm/world_state/`;
+  the block-number index moves from `/evm/world_state/indexes/blocks/` to
+  `/evm/world_state/blocks/indexes/` (storage version 58). (!21911)
+
+### Internals
+
+## Version 0.5 (3038e37e7cfca6f6930dce8375fc97d3917e0518)
+
+### EVM Runtime
+
 - The EVM runtime's cross-runtime HTTP server now dispatches on the
-  request method: `POST` keeps the existing state-mutating entry
-  (`TransactionOrigin::CrossRuntime`), `GET` is routed to a read-only
-  entry (`TransactionOrigin::CrossRuntimeStatic`) that rejects
-  `X-Tezos-Amount != 0`, suppresses the sender balance credit and the
-  `CracReceived` log emission, and runs the EVM transaction with
-  `is_static = true` on the top-level frame. REVM enforces the
-  standard `STATICCALL` contract end-to-end: any state-mutating
-  opcode (`SSTORE`, `LOG*`, `CREATE*`, `SELFDESTRUCT`, value-bearing
-  `CALL`) halts the call with `StateChangeDuringStaticCall`, surfaced
-  as a catchable `400`. Unsupported methods return `405`. Pre-existing
-  journal state from outer frames in the same enclosing transaction
-  is preserved — the static frame's revert only unwinds writes
-  performed within the read-only call. This is the EVM-side
-  groundwork for letting any other runtime expose a read-only entry
-  into EVM. (!21849)
+  request method: `POST` keeps the existing state-mutating entry;
+  `GET` is routed to a read-only entry that rejects `X-Tezos-Amount != 0`,
+  suppresses the sender balance credit and the `CracReceived` log emission.
+  REVM enforces the standard `STATICCALL` contract end-to-end:
+  any state-mutating opcode (`SSTORE`, `LOG*`, `CREATE*`, `SELFDESTRUCT`,
+  value-bearing `CALL`) halts the call with `StateChangeDuringStaticCall`,
+  surfaced as a catchable `400`. (!21849)
 
 ### Michelson Runtime
 
@@ -40,29 +52,13 @@
   synchronously. The view's typed shape is
   `pair string bytes : option bytes` (`(destination, calldata)`
   argument, EVM response body wrapped in `Some` on success). (!21875)
-- Aliases originated as part of a native atomic calls are now surfaced via
-  dedicated receipts. (!21904)
 
 ### Native Atomic Composability
 
 - Reject `STATICCALL` on the runtime gateway precompile's
-  state-mutating selectors (`transfer`, `callMichelson`, and `call`
-  with a non-`GET` method). REVM commits a custom precompile's
-  journal writes unconditionally on `Ok` return — `inputs.is_static`
-  is passed in but never re-validated at frame exit — so the
-  precompile has to police the contract itself. The two read-only
-  entries (`callMichelsonView` and `call(GET)`) keep their existing
-  `STATICCALL`-compatibility intact: they thread alias resolution
-  through the read-only journal API, refuse value transfer, and emit
-  no log. Completes the DELEGATECALL/CALLCODE guard added earlier
-  on the same precompile. (!21905)
+  state-mutating selectors. (!21905)
 
 ### Storage versions
-
-- `chain_id`, `evm_version`, `maximum_gas_per_transaction`,
-  `sequencer_governance`, `sequencer_pool_address` subtree move from `/evm/` to `/evm/world_state/`;
-  the block-number index moves from `/evm/world_state/indexes/blocks/` to
-  `/evm/world_state/blocks/indexes/` (storage version 58). (!21911)
 
 - `/evm/michelson_runtime/sunrise_level` and
   `/evm/michelson_runtime/target_sunrise_level` move under
@@ -73,13 +69,7 @@
 - Generalize the captured transaction source (E_0 / `tx.origin`) on
   the EVM journal from a bare `Address` to a typed `OriginalSource`
   carrying the originating `RuntimeId`, the source's native address
-  string (lowercase hex for Ethereum, b58check PKH for Tezos), and
-  the cached EVM-side alias used by `tezosx_resolve_source_alias`.
-  Tezos-originated transactions reaching the EVM via `call_evm` now
-  retain their PKH instead of collapsing it onto the alias, which
-  CRAC receipt construction and indexer-facing identity tracking
-  rely on. No user-observable change: the resolved sender/source
-  aliases on outgoing CRACs are bit-for-bit identical to before. (!21899)
+  string (lowercase hex for Ethereum, b58check PKH for Tezos). (!21899)
 - MIR: harden the Michelson runtime — internal aborts now surface as
   structured errors. (!21866)
 
