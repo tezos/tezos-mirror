@@ -705,9 +705,7 @@ fn remove_big_map<Host: StorageV1, C: Context>(
     BigMapKeys::remove_keys_in_storage(host, context, id)?;
 
     let total_bytes_path = total_bytes_path(context, id)?;
-    if host.store_has(&total_bytes_path)?.is_some() {
-        host.store_delete(&total_bytes_path)?;
-    }
+    host.store_delete_value(&total_bytes_path)?;
 
     Ok(())
 }
