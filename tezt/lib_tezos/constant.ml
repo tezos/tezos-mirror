@@ -246,15 +246,6 @@ module WASM = struct
 
   let previewnet_commit = "d2a6743ebef523c88c986c21311307a4251e67e4"
 
-  let tezlink_shadownet_kernel =
-    Uses.make
-      ~tag:"tezlink_shadownet_kernel"
-      ~path:
-        "etherlink/kernel_latest/kernel/tests/resources/tezlink_shadownet_kernel.wasm"
-      ()
-
-  let tezlink_shadownet_commit = "f6eb212728d8b2e7fd4b8092890be25ddf6f74cb"
-
   let tx_kernel = Uses.make ~tag:"tx_kernel" ~path:"tx_kernel.wasm" ()
 
   let tx_kernel_dal =

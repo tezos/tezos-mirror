@@ -6,21 +6,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Mainnet | Tezlink_shadownet | Previewnet | Latest
+type t = Mainnet | Previewnet | Latest
 
 let etherlink_all = [Mainnet; Latest]
 
-let tezlink_all = [Tezlink_shadownet; Latest]
+let tezosx_all = [Previewnet; Latest]
 
 let to_uses = function
   | Mainnet -> Constant.WASM.mainnet_kernel
-  | Tezlink_shadownet -> Constant.WASM.tezlink_shadownet_kernel
   | Previewnet -> Constant.WASM.previewnet_kernel
   | Latest -> Constant.WASM.evm_kernel
 
 let to_tag = function
   | Mainnet -> "mainnet"
-  | Tezlink_shadownet -> "tezlink_shadownet"
   | Previewnet -> "previewnet"
   | Latest -> "latest"
 
@@ -31,7 +29,6 @@ let to_uses_and_tags kernel = (to_tag kernel, to_uses kernel)
 let commit_of = function
   | Latest -> None
   | Mainnet -> Some Constant.WASM.mainnet_commit
-  | Tezlink_shadownet -> Some Constant.WASM.tezlink_shadownet_commit
   | Previewnet -> Some Constant.WASM.previewnet_commit
 
 (* The previewnet kernel was built before V57 was introduced, so the
@@ -42,24 +39,17 @@ let commit_of = function
 let name_of = function
   | Latest -> None
   | Mainnet -> Some "farfadet-r2"
-  | Tezlink_shadownet -> Some "farfadet-r1"
   | Previewnet -> Some "farfadet-r2"
 
 let upgrade_to = function
   | Latest -> Latest
   | Mainnet -> Latest
-  | Tezlink_shadownet -> Latest
   | Previewnet -> Latest
 
 let supports_dal = function
   | Mainnet -> false
-  | Tezlink_shadownet -> true
   | Previewnet -> true
   | Latest -> true
-
-let supports_revm = function
-  | Latest | Previewnet | Mainnet -> true
-  | Tezlink_shadownet -> false
 
 (* Storage version baked into each kernel binary at build time, as read at
    each kernel's commit (see [commit_of]) from
@@ -67,11 +57,7 @@ let supports_revm = function
    value for a network when that network's kernel is rebaked; treat this as
    the single source of truth when picking storage-version-gated paths in
    tezt. *)
-let storage_version = function
-  | Latest -> 58
-  | Previewnet -> 56
-  | Mainnet -> 45
-  | Tezlink_shadownet -> 44
+let storage_version = function Latest -> 58 | Previewnet -> 56 | Mainnet -> 45
 
 let of_tag tag =
   let contain_exp ~exp =
@@ -82,7 +68,6 @@ let of_tag tag =
     with Not_found -> false
   in
   if contain_exp ~exp:"mainnet" then Mainnet
-  else if contain_exp ~exp:"tezlink_shadownet" then Tezlink_shadownet
   else if contain_exp ~exp:"previewnet" then Previewnet
   else Latest
 
@@ -94,6 +79,5 @@ let select_evm_version ?evm_version kernel =
   match (evm_version, kernel) with
   | _, Mainnet -> Evm_version.Prague
   | _, Previewnet -> Evm_version.Prague
-  | _, Tezlink_shadownet -> Evm_version.Osaka
   | None, Latest -> Evm_version.Osaka
   | Some v, Latest -> v

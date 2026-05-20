@@ -79,7 +79,7 @@ let register_tezosx_test ~title ~tags ?(kernels = [Kernel.Latest])
     kernels
 
 let register_tezosx_upgrade_test ~title ~tags ~genesis_timestamp
-    ?(kernels = Kernel.tezlink_all) ?(upgrade_to = Kernel.upgrade_to)
+    ?(kernels = Kernel.tezosx_all) ?(upgrade_to = Kernel.upgrade_to)
     ?(additional_uses = []) scenario protocols =
   List.iter
     (fun from ->
