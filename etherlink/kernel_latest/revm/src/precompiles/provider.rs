@@ -112,6 +112,11 @@ impl EtherlinkPrecompiles {
                 gas,
                 output: Bytes::copy_from_slice(reason.as_bytes()),
             },
+            Err(CustomPrecompileError::RevertWithData(data, gas)) => InterpreterResult {
+                result: InstructionResult::Revert,
+                gas,
+                output: Bytes::from(data),
+            },
             Err(CustomPrecompileError::OutOfGas) => InterpreterResult {
                 result: InstructionResult::OutOfGas,
                 gas: Gas::new_spent(inputs.gas_limit),

@@ -21,6 +21,9 @@ pub enum CustomPrecompileAbort {
 #[derive(Debug)]
 pub enum CustomPrecompileError {
     Revert(String, Gas),
+    /// Revert with an ABI-encoded payload (e.g. a Solidity custom error
+    /// from a sol! declaration).
+    RevertWithData(Vec<u8>, Gas),
     OutOfGas,
     Abort(CustomPrecompileAbort),
 }

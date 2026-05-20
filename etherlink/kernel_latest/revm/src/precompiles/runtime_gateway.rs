@@ -1,4 +1,4 @@
-use alloy_sol_types::{sol, SolInterface, SolValue};
+use alloy_sol_types::{sol, SolError, SolInterface, SolValue};
 use evm_types::{CustomPrecompileAbort, CustomPrecompileError};
 use http::header::HeaderMap;
 use revm::{
@@ -9,7 +9,7 @@ use revm::{
 };
 use tezosx_interfaces::headers::format_tez_from_wei;
 use tezosx_interfaces::{
-    gas, Classification, Registry, RuntimeId, ALIAS_LOOKUP_COST,
+    gas, AliasInfo, Classification, Registry, RuntimeId, ALIAS_LOOKUP_COST,
     ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_DEPTH,
     X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER,
     X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
@@ -21,7 +21,8 @@ use crate::{
     journal::{CrossRuntimeCall, Journal},
     precompiles::{
         constants::{
-            HEADER_VALIDATION_PER_HEADER, ORIGIN_OF_BASE_COST, RUNTIME_GATEWAY_BASE_COST,
+            DERIVE_ALIAS_STRING_COST, HEADER_VALIDATION_PER_HEADER, ORIGIN_OF_BASE_COST,
+            RESOLVE_ADDRESS_BASE_COST, RUNTIME_GATEWAY_BASE_COST,
             RUNTIME_GATEWAY_PER_WORD_COST, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
             VALUE_TRANSFER_SURCHARGE,
         },
@@ -57,6 +58,19 @@ sol! {
             uint8 method,
         ) external returns (bytes memory response);
 
+        /// Translate `addr` (canonical printable form in `sourceRuntime`) into
+        /// `targetRuntime`'s representation.
+        ///
+        /// classified == false: addr is malformed for sourceRuntime, OR no
+        ///                      /origin record exists under sourceRuntime.
+        /// classified == true:  res in {0=Recorded, 1=Derived}; translated is
+        ///                      the target's canonical form.
+        function resolveAddress(
+            string addr,
+            uint8 sourceRuntime,
+            uint8 targetRuntime,
+        ) external view returns (bool classified, uint8 res, string translated);
+
         /// Look up `addr`'s classification under `sourceRuntime`.
         ///
         /// kind:  0=Unknown, 1=Native, 2=Alias.
@@ -81,8 +95,12 @@ sol! {
     );
 }
 
-// Origin kind constants for originOf.kind
+// Resolution kind constants for resolveAddress.res
 // Encoded as u16 because alloy's SolValue is not implemented for u8.
+const RESOLUTION_RECORDED: u16 = 0;
+const RESOLUTION_DERIVED: u16 = 1;
+
+// Origin kind constants for originOf.kind
 const ORIGIN_KIND_UNKNOWN: u16 = 0;
 const ORIGIN_KIND_NATIVE: u16 = 1;
 const ORIGIN_KIND_ALIAS: u16 = 2;
@@ -261,6 +279,135 @@ fn dispatch_origin_of<Host: StorageV1, R: Registry>(
                 native_str,
             )
                 .abi_encode_params()
+        }
+    };
+    Ok(output)
+}
+
+/// Core logic for the `resolveAddress` selector, extracted for unit-testability.
+///
+/// Handles: runtime validation, same-source short-circuit (with addr validation),
+/// alias-lookup gas charging, `read_origin` (which includes the code-presence
+/// back-stop internally), derivation via `compute_alias`, destination check, and
+/// ABI-encoding.  Does **not** handle the non-payable check, DELEGATECALL/CALLCODE
+/// guard, or the initial `RESOLVE_ADDRESS_BASE_COST` charge.
+fn dispatch_resolve_address<Host: StorageV1, R: Registry>(
+    host: &Host,
+    registry: &R,
+    addr_str: String,
+    source_runtime: RuntimeId,
+    target_runtime: RuntimeId,
+    gas: &mut Gas,
+) -> Result<Vec<u8>, CustomPrecompileError> {
+    // Same-runtime short-circuit: no storage reads needed.
+    // Malformed `addr` must still return (false, 0, "") even
+    // when source == target.
+    if source_runtime == target_runtime {
+        let valid = registry
+            .address_from_string(&addr_str, source_runtime)
+            .is_ok();
+        if !valid {
+            return Ok((false, 0u16, String::new()).abi_encode_params());
+        }
+        return Ok((true, RESOLUTION_RECORDED, addr_str).abi_encode_params());
+    }
+
+    // Read the source /origin classification record.
+    // Convert outer EVM gas to source_runtime's native unit.
+    let budget = gas::convert(RuntimeId::Ethereum, source_runtime, gas.remaining())
+        .ok_or_else(|| {
+            CustomPrecompileError::Revert(
+                "resolveAddress: gas budget overflow".into(),
+                *gas,
+            )
+        })?;
+    let (source_classification, consumed_source) = registry
+        .read_origin(host, source_runtime, &addr_str, budget)
+        .map_err(|e| {
+            CustomPrecompileError::Revert(format!("resolveAddress: {e}"), *gas)
+        })?;
+    let consumed_evm = gas::convert(source_runtime, RuntimeId::Ethereum, consumed_source)
+        .unwrap_or(u64::MAX);
+    charge(gas, consumed_evm)?;
+
+    let output: Vec<u8> = match source_classification {
+        Classification::Unknown => {
+            // Unknown — cannot translate.
+            (false, 0u16, String::new()).abi_encode_params()
+        }
+        Classification::Alias(info) if info.runtime == target_runtime => {
+            // Direct recorded lookup — target address is in the Alias record.
+            let native_str = String::from_utf8(info.native_address).map_err(|e| {
+                CustomPrecompileError::Revert(
+                    format!("resolveAddress: alias native_address is not UTF-8: {e}"),
+                    *gas,
+                )
+            })?;
+            (true, RESOLUTION_RECORDED, native_str).abi_encode_params()
+        }
+        source_class => {
+            // Derivation path: either Native or Alias pointing to a third
+            // runtime (vacuous in two-runtime mode).
+            let basis: Vec<u8> = match &source_class {
+                Classification::Native if source_runtime == RuntimeId::Ethereum => {
+                    // Canonicalize EVM hex so alias derivation is
+                    // casing-insensitive; the journal performs the same
+                    // normalization on its native-source path.
+                    addr_str.to_lowercase().into_bytes()
+                }
+                Classification::Native => addr_str.as_bytes().to_vec(),
+                Classification::Alias(info) => info.native_address.clone(),
+                Classification::Unknown => unreachable!("Unknown handled above"),
+            };
+
+            // Derive the target alias.
+            charge(gas, DERIVE_ALIAS_STRING_COST)?;
+            let derived = registry
+                .compute_alias(AliasInfo {
+                    runtime: target_runtime,
+                    native_address: basis.clone(),
+                })
+                .map_err(|e| {
+                    CustomPrecompileError::Revert(
+                        format!("resolveAddress: derivation error: {e}"),
+                        *gas,
+                    )
+                })?;
+
+            // Destination check: is the inverse already materialized on
+            // the target side?
+            let dest_budget =
+                gas::convert(RuntimeId::Ethereum, target_runtime, gas.remaining())
+                    .ok_or_else(|| {
+                        CustomPrecompileError::Revert(
+                            "resolveAddress: destination gas budget overflow".into(),
+                            *gas,
+                        )
+                    })?;
+            let (inverse_class, consumed_dest) = registry
+                .read_origin(host, target_runtime, &derived, dest_budget)
+                .map_err(|e| {
+                    CustomPrecompileError::Revert(
+                        format!("resolveAddress: destination check error: {e}"),
+                        *gas,
+                    )
+                })?;
+            let consumed_dest_evm =
+                gas::convert(target_runtime, RuntimeId::Ethereum, consumed_dest)
+                    .unwrap_or(u64::MAX);
+            charge(gas, consumed_dest_evm)?;
+
+            let resolution = match inverse_class {
+                Classification::Alias(info_back)
+                    if info_back.runtime == source_runtime
+                        && info_back.native_address == basis =>
+                {
+                    RESOLUTION_RECORDED
+                }
+                _ => RESOLUTION_DERIVED,
+            };
+
+            (true, resolution, derived).abi_encode_params()
         }
     };
     Ok(output)
@@ -953,10 +1100,11 @@ where
 
             let source_runtime =
                 RuntimeId::try_from(call.sourceRuntime).map_err(|_| {
-                    CustomPrecompileError::Revert(
-                        format!("InvalidRuntimeId({})", call.sourceRuntime),
-                        gas,
-                    )
+                    let payload = RuntimeGateway::InvalidRuntimeId {
+                        received: call.sourceRuntime,
+                    }
+                    .abi_encode();
+                    CustomPrecompileError::RevertWithData(payload, gas)
                 })?;
 
             let output = dispatch_origin_of(
@@ -964,6 +1112,50 @@ where
                 context.db().registry,
                 call.addr,
                 source_runtime,
+                &mut gas,
+            )?;
+
+            return Ok(InterpreterResult {
+                result: InstructionResult::Return,
+                gas,
+                output: output.into(),
+            });
+        }
+        // View-only: no log, no balance touch, no journal write — safe under STATICCALL.
+        RuntimeGatewayCalls::resolveAddress(call) => {
+            charge(&mut gas, RESOLVE_ADDRESS_BASE_COST)?;
+
+            // View-only: non-payable.
+            if !inputs.value.get().is_zero() {
+                return Err(CustomPrecompileError::Revert(
+                    "resolveAddress: non-payable selector".into(),
+                    gas,
+                ));
+            }
+
+            let source_runtime =
+                RuntimeId::try_from(call.sourceRuntime).map_err(|_| {
+                    let payload = RuntimeGateway::InvalidRuntimeId {
+                        received: call.sourceRuntime,
+                    }
+                    .abi_encode();
+                    CustomPrecompileError::RevertWithData(payload, gas)
+                })?;
+            let target_runtime =
+                RuntimeId::try_from(call.targetRuntime).map_err(|_| {
+                    let payload = RuntimeGateway::InvalidRuntimeId {
+                        received: call.targetRuntime,
+                    }
+                    .abi_encode();
+                    CustomPrecompileError::RevertWithData(payload, gas)
+                })?;
+
+            let output = dispatch_resolve_address(
+                context.db().host,
+                context.db().registry,
+                call.addr,
+                source_runtime,
+                target_runtime,
                 &mut gas,
             )?;
 
@@ -991,106 +1183,17 @@ mod tests {
     use alloy_sol_types::SolCall;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_protocol::contract::Contract;
-    use tezosx_interfaces::{
-        AliasInfo, Classification, CrossRuntimeContext, Registry, RuntimeId,
-        TezosXRuntimeError,
-    };
-    use tezosx_journal::TezosXJournal;
+    use tezosx_interfaces::testing::StubRegistry;
+    use tezosx_interfaces::{AliasInfo, Classification, RuntimeId};
 
     use super::*;
 
-    // ── Minimal Registry stub ─────────────────────────────────────────────────
-    //
-    // These tests cover Classification-based dispatch (via read_origin) and the
-    // ABI encoding of the originOf selector.  They do NOT go through
-    // runtime_gateway_precompile because constructing a CTX: ContextTr<Db =
-    // EtherlinkVMDB<…>> in a unit test requires a full revm Context + Journal
-    // wiring that is not practical in this crate.  The dispatch helper
-    // (dispatch_origin_of) is called directly in the tests below, which
-    // exercises the full dispatch logic.
-    //
-    // The stub returns canned Classification values directly — the real
+    // These tests call the dispatch helpers (dispatch_origin_of /
+    // dispatch_resolve_address) directly. Going through
+    // runtime_gateway_precompile would require constructing a
+    // CTX: ContextTr<Db = EtherlinkVMDB<…>>, which needs a full revm
+    // Context + Journal wiring not practical in this crate. The real
     // code-presence back-stop is tested in tezosx-ethereum-runtime.
-
-    struct StubRegistry {
-        /// The classification to return for read_origin calls.
-        classification: Classification,
-        /// The alias string to return from compute_alias.
-        computed_alias: String,
-    }
-
-    impl StubRegistry {
-        fn with_classification(classification: Classification) -> Self {
-            Self {
-                classification,
-                computed_alias: String::new(),
-            }
-        }
-    }
-
-    impl Registry for StubRegistry {
-        fn ensure_alias<Host>(
-            &self,
-            _host: &mut Host,
-            _journal: &mut TezosXJournal,
-            _alias_info: AliasInfo,
-            _native_public_key: Option<&[u8]>,
-            _target_runtime: RuntimeId,
-            _context: CrossRuntimeContext,
-            _gas_remaining: u64,
-        ) -> Result<(String, u64), TezosXRuntimeError>
-        where
-            Host: tezos_smart_rollup_host::storage::StorageV1,
-        {
-            unimplemented!("not needed")
-        }
-
-        fn compute_alias(
-            &self,
-            _alias_info: AliasInfo,
-        ) -> Result<String, TezosXRuntimeError> {
-            Ok(self.computed_alias.clone())
-        }
-
-        fn address_from_string(
-            &self,
-            address_str: &str,
-            _runtime_id: RuntimeId,
-        ) -> Result<Vec<u8>, TezosXRuntimeError> {
-            if address_str.starts_with("not-") || address_str == "invalid" {
-                Err(TezosXRuntimeError::BadRequest(format!(
-                    "malformed address: {address_str}"
-                )))
-            } else {
-                Ok(address_str.as_bytes().to_vec())
-            }
-        }
-
-        fn read_origin<Host>(
-            &self,
-            _host: &Host,
-            _addr_runtime: RuntimeId,
-            _addr: &str,
-            _budget: u64,
-        ) -> Result<(Classification, u64), TezosXRuntimeError>
-        where
-            Host: tezos_smart_rollup_host::storage::StorageV1,
-        {
-            Ok((self.classification.clone(), 0))
-        }
-
-        fn serve<Host>(
-            &self,
-            _host: &mut Host,
-            _journal: &mut TezosXJournal,
-            _request: http::Request<Vec<u8>>,
-        ) -> http::Response<Vec<u8>>
-        where
-            Host: tezos_smart_rollup_host::storage::StorageV1,
-        {
-            unimplemented!("not needed")
-        }
-    }
 
     // ── originOf: Classification rows via dispatch_origin_of ─────────────────
     //
@@ -1136,9 +1239,219 @@ mod tests {
         assert_eq!(output[63], RuntimeId::Tezos as u8);
     }
 
-    // ── dispatch_origin_of logic rows ─────────────────────────────────────────
+    // ── ABI encoding: resolveAddress tuple shape ──────────────────────────────
 
-    const GAS_LIMIT: u64 = u64::MAX;
+    #[test]
+    fn resolve_address_abi_encoding_not_classified() {
+        let output: Vec<u8> = (false, 0u16, String::new()).abi_encode_params();
+        // (bool, uint16, string): bool at [31]=0
+        assert_eq!(output[31], 0); // false
+    }
+
+    #[test]
+    fn resolve_address_abi_encoding_recorded() {
+        let translated = "KT1_X".to_string();
+        let output: Vec<u8> = (true, RESOLUTION_RECORDED, translated).abi_encode_params();
+        assert_eq!(output[31], 1); // true
+        assert_eq!(output[63], RESOLUTION_RECORDED as u8);
+    }
+
+    #[test]
+    fn resolve_address_abi_encoding_derived() {
+        let translated = "KT1_derived".to_string();
+        let output: Vec<u8> = (true, RESOLUTION_DERIVED, translated).abi_encode_params();
+        assert_eq!(output[31], 1); // true
+        assert_eq!(output[63], RESOLUTION_DERIVED as u8);
+    }
+
+    // ── resolveAddress logic rows — via dispatch_resolve_address ─────────────
+    //
+    // All tests below call dispatch_resolve_address directly so that the full
+    // dispatch logic (including compute_alias) is exercised by the test suite.
+    // This approach catches bugs like passing source_runtime instead of
+    // target_runtime to compute_alias (the BLOCKER fixed in this MR).
+
+    // Use a realistic gas limit that can be safely converted to milligas
+    // (milligas = evm_gas * 100; u64::MAX * 100 overflows, so cap at
+    // a value safely below u64::MAX / 100).
+    const GAS_LIMIT: u64 = 100_000_000_000;
+
+    /// Same-runtime short-circuit: source == target, valid addr
+    /// → (true, Recorded, addr).
+    #[test]
+    fn resolve_address_same_runtime_short_circuit() {
+        let host = MockKernelHost::default();
+        let addr = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string();
+        let registry = StubRegistry::with_classification(Classification::Unknown);
+        let output = dispatch_resolve_address(
+            &host,
+            &registry,
+            addr.clone(),
+            RuntimeId::Ethereum,
+            RuntimeId::Ethereum,
+            &mut Gas::new(GAS_LIMIT),
+        )
+        .unwrap();
+        assert_eq!(output[31], 1); // classified = true
+        assert_eq!(output[63], RESOLUTION_RECORDED as u8);
+    }
+
+    /// Same-runtime short-circuit: source == target, malformed addr
+    /// → (false, 0, "").
+    #[test]
+    fn resolve_address_same_runtime_malformed_addr() {
+        let host = MockKernelHost::default();
+        let registry = StubRegistry::with_classification(Classification::Unknown);
+        let output = dispatch_resolve_address(
+            &host,
+            &registry,
+            "not-a-tz1".to_string(),
+            RuntimeId::Tezos,
+            RuntimeId::Tezos,
+            &mut Gas::new(GAS_LIMIT),
+        )
+        .unwrap();
+        assert_eq!(output[31], 0); // classified = false
+        assert_eq!(output[63], 0); // res = 0
+    }
+
+    /// Alias{target, native}: direct lookup → (true, Recorded, native).
+    #[test]
+    fn resolve_address_alias_direct_lookup() {
+        let host = MockKernelHost::default();
+        let native_addr = "KT1_NATIVE".to_string();
+        let alias_info = AliasInfo {
+            runtime: RuntimeId::Tezos,
+            native_address: native_addr.as_bytes().to_vec(),
+        };
+        let registry =
+            StubRegistry::with_classification(Classification::Alias(alias_info));
+
+        let output = dispatch_resolve_address(
+            &host,
+            &registry,
+            "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
+            RuntimeId::Ethereum,
+            RuntimeId::Tezos,
+            &mut Gas::new(GAS_LIMIT),
+        )
+        .unwrap();
+        // classified=true at byte 31, res=RECORDED at byte 63
+        assert_eq!(output[31], 1);
+        assert_eq!(output[63], RESOLUTION_RECORDED as u8);
+        // Decode the string portion: offset is at bytes 64-95, length at
+        // bytes 96-127, data starts at 128.
+        let str_len = u32::from_be_bytes(output[124..128].try_into().unwrap()) as usize;
+        assert_eq!(&output[128..128 + str_len], b"KT1_NATIVE");
+    }
+
+    /// Native source → derivation → destination has materialized inverse
+    /// → RECORDED.  The StubRegistry asserts that compute_alias is called with
+    /// target_runtime (Tezos), which would fail if source_runtime were passed.
+    #[test]
+    fn resolve_address_native_to_derived_recorded() {
+        let host = MockKernelHost::default();
+        let source_addr = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        let derived_alias = "KT1_DERIVED";
+
+        let destination_classification = Some(Classification::Alias(AliasInfo {
+            runtime: RuntimeId::Ethereum,
+            native_address: source_addr.as_bytes().to_vec(),
+        }));
+        // expected_derivation_runtime = Tezos (the target).  If the code
+        // passes source_runtime (Ethereum) instead, the assert fires.
+        let registry = StubRegistry::with_alias_and_expected_runtime(
+            Classification::Native,
+            derived_alias,
+            destination_classification,
+            RuntimeId::Tezos, // expected = target_runtime
+        );
+
+        let output = dispatch_resolve_address(
+            &host,
+            &registry,
+            source_addr.to_string(),
+            RuntimeId::Ethereum,
+            RuntimeId::Tezos,
+            &mut Gas::new(GAS_LIMIT),
+        )
+        .unwrap();
+        assert_eq!(output[31], 1); // classified = true
+        assert_eq!(output[63], RESOLUTION_RECORDED as u8);
+    }
+
+    /// Native source → derivation → destination has NO inverse → DERIVED.
+    #[test]
+    fn resolve_address_native_to_derived_not_recorded() {
+        let host = MockKernelHost::default();
+        let source_addr = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        let derived_alias = "KT1_DERIVED";
+
+        let registry = StubRegistry::with_alias_and_expected_runtime(
+            Classification::Native,
+            derived_alias,
+            None, // no destination → DERIVED
+            RuntimeId::Tezos,
+        );
+
+        let output = dispatch_resolve_address(
+            &host,
+            &registry,
+            source_addr.to_string(),
+            RuntimeId::Ethereum,
+            RuntimeId::Tezos,
+            &mut Gas::new(GAS_LIMIT),
+        )
+        .unwrap();
+        assert_eq!(output[31], 1); // classified = true
+        assert_eq!(output[63], RESOLUTION_DERIVED as u8);
+    }
+
+    /// Native source (back-stop result) falls through to the derivation path.
+    ///
+    /// The real code-presence back-stop is tested in tezosx-ethereum-runtime.
+    /// Here the stub cues directly as Native — exercising that dispatch_resolve_address
+    /// takes the derivation path for a Native classification.
+    #[test]
+    fn resolve_address_evm_native_uses_derivation_path() {
+        let host = MockKernelHost::default();
+        let addr_str = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        let registry = StubRegistry::with_alias_and_expected_runtime(
+            Classification::Native,
+            "KT1_DERIVED",
+            None,
+            RuntimeId::Tezos,
+        );
+        let output = dispatch_resolve_address(
+            &host,
+            &registry,
+            addr_str.to_string(),
+            RuntimeId::Ethereum,
+            RuntimeId::Tezos,
+            &mut Gas::new(GAS_LIMIT),
+        )
+        .unwrap();
+        assert_eq!(output[31], 1); // classified = true
+    }
+
+    /// EVM Unknown → (false, 0, "").
+    #[test]
+    fn resolve_address_evm_unknown() {
+        let host = MockKernelHost::default();
+        let registry = StubRegistry::with_classification(Classification::Unknown);
+        let output = dispatch_resolve_address(
+            &host,
+            &registry,
+            "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
+            RuntimeId::Ethereum,
+            RuntimeId::Tezos,
+            &mut Gas::new(GAS_LIMIT),
+        )
+        .unwrap();
+        assert_eq!(output[31], 0); // classified = false
+    }
+
+    // ── dispatch_origin_of logic rows ─────────────────────────────────────────
 
     /// originOf: Unknown → (0, 0, "").
     #[test]
@@ -1199,6 +1512,25 @@ mod tests {
     // ── ABI selector decode/encode round-trips ───────────────────────────────
 
     #[test]
+    fn resolve_address_call_abi_round_trip() {
+        let call = RuntimeGateway::resolveAddressCall {
+            addr: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
+            sourceRuntime: RuntimeId::Ethereum as u8,
+            targetRuntime: RuntimeId::Tezos as u8,
+        };
+        let encoded = call.abi_encode();
+        let decoded = RuntimeGatewayCalls::abi_decode(&encoded).unwrap();
+        match decoded {
+            RuntimeGatewayCalls::resolveAddress(c) => {
+                assert_eq!(c.addr, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+                assert_eq!(c.sourceRuntime, RuntimeId::Ethereum as u8);
+                assert_eq!(c.targetRuntime, RuntimeId::Tezos as u8);
+            }
+            _ => panic!("expected resolveAddress variant"),
+        }
+    }
+
+    #[test]
     fn origin_of_call_abi_round_trip() {
         let call = RuntimeGateway::originOfCall {
             addr: "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx".to_string(),
@@ -1215,14 +1547,15 @@ mod tests {
         }
     }
 
-    /// Invalid sourceRuntime (9) must revert — verified by checking that
-    /// RuntimeId::try_from(9) returns Err.
     #[test]
-    fn invalid_runtime_id_is_rejected() {
-        assert!(RuntimeId::try_from(9u8).is_err());
-        assert!(RuntimeId::try_from(2u8).is_err());
-        assert!(RuntimeId::try_from(0u8).is_ok());
-        assert!(RuntimeId::try_from(1u8).is_ok());
+    fn invalid_runtime_id_payload_shape() {
+        use alloy_sol_types::SolError;
+        let payload = RuntimeGateway::InvalidRuntimeId { received: 9u8 }.abi_encode();
+        // 4-byte selector + 32-byte uint256
+        assert_eq!(payload.len(), 36);
+        assert_eq!(&payload[0..4], &RuntimeGateway::InvalidRuntimeId::SELECTOR,);
+        // received = 9 in the low byte of the uint256
+        assert_eq!(payload[35], 9);
     }
 
     #[test]
