@@ -881,16 +881,43 @@ impl BigMapKeys {
 /// Value from `src/proto_023_PtSeouLo/lib_protocol/lazy_storage_diff.ml`.
 const BYTES_SIZE_FOR_BIG_MAP_KEY: u64 = 65;
 
-/// Read the `total_bytes` counter persisted for a big-map.
+/// Reconstruct the `total_bytes` counter for a big-map allocated
+/// before the counter existed. Walks the persisted keys list and
+/// sums `BYTES_SIZE_FOR_BIG_MAP_KEY` plus each value's stored size,
+/// then persists the result so subsequent reads are O(1).
+fn init_total_bytes_from_existing<C: Context>(
+    host: &mut impl StorageV1,
+    context: &C,
+    id: &BigMapId,
+) -> Result<Zarith, LazyStorageError> {
+    let keys_path = keys_of_big_map(context, id)?;
+    let keys: BigMapKeys = read_optional_nom_value(host, &keys_path)
+        .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?
+        .unwrap_or(BigMapKeys { keys: vec![] });
+    let mut total: u64 = 0;
+    for key_hash in &keys.keys {
+        let vp = value_path(context, id, key_hash)?;
+        let size = host.store_value_size(&vp)? as u64;
+        total = total.saturating_add(BYTES_SIZE_FOR_BIG_MAP_KEY + size);
+    }
+    let migrated = Zarith(total.into());
+    set_total_bytes(host, context, id, &migrated)?;
+    Ok(migrated)
+}
+
+/// Read the `total_bytes` counter persisted for a big-map. Lazily
+/// migrates pre-counter big-maps via `init_total_bytes_from_existing`.
 fn total_bytes<C: Context>(
-    host: &impl StorageV1,
+    host: &mut impl StorageV1,
     context: &C,
     id: &BigMapId,
 ) -> Result<Zarith, LazyStorageError> {
     let path = total_bytes_path(context, id)?;
-    let total = read_optional_nom_value(host, &path)
-        .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?;
-    Ok(total.unwrap_or(0u64.into()))
+    match read_optional_nom_value::<Zarith>(host, &path) {
+        Ok(Some(total)) => Ok(total),
+        Ok(None) => init_total_bytes_from_existing(host, context, id),
+        Err(e) => Err(LazyStorageError::NomReadError(e.to_string())),
+    }
 }
 
 /// Write the `total_bytes` counter persisted for a big-map.
@@ -1904,6 +1931,51 @@ pub mod tests {
         ctx.big_map_remove(&id).unwrap();
 
         assert!(ctx.host.store_has(&path).unwrap().is_none());
+    }
+
+    #[test]
+    fn total_bytes_lazily_migrates_pre_counter_big_map() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        let entries = [
+            TypedValue::String("a".into()),
+            TypedValue::String("bb".into()),
+            TypedValue::String("ccc".into()),
+        ];
+        let mut expected_sum: u64 = 0;
+        for (i, v) in entries.iter().enumerate() {
+            ctx.big_map_update(&id, TypedValue::int(i as i64), Some(v.clone()))
+                .unwrap();
+            expected_sum += BYTES_SIZE_FOR_BIG_MAP_KEY + encoded_size(v);
+        }
+
+        // Simulate a pre-counter big-map: drop the `total_bytes` path,
+        // leaving the keys list and the values intact.
+        let path = total_bytes_path(ctx.context, &id).unwrap();
+        ctx.host.store_delete(&path).unwrap();
+        assert!(ctx.host.store_has(&path).unwrap().is_none());
+
+        // First read triggers the lazy migration.
+        let migrated = total_bytes(ctx.host, ctx.context, &id).unwrap();
+        assert_eq!(migrated, Zarith(expected_sum.into()));
+
+        // Migration persisted the counter so subsequent reads are O(1).
+        assert!(ctx.host.store_has(&path).unwrap().is_some());
+        assert_eq!(total_bytes(ctx.host, ctx.context, &id).unwrap(), migrated);
+
+        // Maintenance hooks now operate from the correct baseline: an
+        // overwrite produces the expected delta against the migrated value.
+        let new_value = TypedValue::String("dddd".into());
+        let new_size = encoded_size(&new_value);
+        let old_size = encoded_size(&entries[0]);
+        ctx.big_map_update(&id, TypedValue::int(0), Some(new_value))
+            .unwrap();
+        assert_eq!(
+            total_bytes(ctx.host, ctx.context, &id).unwrap(),
+            Zarith((expected_sum + new_size - old_size).into()),
+        );
     }
 
     #[test]
