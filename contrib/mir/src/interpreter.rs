@@ -1102,20 +1102,20 @@ fn interpret_one<'a>(
             }
             #[cfg(feature = "bls")]
             overloads::Int::Bls12381Fr => {
-                let i = pop!(V::Bls12381Fr);
+                pop_ref!(i, Bls12381Fr);
                 ctx.gas().consume(interpret_cost::INT_BLS_FR)?;
                 stack.push(V::Int(i.to_big_int()))
             }
             overloads::Int::Bytes => {
-                let i = pop!(V::Bytes);
+                pop_ref!(i, Bytes);
                 ctx.gas().consume(interpret_cost::int_bytes(i.len())?)?;
-                stack.push(V::Int(BigInt::from_signed_bytes_be(&i)))
+                stack.push(V::Int(BigInt::from_signed_bytes_be(i)))
             }
         },
         I::Nat => {
-            let i = pop!(V::Bytes);
+            pop_ref!(i, Bytes);
             ctx.gas().consume(interpret_cost::int_bytes(i.len())?)?;
-            stack.push(V::Nat(BigUint::from_bytes_be(&i)))
+            stack.push(V::Nat(BigUint::from_bytes_be(i)))
         }
         I::Bytes(overload) => match overload {
             overloads::Bytes::Nat => {
