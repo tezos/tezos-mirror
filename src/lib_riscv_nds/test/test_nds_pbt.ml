@@ -495,7 +495,7 @@ let register_unit_disk (name, f) =
 
 let register_pbt ?(long = false) ?long_factor (module B : BACKEND) f =
   let register =
-    if B.name = Disk_backend.name then register_pbt_with_disk_gc
+    if String.starts_with ~prefix:"disk" B.name then register_pbt_with_disk_gc
     else Qcheck_tezt.register
   in
   register
@@ -544,7 +544,9 @@ let register_with_backend (backend : (module BACKEND)) =
 
 let () =
   register_with_backend (module Memory_backend) ;
+  register_with_backend (module Memory_prove_backend) ;
   register_with_backend (module Disk_backend) ;
+  register_with_backend (module Disk_prove_backend) ;
   register_unit_disk test_checkout_unknown_commit ;
   List.iter
     register_pbt_disk
@@ -561,7 +563,17 @@ let () =
     test_bisimulation ;
   register_pbt
     ~long:true
+    ~long_factor:250
+    (module Memory_prove_backend)
+    test_bisimulation ;
+  register_pbt
+    ~long:true
     ~long_factor:50
     (module Disk_backend)
+    test_bisimulation ;
+  register_pbt
+    ~long:true
+    ~long_factor:50
+    (module Disk_prove_backend)
     test_bisimulation ;
   register_pbt_disk ~long:true ~long_factor:5 test_cross_backend_bisimulation

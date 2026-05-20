@@ -107,7 +107,7 @@ where
 {
     fn apply<F, R>(&self, fun: F) -> Result<R, OperationalError>
     where
-        F: FnOnce(&mut Registry<KV, Normal>) -> R,
+        F: FnOnce(&mut Registry<KV, Normal>) -> R + Send + 'static,
         KV::Repo: Clone,
     {
         MutableState::apply(self, fun)
@@ -115,7 +115,7 @@ where
 
     fn apply_ro<F, R>(&self, fun: F) -> Result<R, OperationalError>
     where
-        F: FnOnce(&Registry<KV, Normal>) -> R,
+        F: FnOnce(&Registry<KV, Normal>) -> R + Send + 'static,
     {
         Ok(MutableState::apply_ro(self, fun))
     }
