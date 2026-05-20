@@ -711,8 +711,6 @@ where
 {
     // --- sender alias ---
     charge(gas, ALIAS_LOOKUP_COST)?;
-    // TODO: charge `sender_resolution.delegated_storage_cost`, if set,
-    // by converting it to EVM gas via the block's base_fee_per_gas.
     let (sender_alias, sender_resolution) = context
         .journal_mut()
         .tezosx_resolve_source_alias(sender, target_runtime, gas.remaining())?;
@@ -725,6 +723,11 @@ where
     if sender_gen_evm > 0 {
         charge(gas, sender_gen_evm)?;
     }
+    charge_delegated_storage_cost(
+        gas,
+        sender_resolution.delegated_storage_cost,
+        context.block().basefee(),
+    )?;
 
     // --- source alias ---
     // Fast path: if sender == source, reuse the resolved alias and skip
@@ -734,8 +737,6 @@ where
     }
 
     charge(gas, ALIAS_LOOKUP_COST)?;
-    // TODO: charge `source_resolution.delegated_storage_cost`, if set,
-    // by converting it to EVM gas via the block's base_fee_per_gas.
     let (source_alias, source_resolution) = context
         .journal_mut()
         .tezosx_resolve_source_alias(source, target_runtime, gas.remaining())?;
@@ -748,6 +749,11 @@ where
     if source_gen_evm > 0 {
         charge(gas, source_gen_evm)?;
     }
+    charge_delegated_storage_cost(
+        gas,
+        source_resolution.delegated_storage_cost,
+        context.block().basefee(),
+    )?;
 
     Ok((sender_alias, source_alias))
 }
