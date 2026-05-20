@@ -253,6 +253,15 @@ let ic_execute_skipped =
     ~msg:"skipping single transaction execution for {hash}, IC is not ready"
     ("hash", Ethereum_types.hash_encoding)
 
+let observer_applied_finalized_levels =
+  declare_1
+    ~section
+    ~name:"evm_context_observer_applied_finalized_levels"
+    ~level:Info
+    ~msg:"observer applied finalized levels up to {level}"
+    ~pp1:Z.pp_print
+    ("level", Data_encoding.n)
+
 let ready () = emit ready ()
 
 let shutdown () = emit shutdown ()
@@ -312,3 +321,6 @@ let ic_reset level = emit ic_reset level
 let ic_reset_unexpected_level level = emit ic_reset_unexpected_level level
 
 let ic_execute_skipped hash = emit ic_execute_skipped hash
+
+let observer_applied_finalized_levels Ethereum_types.(Qty level) =
+  emit observer_applied_finalized_levels level
