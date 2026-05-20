@@ -195,19 +195,35 @@ val set_ongoing_amplifications : t -> Types.Slot_id.Set.t -> unit
 (** Retrieves the set of pkhs whose messages are not propagated. *)
 val get_ignore_pkhs : t -> Signature.Public_key_hash.Set.t
 
-(** [storage_period ctxt proto_parameters] returns for how many levels should
-    the node store data about attested slots. This depends on the node's profile
-    and its history mode.  *)
-val storage_period : t -> Types.proto_parameters -> [`Always | `Finite of int]
+(** [shard_level_to_gc ctxt ~current_level] returns the oldest level whose
+    shards (and skip-list cells) should still be stored; during
+    [current_level], such data for commitments published at the returned
+    level will be removed. Shard retention is profile-independent and equal
+    to [Constants.shard_retention_period_in_levels]. The returned level is
+    non-negative and not inferior to the [first_seen_level] stored in the
+    store. Returns [None] when no removal is needed yet. *)
+val shard_level_to_gc : t -> current_level:int32 -> int32 option tzresult Lwt.t
 
-(** [level_to_gc ctxt proto_parameters ~current_level] returns the oldest level
-    that should have attested data (like shards and slots, skip list cells)
-    stored; during [current_level], such data for commitments published at the
-    returned level will be removed. The returned level is non-negative and will
-    not be inferior to the [first_seen_level] stored in the store. In case
-    no removal is needed (either because the node is thus configured, or the
-    current_level is not big enough), the function returns [None]. *)
-val level_to_gc :
+(** [operator_slot_level_to_gc ctxt proto_parameters ~current_level] returns
+    the oldest level whose slots at operator slot indices should still be
+    stored; their retention is driven by [history_mode] (and is [None] for
+    [Archive]). Non-operator slot indices share the shard retention, so
+    {!shard_level_to_gc} applies to them. The returned level satisfies the
+    same non-negativity / [first_seen_level] constraints as
+    {!shard_level_to_gc}. *)
+val operator_slot_level_to_gc :
+  t ->
+  Types.proto_parameters ->
+  current_level:int32 ->
+  int32 option tzresult Lwt.t
+
+(** [skip_list_level_to_gc ctxt proto_parameters ~current_level] returns
+    the oldest level whose skip-list cells should still be stored.
+    Skip-list cells carry the attestation status used by refutation games
+    and are useful only within the refutation window, so their retention is
+    the bounded default store period, independent of [history_mode] (it
+    stays bounded even under [Archive]). *)
+val skip_list_level_to_gc :
   t ->
   Types.proto_parameters ->
   current_level:int32 ->

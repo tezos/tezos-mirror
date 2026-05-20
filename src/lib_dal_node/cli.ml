@@ -513,18 +513,22 @@ module Term = struct
     let open Result_syntax in
     let doc =
       Format.sprintf
-        "The duration for the shards to be kept in the node storage. Either a \
-         number, the string \"full\" or the string \"auto\". A number is \
-         interpreted as the number of levels the shards should be kept; the \
-         string \"full\" means no shard deletion, the string \"auto\" means \
+        "The duration for which slot payloads are kept in the node storage \
+         (shards always follow their own, shorter lifetime of %d levels \
+         regardless). Either a number, the string \"archive\" or the string \
+         \"auto\". A number is interpreted as the number of levels the \
+         payloads should be kept; the string \"archive\" means slot payloads \
+         are never deleted (this is the default); the string \"auto\" means \
          the default of the profile: about 3 months for an operator, %d levels \
-         for the other controller profiles."
+         for the other controller profiles. The legacy value \"full\" is \
+         accepted as a synonym for \"archive\"."
+        Constants.shard_retention_period_in_levels
         Constants.shard_retention_period_in_levels
     in
     let decoder =
       Configuration_file.(
         function
-        | "full" -> return Full
+        | "archive" | "full" -> return Archive
         | "auto" -> return @@ Rolling {blocks = `Auto}
         | s -> (
             match int_of_string_opt s with
@@ -532,7 +536,7 @@ module Term = struct
             | None -> Error ("Invalid argument " ^ s ^ " for history-mode.")))
     in
     let printer fmt = function
-      | Configuration_file.Full -> Format.fprintf fmt "full"
+      | Configuration_file.Archive -> Format.fprintf fmt "archive"
       | Rolling {blocks = `Auto} -> Format.fprintf fmt "auto"
       | Rolling {blocks = `Some i} -> Format.fprintf fmt "%d" i
     in

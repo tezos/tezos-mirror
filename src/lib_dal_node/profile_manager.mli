@@ -57,6 +57,10 @@ val is_attester_only_profile : t -> bool
     given slot index. *)
 val can_publish_on_slot_index : Types.slot_index -> t -> bool
 
+(** [is_operator_slot t ~slot_index] returns [true] if the node has an
+    operator role for [slot_index]. *)
+val is_operator_slot : t -> slot_index:Types.slot_index -> bool
+
 val encoding : t Data_encoding.t
 
 val unresolved_encoding : unresolved_profile Data_encoding.t
@@ -151,6 +155,11 @@ val resolve_profile : unresolved_profile -> number_of_slots:int -> t
 
 (** Returns [true] iff the node should support refutation games. *)
 val supports_refutations : t -> bool
+
+(** Same as {!supports_refutations} but for an as-yet-unresolved profile
+    (e.g. the profile read from the configuration file before merging with
+    CLI arguments). A random observer is never refutation-supporting. *)
+val unresolved_supports_refutations : unresolved_profile -> bool
 
 (** Load the profile context from disk. The file where the context is loaded
     from is relative to the given [base_dir]. An error is returned in case of an

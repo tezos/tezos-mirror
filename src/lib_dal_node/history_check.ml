@@ -23,8 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* This function checks that in case the history mode is Rolling with a custom
-   number of blocks, these number of blocks are sufficient. *)
+(* This function checks that in case the history mode is [Rolling { Some b }]
+   on a node that supports refutations, [b] is at least [storage_period].
+   On other profiles, [history_mode] governs slot retention only and has no
+   effect: there is nothing to compare against. *)
 let check_history_mode config profile_ctxt proto_parameters =
   let open Lwt_result_syntax in
   let supports_refutations =
@@ -36,15 +38,13 @@ let check_history_mode config profile_ctxt proto_parameters =
       proto_parameters
   in
   match config.Configuration_file.history_mode with
-  | Rolling {blocks = `Some b} ->
-      let minimal_levels =
-        if supports_refutations then storage_period
-        else proto_parameters.attestation_lag
-      in
-      if b < minimal_levels then
-        tzfail @@ Errors.Not_enough_history {stored_levels = b; minimal_levels}
+  | Rolling {blocks = `Some b} when supports_refutations ->
+      if b < storage_period then
+        tzfail
+        @@ Errors.Not_enough_history
+             {stored_levels = b; minimal_levels = storage_period}
       else return_unit
-  | Rolling {blocks = `Auto} | Full -> return_unit
+  | Rolling _ | Archive -> return_unit
 
 (* We need more levels because [store_skip_list_cells level] needs the plugin
    for [attestation_lag + 1] levels in the past wrt to the target [level]. Note

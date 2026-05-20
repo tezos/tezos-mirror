@@ -88,6 +88,17 @@ let can_publish_on_slot_index slot_index = function
   | Types.Controller p ->
       Controller_profiles.(can_publish_on_slot_index slot_index p)
 
+(* Slot indices the node has an operator role for: during a refutation game
+   the node may be asked to serve pages of those slots, and pages are chunks
+   of the slot (see [Slot_manager.get_slot_pages]). Keeping the slot is
+   what makes serving pages cheap, so operator slots deserve the long
+   retention. Observer slots don't qualify — observers gossip shards but
+   do not participate in refutation games. *)
+let is_operator_slot t ~slot_index =
+  match t with
+  | Types.Bootstrap -> false
+  | Types.Controller p -> Controller_profiles.is_operator_slot slot_index p
+
 let merge_profiles ~lower_prio ~higher_prio =
   match (lower_prio, higher_prio) with
   | Profile (Controller c1), Profile (Controller c2) ->
@@ -209,6 +220,10 @@ let supports_refutations t =
   match get_profiles t with
   | Controller c -> Controller_profiles.(has_operator c)
   | Bootstrap -> false
+
+let unresolved_supports_refutations = function
+  | Profile t -> supports_refutations t
+  | Random_observer | Empty -> false
 
 (* Returns the period relevant for a refutation game. With a block time of 10
    seconds, this corresponds to about 42 days. *)

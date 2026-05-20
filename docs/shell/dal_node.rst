@@ -145,13 +145,29 @@ Storage
 
 The DAL node essentially stores slots and shards. Slots are injected into the node through an RPC (see details at :ref:`slots_lifetime`), at which moment the corresponding commitment is computed and stored. Shards and their proofs are computed and stored via another RPC. It is important to also compute the shards’ proofs, because shards can be exchanged over the P2P network only if they are accompanied by their proof. Shards received over the P2P network are also stored. The node also tracks and stores the status of commitments by monitoring the L1 chain, connecting to this end to an L1 node specified at startup.
 
-The amount of storage space a DAL node needs depends on how long it keeps the data, and different profiles keep the data for different amounts of time:
+Slot payloads and shards follow independent lifetimes:
+
+- **Shards** are operationally useful only around attestation time and can be re-derived from a slot payload (which is the canonical source: pages, used in refutation games, are simply chunks of the slot payload). Their storage location and lifetime depend on the profile:
+
+  - On *attester-only* nodes (any controller with at least one attester role and no operator nor observer role), shards are kept **only in an in-memory LRU cache**, never written to disk. The cache is bounded by roughly ``number_of_slots × (attestation_lag + a few blocks)`` slot entries; in practice this is a much shorter effective lifetime than 150 levels.
+  - On any other shard-storing profile (operator, observer, or a mix that includes one of these), shards are written to **disk** and capped at 150 levels by a profile-independent periodic GC (``Constants.shard_retention_period_in_levels``, about 10 minutes on Ghostnet and 20 minutes on Mainnet). The same in-memory LRU is used as a read-through hot-path cache on top of the disk store.
+
+- **Slot payloads** are kept on disk for the slot indices registered as *operator* slots on the node. By default, they are kept indefinitely (``--history-mode archive``), so the data remains available for serving pages during Smart Rollup refutation games. The ``--history-mode`` option, described below, only controls slot-payload retention; shard retention is governed independently as described above.
+
+The amount of storage space a DAL node needs therefore depends primarily on its profile:
 
 - Bootstrap nodes store no DAL data and therefore require negligible storage.
-- Attester and observer nodes store data in memory for a few blocks after the maximum attestation lag by default.
-- Operator nodes store data on disk for the slots registered with this profile for 3 months by default because the data may be needed for the Smart Rollup refutation game.
+- Attester-only nodes store nothing on disk; their shard footprint is bounded by the in-memory LRU cache.
+- Observer nodes store shards on disk for up to 150 levels.
+- Operator nodes store, in addition, slot payloads for the slot indices configured in their operator profile, for the duration set by ``--history-mode``.
 
-You can set how long the node stores data with the ``--history-mode`` option.
+``--history-mode`` accepts the following values:
+
+- ``archive`` (default): keep slot payloads indefinitely.
+- ``auto``: use the profile's default storage period (about 3 months for an operator, the shard retention window for other controller profiles).
+- ``<n>``: keep slot payloads for the last ``n`` levels.
+
+The legacy value ``full`` is accepted as a synonym for ``archive``.
 
 L1 monitoring
 ^^^^^^^^^^^^^

@@ -376,6 +376,22 @@ open struct
       ("from_version", Data_encoding.int31)
       ("to_version", Data_encoding.int31)
 
+  let history_mode_default_changed =
+    declare_0
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"history_mode_default_changed"
+      ~msg:
+        "this operator node's configuration does not set an explicit history \
+         mode, and the default changed to 'archive' in configuration version \
+         3, so this new default now applies: slot payloads are kept \
+         indefinitely (previously the default kept them for a bounded period, \
+         about 3 months), and the slot store may grow without bound. Pass \
+         --history-mode auto (or set it in the configuration file) to restore \
+         the previous bounded retention."
+      ~level:Warning
+      ()
+
   let stored_slot_content =
     declare_2
       ~section
@@ -1556,6 +1572,8 @@ let emit_configuration_saving_failed ~error_trace =
 
 let emit_upgrading_configuration ~from ~into =
   emit upgrading_configuration (from, into)
+
+let emit_history_mode_default_changed () = emit history_mode_default_changed ()
 
 let emit_stored_slot_content ~published_level ~slot_index =
   emit stored_slot_content (published_level, slot_index)
