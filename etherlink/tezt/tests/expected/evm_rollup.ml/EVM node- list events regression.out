@@ -628,6 +628,18 @@ evm_context_missing_state:
          byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
+evm_context_observer_applied_finalized_levels:
+  description: observer applied finalized levels up to {level}
+  level: info
+  section: evm_node.dev.evm_context
+  json format:
+    { /* evm_context_observer_applied_finalized_levels version 0 */
+      "evm_context_observer_applied_finalized_levels.v0": $positive_bignum }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+  
 evm_context_observer_potential_reorg:
   description: potential reorganization happening at level {level}
   level: warning
