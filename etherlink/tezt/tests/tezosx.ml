@@ -4296,6 +4296,80 @@ let test_script_coherency_enshrined () =
          /script parameter type (%L)") ;
   unit
 
+(** Extract the `view` toplevel items from a /script Micheline code list,
+    returning the name carried by each as a string. View nodes have shape
+    `{prim:view, args:[<name>, <param_ty>, <return_ty>, <code>]}` where
+    [<name>] is a Micheline `String` node. *)
+let script_view_names code_list =
+  List.filter_map
+    (fun item ->
+      match JSON.(item |-> "prim" |> as_string_opt) with
+      | Some "view" ->
+          let name_node = JSON.(item |-> "args" |=> 0) in
+          JSON.(name_node |-> "string" |> as_string_opt)
+      | _ -> None)
+    code_list
+
+(** Regression test that captures the full /script output for the
+    enshrined TezosX Gateway. Any change to the synthesized script
+    schema — added/removed/renamed entrypoint, added/removed/renamed
+    synthetic view, type change, code body change — surfaces as a
+    diff against the captured [.out] file and forces an explicit
+    review acknowledgement before landing. Complements
+    [test_entrypoints_enshrined] which does the same for
+    /entrypoints. *)
+let test_script_synthetic_views_enshrined () =
+  Setup.register_sandbox_regression_test
+    ~title:"Script RPC exposes synthetic views for enshrined TezosX Gateway"
+    ~tags:["rpc"; "script"; "views"; "tezlink"; "tezosx"; "gateway"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@ fun sandbox ->
+  let* script_json = get_script sandbox gateway_address in
+  Regression.capture (JSON.encode script_json) ;
+  unit
+
+(** Regression: a regular originated KT1 with no views in its source
+    code must not have any `view` declaration appear in its /script.
+    Without this guard, an accidental change to the script synthesizer
+    (which only fires for enshrined contracts) could regress and start
+    leaking declarations into the responses of regular contracts too. *)
+let test_script_no_synthetic_views_for_originated_contract () =
+  Setup.register_sandbox_test
+    ~title:"Script RPC has no views for a regular originated KT1 (no views)"
+    ~tags:["rpc"; "script"; "views"; "tezlink"; "tezosx"; "originated"]
+    ~with_runtimes:[Tezos]
+    ~uses_client:true
+    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun sandbox ->
+  let* tez_client = tezos_client sandbox in
+  let script_path =
+    Michelson_script.(
+      find ["opcodes"; "store_input"] Michelson_contracts.tezlink_protocol
+      |> path)
+  in
+  let* kt1_address =
+    Client.originate_contract
+      ~alias:"no_views_kt1"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:{|""|}
+      ~prg:script_path
+      ~burn_cap:Tez.one
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block sandbox in
+  let* script_json = get_script sandbox kt1_address in
+  let code_list = JSON.(script_json |-> "code" |> as_list) in
+  let view_names = script_view_names code_list in
+  Check.(
+    (view_names = [])
+      (list string)
+      ~error_msg:
+        "Expected no view declarations in /script for a regular originated \
+         KT1, got %L") ;
+  unit
+
 (** Test the http_traceCall RPC with an EVM call that triggers a
     cross-runtime call.
 
@@ -5702,6 +5776,8 @@ let () =
   test_tezosx_simulation () ;
   test_entrypoints_enshrined () ;
   test_script_coherency_enshrined () ;
+  test_script_synthetic_views_enshrined () ;
+  test_script_no_synthetic_views_for_originated_contract () ;
   test_trace_call_evm ~runtime:Tezos () ;
   test_http_trace_replay ~runtime:Tezos () ;
   test_cross_runtime_evm_sender_is_alias [Alpha] ;
