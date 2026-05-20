@@ -41,7 +41,7 @@ module Error = struct
     | Store_invalid_subkey_index
     | Store_value_already_exists
     | Nds_database_out_of_bounds
-    | Nds_resize_too_large
+    | Nds_resize_invalid
     | Nds_not_enabled
 
   (** [code error] returns the error code associated to the error. *)
@@ -60,7 +60,7 @@ module Error = struct
     | Store_invalid_subkey_index -> -12l
     | Store_value_already_exists -> -13l
     | Nds_database_out_of_bounds -> -14l
-    | Nds_resize_too_large -> -15l
+    | Nds_resize_invalid -> -15l
     | Nds_not_enabled -> -16l
 end
 
@@ -789,6 +789,8 @@ module Tick_model = struct
 
   let nds_clear = one
 
+  let nds_size = one
+
   let nds_resize = one
 
   let nds_hash = one
@@ -1481,7 +1483,7 @@ module Nds_aux = struct
     | Nds_errors.Database_index_out_of_bounds ->
         Error.code Error.Nds_database_out_of_bounds
     | Nds_errors.Registry_resize_too_large ->
-        Error.code Error.Nds_resize_too_large
+        Error.code Error.Nds_resize_invalid
 
   let extract_nds_error_code = function
     | Error code -> Lwt.return code
@@ -1489,10 +1491,35 @@ module Nds_aux = struct
 
   let map_nds r = Result.map_error nds_error_code r
 
-  let registry_resize ~nds ~n =
-    map_nds (Nds.resize nds n)
-    |> Result.map (fun () -> 0l)
-    |> extract_nds_error_code
+  (** [registry_resize ~nds ~diff] queries the current registry size and
+      then, if [diff] is non-zero, adjusts the registry by [diff]
+      databases. Returns the new size as [int32].
+
+      - [diff = 0] is a pure size query (no [Nds.resize] call).
+      - [new_size < 0] returns [Nds_resize_invalid] without touching
+        the registry.
+      - [new_size > Int32.max_int] returns [Nds_resize_invalid] without
+        touching the registry.
+      - The Rust backend additionally enforces "delta of at most one"
+        and reports out-of-range deltas as
+        [Nds_errors.Registry_resize_too_large], which maps to
+        [Nds_resize_invalid] (also [-15]).
+  *)
+  let registry_resize ~nds ~diff =
+    let open Lwt_result_syntax in
+    let*! res =
+      let*? size = map_nds (Nds.size nds) in
+      let new_size = Int64.add size diff in
+      if
+        Int64.compare new_size 0L < 0
+        || Int64.compare new_size max_int32_as_int64 > 0
+      then fail (Error.code Error.Nds_resize_invalid)
+      else if Int64.equal diff 0L then return (Int64.to_int32 new_size)
+      else
+        let*? () = map_nds (Nds.resize nds new_size) in
+        return (Int64.to_int32 new_size)
+    in
+    extract_nds_error_code res
 
   let registry_copy ~nds ~src ~dst =
     map_nds (Nds.copy_database nds ~src ~dst)
@@ -1631,13 +1658,16 @@ let nds_disabled_code = Error.code Error.Nds_not_enabled
 
 let nds_registry_resize ~nds_host_functions_enabled =
   nds_handler @@ fun nds _memories -> function
-  | [Values.(Num (I64 n))] ->
+  | [Values.(Num (I64 diff))] ->
       let open Lwt.Syntax in
-      let ticks = Tick_model.(to_z nds_resize) in
+      (* Worst-case: one [Nds.size] plus one [Nds.resize] backend call.
+         Charge unconditionally so the tick cost does not branch on the
+         runtime [diff] value. *)
+      let ticks = Tick_model.(to_z (nds_size + nds_resize)) in
       if not nds_host_functions_enabled then
         Lwt.return (nds_disabled_code, ticks)
       else
-        let+ code = Nds_aux.registry_resize ~nds ~n in
+        let+ code = Nds_aux.registry_resize ~nds ~diff in
         (code, ticks)
   | _ -> raise Bad_input
 
