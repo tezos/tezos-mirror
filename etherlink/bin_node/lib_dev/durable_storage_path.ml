@@ -49,6 +49,12 @@ module World_state = struct
   let make s = EVM.make (root ^ s)
 end
 
+module EVM_ETH_ACCOUNTS = struct
+  let root = "/evm/eth_accounts"
+
+  let make s = root ^ s
+end
+
 module Single_tx = struct
   let input_tx_base = BASE.make "/instant_confirmation/input_tx"
 
@@ -102,6 +108,10 @@ let michelson_ledger_root = "/tez/tez_accounts/tezosx"
 let tez_world_state_root = TEZ.World_state.root
 
 let tez_world_state_safe_root = "/tmp" ^ TEZ.World_state.root
+
+let evm_eth_accounts_root = EVM_ETH_ACCOUNTS.root
+
+let evm_eth_accounts_safe_root = "/tmp" ^ EVM_ETH_ACCOUNTS.root
 
 (** TezosX: Tezos blocks live in the Michelson world-state keyspace. *)
 let tezosx_tezos_blocks_root = TEZ.World_state.make "/tez_blocks"
@@ -209,7 +219,10 @@ let maximum_allowed_ticks ~storage_version =
   else EVM.make "/maximum_allowed_ticks"
 
 module Accounts = struct
-  let accounts_path = World_state.make "/eth_accounts"
+  let accounts_root ~storage_version =
+    if Storage_version.evm_accounts_isolated ~storage_version then
+      EVM_ETH_ACCOUNTS.root
+    else World_state.make "/eth_accounts"
 
   let info_path = "/info"
 
@@ -223,17 +236,23 @@ module Accounts = struct
 
   let storage_path = "/storage"
 
-  let account (Address (Hex s)) = accounts_path ^ "/" ^ s
+  let account ~storage_version (Address (Hex s)) =
+    accounts_root ~storage_version ^ "/" ^ s
 
-  let info address = account address ^ info_path
+  let info ~storage_version address =
+    account ~storage_version address ^ info_path
 
-  let balance address = account address ^ balance_path
+  let balance ~storage_version address =
+    account ~storage_version address ^ balance_path
 
-  let nonce address = account address ^ nonce_path
+  let nonce ~storage_version address =
+    account ~storage_version address ^ nonce_path
 
-  let code address = account address ^ code_path
+  let code ~storage_version address =
+    account ~storage_version address ^ code_path
 
-  let code_hash address = account address ^ code_hash
+  let code_hash ~storage_version address =
+    account ~storage_version address ^ code_hash
 
   type error += Invalid_address of string | Invalid_key of string
 
@@ -267,9 +286,10 @@ module Accounts = struct
 
   type fixed_index = path
 
-  let fixed_address (Address (Hex s)) =
+  let fixed_address ~storage_version (Address (Hex s)) =
     let open Result_syntax in
-    if String.length s = 40 then return (accounts_path ^ "/" ^ s)
+    if String.length s = 40 then
+      return (accounts_root ~storage_version ^ "/" ^ s)
     else tzfail (Invalid_address s)
 
   let fixed_index s =
@@ -282,13 +302,18 @@ module Accounts = struct
 end
 
 module Code = struct
-  let codes = World_state.make "/eth_codes"
+  let codes ~storage_version =
+    if Storage_version.evm_accounts_isolated ~storage_version then
+      EVM_ETH_ACCOUNTS.make "/eth_codes"
+    else World_state.make "/eth_codes"
 
-  let code_storage (Hash (Hex hash)) = codes ^ "/" ^ hash
+  let code_storage ~storage_version (Hash (Hex hash)) =
+    codes ~storage_version ^ "/" ^ hash
 
-  let code = "/code"
+  let code_path = "/code"
 
-  let code code_hash = code_storage code_hash ^ code
+  let code ~storage_version code_hash =
+    code_storage ~storage_version code_hash ^ code_path
 end
 
 module Blueprint = struct

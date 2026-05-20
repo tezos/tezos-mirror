@@ -28,10 +28,12 @@ let () =
     (function State_and_state_diff -> Some () | _ -> None)
     (fun () -> State_and_state_diff)
 
-let update_storage address state_diff state =
+let update_storage ~storage_version address state_diff state =
   let open Ethereum_types in
   let open Lwt_result_syntax in
-  let*? fixed_addr = Durable_storage_path.Accounts.fixed_address address in
+  let*? fixed_addr =
+    Durable_storage_path.Accounts.fixed_address ~storage_version address
+  in
   let update key value state =
     let (Hex key_hex) = key in
     let (Hex value_hex) = value in
@@ -45,16 +47,18 @@ let update_storage address state_diff state =
   in
   StorageMap.fold_es update state_diff state
 
-let replace_storage address state_override state =
+let replace_storage ~storage_version address state_override state =
   let open Lwt_result_syntax in
   match state_override with
   | None -> return state
   | Some state_override ->
-      let*? fixed_addr = Durable_storage_path.Accounts.fixed_address address in
+      let*? fixed_addr =
+        Durable_storage_path.Accounts.fixed_address ~storage_version address
+      in
       let* state =
         Durable_storage.delete_dir (Evm_account_storage_dir fixed_addr) state
       in
-      update_storage address state_override state
+      update_storage ~storage_version address state_override state
 
 let is_invalid state_override =
   let open Ethereum_types in
@@ -66,6 +70,7 @@ let update_account address state_override evm_state =
   let open Lwt_result_syntax in
   if is_invalid state_override then tzfail State_and_state_diff
   else
+    let* storage_version = Durable_storage.storage_version evm_state in
     let* info = Durable_storage.read_opt (Evm_account_info address) evm_state in
     let* evm_state =
       match info with
@@ -124,9 +129,15 @@ let update_account address state_override evm_state =
                 evm_state)
     in
     let* evm_state =
-      update_storage address state_override.state_diff evm_state
+      update_storage
+        ~storage_version
+        address
+        state_override.state_diff
+        evm_state
     in
-    let* evm_state = replace_storage address state_override.state evm_state in
+    let* evm_state =
+      replace_storage ~storage_version address state_override.state evm_state
+    in
     return evm_state
 
 let update_accounts state_override state =

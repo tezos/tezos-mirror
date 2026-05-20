@@ -293,12 +293,13 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
         let new_balance =
           Ethereum_types.quantity_of_z Z.(of_int 10_000 * pow (of_int 10) 18)
         in
+        let storage_version = head.storage_version in
         let* () =
           List.iter_es
-            (fun address -> Evm_context.provision_balance address new_balance)
+            (fun address ->
+              Evm_context.provision_balance ~storage_version address new_balance)
             funded_addresses
         in
-        let storage_version = head.storage_version in
         let* () =
           List.iter_es
             (fun (runtime, target_sunrise_level) ->

@@ -394,7 +394,10 @@ let storage_at state address (Qty pos) =
     String.make (64 - len) '0' ^ s
   in
   let index = Z.format "#x" pos |> pad32left0 in
-  let*? fixed_addr = Durable_storage_path.Accounts.fixed_address address in
+  let* storage_version = Durable_storage.storage_version state in
+  let*? fixed_addr =
+    Durable_storage_path.Accounts.fixed_address ~storage_version address
+  in
   let*? fixed_idx = Durable_storage_path.Accounts.fixed_index index in
   Durable_storage.read_or_default
     ~default:(Ethereum_types.Hex (pad32left0 "0"))
