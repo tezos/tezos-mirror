@@ -150,6 +150,17 @@
 
 ### Native Atomic Composability
 
+- Add a read-only `originOf(addr, sourceRuntime)` view selector to
+  the runtime-gateway precompile at `0xff…07`. Returns a three-field
+  tuple `(uint8 kind, uint8 homeRuntime, string nativeAddress)` where
+  `kind` is `0` (Unknown), `1` (Native), or `2` (Alias). For an EVM
+  source with no `/origin` record, a nonce check acts as a back-stop:
+  `nonce > 0` is treated as `Native`. Malformed addresses return
+  `Unknown` without reverting. STATICCALL-compatible: non-payable,
+  no journal writes, no log emission. Gas constants:
+  `ORIGIN_OF_BASE_COST = 1 500`, `NONCE_BACKSTOP_COST = 2 100`
+  (conditional, charged only when the EVM back-stop path executes).
+
 - Reject `STATICCALL` on the runtime gateway precompile's
   state-mutating selectors. (!21905)
 

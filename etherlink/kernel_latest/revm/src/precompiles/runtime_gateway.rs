@@ -9,9 +9,10 @@ use revm::{
 };
 use tezosx_interfaces::headers::format_tez_from_wei;
 use tezosx_interfaces::{
-    gas, RuntimeId, ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER,
-    X_TEZOS_CRAC_DEPTH, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT,
-    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
+    gas, Classification, Registry, RuntimeId, ALIAS_LOOKUP_COST,
+    ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_DEPTH,
+    X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER,
+    X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
 };
 
 use crate::{
@@ -20,7 +21,7 @@ use crate::{
     journal::{CrossRuntimeCall, Journal},
     precompiles::{
         constants::{
-            HEADER_VALIDATION_PER_HEADER, RUNTIME_GATEWAY_BASE_COST,
+            HEADER_VALIDATION_PER_HEADER, ORIGIN_OF_BASE_COST, RUNTIME_GATEWAY_BASE_COST,
             RUNTIME_GATEWAY_PER_WORD_COST, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
             VALUE_TRANSFER_SURCHARGE,
         },
@@ -29,7 +30,6 @@ use crate::{
     },
 };
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezosx_interfaces::{Registry, ALIAS_LOOKUP_COST};
 use tezosx_journal::OriginalSource;
 
 sol! {
@@ -56,6 +56,18 @@ sol! {
             bytes body,
             uint8 method,
         ) external returns (bytes memory response);
+
+        /// Look up `addr`'s classification under `sourceRuntime`.
+        ///
+        /// kind:  0=Unknown, 1=Native, 2=Alias.
+        /// homeRuntime / nativeAddress are zero-initialized when kind == Unknown.
+        /// When kind == Native, nativeAddress echoes addr.
+        function originOf(
+            string addr,
+            uint8 sourceRuntime,
+        ) external view returns (uint8 kind, uint8 homeRuntime, string nativeAddress);
+
+        error InvalidRuntimeId(uint8 received);
     }
 
     /// Emitted on every outgoing CRAC (EVM -> other runtime).
@@ -68,6 +80,12 @@ sol! {
         uint256 amount
     );
 }
+
+// Origin kind constants for originOf.kind
+// Encoded as u16 because alloy's SolValue is not implemented for u8.
+const ORIGIN_KIND_UNKNOWN: u16 = 0;
+const ORIGIN_KIND_NATIVE: u16 = 1;
+const ORIGIN_KIND_ALIAS: u16 = 2;
 
 /// Charge `RUNTIME_GATEWAY_PER_WORD_COST * ceil(bytes / 32)` for a chunk
 /// of gateway payload (calldata, outgoing body, or incoming response).
@@ -184,6 +202,68 @@ fn classify_and_charge_crac_response(
             ),
         )))
     }
+}
+
+/// Core logic for the `originOf` selector, extracted for unit-testability.
+///
+/// Handles: `read_origin` (which includes alias-lookup cost and the
+/// code-presence back-stop internally), gas conversion, and ABI-encoding
+/// of the return tuple.  Does **not** handle the non-payable check, the
+/// DELEGATECALL/CALLCODE guard, or the initial `ORIGIN_OF_BASE_COST`
+/// charge — those stay in the outer dispatch arm.
+fn dispatch_origin_of<Host: StorageV1, R: Registry>(
+    host: &Host,
+    registry: &R,
+    addr_str: String,
+    source_runtime: RuntimeId,
+    gas: &mut Gas,
+) -> Result<Vec<u8>, CustomPrecompileError> {
+    // Convert outer EVM gas to source_runtime's native unit.
+    let budget = gas::convert(RuntimeId::Ethereum, source_runtime, gas.remaining())
+        .ok_or_else(|| {
+            CustomPrecompileError::Revert("originOf: gas budget overflow".into(), *gas)
+        })?;
+    let (classification, consumed_source) = registry
+        .read_origin(host, source_runtime, &addr_str, budget)
+        .map_err(|e| CustomPrecompileError::Revert(format!("originOf: {e}"), *gas))?;
+    // Convert consumed back to EVM gas and charge.
+    let consumed_evm = gas::convert(source_runtime, RuntimeId::Ethereum, consumed_source)
+        .unwrap_or(u64::MAX);
+    charge(gas, consumed_evm)?;
+
+    let output: Vec<u8> = match classification {
+        Classification::Unknown => {
+            (ORIGIN_KIND_UNKNOWN, 0u16, String::new()).abi_encode_params()
+        }
+        Classification::Native => {
+            let native_str = if source_runtime == RuntimeId::Ethereum {
+                addr_str.to_lowercase()
+            } else {
+                addr_str
+            };
+            (
+                ORIGIN_KIND_NATIVE,
+                u16::from(u8::from(source_runtime)),
+                native_str,
+            )
+                .abi_encode_params()
+        }
+        Classification::Alias(info) => {
+            let native_str = String::from_utf8(info.native_address).map_err(|e| {
+                CustomPrecompileError::Revert(
+                    format!("originOf: alias native_address is not UTF-8: {e}"),
+                    *gas,
+                )
+            })?;
+            (
+                ORIGIN_KIND_ALIAS,
+                u16::from(u8::from(info.runtime)),
+                native_str,
+            )
+                .abi_encode_params()
+        }
+    };
+    Ok(output)
 }
 
 /// Reset the gateway precompile's EVM balance to zero, charging the
@@ -859,6 +939,40 @@ where
                 output: output.into(),
             });
         }
+        // View-only: no log, no balance touch, no journal write — safe under STATICCALL.
+        RuntimeGatewayCalls::originOf(call) => {
+            charge(&mut gas, ORIGIN_OF_BASE_COST)?;
+
+            // View-only: non-payable.
+            if !inputs.value.get().is_zero() {
+                return Err(CustomPrecompileError::Revert(
+                    "originOf: non-payable selector".into(),
+                    gas,
+                ));
+            }
+
+            let source_runtime =
+                RuntimeId::try_from(call.sourceRuntime).map_err(|_| {
+                    CustomPrecompileError::Revert(
+                        format!("InvalidRuntimeId({})", call.sourceRuntime),
+                        gas,
+                    )
+                })?;
+
+            let output = dispatch_origin_of(
+                context.db().host,
+                context.db().registry,
+                call.addr,
+                source_runtime,
+                &mut gas,
+            )?;
+
+            return Ok(InterpreterResult {
+                result: InstructionResult::Return,
+                gas,
+                output: output.into(),
+            });
+        }
     }
 
     // The value (if any) was bridged to Tezos — erase any residual
@@ -874,9 +988,242 @@ where
 
 #[cfg(test)]
 mod tests {
+    use alloy_sol_types::SolCall;
+    use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_protocol::contract::Contract;
+    use tezosx_interfaces::{
+        AliasInfo, Classification, CrossRuntimeContext, Registry, RuntimeId,
+        TezosXRuntimeError,
+    };
+    use tezosx_journal::TezosXJournal;
 
     use super::*;
+
+    // ── Minimal Registry stub ─────────────────────────────────────────────────
+    //
+    // These tests cover Classification-based dispatch (via read_origin) and the
+    // ABI encoding of the originOf selector.  They do NOT go through
+    // runtime_gateway_precompile because constructing a CTX: ContextTr<Db =
+    // EtherlinkVMDB<…>> in a unit test requires a full revm Context + Journal
+    // wiring that is not practical in this crate.  The dispatch helper
+    // (dispatch_origin_of) is called directly in the tests below, which
+    // exercises the full dispatch logic.
+    //
+    // The stub returns canned Classification values directly — the real
+    // code-presence back-stop is tested in tezosx-ethereum-runtime.
+
+    struct StubRegistry {
+        /// The classification to return for read_origin calls.
+        classification: Classification,
+        /// The alias string to return from compute_alias.
+        computed_alias: String,
+    }
+
+    impl StubRegistry {
+        fn with_classification(classification: Classification) -> Self {
+            Self {
+                classification,
+                computed_alias: String::new(),
+            }
+        }
+    }
+
+    impl Registry for StubRegistry {
+        fn ensure_alias<Host>(
+            &self,
+            _host: &mut Host,
+            _journal: &mut TezosXJournal,
+            _alias_info: AliasInfo,
+            _native_public_key: Option<&[u8]>,
+            _target_runtime: RuntimeId,
+            _context: CrossRuntimeContext,
+            _gas_remaining: u64,
+        ) -> Result<(String, u64), TezosXRuntimeError>
+        where
+            Host: tezos_smart_rollup_host::storage::StorageV1,
+        {
+            unimplemented!("not needed")
+        }
+
+        fn compute_alias(
+            &self,
+            _alias_info: AliasInfo,
+        ) -> Result<String, TezosXRuntimeError> {
+            Ok(self.computed_alias.clone())
+        }
+
+        fn address_from_string(
+            &self,
+            address_str: &str,
+            _runtime_id: RuntimeId,
+        ) -> Result<Vec<u8>, TezosXRuntimeError> {
+            if address_str.starts_with("not-") || address_str == "invalid" {
+                Err(TezosXRuntimeError::BadRequest(format!(
+                    "malformed address: {address_str}"
+                )))
+            } else {
+                Ok(address_str.as_bytes().to_vec())
+            }
+        }
+
+        fn read_origin<Host>(
+            &self,
+            _host: &Host,
+            _addr_runtime: RuntimeId,
+            _addr: &str,
+            _budget: u64,
+        ) -> Result<(Classification, u64), TezosXRuntimeError>
+        where
+            Host: tezos_smart_rollup_host::storage::StorageV1,
+        {
+            Ok((self.classification.clone(), 0))
+        }
+
+        fn serve<Host>(
+            &self,
+            _host: &mut Host,
+            _journal: &mut TezosXJournal,
+            _request: http::Request<Vec<u8>>,
+        ) -> http::Response<Vec<u8>>
+        where
+            Host: tezos_smart_rollup_host::storage::StorageV1,
+        {
+            unimplemented!("not needed")
+        }
+    }
+
+    // ── originOf: Classification rows via dispatch_origin_of ─────────────────
+    //
+    // Note: alloy's SolValue is not implemented for u8, so the uint8 fields
+    // are encoded as u16.  Both types produce the same 32-byte ABI word and
+    // the low byte is what Solidity reads.
+
+    #[test]
+    fn origin_of_abi_encoding_unknown() {
+        let output: Vec<u8> =
+            (ORIGIN_KIND_UNKNOWN, 0u16, String::new()).abi_encode_params();
+        // (uint16, uint16, string) with empty string:
+        // slot 1: kind (32 bytes)
+        // slot 2: homeRuntime (32 bytes)
+        // slot 3: offset to string data (32 bytes)
+        // slot 4: string length = 0 (32 bytes)
+        // total: 4 * 32 = 128 bytes
+        assert_eq!(output.len(), 128);
+        // kind == 0 at byte 31
+        assert_eq!(output[31], ORIGIN_KIND_UNKNOWN as u8);
+    }
+
+    #[test]
+    fn origin_of_abi_encoding_native() {
+        let addr = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string();
+        let output: Vec<u8> = (
+            ORIGIN_KIND_NATIVE,
+            u16::from(RuntimeId::Ethereum as u8),
+            addr.clone(),
+        )
+            .abi_encode_params();
+        assert_eq!(output[31], ORIGIN_KIND_NATIVE as u8);
+        assert_eq!(output[63], RuntimeId::Ethereum as u8);
+    }
+
+    #[test]
+    fn origin_of_abi_encoding_alias() {
+        let native = "KT1_X".to_string();
+        let output: Vec<u8> =
+            (ORIGIN_KIND_ALIAS, u16::from(RuntimeId::Tezos as u8), native)
+                .abi_encode_params();
+        assert_eq!(output[31], ORIGIN_KIND_ALIAS as u8);
+        assert_eq!(output[63], RuntimeId::Tezos as u8);
+    }
+
+    // ── dispatch_origin_of logic rows ─────────────────────────────────────────
+
+    const GAS_LIMIT: u64 = u64::MAX;
+
+    /// originOf: Unknown → (0, 0, "").
+    #[test]
+    fn dispatch_origin_of_unknown() {
+        let host = MockKernelHost::default();
+        let registry = StubRegistry::with_classification(Classification::Unknown);
+        let output = dispatch_origin_of(
+            &host,
+            &registry,
+            "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx".to_string(),
+            RuntimeId::Tezos,
+            &mut Gas::new(GAS_LIMIT),
+        )
+        .unwrap();
+        assert_eq!(output[31], ORIGIN_KIND_UNKNOWN as u8);
+    }
+
+    /// originOf: Native → (1, source_runtime, addr).
+    #[test]
+    fn dispatch_origin_of_native() {
+        let host = MockKernelHost::default();
+        let registry = StubRegistry::with_classification(Classification::Native);
+        let addr = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx".to_string();
+        let output = dispatch_origin_of(
+            &host,
+            &registry,
+            addr,
+            RuntimeId::Tezos,
+            &mut Gas::new(GAS_LIMIT),
+        )
+        .unwrap();
+        assert_eq!(output[31], ORIGIN_KIND_NATIVE as u8);
+        assert_eq!(output[63], RuntimeId::Tezos as u8);
+    }
+
+    /// originOf: Alias → (2, home_runtime, native_addr).
+    #[test]
+    fn dispatch_origin_of_alias() {
+        let host = MockKernelHost::default();
+        let alias_info = AliasInfo {
+            runtime: RuntimeId::Tezos,
+            native_address: b"KT1_X".to_vec(),
+        };
+        let registry =
+            StubRegistry::with_classification(Classification::Alias(alias_info));
+        let output = dispatch_origin_of(
+            &host,
+            &registry,
+            "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
+            RuntimeId::Ethereum,
+            &mut Gas::new(GAS_LIMIT),
+        )
+        .unwrap();
+        assert_eq!(output[31], ORIGIN_KIND_ALIAS as u8);
+        assert_eq!(output[63], RuntimeId::Tezos as u8);
+    }
+
+    // ── ABI selector decode/encode round-trips ───────────────────────────────
+
+    #[test]
+    fn origin_of_call_abi_round_trip() {
+        let call = RuntimeGateway::originOfCall {
+            addr: "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx".to_string(),
+            sourceRuntime: RuntimeId::Tezos as u8,
+        };
+        let encoded = call.abi_encode();
+        let decoded = RuntimeGatewayCalls::abi_decode(&encoded).unwrap();
+        match decoded {
+            RuntimeGatewayCalls::originOf(c) => {
+                assert_eq!(c.addr, "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx");
+                assert_eq!(c.sourceRuntime, RuntimeId::Tezos as u8);
+            }
+            _ => panic!("expected originOf variant"),
+        }
+    }
+
+    /// Invalid sourceRuntime (9) must revert — verified by checking that
+    /// RuntimeId::try_from(9) returns Err.
+    #[test]
+    fn invalid_runtime_id_is_rejected() {
+        assert!(RuntimeId::try_from(9u8).is_err());
+        assert!(RuntimeId::try_from(2u8).is_err());
+        assert!(RuntimeId::try_from(0u8).is_ok());
+        assert!(RuntimeId::try_from(1u8).is_ok());
+    }
 
     #[test]
     fn test_build_http_request_get() {

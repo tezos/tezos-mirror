@@ -237,6 +237,9 @@ pub(crate) const HEADER_VALIDATION_PER_HEADER: u64 = 100;
 // either case native to this runtime).
 pub const CODE_BACKSTOP_COST: u64 = 2_100;
 
+// `originOf` flat base cost.
+pub(crate) const ORIGIN_OF_BASE_COST: u64 = 1_500;
+
 // Rationale regarding the cost:
 // Consumed gas is ~81000 for both queue execute_without_proxy entrypoints
 pub const FA_DEPOSIT_EXECUTION_COST: u64 = 100_000;
