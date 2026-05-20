@@ -48,7 +48,15 @@ implementation)
 
 /// Either a simple [Lambda], or a partially-applied one, the result of the
 /// `APPLY` instruction.
-#[derive(Debug, Clone, Eq, PartialEq)]
+///
+/// `Debug` is implemented manually as an iterative walk over the
+/// `Apply` chain so a closure built by many nested `APPLY`s does not
+/// blow the WASM call stack when formatted into an error message
+/// (`InterpretError::FailedWith` embeds a `TypedValue` via `{1:?}`,
+/// which in turn formats `TypedValue::Lambda(Closure)` via `Closure`'s
+/// `Debug`; the kernel runs `err.to_string()` outside MIR's gas
+/// accounting).
+#[derive(Clone, Eq, PartialEq)]
 pub enum Closure<'a> {
     /// Simple [Lambda].
     Lambda(Lambda<'a>),
@@ -61,6 +69,46 @@ pub enum Closure<'a> {
         /// Inner closure
         closure: Box<Closure<'a>>,
     },
+}
+
+impl<'a> std::fmt::Debug for Closure<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Walk the Apply spine to the terminal Lambda iteratively; emit the
+        // outer Apply tokens on the way down, then the terminal Lambda's
+        // Debug at the deepest point, then close the Apply parentheses.
+        let mut depth: usize = 0;
+        let mut cur = self;
+        loop {
+            match cur {
+                Closure::Lambda(lam) => {
+                    f.write_str("Lambda(")?;
+                    write!(f, "{:?}", lam)?;
+                    f.write_str(")")?;
+                    break;
+                }
+                Closure::Apply {
+                    arg_ty,
+                    arg_val,
+                    closure,
+                } => {
+                    // arg_ty uses Type's iterative Debug; arg_val uses
+                    // TypedValue's iterative Debug. Both safe at any
+                    // depth.
+                    write!(
+                        f,
+                        "Apply {{ arg_ty: {:?}, arg_val: {:?}, closure: ",
+                        arg_ty, arg_val
+                    )?;
+                    depth = depth.checked_add(1).ok_or(std::fmt::Error)?;
+                    cur = closure;
+                }
+            }
+        }
+        for _ in 0..depth {
+            f.write_str(" }")?;
+        }
+        Ok(())
+    }
 }
 
 impl<'a> IntoMicheline<'a> for Closure<'a> {

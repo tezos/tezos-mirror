@@ -5227,6 +5227,78 @@ let test_recursive_lambda_exhausts_gas =
   let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
   unit
 
+(* Originates a contract whose parameter type is a deeply nested pair,
+   then transfers to it with the wrong argument shape (Unit). The
+   typechecker rejects the value with `TcError::TypesNotEqual` (or
+   `InvalidValueForType`) carrying the expected deep type. The kernel
+   formats that error via `err.to_string()` (see
+   `etherlink/kernel_latest/tezos/src/operation_result.rs:218`), which
+   in turn formats the inner `Type` via the auto derived `Debug` impl.
+   That Debug walks the `Type` tree recursively in the WASM call stack,
+   so a depth chosen above the recursive ceiling traps the kernel even
+   though origination at the same depth succeeded.
+
+   This path is reachable purely via origination + transfer with a
+   wrong argument; it does not require runtime gas to build a deep
+   value. The depth is bounded only by the protocol operation size
+   limit (the script source must fit within 32 KB), not by per
+   transaction gas. *)
+let test_deep_type_in_invalid_arg_error =
+  register_tezosx_test
+    ~title:"Deep parameter type in invalid arg error does not trap kernel"
+    ~tags:["stack_overflow"; "typecheck"; "error_format"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let depth = 2500 in
+  let path =
+    write_temp_michelson
+      ~name:"deep_pair_param_wrong_arg"
+      ~contents:(nested_pair_param_script depth)
+  in
+  let* _alias =
+    Client.originate_contract
+      ~endpoint
+      ~amount:Tez.zero
+      ~alias:"deep_pair_param_wrong_arg"
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:"0"
+      ~prg:path
+      ~burn_cap:(Tez.of_int 10)
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  (* The contract expects a deeply nested pair of ints; passing Unit
+     forces typecheck_value to fail and return a `TcError` that carries
+     the expected deep type. *)
+  let call_proc =
+    Client.spawn_transfer
+      ~endpoint
+      ~amount:Tez.zero
+      ~fee:(Tez.of_mutez_int 100_000)
+      ~gas_limit:1_040_000
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:"deep_pair_param_wrong_arg"
+      ~arg:"Unit"
+      ~burn_cap:(Tez.of_int 10)
+      client
+  in
+  let* stderr = Process.check_and_read_stderr ~expect_failure:true call_proc in
+  (* The transfer must fail with a clean typechecker error reported by
+     the kernel as a normal rejection, not with the WASM PVM trapping
+     out from under it. A `signal_trap: Some(StackOverflow)` in the
+     simulation stderr indicates the kernel aborted inside MIR's error
+     formatting path (auto derived `Debug` recursing on the deep type
+     carried by the `TcError` returned by `typecheck_value`). *)
+  if stderr =~ rex "signal_trap: Some\\(StackOverflow\\)" then
+    Test.fail
+      ~__LOC__
+      "kernel trapped on stack overflow while formatting a TcError that \
+       carries a deep type (Debug for Type is recursive); see \
+       etherlink/kernel_latest/tezos/src/operation_result.rs:218" ;
+  let*@ _ = produce_block sequencer in
+  unit
+
 let () =
   test_observer_starts [Alpha] ;
   test_describe_endpoint [Alpha] ;
@@ -5312,4 +5384,5 @@ let () =
   test_deep_pair_param [Alpha] ;
   test_deep_if_code [Alpha] ;
   test_deep_or_param [Alpha] ;
-  test_recursive_lambda_exhausts_gas [Alpha]
+  test_recursive_lambda_exhausts_gas [Alpha] ;
+  test_deep_type_in_invalid_arg_error [Alpha]
