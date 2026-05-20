@@ -433,6 +433,21 @@ where
             .unwrap();
     }
 
+    let eth_accounts_subkeys = host
+        .host
+        .store_count_subkeys(&chains::EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+        .expect("The kernel failed to read the number of /evm/eth_accounts subkeys");
+
+    if eth_accounts_subkeys == 0 {
+        host.host
+            .store_write(
+                &chains::EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
+                "Un défilé d'isomorphismes".as_bytes(),
+                0,
+            )
+            .unwrap();
+    }
+
     if is_revealed_storage(&host) {
         reveal_storage(
             &mut host,

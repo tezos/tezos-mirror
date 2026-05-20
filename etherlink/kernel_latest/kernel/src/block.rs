@@ -599,7 +599,8 @@ mod tests {
     use crate::chains::TezlinkOperation;
     use crate::chains::{
         EvmChainConfig, ExperimentalFeatures, MichelsonChainConfig,
-        TezlinkBlockConstants, TezosXBlockConstants, TezosXTransaction, TEZ_BLOCKS_PATH,
+        TezlinkBlockConstants, TezosXBlockConstants, TezosXTransaction,
+        EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH, TEZ_BLOCKS_PATH,
         TEZ_SAFE_STORAGE_ROOT_PATH, TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
     };
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
@@ -630,6 +631,7 @@ mod tests {
     use tezos_ethereum::tx_common::EthereumTransactionCommon;
     use tezos_evm_runtime::extensions::WithGas;
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 
     use tezos_execution::account_storage::TezlinkAccount;
     use tezos_execution::account_storage::{
@@ -863,12 +865,15 @@ mod tests {
         )
     }
 
-    /// Pre-populate the `/tez/world_state` and `/tez/tez_accounts` safe roots
-    /// so that `SafeStorage::start()`'s `store_copy` of each root succeeds.
-    /// Required by every test that produces blocks with the Michelson
-    /// runtime active. Mirrors the production bootstrap performed by
+    /// Pre-populate all safe storage roots so that `SafeStorage::start()`'s
+    /// `store_copy` of each root succeeds. Required by every test that
+    /// produces blocks. Mirrors the production bootstrap performed by
     /// [`crate::kernel`].
-    fn init_tez_safe_roots(host: &mut impl StorageV1) {
+    fn init_safe_storage_roots(host: &mut impl StorageV1) {
+        host.store_write_all(&ETHERLINK_SAFE_STORAGE_ROOT_PATH, b"placeholder")
+            .expect("Write in durable storage should have succeeded");
+        host.store_write_all(&EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH, b"placeholder")
+            .expect("Write in durable storage should have succeeded");
         host.store_write_all(&TEZ_SAFE_STORAGE_ROOT_PATH, b"placeholder")
             .expect("Write in durable storage should have succeeded");
         host.store_write_all(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH, b"placeholder")
@@ -876,7 +881,7 @@ mod tests {
     }
 
     fn dummy_tez_config(host: &mut impl StorageV1) -> MichelsonChainConfig {
-        init_tez_safe_roots(host);
+        init_safe_storage_roots(host);
         MichelsonChainConfig::create_config(
             ChainId::try_from_bytes(&1u32.to_le_bytes()).unwrap(),
         )
@@ -1183,7 +1188,7 @@ mod tests {
     fn dummy_evm_config_with_tezos_runtime(host: &mut impl StorageV1) -> EvmChainConfig {
         host.store_write(&crate::storage::ENABLE_TEZOS_RUNTIME, &[], 0)
             .expect("Should have written feature flag");
-        init_tez_safe_roots(host);
+        init_safe_storage_roots(host);
         let experimental_features = ExperimentalFeatures::read_from_storage(host);
         EvmChainConfig::create_config(
             DUMMY_CHAIN_ID,
@@ -2243,6 +2248,9 @@ mod tests {
     #[test]
     fn test_first_blocks() {
         let mut host = MockKernelHost::default();
+        // EvmChainConfig::storage_root_paths lists EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
+        // so SafeStorage::start()'s store_copy needs each safe root to exist.
+        init_safe_storage_roots(&mut host);
 
         let chain_config = dummy_evm_config(SpecId::default());
         // first block should be 0

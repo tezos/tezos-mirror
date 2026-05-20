@@ -17,8 +17,8 @@
 //!  || michelson_ops_commitment
 //!  || timestamp_le_bytes
 //! )
-//! evm_state_hash          = keccak256(h(/evm/world_state/eth_accounts) || blueprint_hash)
-//! tez_accounts_state_hash = keccak256(h(/tez/tez_accounts)             || blueprint_hash)
+//! evm_state_hash          = keccak256(h(/evm/eth_accounts) || blueprint_hash)
+//! tez_accounts_state_hash = keccak256(h(/tez/tez_accounts) || blueprint_hash)
 //! ```
 //!
 //! The `u32`-length prefixes on each tx list disambiguate the boundary
@@ -110,7 +110,7 @@ fn runtime_state_hash<Host: StorageV1>(
     hasher.finalize().to_vec()
 }
 
-/// Compute `keccak256(h(/evm/world_state/eth_accounts) || blueprint_hash)`
+/// Compute `keccak256(h(/evm/eth_accounts) || blueprint_hash)`
 /// and return it as a byte vector suitable for `EthBlock::state_root`.
 pub fn evm_state_hash<Host: StorageV1>(
     host: &mut Host,
