@@ -150,8 +150,14 @@ fn charge_and_encode_crac_response(
     response: http::Response<Vec<u8>>,
     target_runtime: RuntimeId,
     gas: &mut Gas,
+    base_fee_per_gas: u64,
 ) -> Result<Vec<u8>, CustomPrecompileError> {
-    let body = classify_and_charge_crac_response(response, target_runtime, gas)?;
+    let body = classify_and_charge_crac_response(
+        response,
+        target_runtime,
+        gas,
+        base_fee_per_gas,
+    )?;
     charge_payload(gas, body.len())?;
     Ok((body,).abi_encode_params())
 }
@@ -222,6 +228,7 @@ fn classify_and_charge_crac_response(
     response: http::Response<Vec<u8>>,
     target_runtime: RuntimeId,
     gas: &mut Gas,
+    _base_fee_per_gas: u64,
 ) -> Result<Vec<u8>, CustomPrecompileError> {
     let callee_gas = response
         .headers()
@@ -914,8 +921,12 @@ where
             )?;
 
             let response = context.journal_mut().tezosx_call_http(request);
-            let _body =
-                classify_and_charge_crac_response(response, RuntimeId::Tezos, &mut gas)?;
+            let _body = classify_and_charge_crac_response(
+                response,
+                RuntimeId::Tezos,
+                &mut gas,
+                context.block().basefee(),
+            )?;
 
             emit_crac_sent(context, crac_id, "tezos", implicit_address, amount);
         }
@@ -981,8 +992,12 @@ where
             )?;
 
             let response = context.journal_mut().tezosx_call_http(request);
-            let _body =
-                classify_and_charge_crac_response(response, RuntimeId::Tezos, &mut gas)?;
+            let _body = classify_and_charge_crac_response(
+                response,
+                RuntimeId::Tezos,
+                &mut gas,
+                context.block().basefee(),
+            )?;
 
             emit_crac_sent(context, crac_id, "tezos", destination, amount);
         }
@@ -1063,8 +1078,12 @@ where
             )?;
 
             let response = context.journal_mut().tezosx_call_http(request);
-            let output =
-                charge_and_encode_crac_response(response, RuntimeId::Tezos, &mut gas)?;
+            let output = charge_and_encode_crac_response(
+                response,
+                RuntimeId::Tezos,
+                &mut gas,
+                context.block().basefee(),
+            )?;
 
             // Intentionally no log emission. A dedicated
             // `MichelsonViewCalled` event was considered for indexer
@@ -1200,8 +1219,12 @@ where
                 .to_string();
 
             let response = context.journal_mut().tezosx_call_http(request);
-            let output =
-                charge_and_encode_crac_response(response, target_runtime, &mut gas)?;
+            let output = charge_and_encode_crac_response(
+                response,
+                target_runtime,
+                &mut gas,
+                context.block().basefee(),
+            )?;
 
             // POST-only state effects: burn any residual precompile
             // balance from a bridged value, and emit the CracSent
@@ -2460,6 +2483,7 @@ mod tests {
             response,
             RuntimeId::Tezos,
             &mut gas,
+            1_000_000,
         );
         assert!(
             matches!(
