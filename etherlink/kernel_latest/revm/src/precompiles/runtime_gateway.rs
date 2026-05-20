@@ -10,6 +10,7 @@ use revm::{
         Address, Bytes, Log, U256,
     },
 };
+use tezos_ethereum::wei::{mutez_to_evm_gas, Wei};
 use tezosx_interfaces::{
     canonicalize_native_address, gas,
     headers::{format_tez_from_wei, parse_u64_opt},
@@ -228,7 +229,7 @@ fn classify_and_charge_crac_response(
     response: http::Response<Vec<u8>>,
     target_runtime: RuntimeId,
     gas: &mut Gas,
-    _base_fee_per_gas: u64,
+    base_fee_per_gas: u64,
 ) -> Result<Vec<u8>, CustomPrecompileError> {
     let callee_gas = response
         .headers()
@@ -248,14 +249,14 @@ fn classify_and_charge_crac_response(
                 *gas,
             ));
         }
-        // TODO(L2-1340): handle the storage cost delegated by the callee.
-        let storage_cost = parse_u64_opt(response.headers(), X_TEZOS_STORAGE_COST)
-            .map_err(|e| CustomPrecompileError::Revert(e.to_string(), *gas))?;
-        if let Some(v) = storage_cost {
-            return Err(CustomPrecompileError::Abort(CustomPrecompileAbort::Crac(
-                format!("{X_TEZOS_STORAGE_COST} not yet supported on the EVM caller (got {v})")
-            )));
-        }
+        let delegated_storage_cost_mutez =
+            parse_u64_opt(response.headers(), X_TEZOS_STORAGE_COST)
+                .map_err(|e| CustomPrecompileError::Revert(e.to_string(), *gas))?;
+        charge_delegated_storage_cost(
+            gas,
+            delegated_storage_cost_mutez,
+            base_fee_per_gas,
+        )?;
         Ok(response.into_body())
     } else if response.status().is_client_error() {
         Err(CustomPrecompileError::Revert(
@@ -275,6 +276,36 @@ fn classify_and_charge_crac_response(
             ),
         )))
     }
+}
+
+/// Charge the EVM caller, in gas, for the storage-fee cost (in mutez)
+/// a CRAC callee delegated to it.
+///
+/// Special cases:
+/// - `None` / `Some(0)`: nothing delegated, no charge.
+/// - `base_fee_per_gas == 0` with a non-zero cost: reverts (impossible
+///   on production blocks per the EIP-1559 invariant, but reachable on
+///   test harnesses with a default `BlockEnv`).
+/// - a cost whose gas equivalent overflows `u64`: unaffordable by
+///   construction, surfaced as `OutOfGas`.
+fn charge_delegated_storage_cost(
+    gas: &mut Gas,
+    cost_mutez: Option<u64>,
+    base_fee_per_gas: u64,
+) -> Result<(), CustomPrecompileError> {
+    let Some(v) = cost_mutez else { return Ok(()) };
+    if v == 0 {
+        return Ok(());
+    }
+    if base_fee_per_gas == 0 {
+        return Err(CustomPrecompileError::Revert(
+            "storage cost: cannot convert to gas, base_fee_per_gas is zero".into(),
+            *gas,
+        ));
+    }
+    let g2 = mutez_to_evm_gas(v, Wei::from(base_fee_per_gas))
+        .ok_or(CustomPrecompileError::OutOfGas)?;
+    charge(gas, g2)
 }
 
 /// Core logic for the `originOf` selector, extracted for unit-testability.
@@ -2471,29 +2502,291 @@ mod tests {
     }
 
     #[test]
-    fn test_classify_and_charge_crac_response_rejects_storage_cost_header() {
+    fn test_charge_delegated_storage_cost_converts_mutez_to_wei() {
+        // 1 mutez = 10^12 wei; base_fee = 1 GWei = 10^9 wei/gas.
+        // g2 = ceil(1 * 10^12 / 10^9) = 1000. Guards against the
+        // mutez-as-wei unit bug, which would charge 1 / 10^9 = 0.
+        let gas_limit = 1_000_000u64;
+        let mut gas = Gas::new(gas_limit);
+        charge_delegated_storage_cost(&mut gas, Some(1), 1_000_000_000)
+            .expect("should succeed");
+        assert_eq!(
+            gas.remaining(),
+            gas_limit - 1000,
+            "1 mutez at 1 GWei base_fee must deduct 1000 gas"
+        );
+    }
+
+    #[test]
+    fn test_charge_delegated_storage_cost_none_no_charge() {
+        // No delegation → no charge.
+        let gas_limit = 1_000_000u64;
+        let mut gas = Gas::new(gas_limit);
+        charge_delegated_storage_cost(&mut gas, None, 100).expect("should succeed");
+        assert_eq!(
+            gas.remaining(),
+            gas_limit,
+            "no delegation must not deduct any gas"
+        );
+    }
+
+    #[test]
+    fn test_charge_delegated_storage_cost_some_zero_no_charge() {
+        // cost = 0 → no storage charge.
+        let gas_limit = 1_000_000u64;
+        let mut gas = Gas::new(gas_limit);
+        charge_delegated_storage_cost(&mut gas, Some(0), 100).expect("should succeed");
+        assert_eq!(
+            gas.remaining(),
+            gas_limit,
+            "zero storage cost must not deduct any gas"
+        );
+    }
+
+    #[test]
+    fn test_charge_delegated_storage_cost_exact_division() {
+        // cost_wei = 10^12, base_fee = 10^12 → exactly 1, no rounding.
+        let gas_limit = 1_000_000u64;
+        let mut gas = Gas::new(gas_limit);
+        charge_delegated_storage_cost(&mut gas, Some(1), 1_000_000_000_000)
+            .expect("should succeed");
+        assert_eq!(
+            gas.remaining(),
+            gas_limit - 1,
+            "an exact division must deduct exactly the quotient"
+        );
+    }
+
+    #[test]
+    fn test_charge_delegated_storage_cost_rounds_up() {
+        // cost_wei = 3 * 10^12, base_fee = 2 * 10^12 → 1.5, ceil → 2.
+        let gas_limit = 1_000_000u64;
+        let mut gas = Gas::new(gas_limit);
+        charge_delegated_storage_cost(&mut gas, Some(3), 2_000_000_000_000)
+            .expect("should succeed");
+        assert_eq!(
+            gas.remaining(),
+            gas_limit - 2,
+            "a non-exact division must round the gas charge up"
+        );
+    }
+
+    #[test]
+    fn test_charge_delegated_storage_cost_sub_base_fee_rounds_up_to_one() {
+        // cost_wei = 10^12 < base_fee = 3 * 10^12 → ceil(1/3) = 1.
+        // Under ceil, any non-zero delegated cost charges at least 1 gas.
+        let gas_limit = 1_000_000u64;
+        let mut gas = Gas::new(gas_limit);
+        charge_delegated_storage_cost(&mut gas, Some(1), 3_000_000_000_000)
+            .expect("should succeed");
+        assert_eq!(
+            gas.remaining(),
+            gas_limit - 1,
+            "a non-zero cost below one gas-unit must round up to 1 gas"
+        );
+    }
+
+    #[test]
+    fn test_charge_delegated_storage_cost_reverts_on_zero_base_fee_with_cost() {
+        // cost > 0 with base_fee == 0 must revert explicitly.
+        let mut gas = Gas::new(1_000_000);
+        let result = charge_delegated_storage_cost(&mut gas, Some(42), 0);
+        assert!(
+            matches!(
+                result,
+                Err(CustomPrecompileError::Revert(ref msg, _))
+                if msg.contains("storage cost")
+                    && msg.contains("base_fee_per_gas is zero")
+            ),
+            "expected Revert with base-fee-zero message, got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn test_charge_delegated_storage_cost_zero_cost_with_zero_base_fee_no_revert() {
+        // cost == 0 + base_fee == 0 → division skipped, no revert, no charge.
+        let gas_limit = 1_000_000u64;
+        let mut gas = Gas::new(gas_limit);
+        charge_delegated_storage_cost(&mut gas, Some(0), 0)
+            .expect("zero cost with zero base_fee must not revert");
+        assert_eq!(
+            gas.remaining(),
+            gas_limit,
+            "zero storage cost must not deduct any gas even when base_fee is zero"
+        );
+    }
+
+    #[test]
+    fn test_charge_delegated_storage_cost_none_with_zero_base_fee_no_revert() {
+        // None + base_fee == 0 → division skipped, no revert, no charge.
+        let gas_limit = 1_000_000u64;
+        let mut gas = Gas::new(gas_limit);
+        charge_delegated_storage_cost(&mut gas, None, 0)
+            .expect("no delegation with zero base_fee must not revert");
+        assert_eq!(
+            gas.remaining(),
+            gas_limit,
+            "no delegation must not deduct any gas even when base_fee is zero"
+        );
+    }
+
+    #[test]
+    fn test_charge_delegated_storage_cost_overflow_is_out_of_gas() {
+        // cost_wei = 20_000_000 * 10^12 = 2e19 > u64::MAX at base_fee 1 →
+        // g2 overflows u64, so the cost is unaffordable: OutOfGas.
+        let mut gas = Gas::new(u64::MAX);
+        let result = charge_delegated_storage_cost(&mut gas, Some(20_000_000), 1);
+        assert!(
+            matches!(result, Err(CustomPrecompileError::OutOfGas)),
+            "a gas equivalent overflowing u64 must surface as OutOfGas, got: {result:?}"
+        );
+    }
+
+    // --- Integration: the storage-cost header wired through
+    // `classify_and_charge_crac_response` on the 2xx CRAC return path. ---
+
+    #[test]
+    fn test_classify_and_charge_crac_response_charges_storage_cost_header() {
+        // 2xx + `X-Tezos-Storage-Cost: 1` mutez at base_fee = 1 GWei →
+        // g2 = ceil(1 * 10^12 / 10^9) = 1000. Compare the gas remaining
+        // with vs without the header: the difference is exactly the
+        // storage charge, isolating it from the callee-gas charge. This
+        // is the wiring guard — it fails if the helper call is dropped
+        // from the success branch.
+        let base_fee = 1_000_000_000u64;
+        let gas_limit = 1_000_000u64;
+        let build = |with_storage_cost: bool| {
+            let mut builder = http::Response::builder()
+                .status(http::status::StatusCode::OK)
+                .header(X_TEZOS_GAS_CONSUMED, "1000");
+            if with_storage_cost {
+                builder = builder.header(X_TEZOS_STORAGE_COST, "1");
+            }
+            builder.body(vec![]).unwrap()
+        };
+
+        let mut gas_with = Gas::new(gas_limit);
+        classify_and_charge_crac_response(
+            build(true),
+            RuntimeId::Tezos,
+            &mut gas_with,
+            base_fee,
+        )
+        .expect("should succeed");
+        let mut gas_without = Gas::new(gas_limit);
+        classify_and_charge_crac_response(
+            build(false),
+            RuntimeId::Tezos,
+            &mut gas_without,
+            base_fee,
+        )
+        .expect("should succeed");
+
+        assert_eq!(
+            gas_without.remaining() - gas_with.remaining(),
+            1000,
+            "the storage-cost header must deduct g2 = ceil(1 mutez / 1 GWei) = 1000 gas"
+        );
+    }
+
+    #[test]
+    fn test_classify_and_charge_crac_response_no_storage_cost_header() {
+        // 2xx without `X-Tezos-Storage-Cost` → only the callee gas is
+        // charged (1000 Tezos milligas / 100 = 10 EVM gas), no storage.
         let response = http::Response::builder()
             .status(http::status::StatusCode::OK)
             .header(X_TEZOS_GAS_CONSUMED, "1000")
-            .header(X_TEZOS_STORAGE_COST, "42")
             .body(vec![])
             .unwrap();
-        let mut gas = Gas::new(u64::MAX);
-        let result = super::classify_and_charge_crac_response(
+        let gas_limit = 1_000_000u64;
+        let mut gas = Gas::new(gas_limit);
+        classify_and_charge_crac_response(
             response,
             RuntimeId::Tezos,
             &mut gas,
-            1_000_000,
+            1_000_000_000,
+        )
+        .expect("should succeed");
+        assert_eq!(
+            gas.remaining(),
+            gas_limit - 10,
+            "an absent storage-cost header must not deduct any storage gas"
+        );
+    }
+
+    #[test]
+    fn test_classify_and_charge_crac_response_storage_cost_out_of_gas() {
+        // g2 = 1000 but only 490 gas remains after the callee charge →
+        // the storage charge fails with OutOfGas and the call reverts.
+        let response = http::Response::builder()
+            .status(http::status::StatusCode::OK)
+            .header(X_TEZOS_GAS_CONSUMED, "1000")
+            .header(X_TEZOS_STORAGE_COST, "1")
+            .body(vec![])
+            .unwrap();
+        let mut gas = Gas::new(500);
+        let result = classify_and_charge_crac_response(
+            response,
+            RuntimeId::Tezos,
+            &mut gas,
+            1_000_000_000,
+        );
+        assert!(
+            matches!(result, Err(CustomPrecompileError::OutOfGas)),
+            "insufficient gas to cover the storage cost must fail with OutOfGas, got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn test_classify_and_charge_crac_response_malformed_storage_cost_header() {
+        // 2xx + malformed `X-Tezos-Storage-Cost` → parse-error revert.
+        let response = http::Response::builder()
+            .status(http::status::StatusCode::OK)
+            .header(X_TEZOS_GAS_CONSUMED, "1000")
+            .header(X_TEZOS_STORAGE_COST, "not-a-number")
+            .body(vec![])
+            .unwrap();
+        let mut gas = Gas::new(1_000_000);
+        let result = classify_and_charge_crac_response(
+            response,
+            RuntimeId::Tezos,
+            &mut gas,
+            1_000_000_000,
         );
         assert!(
             matches!(
                 result,
-                Err(CustomPrecompileError::Abort(CustomPrecompileAbort::Crac(ref msg)))
-                if msg.contains("X-Tezos-Storage-Cost")
-                    && msg.contains("not yet supported")
-                    && msg.contains("42")
+                Err(CustomPrecompileError::Revert(ref msg, _))
+                    if msg.contains(X_TEZOS_STORAGE_COST)
             ),
-            "expected Revert with storage-cost not-yet-supported message, got: {result:?}"
+            "a malformed storage-cost header must revert with a parse error, got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn test_classify_and_charge_crac_response_storage_cost_ignored_on_non_2xx() {
+        // A non-2xx response carrying the header must NOT trigger storage
+        // parsing/charge; it follows the normal client-error path. The
+        // header is meaningful only on a 2xx response.
+        let response = http::Response::builder()
+            .status(http::status::StatusCode::BAD_REQUEST)
+            .header(X_TEZOS_STORAGE_COST, "1")
+            .body(b"boom".to_vec())
+            .unwrap();
+        let mut gas = Gas::new(1_000_000);
+        let result = classify_and_charge_crac_response(
+            response,
+            RuntimeId::Tezos,
+            &mut gas,
+            1_000_000_000,
+        );
+        assert!(
+            matches!(
+                result,
+                Err(CustomPrecompileError::Revert(ref msg, _))
+                    if !msg.contains(X_TEZOS_STORAGE_COST)
+            ),
+            "the header on a non-2xx response must be ignored, got: {result:?}"
         );
     }
 }

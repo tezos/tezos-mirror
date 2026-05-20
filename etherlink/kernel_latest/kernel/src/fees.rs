@@ -26,6 +26,7 @@ use revm_etherlink::{storage::world_state_handler::StorageAccount, EvmKernelErro
 use tezos_ethereum::access_list::AccessListItem;
 use tezos_ethereum::block::BlockFees;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
+use tezos_ethereum::wei::{ceil_div, gas_from_wei};
 use tezos_smart_rollup_host::storage::StorageV1;
 
 use std::mem::size_of;
@@ -158,7 +159,7 @@ impl FeeUpdates {
 
         let gas_price = block_fees.base_fee_per_gas();
 
-        let gas_used = cdiv(initial_total_fees, gas_price);
+        let gas_used = ceil_div(initial_total_fees, gas_price);
 
         let total_fees = gas_price * gas_used;
 
@@ -294,8 +295,7 @@ pub(crate) fn gas_for_fees(
         authorization_list_len,
     );
 
-    let gas_for_fees = cdiv(fees, gas_price);
-    gas_as_u64(gas_for_fees)
+    gas_from_wei(fees, gas_price).ok_or(EvmKernelError::GasForFeesOverflow)
 }
 
 // Size of a single EIP-7702 authorization entry:
@@ -326,19 +326,6 @@ pub(crate) fn da_fee(
         .saturating_add(access_data_size.into())
         .saturating_add(authorization_data_size.into())
         .saturating_mul(da_fee_per_byte)
-}
-
-fn cdiv(l: U256, r: U256) -> U256 {
-    match l.div_mod(r) {
-        (res, rem) if rem.is_zero() => res,
-        (res, _) => res.saturating_add(U256::one()),
-    }
-}
-
-fn gas_as_u64(gas_for_fees: U256) -> Result<u64, EvmKernelError> {
-    gas_for_fees
-        .try_into()
-        .map_err(|_| EvmKernelError::GasForFeesOverflow)
 }
 
 #[cfg(test)]
