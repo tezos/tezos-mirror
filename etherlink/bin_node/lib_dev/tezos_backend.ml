@@ -19,38 +19,91 @@ let () =
     (function Entrypoints_decode_error msg -> Some msg | _ -> None)
     (fun msg -> Entrypoints_decode_error msg)
 
-(* Decode the entrypoints result written by the kernel's
-   tezosx_michelson_entrypoints entrypoint. RLP encoding:
-     List []        → None (contract not found)
-     List [entries] → Some ([], entries)
-   where entries is an RLP list of [name_bytes, micheline_type_bytes] pairs. *)
+(* Decode the entrypoints + synthetic-views result written by the
+   kernel's tezosx_michelson_entrypoints entrypoint.
+
+   Two RLP shapes are accepted, both wrapped by the canonical-option
+   [Some] wrapper from [append_option_canonical] on the kernel side
+   (empty list is the canonical [None]):
+
+   - Current shape (kernels from !21936 onward):
+       List []                  → None (contract not found)
+       List [[entries, views]]  → Some ([], entries, views)
+     where
+     * [entries] is an RLP list of [name_bytes, micheline_type_bytes]
+       pairs;
+     * [views] is an RLP list of [name_bytes, parameter_type_bytes,
+       return_type_bytes] triples (empty when the contract has no
+       synthetic views).
+
+   - Legacy shape (kernels predating !21936):
+       List [entries]  → Some ([], entries, [])
+     i.e. only the entries list, no views element. Required so the
+     EVM node can be upgraded ahead of the rollup kernel upgrade
+     that introduces the new shape — without this branch, every
+     [/script] call against an enshrined contract on an old kernel
+     would surface as a 500.
+
+   The two shapes are distinguished by the structure of the first
+   child of the inner list: in the new shape it is itself a list
+   (the [entries_list]); in the legacy shape it is the first
+   entrypoint pair, whose first element is a [Value name_bytes]. *)
 let decode_entrypoints_result bytes =
   let open Lwt_result_syntax in
+  let decode_type_bytes type_bytes =
+    match
+      Data_encoding.Binary.of_bytes_opt
+        Tezlink_imports.Imported_context.Script.expr_encoding
+        type_bytes
+    with
+    | None ->
+        Result_syntax.tzfail
+          (Entrypoints_decode_error "Failed to decode Micheline type bytes")
+    | Some type_expr -> Result_syntax.return type_expr
+  in
   let decode_entry = function
-    | Rlp.List [Value name_bytes; Value type_bytes] -> (
+    | Rlp.List [Value name_bytes; Value type_bytes] ->
         let open Result_syntax in
         let name = Bytes.to_string name_bytes in
-        match
-          Data_encoding.Binary.of_bytes_opt
-            Tezlink_imports.Imported_context.Script.expr_encoding
-            type_bytes
-        with
-        | None ->
-            tzfail
-              (Entrypoints_decode_error "Failed to decode Micheline type bytes")
-        | Some type_expr -> return (name, type_expr))
+        let* type_expr = decode_type_bytes type_bytes in
+        return (name, type_expr)
     | _ ->
         Result_syntax.tzfail
           (Entrypoints_decode_error "Invalid RLP entry format")
   in
+  let decode_view = function
+    | Rlp.List
+        [Value name_bytes; Value param_type_bytes; Value return_type_bytes] ->
+        let open Result_syntax in
+        let name = Bytes.to_string name_bytes in
+        let* param_expr = decode_type_bytes param_type_bytes in
+        let* return_expr = decode_type_bytes return_type_bytes in
+        return (name, param_expr, return_expr)
+    | _ ->
+        Result_syntax.tzfail
+          (Entrypoints_decode_error "Invalid RLP view triple format")
+  in
   let*? rlp = Rlp.decode bytes in
   match rlp with
   | Rlp.List [] -> return_none
-  | Rlp.List [entries_rlp] ->
-      let*? entries = Rlp.decode_list decode_entry entries_rlp in
-      (* The kernel does not encode unreachable entrypoints; always return
-         an empty list for the unreachable field. *)
-      return_some ([], entries)
+  | Rlp.List [Rlp.List inner] -> (
+      match inner with
+      | [(Rlp.List (Rlp.List _ :: _) as entries_rlp); (Rlp.List _ as views_rlp)]
+      | [(Rlp.List [] as entries_rlp); (Rlp.List _ as views_rlp)] ->
+          (* New shape: the first child of [inner] is itself a list
+             (the entries list, whose children are pairs), so we
+             know the second child is the views list. *)
+          let*? entries = Rlp.decode_list decode_entry entries_rlp in
+          let*? views = Rlp.decode_list decode_view views_rlp in
+          (* The kernel does not encode unreachable entrypoints;
+             always return an empty list for the unreachable field. *)
+          return_some ([], entries, views)
+      | _ ->
+          (* Legacy shape (`[entries]`): [inner] is the entries list
+             itself. No views are reported, matching the pre-!21936
+             behaviour. *)
+          let*? entries = Rlp.decode_list decode_entry (Rlp.List inner) in
+          return_some ([], entries, []))
   | _ ->
       tzfail
         (Entrypoints_decode_error "Invalid RLP structure for entrypoints result")
@@ -262,8 +315,8 @@ let make (ctxt : Evm_ro_context.t) =
               let* result = decode_entrypoints_result bytes in
               match result with
               | None -> return_none
-              | Some (_, entries) ->
-                  return_some (Tezlink_mock.script_of_entrypoints entries)))
+              | Some (_, entries, views) ->
+                  return_some (Tezlink_mock.script_of_metadata ~views entries)))
 
     let manager_key _chain block contract =
       let open Lwt_result_syntax in
@@ -467,7 +520,7 @@ let make (ctxt : Evm_ro_context.t) =
           let* result = decode_entrypoints_result bytes in
           match result with
           | None -> return_none
-          | Some (unreachable, entries) ->
+          | Some (unreachable, entries, _views) ->
               if normalize_types then
                 let* normalized =
                   Tezlink_mock.normalize_entrypoint_type_exprs entries

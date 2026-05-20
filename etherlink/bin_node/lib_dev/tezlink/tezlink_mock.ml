@@ -476,16 +476,25 @@ let pack_data ~data ~ty ~gas =
   in
   return result
 
-(* Build a synthetic Michelson script from a list of (name, type) entrypoint
-   pairs. Used to mock /script for enshrined TezosX contracts that have no
-   stored Michelson code.
+(* Build a synthetic Michelson script from a contract's entrypoint and
+   synthetic-view metadata. Used to mock /script for enshrined TezosX
+   contracts that have no stored Michelson code.
 
    The script has unit storage and FAILWITH code — it is a type carrier only.
    The parameter type is reconstructed from the entrypoints:
    - empty list         → unit
    - [("default", T)]   → T  (default is implicit for unannotated types)
-   - otherwise          → left-biased or tree, each leaf annotated with %name *)
-let script_of_entrypoints entries =
+   - otherwise          → left-biased or tree, each leaf annotated with %name
+
+   Each entry of [views] (a list of [(name, parameter_type, return_type)]
+   triples) is emitted as a `view "name" T1 T2 { FAILWITH }` declaration in
+   the script's toplevel. The body is a stub: the real implementation lives
+   in the kernel's `try_dispatch_enshrined_view` hook and is unreachable
+   from off-chain Michelson interpretation. This matches the convention
+   used for entrypoints (real types, FAILWITH bodies) and exists so
+   off-chain consumers (wallets, indexers, block explorers) see the views
+   when they fetch /script. *)
+let script_of_metadata ?(views = []) entries =
   let open Imported_protocol in
   let open Imported_env.Micheline in
   let open Michelson_v1_primitives in
@@ -512,34 +521,46 @@ let script_of_entrypoints entries =
   in
   let unit_ty = strip_locations (Prim (0, T_unit, [], [])) in
   let unit_val = strip_locations (Prim (0, D_Unit, [], [])) in
-  let code_expr =
-    strip_locations
-      (Seq
-         ( 0,
-           [
-             Prim (0, K_parameter, [root param_type], []);
-             Prim (0, K_storage, [root unit_ty], []);
-             Prim
-               ( 0,
-                 K_code,
-                 [
-                   Seq
-                     ( 0,
-                       [
-                         Prim (0, I_DROP, [], []);
-                         Prim
-                           ( 0,
-                             I_PUSH,
-                             [
-                               Prim (0, T_string, [], []);
-                               String (0, "Enshrined contract");
-                             ],
-                             [] );
-                         Prim (0, I_FAILWITH, [], []);
-                       ] );
-                 ],
-                 [] );
-           ] ))
+  let failwith_body =
+    Seq
+      ( 0,
+        [
+          Prim (0, I_DROP, [], []);
+          Prim
+            ( 0,
+              I_PUSH,
+              [Prim (0, T_string, [], []); String (0, "Enshrined contract")],
+              [] );
+          Prim (0, I_FAILWITH, [], []);
+        ] )
   in
+  let view_node (name, param_ty, return_ty) =
+    Prim
+      ( 0,
+        K_view,
+        [
+          String (0, name);
+          root param_ty;
+          root return_ty;
+          (* The body is `{ DROP; PUSH string "..."; FAILWITH }` — a
+             stub: the real view dispatch happens in the kernel's
+             `try_dispatch_enshrined_view` hook, which is unreachable
+             from off-chain Michelson interpretation. *)
+          failwith_body;
+        ],
+        [] )
+  in
+  let sorted_views =
+    List.sort (fun (a, _, _) (b, _, _) -> String.compare a b) views
+  in
+  let toplevel_nodes =
+    [
+      Prim (0, K_parameter, [root param_type], []);
+      Prim (0, K_storage, [root unit_ty], []);
+      Prim (0, K_code, [failwith_body], []);
+    ]
+    @ List.map view_node sorted_views
+  in
+  let code_expr = strip_locations (Seq (0, toplevel_nodes)) in
   Imported_context.Script.
     {code = lazy_expr code_expr; storage = lazy_expr unit_val}
