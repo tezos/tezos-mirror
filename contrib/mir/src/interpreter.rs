@@ -1449,9 +1449,9 @@ fn interpret_one<'a>(
         },
         I::GetN(n) => {
             ctx.gas().consume(interpret_cost::get_n(*n as usize)?)?;
-            let res = get_nth_field_ref(*n, Rc::make_mut(stack.get_mut(0)?));
-            // this is a bit hacky, but borrow rules leave few other options
-            *stack.get_mut(0)? = Rc::new(std::mem::replace(res, V::Unit));
+            let comb_rc = pop_rc!();
+            let field = get_nth_field_rc(*n, &comb_rc);
+            stack.push(field);
         }
         I::Update(overload) => match overload {
             overloads::Update::Set => {
@@ -2039,6 +2039,34 @@ fn get_nth_field_ref<'a, 'b>(
 
             (_, V::Pair(_, r)) => {
                 val = Rc::make_mut(r);
+                m -= 2;
+            }
+            _ => unreachable_state(),
+        }
+    }
+}
+
+/// Walk the comb by reference (no `Rc::make_mut`) and return the `Rc`
+/// of the nth field. Refcount-only operation: extracting a field from a
+/// shared comb no longer deep-clones the whole pair tree.
+///
+/// The Michelson `GET n` indexing on a right-nested pair tree
+/// `Pair(f0, Pair(f1, Pair(f2, ...)))` is:
+///   - even `n`: the suffix subtree starting at depth `n/2`
+///     (`n=0` is the whole comb, `n=2` is `Pair(f1, ...)`, etc.)
+///   - odd  `n`: the field at depth `(n-1)/2`
+///     (`n=1` is `f0`, `n=3` is `f1`, etc.)
+/// Descending into the right child consumes two indices at once: the
+/// "suffix at this level" (even) and the "field at this level" (odd),
+/// hence `m -= 2`.
+fn get_nth_field_rc<'b>(mut m: u16, mut val: &Rc<TypedValue<'b>>) -> Rc<TypedValue<'b>> {
+    use TypedValue as V;
+    loop {
+        match (m, &**val) {
+            (0, _) => return val.clone(),
+            (1, V::Pair(l, _)) => return l.clone(),
+            (_, V::Pair(_, r)) => {
+                val = r;
                 m -= 2;
             }
             _ => unreachable_state(),
