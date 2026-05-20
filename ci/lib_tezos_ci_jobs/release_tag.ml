@@ -227,26 +227,6 @@ let job_release_page =
     ~variables:(release_page_variables ~mode)
     ~script:["eval $(opam env)"; "./scripts/releases/publish-release-page.sh"]
 
-let job_opam_release =
-  Cacio.parameterize @@ fun mode ->
-  CI.job
-    "opam:release"
-    ~__POS__
-    ~image:Images.CI.prebuild
-    ~stage:Publish
-    ~description:
-      "Update opam package descriptions on tezos/tezos opam-repository fork.\n\n\
-       This job does preliminary work for releasing Octez opam packages on \
-       opam repository, by pushing a branch with updated package descriptions \
-       (.opam files) to https://github.com/tezos/opam-repository. It _does \
-       not_ automatically create a corresponding pull request on the official \
-       opam repository."
-    ~script:
-      [
-        ("./scripts/ci/opam-release.sh"
-        ^ match mode with `test -> " --dry-run" | `real -> "");
-      ]
-
 let job_dispatch_call =
   CI.job
     "dispatch-call"
@@ -278,7 +258,6 @@ let () =
       (Auto, job_docker_merge_manifests `real);
       (Auto, job_gitlab_release `real);
       (Manual, job_release_page `real `wait_for_build);
-      (Auto, job_opam_release `real);
       (Auto, job_dispatch_call);
       (Auto, Debian_repository.job_apt_repo_debian Release);
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
@@ -290,7 +269,6 @@ let () =
       (Auto, job_docker_container_scanning `test);
       (Auto, job_gitlab_release `test);
       (Manual, job_release_page `test `wait_for_build);
-      (Auto, job_opam_release `test);
       (Auto, job_docker_promote_to_latest `test_wait);
       (Auto, Debian_repository.job_apt_repo_debian Release);
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
@@ -302,7 +280,6 @@ let () =
       (Auto, job_docker_merge_manifests `real);
       (Auto, job_gitlab_release `real);
       (Manual, job_release_page `real `wait_for_build);
-      (Auto, job_opam_release `real);
       (Auto, job_dispatch_call);
       (Auto, Debian_repository.job_apt_repo_debian Release);
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
@@ -314,7 +291,6 @@ let () =
       (Auto, job_docker_container_scanning `test);
       (Auto, job_gitlab_release `test);
       (Manual, job_release_page `test `wait_for_build);
-      (Auto, job_opam_release `test);
       (Auto, job_docker_promote_to_latest `test_wait);
       (Auto, Debian_repository.job_apt_repo_debian Release);
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
