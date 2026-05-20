@@ -447,6 +447,15 @@ let wait_for_blueprint_finalized ?timeout evm_node level =
   | Not_running | Running {session_state = {ready = false; _}; _} ->
       failwith "EVM node is not ready"
 
+let wait_for_observer_finalized_level ?timeout evm_node level =
+  wait_for_event
+    ?timeout
+    evm_node
+    ~event:"evm_context_observer_applied_finalized_levels.v0"
+  @@ fun json ->
+  let found_level = JSON.(json |> as_string |> int_of_string) in
+  if found_level >= level then Some () else None
+
 let wait_for_blueprint_injected ?timeout evm_node level =
   match evm_node.status with
   | Running {session_state = {ready = true; _}; _} when is_sequencer evm_node ->

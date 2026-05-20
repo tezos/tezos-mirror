@@ -331,6 +331,11 @@ val wait_for_blueprint_invalid_applied : t -> unit Lwt.t
 
 val wait_for_blueprint_finalized : ?timeout:float -> t -> int -> unit Lwt.t
 
+(** [wait_for_observer_finalized_level ?timeout evm_node level] waits until
+    [evm_node] (an observer running with [--dont-track-rollup-node]) has
+    processed a [Finalized_levels] broadcast with [end_l2_level >= level]. *)
+val wait_for_observer_finalized_level : ?timeout:float -> t -> int -> unit Lwt.t
+
 (** [wait_for_predownload_kernel ?timeout evm_node ~root_hash] waits until
     [evm_node] has download a kernel with [root_hash]. *)
 val wait_for_predownload_kernel :
