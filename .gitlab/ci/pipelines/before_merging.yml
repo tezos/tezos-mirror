@@ -19,6 +19,7 @@ oc.docker:ci:amd64:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
@@ -46,6 +47,7 @@ oc.docker:rust-toolchain:amd64:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_rust_toolchain_build.sh
@@ -98,6 +100,7 @@ oc.docker:ci:arm64:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
@@ -5898,7 +5901,7 @@ oc.docker:arm64:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/docker_initialize.sh --image-names
   - ./scripts/ci/docker_release.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
@@ -5951,7 +5954,7 @@ oc.script.docker_verify_image_arm64:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/docker_initialize.sh --image-names
   - ./scripts/ci/docker_verify_signature.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
@@ -6000,7 +6003,7 @@ oc.docker:amd64:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/docker_initialize.sh --image-names
   - ./scripts/ci/docker_release.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
@@ -6053,7 +6056,7 @@ oc.script.docker_verify_image_amd64:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/docker_initialize.sh --image-names
   - ./scripts/ci/docker_verify_signature.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:

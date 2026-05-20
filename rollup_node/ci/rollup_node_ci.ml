@@ -43,7 +43,10 @@ let job_docker_build =
     ~description:
       (sf "Build Octez Smart Rollup docker image for %s." arch_string)
     ~script:
-      ["./scripts/ci/docker_initialize.sh"; "./scripts/ci/docker_release.sh"]
+      [
+        "./scripts/ci/docker_initialize.sh --image-names";
+        "./scripts/ci/docker_release.sh";
+      ]
 
 let job_build_static_binaries =
   Cacio.parameterize @@ fun arch ->
@@ -102,7 +105,7 @@ let job_docker_merge_manifests =
     ~description:"Merge manifest for arm64 and arm64 docker images."
     ~script:
       [
-        "./scripts/ci/docker_initialize.sh";
+        "./scripts/ci/docker_initialize.sh --image-names";
         "./scripts/ci/docker_merge_manifests.sh";
       ]
 

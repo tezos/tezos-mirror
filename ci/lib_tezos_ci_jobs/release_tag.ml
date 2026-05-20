@@ -108,7 +108,7 @@ let job_docker_promote_to_latest =
           [])
     ~script:
       [
-        "./scripts/ci/docker_initialize.sh";
+        "./scripts/ci/docker_initialize.sh --image-names";
         "./scripts/ci/docker_promote_to_latest.sh";
       ]
 
@@ -416,7 +416,7 @@ let job_docker_promote_to_version =
       ]
     ~script:
       [
-        "./scripts/ci/docker_initialize.sh";
+        "./scripts/ci/docker_initialize.sh --image-names";
         "./scripts/ci/docker_promote_to_version.sh";
       ]
 

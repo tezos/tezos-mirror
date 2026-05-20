@@ -84,7 +84,10 @@ let job_docker_build =
     ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
     ~description:(sf "Build EVM node docker image for %s." arch_string)
     ~script:
-      ["./scripts/ci/docker_initialize.sh"; "./scripts/ci/docker_release.sh"]
+      [
+        "./scripts/ci/docker_initialize.sh --image-names";
+        "./scripts/ci/docker_release.sh";
+      ]
 
 let job_build_evm_node_static =
   Cacio.parameterize @@ fun arch ->
@@ -412,7 +415,7 @@ let job_docker_merge =
     ~description:"Merge manifest for arm64 and arm64 docker images."
     ~script:
       [
-        "./scripts/ci/docker_initialize.sh";
+        "./scripts/ci/docker_initialize.sh --image-names";
         "./scripts/ci/docker_merge_manifests.sh";
       ]
 
@@ -433,7 +436,7 @@ let job_docker_promote_to_latest =
     ~description:"Promote the docker images to octez-evm-node-latest."
     ~script:
       [
-        "./scripts/ci/docker_initialize.sh";
+        "./scripts/ci/docker_initialize.sh --image-names";
         "./scripts/ci/docker_promote_to_latest.sh octez-evm-node-latest \
          ./scripts/ci/octez-evm-node-release.sh";
       ]

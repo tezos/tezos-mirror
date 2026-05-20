@@ -2,8 +2,8 @@
 
 set -eu
 
-# Read environment variables written by 'docker_registry_auth.sh' in
-# 'before_script'.
+# Read environment variables written by 'docker_image_names.sh'
+# (via docker_initialize.sh --image-names) in 'before_script'.
 . scripts/ci/docker.env
 
 # Note: 'ci_image_name' is set in the variables section

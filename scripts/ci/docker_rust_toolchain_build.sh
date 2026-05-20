@@ -58,8 +58,6 @@ docker_image_ref_tag=$(echo "${CI_COMMIT_REF_NAME}" | sanitizeTag)
 # Store the image name for jobs that use it.
 echo "rust_toolchain_image_tag=$image_tag" > rust_toolchain_image_tag.env
 
-./scripts/ci/docker_initialize.sh
-
 # Build image unless it already exists in the registry.
 
 # Enforce image rebuild ignoring inputs changes (i.e. rebuild the image
