@@ -13,7 +13,7 @@ use revm::{
 };
 use tezos_indexable_storage::IndexableStorageError;
 use tezos_smart_rollup_host::{path::PathError, runtime::RuntimeError};
-use tezosx_interfaces::TezosXRuntimeError;
+use tezosx_interfaces::{KernelStorageError, TezosXRuntimeError};
 use thiserror::Error;
 
 /// Failures from the EVM database when reading or writing storage
@@ -140,11 +140,23 @@ pub enum EvmRunError {
     DB(#[from] EvmDbError),
 }
 
+impl From<EvmDbError> for KernelStorageError {
+    fn from(e: EvmDbError) -> Self {
+        KernelStorageError(e.to_string())
+    }
+}
+
+impl From<OriginStorageError> for KernelStorageError {
+    fn from(e: OriginStorageError) -> Self {
+        KernelStorageError(e.to_string())
+    }
+}
+
 impl From<EvmDbError> for TezosXRuntimeError {
     fn from(value: EvmDbError) -> Self {
         match value {
             EvmDbError::Runtime(err) => TezosXRuntimeError::Runtime(err),
-            other => TezosXRuntimeError::Custom(other.to_string()),
+            other => TezosXRuntimeError::Storage(other.into()),
         }
     }
 }
