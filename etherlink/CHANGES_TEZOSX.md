@@ -44,6 +44,11 @@
   the block-number index moves from `/evm/world_state/indexes/blocks/` to
   `/evm/world_state/blocks/indexes/` (storage version 58). (!21911)
 
+- Move `/evm/world_state/eth_accounts/` to
+  `/evm/eth_accounts/` and `/evm/world_state/eth_codes/` to
+  `/evm/eth_accounts/eth_codes/`. Add `/evm/eth_accounts` as the fourth
+  SafeStorage safe root (storage version 59). (!21933)
+
 ### Internals
 
 ## Version 0.5 (3038e37e7cfca6f6930dce8375fc97d3917e0518)

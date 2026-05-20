@@ -23,6 +23,12 @@
   `/evm/` paths otherwise. Operators must upgrade to this release before
   running a V58+ kernel; the release stays backward-compatible with pre-V58
   kernels. (!21911)
+- Resolve EVM account state (`eth_accounts`) and deduplicated bytecode
+  (`eth_codes`) from `/evm/eth_accounts/` on kernels at storage version 59
+  or higher, falling back to the legacy `/evm/world_state/eth_accounts/` and
+  `/evm/world_state/eth_codes/` paths otherwise. Operators must upgrade to this
+  release before running a V59+ kernel; the release stays backward-compatible
+  with pre-V59 kernels. (!21933)
 
 ### Documentation changes
 
