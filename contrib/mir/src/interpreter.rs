@@ -351,6 +351,17 @@ fn interpret_one<'a>(
         };
     }
 
+    // `pop_ref!(x, Foo)` pops the stack and binds `x` as a borrow into
+    // `V::Foo`'s payload, without cloning. Expands to two `let`s so the
+    // intermediate `Rc<TypedValue>` lives in the caller's scope and `x`
+    // stays a valid reference.
+    macro_rules! pop_ref {
+        ($var:ident, $ctor:tt) => {
+            let __pop_ref_rc = pop_rc!();
+            let $var = irrefutable_match!(&*__pop_ref_rc; V::$ctor);
+        };
+    }
+
     match i {
         I::Add(overload) => match overload {
             overloads::Add::IntInt => {
@@ -1529,7 +1540,7 @@ fn interpret_one<'a>(
         I::Size(overload) => {
             macro_rules! run_size {
                 ($ctor:tt, $gas:ident) => {{
-                    let e = pop!(V::$ctor);
+                    pop_ref!(e, $ctor);
                     ctx.gas().consume(interpret_cost::$gas)?;
                     let res = e.len();
                     stack.push(V::Nat(res.into()));
