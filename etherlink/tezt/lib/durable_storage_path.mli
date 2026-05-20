@@ -45,29 +45,29 @@ val kernel_version : Kernel.t -> path
 (** [indexes] is the directory with all indexes category. *)
 val indexes : path
 
-(** [eth_accounts] is the path to ethereum accounts. *)
-val eth_accounts : path
+(** [eth_accounts kernel] is the path to ethereum accounts. *)
+val eth_accounts : Kernel.t -> path
 
-(** [eth_account addr] is the path to the [addr] account. The address
+(** [eth_account kernel addr] is the path to the [addr] account. The address
     is "normalized", i.e. lowered and removed the prefix [0x] if it exists. *)
-val eth_account : string -> path
+val eth_account : Kernel.t -> string -> path
 
-(** [account_info addr] is the path to the [addr] account's RLP-encoded info
+(** [account_info kernel addr] is the path to the [addr] account's RLP-encoded info
     (balance, nonce, code_hash). *)
-val account_info : string -> path
+val account_info : Kernel.t -> string -> path
 
-(** [balance addr] is the path to the [addr] account's balance. *)
-val balance : string -> path
+(** [balance kernel addr] is the path to the [addr] account's balance. *)
+val balance : Kernel.t -> string -> path
 
-(** [nonce addr] is the path to the [addr] account's nonce. *)
-val nonce : string -> path
+(** [nonce kernel addr] is the path to the [addr] account's nonce. *)
+val nonce : Kernel.t -> string -> path
 
-(** [code addr] is the path to the [addr] account's code. *)
-val code : string -> path
+(** [code kernel addr] is the path to the [addr] account's code. *)
+val code : Kernel.t -> string -> path
 
-(** [storage addr ?key ()] is the path to the [addr] storage's code. [key]
+(** [storage kernel addr ?key ()] is the path to the [addr] storage's code. [key]
     can be provided to get the path of a sub-element in the storage. *)
-val storage : string -> ?key:string -> unit -> path
+val storage : Kernel.t -> string -> ?key:string -> unit -> path
 
 (** [admin] is the path to the administrator contract. *)
 val admin : Kernel.t -> path
@@ -133,9 +133,12 @@ val storage_version : Kernel.t -> path
 val evm_node_flag : Kernel.t -> path
 
 module Ticket_table : sig
-  (** [balance ~ticket_hash ~account] returns the path where the balance of
+  (** [ticket_table kernel] returns the path to the ticket table. *)
+  val ticket_table : Kernel.t -> path
+
+  (** [balance kernel ~ticket_hash ~account] returns the path where the balance of
       [account] of ticket [ticket_hash] is. *)
-  val balance : ticket_hash:path -> account:path -> path
+  val balance : Kernel.t -> ticket_hash:path -> account:path -> path
 end
 
 module Ghostnet : sig

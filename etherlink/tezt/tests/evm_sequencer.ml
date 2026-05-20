@@ -1706,12 +1706,14 @@ let ticket_hash ticketer token_id =
   let payload_digest = Tezos_crypto.Hacl.Hash.Keccak_256.digest payload in
   return (payload_digest |> Hex.of_bytes |> Hex.show)
 
-let ticket_balance ~ticket_hash ~account endpoint =
+let ticket_balance ~kernel ~ticket_hash ~account endpoint =
   let account =
     account |> Durable_storage_path.no_0x |> String.lowercase_ascii
   in
   let* ticket_balance =
-    let key = Durable_storage_path.Ticket_table.balance ~ticket_hash ~account in
+    let key =
+      Durable_storage_path.Ticket_table.balance kernel ~ticket_hash ~account
+    in
     match endpoint with
     | Either.Left sc_rollup_node ->
         Sc_rollup_node.RPC.call
@@ -1747,7 +1749,15 @@ let test_delayed_fa_deposit_is_included =
     ~additional_uses:[Constant.octez_codec]
     ~time_between_blocks:Nothing
   @@
-  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+  fun {
+        client;
+        l1_contracts;
+        sc_rollup_address;
+        sc_rollup_node;
+        sequencer;
+        kernel;
+        _;
+      }
       _protocol
     ->
   (* let endpoint = Evm_node.endpoint sequencer in *)
@@ -1778,6 +1788,7 @@ let test_delayed_fa_deposit_is_included =
 
   let* ticket_balance_via_rollup_node =
     ticket_balance
+      ~kernel
       ~ticket_hash:zero_ticket_hash
       ~account:receiver
       (Either.Left sc_rollup_node)
@@ -1787,6 +1798,7 @@ let test_delayed_fa_deposit_is_included =
       "After deposit we expect %L ticket balance in the rollup node, got %R" ;
   let* ticket_balance_via_sequencer =
     ticket_balance
+      ~kernel
       ~ticket_hash:zero_ticket_hash
       ~account:receiver
       (Either.Right sequencer)
@@ -1815,7 +1827,15 @@ let test_delayed_fa_deposit_is_ignored_if_feature_disabled =
     ~additional_uses:[Constant.octez_codec]
     ~time_between_blocks:Nothing
   @@
-  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+  fun {
+        client;
+        l1_contracts;
+        sc_rollup_address;
+        sc_rollup_node;
+        sequencer;
+        kernel;
+        _;
+      }
       _protocol
     ->
   (* let endpoint = Evm_node.endpoint sequencer in *)
@@ -1841,6 +1861,7 @@ let test_delayed_fa_deposit_is_ignored_if_feature_disabled =
 
   let* ticket_balance_via_rollup_node =
     ticket_balance
+      ~kernel
       ~ticket_hash:zero_ticket_hash
       ~account:receiver
       (Either.Left sc_rollup_node)
@@ -1850,6 +1871,7 @@ let test_delayed_fa_deposit_is_ignored_if_feature_disabled =
       "The deposit should have been refused by rollup node, but balance is %R" ;
   let* ticket_balance_via_sequencer =
     ticket_balance
+      ~kernel
       ~ticket_hash:zero_ticket_hash
       ~account:receiver
       (Either.Right sequencer)
@@ -2076,7 +2098,15 @@ let test_fa_withdrawal_is_included =
     ~time_between_blocks:Nothing
     ~additional_uses:[Constant.octez_codec]
   @@
-  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+  fun {
+        client;
+        l1_contracts;
+        sc_rollup_address;
+        sc_rollup_node;
+        sequencer;
+        kernel;
+        _;
+      }
       _protocol
     ->
   (* 1. Deposit some tickets *)
@@ -2109,6 +2139,7 @@ let test_fa_withdrawal_is_included =
 
   let* ticket_balance_after_deposit =
     ticket_balance
+      ~kernel
       ~ticket_hash:zero_ticket_hash
       ~account:receiver
       (Either.Right sequencer)
@@ -2149,6 +2180,7 @@ let test_fa_withdrawal_is_included =
   (* Check that tickets are gone *)
   let* ticket_balance_after_withdraw =
     ticket_balance
+      ~kernel
       ~ticket_hash:zero_ticket_hash
       ~account:receiver
       (Either.Right sequencer)
@@ -2225,6 +2257,7 @@ let test_fa_reentrant_deposit_reverts =
         sc_rollup_node;
         sequencer;
         evm_version;
+        kernel;
         _;
       }
       _protocol
@@ -2294,6 +2327,7 @@ let test_fa_reentrant_deposit_reverts =
   let* zero_ticket_hash = ticket_hash l1_contracts.ticket_router_tester 0 in
   let* receiver_balance =
     ticket_balance
+      ~kernel
       ~ticket_hash:zero_ticket_hash
       ~account:receiver
       (Either.Right sequencer)
@@ -2302,6 +2336,7 @@ let test_fa_reentrant_deposit_reverts =
     ~error_msg:"As the deposit fails, the receiver should own the ticket" ;
   let* proxy_balance =
     ticket_balance
+      ~kernel
       ~ticket_hash:zero_ticket_hash
       ~account:reentrancy
       (Either.Right sequencer)
@@ -9349,7 +9384,15 @@ let test_deposit_and_fa_fast_withdraw =
     ~enable_fa_bridge:true
     ~enable_fast_fa_withdrawal:true
   @@
-  fun {sequencer; sc_rollup_address; client; l1_contracts; sc_rollup_node; _}
+  fun {
+        sequencer;
+        sc_rollup_address;
+        client;
+        l1_contracts;
+        sc_rollup_node;
+        kernel;
+        _;
+      }
       _protocol
     ->
   let* fast_withdrawal_contract_address =
@@ -9448,6 +9491,7 @@ let test_deposit_and_fa_fast_withdraw =
 
   let* ticket_balance_after_deposit =
     ticket_balance
+      ~kernel
       ~ticket_hash:zero_ticket_hash
       ~account:receiver.address
       (Either.Right sequencer)
@@ -14882,7 +14926,7 @@ let test_validate_encoding_compatibility_accounts =
     ~__FILE__
     ~title:"Validate encoding compatibility of accounts"
     ~tags:["encoding"; "accounts"; "foo"]
-  @@ fun {sequencer; observer; _} _protocol ->
+  @@ fun {sequencer; observer; kernel; _} _protocol ->
   let nonce = Z.of_int 1234 in
   let source = Eth_account.bootstrap_accounts.(0) in
   let bits = Z.to_bits nonce |> Bytes.of_string in
@@ -14892,13 +14936,13 @@ let test_validate_encoding_compatibility_accounts =
   let* () =
     Evm_node.patch_state
       sequencer
-      ~key:(Durable_storage_path.nonce source.address)
+      ~key:(Durable_storage_path.nonce kernel source.address)
       ~value:(Hex.of_bytes encoded_nonce |> Hex.show)
   in
   let* () =
     Evm_node.patch_state
       observer
-      ~key:(Durable_storage_path.nonce source.address)
+      ~key:(Durable_storage_path.nonce kernel source.address)
       ~value:(Hex.of_bytes encoded_nonce |> Hex.show)
   in
   let* () = Evm_node.run sequencer in
@@ -14995,6 +15039,7 @@ let test_fa_deposit_watchtower =
         sc_rollup_node;
         sequencer;
         evm_version;
+        kernel;
         _;
       }
       _protocol
@@ -15065,7 +15110,7 @@ let test_fa_deposit_watchtower =
   let*@ ticket_hashes =
     Rpc.state_subkeys
       sequencer
-      "/evm/world_state/eth_accounts/0000000000000000000000000000000000000000/ticket_table"
+      (Durable_storage_path.Ticket_table.ticket_table kernel)
   in
   let ticket_hash =
     match ticket_hashes with
@@ -15076,7 +15121,7 @@ let test_fa_deposit_watchtower =
      NB: If the proxy was not a dummy one we could check the ERC20 balance of the
      receiver's address as an additional check. *)
   let* ticket_balance_via_sequencer =
-    ticket_balance ~ticket_hash ~account:proxy (Either.Right sequencer)
+    ticket_balance ~kernel ~ticket_hash ~account:proxy (Either.Right sequencer)
   in
   Check.((amount = ticket_balance_via_sequencer) int)
     ~error_msg:
@@ -15518,7 +15563,15 @@ let test_fa_withdrawal_eoa_without_code =
     ~time_between_blocks:Nothing
     ~additional_uses:[Constant.octez_codec]
   @@
-  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+  fun {
+        client;
+        l1_contracts;
+        sc_rollup_address;
+        sc_rollup_node;
+        sequencer;
+        kernel;
+        _;
+      }
       _protocol
     ->
   let amount = 42 in
@@ -15548,6 +15601,7 @@ let test_fa_withdrawal_eoa_without_code =
   let* zero_ticket_hash = ticket_hash l1_contracts.ticket_router_tester 0 in
   let* ticket_balance_before =
     ticket_balance
+      ~kernel
       ~ticket_hash:zero_ticket_hash
       ~account:receiver
       (Either.Right sequencer)
@@ -15587,6 +15641,7 @@ let test_fa_withdrawal_eoa_without_code =
 
   let* ticket_balance_mid =
     ticket_balance
+      ~kernel
       ~ticket_hash:zero_ticket_hash
       ~account:receiver
       (Either.Right sequencer)
@@ -15612,6 +15667,7 @@ let test_fa_withdrawal_eoa_without_code =
 
   let* ticket_balance_after =
     ticket_balance
+      ~kernel
       ~ticket_hash:zero_ticket_hash
       ~account:receiver
       (Either.Right sequencer)
@@ -15631,7 +15687,15 @@ let test_fa_withdrawal_eoa_unauthorized_caller_fails =
     ~time_between_blocks:Nothing
     ~additional_uses:[Constant.octez_codec]
   @@
-  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+  fun {
+        client;
+        l1_contracts;
+        sc_rollup_address;
+        sc_rollup_node;
+        sequencer;
+        kernel;
+        _;
+      }
       _protocol
     ->
   let amount = 42 in
@@ -15661,6 +15725,7 @@ let test_fa_withdrawal_eoa_unauthorized_caller_fails =
   let* zero_ticket_hash = ticket_hash l1_contracts.ticket_router_tester 0 in
   let* ticket_balance_before =
     ticket_balance
+      ~kernel
       ~ticket_hash:zero_ticket_hash
       ~account:owner.address
       (Either.Right sequencer)
@@ -15720,6 +15785,7 @@ let test_fa_withdrawal_eoa_unauthorized_caller_fails =
   (* Verify the owner's tickets are still there *)
   let* ticket_balance_after =
     ticket_balance
+      ~kernel
       ~ticket_hash:zero_ticket_hash
       ~account:owner.address
       (Either.Right sequencer)
@@ -15747,6 +15813,7 @@ let test_fa_withdrawal_eip7702_unauthorized_caller_fails =
         sc_rollup_node;
         sequencer;
         evm_version;
+        kernel;
         _;
       }
       _protocol
@@ -15854,6 +15921,7 @@ let test_fa_withdrawal_eip7702_unauthorized_caller_fails =
   let* zero_ticket_hash = ticket_hash l1_contracts.ticket_router_tester 0 in
   let* ticket_balance_before =
     ticket_balance
+      ~kernel
       ~ticket_hash:zero_ticket_hash
       ~account:owner.address
       (Either.Right sequencer)
@@ -15914,6 +15982,7 @@ let test_fa_withdrawal_eip7702_unauthorized_caller_fails =
   (* Verify the owner's tickets are still there *)
   let* ticket_balance_after =
     ticket_balance
+      ~kernel
       ~ticket_hash:zero_ticket_hash
       ~account:owner.address
       (Either.Right sequencer)
@@ -15940,6 +16009,7 @@ let test_fa_withdrawal_eip7702_eoa =
         sc_rollup_node;
         sequencer;
         evm_version;
+        kernel;
         _;
       }
       _protocol
@@ -16047,6 +16117,7 @@ let test_fa_withdrawal_eip7702_eoa =
   let* zero_ticket_hash = ticket_hash l1_contracts.ticket_router_tester 0 in
   let* ticket_balance_before =
     ticket_balance
+      ~kernel
       ~ticket_hash:zero_ticket_hash
       ~account:eoa.address
       (Either.Right sequencer)
@@ -16088,6 +16159,7 @@ let test_fa_withdrawal_eip7702_eoa =
 
   let* ticket_balance_mid =
     ticket_balance
+      ~kernel
       ~ticket_hash:zero_ticket_hash
       ~account:eoa.address
       (Either.Right sequencer)
@@ -16113,6 +16185,7 @@ let test_fa_withdrawal_eip7702_eoa =
 
   let* ticket_balance_after =
     ticket_balance
+      ~kernel
       ~ticket_hash:zero_ticket_hash
       ~account:eoa.address
       (Either.Right sequencer)

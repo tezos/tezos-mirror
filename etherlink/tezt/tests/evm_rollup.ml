@@ -189,18 +189,25 @@ let check_status_n_logs ~endpoint ~status ~logs ~tx =
           ~error_msg:"Unexpected transaction logs, expected:\n%R but got:\n%L") ;
       unit
 
-(** [get_value_in_storage client addr nth] fetch the [nth] value in the storage
-    of account [addr]  *)
-let get_value_in_storage sc_rollup_node address nth =
-  Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks:Tezos_regression.rpc_hooks
+(** [get_value_in_storage evm_setup addr nth] fetch the [nth] value in the
+    storage of account [addr]  *)
+let get_value_in_storage ~evm_setup address nth =
+  Sc_rollup_node.RPC.call
+    evm_setup.sc_rollup_node
+    ~rpc_hooks:Tezos_regression.rpc_hooks
   @@ Sc_rollup_rpc.get_global_block_durable_state_value
        ~pvm_kind
        ~operation:Sc_rollup_rpc.Value
-       ~key:(Durable_storage_path.storage address ~key:(hex_256_of_int nth) ())
+       ~key:
+         (Durable_storage_path.storage
+            evm_setup.kernel
+            address
+            ~key:(hex_256_of_int nth)
+            ())
        ()
 
 let check_str_in_storage ~evm_setup ~address ~nth ~expected =
-  let* value = get_value_in_storage evm_setup.sc_rollup_node address nth in
+  let* value = get_value_in_storage ~evm_setup address nth in
   Check.((value = Some expected) (option string))
     ~error_msg:"Unexpected value in storage, should be %R, but got %L" ;
   unit
@@ -212,20 +219,21 @@ let check_nb_in_storage ~evm_setup ~address ~nth ~expected =
     ~nth
     ~expected:(hex_256_of_int expected)
 
-let get_storage_size sc_rollup_node ~address =
+let get_storage_size ~evm_setup ~address =
   let* storage =
-    Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks:Tezos_regression.rpc_hooks
+    Sc_rollup_node.RPC.call
+      evm_setup.sc_rollup_node
+      ~rpc_hooks:Tezos_regression.rpc_hooks
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
          ~pvm_kind
          ~operation:Sc_rollup_rpc.Subkeys
-         ~key:(Durable_storage_path.storage address ())
+         ~key:(Durable_storage_path.storage evm_setup.kernel address ())
          ()
   in
   return (List.length storage)
 
-let check_storage_size sc_rollup_node ~address size =
-  (* check storage size *)
-  let* storage_size = get_storage_size sc_rollup_node ~address in
+let check_storage_size ~evm_setup ~address size =
+  let* storage_size = get_storage_size ~evm_setup ~address in
   Check.((storage_size = size) int)
     ~error_msg:"Unexpected storage size, should be %R, but is %L" ;
   unit
@@ -902,7 +910,7 @@ let deploy_with_base_checks {contract; expected_address} full_evm_setup =
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
          ~pvm_kind
          ~operation:Sc_rollup_rpc.Subkeys
-         ~key:Durable_storage_path.eth_accounts
+         ~key:(Durable_storage_path.eth_accounts full_evm_setup.kernel)
          ()
   in
   (* check tx status*)
@@ -1436,7 +1444,7 @@ let test_l2_call_simple_storage =
       ()
   in
   let* () = check_tx_succeeded ~endpoint ~tx in
-  let* () = check_storage_size sc_rollup_node ~address 1 in
+  let* () = check_storage_size ~evm_setup ~address 1 in
   let* () = check_nb_in_storage ~evm_setup ~address ~nth:0 ~expected:42 in
 
   (* set 24 by another user *)
@@ -1457,7 +1465,7 @@ let test_l2_call_simple_storage =
       ()
   in
   let* () = check_tx_succeeded ~endpoint ~tx in
-  let* () = check_storage_size sc_rollup_node ~address 1 in
+  let* () = check_storage_size ~evm_setup ~address 1 in
   (* value stored has changed *)
   let* () = check_nb_in_storage ~evm_setup ~address ~nth:0 ~expected:24 in
 
@@ -1481,7 +1489,7 @@ let test_l2_call_simple_storage =
       ()
   in
   let* () = check_tx_succeeded ~endpoint ~tx in
-  let* () = check_storage_size sc_rollup_node ~address 1 in
+  let* () = check_storage_size ~evm_setup ~address 1 in
   (* value stored has changed *)
   let* () =
     check_str_in_storage
@@ -1530,7 +1538,7 @@ let test_l2_deploy_erc20 =
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
          ~pvm_kind
          ~operation:Sc_rollup_rpc.Subkeys
-         ~key:Durable_storage_path.eth_accounts
+         ~key:(Durable_storage_path.eth_accounts evm_setup.kernel)
          ()
   in
   Check.(
@@ -5779,7 +5787,7 @@ let test_l2_call_inter_contract =
   in
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node () in
   let* () = check_tx_succeeded ~endpoint ~tx in
-  let* () = check_storage_size sc_rollup_node ~address:callee_address 1 in
+  let* () = check_storage_size ~evm_setup ~address:callee_address 1 in
   let* () =
     check_nb_in_storage ~evm_setup ~address:callee_address ~nth:0 ~expected:20
   in
@@ -5804,7 +5812,7 @@ let test_l2_call_inter_contract =
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node () in
 
   let* () = check_tx_succeeded ~endpoint ~tx in
-  let* () = check_storage_size sc_rollup_node ~address:callee_address 1 in
+  let* () = check_storage_size ~evm_setup ~address:callee_address 1 in
   let* () =
     check_nb_in_storage ~evm_setup ~address:callee_address ~nth:0 ~expected:10
   in
@@ -6839,7 +6847,7 @@ let test_reveal_storage =
       @@ Sc_rollup_rpc.get_global_block_durable_state_value
            ~pvm_kind
            ~operation:Sc_rollup_rpc.Value
-           ~key:(Durable_storage_path.account_info address)
+           ~key:(Durable_storage_path.account_info evm_setup.kernel address)
            ()
     in
     match info_opt with
@@ -7492,12 +7500,12 @@ let test_rpc_state_value_and_subkeys =
            [maximum_gas_per_transaction] under [/evm/world_state/], and
            reorganized the block index from [/evm/world_state/indexes/blocks/]
            to [/evm/world_state/blocks/indexes/], so [indexes] is no longer a
-           direct child of [/evm/world_state/]. *)
+           direct child of [/evm/world_state/]. Phase 7 (V59) moved
+           [eth_accounts] and [eth_codes] out of [/evm/world_state/] entirely
+           into [/evm/eth_accounts/]. *)
         [
           "blocks";
           "chain_id";
-          "eth_accounts";
-          "eth_codes";
           "evm_version";
           "fees";
           "maximum_gas_per_transaction";
