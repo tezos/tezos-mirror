@@ -399,6 +399,22 @@ module Term = struct
 
   let ignore_l1_config_peers = switch_to_cmdliner ignore_l1_config_peers_switch
 
+  let ignore_l1_history_check_switch =
+    make_switch
+      ~doc:
+        "If set, downgrade the startup check that the L1 node retains enough \
+         past cycles from an error to a warning. Intended for test networks \
+         where the operator does not control the L1 node and cannot recompile \
+         the DAL node (for instance when running official Docker images). \
+         Bypassing this check may result in the DAL node behaving incorrectly \
+         if it needs to fetch data from levels the L1 node has already pruned; \
+         on a mainnet this may translate into missed attestations and lost \
+         rewards."
+      "ignore-l1-history-check"
+
+  let ignore_l1_history_check =
+    switch_to_cmdliner ignore_l1_history_check_switch
+
   let attester_profile_printer = Signature.Public_key_hash.pp
 
   let attester_profile_format =
@@ -786,7 +802,8 @@ module Run = struct
        banned_addrs
        ignore_topics
        batching_configuration
-       publish_slots_regularly ->
+       publish_slots_regularly
+       ignore_l1_history_check ->
     let open Lwt_result_syntax in
     let data_dir =
       Option.value ~default:Configuration_file.default.data_dir data_dir
@@ -877,6 +894,7 @@ module Run = struct
     @@ fun () ->
     Daemon.run
       ~disable_shard_validation
+      ~ignore_l1_history_check
       ~ignore_pkhs
       ~data_dir
       ~config_file
@@ -895,7 +913,8 @@ module Run = struct
        $ history_mode $ service_name $ service_namespace $ telemetry_env
        $ fetch_trusted_setup $ disable_shard_validation $ verbose
        $ ignore_l1_config_peers $ disable_amplification $ banned_addrs
-       $ ignore_topics $ batching_configuration $ publish_slots_regularly))
+       $ ignore_topics $ batching_configuration $ publish_slots_regularly
+       $ ignore_l1_history_check))
 
   let cmd = Cmdliner.Cmd.v info term
 end
@@ -1350,7 +1369,7 @@ module Action = struct
       ?(disable_shard_validation = false) ?(verbose = false)
       ?(ignore_l1_config_peers = false) ?(disable_amplification = false)
       ?banned_addrs ?ignore_topics ?batching_configuration
-      ?publish_slots_regularly () =
+      ?publish_slots_regularly ?(ignore_l1_history_check = false) () =
     Run.action
       data_dir
       config_file
@@ -1380,6 +1399,7 @@ module Action = struct
       ignore_topics
       batching_configuration
       publish_slots_regularly
+      ignore_l1_history_check
 
   let mk_config_action action =
    fun ?data_dir

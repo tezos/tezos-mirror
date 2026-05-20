@@ -463,8 +463,8 @@ let backfill_slot_statuses cctxt store (module Plugin : Dal_plugin.T)
       else return_unit)
     (Stdlib.List.init proto_parameters.attestation_lag Fun.id)
 
-let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
-    ~configuration_override () =
+let run ?(disable_shard_validation = false) ?(ignore_l1_history_check = false)
+    ~ignore_pkhs ~data_dir ~config_file ~configuration_override () =
   let open Lwt_result_syntax in
   let*! () =
     let log_cfg =
@@ -711,6 +711,7 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
   in
   let* () =
     History_check.check_l1_history_mode
+      ~ignore_l1_check:ignore_l1_history_check
       profile_ctxt
       cctxt
       proto_parameters

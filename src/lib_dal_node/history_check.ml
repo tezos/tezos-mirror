@@ -58,9 +58,13 @@ let skip_list_offset proto_parameters =
   proto_parameters.Types.attestation_lag + 1
 
 (* This function checks the L1 node stores enough block data for the DAL node to
-   function correctly. *)
-let check_l1_history_mode profile_ctxt cctxt proto_parameters ~head_level
-    ~first_seen_level =
+   function correctly. If [ignore_l1_check] is set and the L1 node does not
+   retain enough cycles, the function emits a warning event and proceeds
+   instead of failing. This is intended for test networks where the operator
+   does not control the L1 node and cannot recompile the DAL node (e.g. when
+   running official Docker images). *)
+let check_l1_history_mode ?(ignore_l1_check = false) profile_ctxt cctxt
+    proto_parameters ~head_level ~first_seen_level =
   let open Lwt_result_syntax in
   let* l1_history_mode =
     let* l1_mode, blocks_preservation_cycles_opt =
@@ -93,9 +97,17 @@ let check_l1_history_mode profile_ctxt cctxt proto_parameters ~head_level
       if dal_blocks mod blocks_per_cycle = 0 then dal_cycles else 1 + dal_cycles
     in
     if l1_cycles < minimal_cycles then
-      tzfail
-      @@ Errors.Not_enough_l1_history
-           {stored_cycles = l1_cycles; minimal_cycles}
+      if ignore_l1_check then
+        let*! () =
+          Event.emit_l1_history_check_bypassed
+            ~stored_cycles:l1_cycles
+            ~minimal_cycles
+        in
+        return_unit
+      else
+        tzfail
+        @@ Errors.Not_enough_l1_history
+             {stored_cycles = l1_cycles; minimal_cycles}
     else return_unit
   in
   match l1_history_mode with
