@@ -1172,6 +1172,28 @@ where
             )?;
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V59 => {
+            // Phase 7: isolate EVM accounts into /evm/eth_accounts/.
+            // Order is load-bearing, do not alphabetise: the eth_accounts
+            // move overwrites the destination subtree, so it must run
+            // before eth_codes is placed at /evm/eth_accounts/eth_codes.
+            let moves: &[(&[u8], &[u8])] = &[
+                (b"/evm/world_state/eth_accounts", b"/evm/eth_accounts"),
+                (
+                    b"/evm/world_state/eth_codes",
+                    b"/evm/eth_accounts/eth_codes",
+                ),
+            ];
+            for (old, new) in moves {
+                allow_path_not_found(
+                    host.store_move(
+                        &RefPath::assert_from(old),
+                        &RefPath::assert_from(new),
+                    ),
+                )?;
+            }
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 
