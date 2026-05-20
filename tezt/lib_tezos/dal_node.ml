@@ -54,7 +54,7 @@ module Parameters = struct
   let default_colors = Log.Color.[|FG.gray; FG.magenta; FG.yellow; FG.green|]
 end
 
-type history_mode = Full | Auto | Custom of int
+type history_mode = Archive | Full | Auto | Custom of int
 
 open Parameters
 include Daemon.Make (Parameters)
@@ -181,6 +181,7 @@ let spawn_config_init_or_reset ~subcommand ?(expected_pow = 0.) ?(peers = [])
   @
   match history_mode with
   | None -> []
+  | Some Archive -> ["--history-mode"; "archive"]
   | Some Full -> ["--history-mode"; "full"]
   | Some Auto -> ["--history-mode"; "auto"]
   | Some (Custom i) -> ["--history-mode"; string_of_int i]
@@ -228,6 +229,7 @@ let spawn_config_update ?(expected_pow = 0.) ?(peers = [])
   @
   match history_mode with
   | None -> []
+  | Some Archive -> ["--history-mode"; "archive"]
   | Some Full -> ["--history-mode"; "full"]
   | Some Auto -> ["--history-mode"; "auto"]
   | Some (Custom i) -> ["--history-mode"; string_of_int i]
