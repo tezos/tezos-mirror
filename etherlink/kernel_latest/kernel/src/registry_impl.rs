@@ -36,7 +36,10 @@ impl Registry for RegistryImpl {
         target_runtime: tezosx_interfaces::RuntimeId,
         context: tezosx_interfaces::CrossRuntimeContext,
         gas_remaining: u64,
-    ) -> Result<(String, u64), tezosx_interfaces::TezosXRuntimeError>
+    ) -> Result<
+        (String, tezosx_interfaces::AliasResolution),
+        tezosx_interfaces::TezosXRuntimeError,
+    >
     where
         Host: StorageV1,
     {

@@ -904,7 +904,7 @@ mod test {
                 target_runtime: RuntimeId,
                 context: CrossRuntimeContext,
                 gas_remaining: u64,
-            ) -> Result<(String, u64), TezosXRuntimeError>
+            ) -> Result<(String, tezosx_interfaces::AliasResolution), TezosXRuntimeError>
             where
                 Host: StorageV1,
             {
@@ -1050,7 +1050,7 @@ mod test {
                 _native_public_key: Option<&[u8]>,
                 _context: CrossRuntimeContext,
                 gas_remaining: u64,
-            ) -> Result<(String, u64), TezosXRuntimeError>
+            ) -> Result<(String, tezosx_interfaces::AliasResolution), TezosXRuntimeError>
             where
                 Host: StorageV1,
             {
@@ -1059,7 +1059,10 @@ mod test {
                 let kt1 = ContractKt1Hash::from(blake2b::digest_160(
                     &alias_info.native_address,
                 ));
-                Ok((kt1.to_base58_check(), gas_remaining))
+                Ok((
+                    kt1.to_base58_check(),
+                    tezosx_interfaces::AliasResolution::build(gas_remaining),
+                ))
             }
 
             fn compute_alias(

@@ -49,8 +49,9 @@ use tezos_tezlink::{
     },
 };
 use tezosx_interfaces::{
-    AliasInfo, Classification, CrossRuntimeContext, Origin, Registry, RuntimeId,
-    RuntimeInterface, TezosXRuntimeError, ALIAS_LOOKUP_MILLIGAS, X_TEZOS_GAS_CONSUMED,
+    AliasInfo, AliasResolution, Classification, CrossRuntimeContext, Origin, Registry,
+    RuntimeId, RuntimeInterface, TezosXRuntimeError, ALIAS_LOOKUP_MILLIGAS,
+    X_TEZOS_GAS_CONSUMED,
 };
 use tezosx_journal::{DispatchSlotError, TezosXJournal};
 
@@ -999,7 +1000,7 @@ impl RuntimeInterface for TezosRuntime {
         _native_public_key: Option<&[u8]>,
         _context: CrossRuntimeContext,
         gas_remaining: u64,
-    ) -> Result<(String, u64), TezosXRuntimeError>
+    ) -> Result<(String, AliasResolution), TezosXRuntimeError>
     where
         Host: StorageV1,
     {
@@ -1046,7 +1047,7 @@ impl RuntimeInterface for TezosRuntime {
         // preserves the gas budget and performs no durable writes.
         match get_origin_at(host, &account_path)? {
             Some(Origin::Alias(_)) => {
-                return Ok((kt1_str, remaining));
+                return Ok((kt1_str, AliasResolution::build(remaining)));
             }
             Some(Origin::Native) => {
                 return Err(TezosXRuntimeError::Custom(format!(
@@ -1075,7 +1076,7 @@ impl RuntimeInterface for TezosRuntime {
             consume(&mut remaining, STORAGE_WRITE_BASE_MILLIGAS)?;
             let new_origin = Origin::Alias(alias_info);
             set_origin_at(host, &account_path, &new_origin)?;
-            return Ok((kt1_str, remaining));
+            return Ok((kt1_str, AliasResolution::build(remaining)));
         }
 
         // Branch 3: full materialization. Deploy the forwarder via the
@@ -1185,7 +1186,10 @@ impl RuntimeInterface for TezosRuntime {
             .michelson
             .push_pending_alias_origination_internal(internal_op);
 
-        Ok((kt1_str, remaining))
+        // TODO(L2-1519): compute the mutez cost of the bytes written
+        // here and set `delegated_storage_cost` to `Some(cost)` so the
+        // caller can absorb it.
+        Ok((kt1_str, AliasResolution::build(remaining)))
     }
 
     fn compute_alias(&self, native_address: &[u8]) -> Result<String, TezosXRuntimeError> {
@@ -1822,8 +1826,8 @@ mod tests {
         // cost is zero — only the first call pays for the storage init
         // (via the `originate_contract` receipt) and the classification
         // write.
-        let first_consumed = 5_000_000 - first.1;
-        let second_consumed = 500_000 - second.1;
+        let first_consumed = 5_000_000 - first.1.gas_remaining;
+        let second_consumed = 500_000 - second.1.gas_remaining;
         assert!(
             second_consumed < first_consumed / 10,
             "second call must be vastly cheaper than the first (first {first_consumed}, second {second_consumed})"

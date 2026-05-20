@@ -23,6 +23,41 @@ use primitive_types::U256;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_journal::TezosXJournal;
 
+/// Result of an alias-resolution call.
+///
+/// Returned alongside the alias string by `Registry::ensure_alias` and
+/// `RuntimeInterface::ensure_alias`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AliasResolution {
+    /// Gas remaining in the target runtime's units after the resolution
+    /// work has been deducted.
+    pub gas_remaining: u64,
+    /// Storage cost the target runtime asks the caller to bill, in
+    /// mutez, for bytes allocated during this resolution. `None` when
+    /// the target runtime makes no claim on the caller for this
+    /// materialization.
+    pub delegated_storage_cost: Option<u64>,
+}
+
+impl AliasResolution {
+    pub fn build(gas_remaining: u64) -> Self {
+        Self {
+            gas_remaining,
+            delegated_storage_cost: None,
+        }
+    }
+
+    pub fn build_with_delegated_storage_cost(
+        gas_remaining: u64,
+        delegated_storage_cost: u64,
+    ) -> Self {
+        Self {
+            gas_remaining,
+            delegated_storage_cost: Some(delegated_storage_cost),
+        }
+    }
+}
+
 pub trait Registry {
     /// Idempotently ensure that the alias of `alias_info` exists in
     /// `target_runtime`, materializing the forwarder and recording the
@@ -37,13 +72,13 @@ pub trait Registry {
     /// Ethereum). The function consumes gas incrementally and fails
     /// early if the budget is exceeded.
     ///
-    /// Returns `(alias, gas_remaining_after)`. On a fresh deploy the
-    /// behavior matches the legacy alias generation. When the alias is
-    /// already classified, the call is a no-op and the gas budget is
-    /// returned unchanged. When a forwarder exists but the
-    /// classification path is empty (a legacy account from before this
-    /// work), the call writes the classification only and skips the
-    /// redeploy.
+    /// Returns `(alias, AliasResolution)`. See [`AliasResolution`] for
+    /// the meaning of each field. On a fresh deploy the behavior matches
+    /// the legacy alias generation. When the alias is already classified,
+    /// the call is a no-op and the gas budget is returned unchanged.
+    /// When a forwarder exists but the classification path is empty
+    /// (a legacy account from before this work), the call writes the
+    /// classification only and skips the redeploy.
     #[allow(clippy::too_many_arguments)]
     fn ensure_alias<Host>(
         &self,
@@ -54,7 +89,7 @@ pub trait Registry {
         target_runtime: RuntimeId,
         context: CrossRuntimeContext,
         gas_remaining: u64,
-    ) -> Result<(String, u64), TezosXRuntimeError>
+    ) -> Result<(String, AliasResolution), TezosXRuntimeError>
     where
         Host: StorageV1;
 
@@ -107,7 +142,8 @@ pub trait RuntimeInterface {
     /// holds the UTF-8 bytes of its canonical address string.
     ///
     /// `gas_remaining` is the caller's remaining budget in this runtime
-    /// gas units. Returns `(alias, gas_remaining_after)`. Fails if the
+    /// gas units. Returns `(alias, AliasResolution)`. See
+    /// [`AliasResolution`] for the meaning of each field. Fails if the
     /// budget is exceeded.
     ///
     /// Three branches:
@@ -130,7 +166,7 @@ pub trait RuntimeInterface {
         native_public_key: Option<&[u8]>,
         context: CrossRuntimeContext,
         gas_remaining: u64,
-    ) -> Result<(String, u64), TezosXRuntimeError>
+    ) -> Result<(String, AliasResolution), TezosXRuntimeError>
     where
         Host: StorageV1;
 

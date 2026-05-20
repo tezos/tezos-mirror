@@ -711,12 +711,17 @@ where
 {
     // --- sender alias ---
     charge(gas, ALIAS_LOOKUP_COST)?;
-    let (sender_alias, sender_gen_gas) = context
+    // TODO: charge `sender_resolution.delegated_storage_cost`, if set,
+    // by converting it to EVM gas via the block's base_fee_per_gas.
+    let (sender_alias, sender_resolution) = context
         .journal_mut()
         .tezosx_resolve_source_alias(sender, target_runtime, gas.remaining())?;
-    let sender_gen_evm =
-        gas::convert(target_runtime, RuntimeId::Ethereum, sender_gen_gas)
-            .unwrap_or(u64::MAX);
+    let sender_gen_evm = gas::convert(
+        target_runtime,
+        RuntimeId::Ethereum,
+        sender_resolution.consumed_gas,
+    )
+    .unwrap_or(u64::MAX);
     if sender_gen_evm > 0 {
         charge(gas, sender_gen_evm)?;
     }
@@ -729,12 +734,17 @@ where
     }
 
     charge(gas, ALIAS_LOOKUP_COST)?;
-    let (source_alias, source_gen_gas) = context
+    // TODO: charge `source_resolution.delegated_storage_cost`, if set,
+    // by converting it to EVM gas via the block's base_fee_per_gas.
+    let (source_alias, source_resolution) = context
         .journal_mut()
         .tezosx_resolve_source_alias(source, target_runtime, gas.remaining())?;
-    let source_gen_evm =
-        gas::convert(target_runtime, RuntimeId::Ethereum, source_gen_gas)
-            .unwrap_or(u64::MAX);
+    let source_gen_evm = gas::convert(
+        target_runtime,
+        RuntimeId::Ethereum,
+        source_resolution.consumed_gas,
+    )
+    .unwrap_or(u64::MAX);
     if source_gen_evm > 0 {
         charge(gas, source_gen_evm)?;
     }
