@@ -435,10 +435,15 @@ where
     handle_query_entrypoints_to(&mut host, &input, &TEZOSX_ENTRYPOINTS_RESULT);
 }
 
-/// Query the entrypoints of a contract and write the result to `result_path`.
+/// Query the entrypoints and synthetic views of a contract and write
+/// the result to `result_path`.
 ///
-/// This works for both originated and enshrined smart contracts of the
-/// Michelson runtime but is currently only used for enshrined contracts.
+/// This works for both originated and enshrined smart contracts of
+/// the Michelson runtime but is currently only used for enshrined
+/// contracts. Synthetic views are returned only for enshrined
+/// contracts; for originated contracts the views are already
+/// embedded in the on-chain Michelson code and are discovered
+/// through `/script` directly.
 ///
 /// Input: binary-encoded contract AddressHash (22 bytes).
 fn handle_query_entrypoints_to<Host, R>(
@@ -472,7 +477,9 @@ fn handle_query_entrypoints_to<Host, R>(
         };
     let entrypoints =
         tezos_execution::get_contract_entrypoint(&*host, &context, &address);
-    let result = match encode_entrypoints_result(entrypoints) {
+    let views = tezos_execution::get_enshrined_contract_views(&*host, &context, &address)
+        .unwrap_or_default();
+    let result = match encode_entrypoints_result(entrypoints, views) {
         Ok(bytes) => bytes,
         Err(err) => {
             log!(
@@ -488,16 +495,23 @@ fn handle_query_entrypoints_to<Host, R>(
     }
 }
 
-/// Serialize the entrypoints of a contract for the `tezosx_michelson_entrypoints`
-/// result.
+/// Serialize the entrypoints and synthetic views of a contract for
+/// the `tezosx_michelson_entrypoints` result.
 ///
-/// RLP encoding:
-/// - `List []`        if `None` (contract not found)
-/// - `List [entries]` if `Some(map)`, where `entries` is an RLP list of pairs
-///   `[name_bytes, micheline_type_bytes]`.
+/// RLP encoding (outer 1-element list is the canonical-option
+/// `Some` wrapper from [`append_option_canonical`]; the empty list
+/// is the canonical `None`):
+/// - `List []`                  if `None` (contract not found);
+/// - `List [[entries, views]]`  if `Some(map)`, where:
+///     * `entries` is an RLP list of pairs `[name_bytes,
+///       micheline_type_bytes]` — one per entrypoint;
+///     * `views` is an RLP list of triples `[name_bytes,
+///       parameter_type_bytes, return_type_bytes]` — one per
+///       synthetic view (empty for contracts without synthetic
+///       views).
 ///
-/// The micheline_type_bytes are treated as bytes, and encoded using data_encoding
-/// via MIR.
+/// The micheline_type_bytes are treated as bytes, and encoded using
+/// data_encoding via MIR.
 ///
 /// **Determinism warning.** The input is a [`HashMap`], whose iteration order
 /// depends on a per-process random seed. Iterating it directly into an RLP
@@ -506,12 +520,23 @@ fn handle_query_entrypoints_to<Host, R>(
 /// which would diverge the rollup PVM. Any new kernel code that serializes a
 /// `HashMap` to bytes must apply the same sort-before-encode discipline, or
 /// better, use [`BTreeMap`] from the start so the ordering invariant is
-/// enforced structurally.
+/// enforced structurally. The `views` list is already a `Vec` from a
+/// `match`-based enumeration, so its order is already deterministic; we
+/// nevertheless sort it for symmetry and to keep the canonical form stable
+/// against future re-ordering of the enumeration source.
 fn encode_entrypoints_result(
     entrypoints_opt: Option<HashMap<Entrypoint, Type>>,
+    views: Vec<(&'static str, Type, Type)>,
 ) -> anyhow::Result<Vec<u8>> {
     let parser = Parser::new();
     let mut gas = Gas::default();
+    let encode_type = |ty: Type, gas: &mut Gas| -> anyhow::Result<Vec<u8>> {
+        // NB: into_micheline_optimized_legacy linearizes right-comb pairs,
+        // producing multi-arg pairs (equivalent to L1 normalize_types=true).
+        Ok(ty
+            .into_micheline_optimized_legacy(&parser.arena, gas)?
+            .encode(gas)??)
+    };
     // Pre-encode all entries up front so encoding errors can be surfaced
     // to the caller (the RLP stream API does not let us return errors
     // from inside the encode closure).
@@ -521,11 +546,7 @@ fn encode_entrypoints_result(
                 .into_iter()
                 .map(|(name, ty)| {
                     let name_bytes = name.to_string().into_bytes();
-                    // NB: into_micheline_optimized_legacy linearizes right-comb pairs,
-                    // producing multi-arg pairs (equivalent to L1 normalize_types=true).
-                    let type_bytes = ty
-                        .into_micheline_optimized_legacy(&parser.arena, &mut gas)?
-                        .encode(&mut gas)??;
+                    let type_bytes = encode_type(ty, &mut gas)?;
                     Ok((name_bytes, type_bytes))
                 })
                 .collect::<anyhow::Result<Vec<_>>>()
@@ -538,13 +559,31 @@ fn encode_entrypoints_result(
     if let Some(entries) = encoded_entries.as_mut() {
         entries.sort_by(|(a, _), (b, _)| a.cmp(b));
     }
+    let mut encoded_views: Vec<(Vec<u8>, Vec<u8>, Vec<u8>)> = views
+        .into_iter()
+        .map(|(name, param_ty, return_ty)| {
+            let name_bytes = name.as_bytes().to_vec();
+            let param_bytes = encode_type(param_ty, &mut gas)?;
+            let return_bytes = encode_type(return_ty, &mut gas)?;
+            Ok((name_bytes, param_bytes, return_bytes))
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    encoded_views.sort_by(|(a, _, _), (b, _, _)| a.cmp(b));
     let mut stream = rlp::RlpStream::new();
     append_option_canonical(&mut stream, &encoded_entries, |s, entries| {
+        s.begin_list(2);
         s.begin_list(entries.len());
         for (name_bytes, type_bytes) in entries {
             s.begin_list(2);
             s.append(name_bytes);
             s.append(type_bytes);
+        }
+        s.begin_list(encoded_views.len());
+        for (name_bytes, param_bytes, return_bytes) in &encoded_views {
+            s.begin_list(3);
+            s.append(name_bytes);
+            s.append(param_bytes);
+            s.append(return_bytes);
         }
         s
     });
@@ -568,9 +607,23 @@ mod tests {
     use super::encode_entrypoints_result;
     use tezos_execution::enshrined_contracts::EnshrinedContracts;
 
-    /// Decodes the output of `encode_entrypoints_result` back into a map of
-    /// entrypoint name -> Type, performing a full roundtrip through Micheline.
-    fn decode_result(bytes: &[u8]) -> Option<HashMap<String, Type>> {
+    /// Decodes the output of `encode_entrypoints_result` back into a
+    /// `(entrypoints, views)` pair, performing a full roundtrip through
+    /// Micheline. The `views` map is keyed by view name and stores
+    /// `(parameter_type, return_type)`.
+    #[allow(clippy::type_complexity)]
+    fn decode_result(
+        bytes: &[u8],
+    ) -> Option<(HashMap<String, Type>, HashMap<String, (Type, Type)>)> {
+        let parser = Parser::new();
+        let mut gas = Gas::default();
+        let decode_type = |bytes: &[u8], gas: &mut Gas| -> Type {
+            let micheline =
+                Micheline::decode_raw(&parser.arena, bytes, &mut Gas::default())
+                    .expect("unmetered Gas cannot OOG")
+                    .expect("decode micheline");
+            micheline.parse_ty(gas).expect("parse type")
+        };
         let rlp = rlp::Rlp::new(bytes);
         assert!(rlp.is_list(), "expected RLP list");
         match rlp.item_count().expect("item count") {
@@ -578,12 +631,17 @@ mod tests {
             1 => {
                 let inner = rlp.at(0).expect("inner list");
                 assert!(inner.is_list(), "expected inner RLP list");
-                let n = inner.item_count().expect("entry count");
-                let mut map = HashMap::with_capacity(n);
-                let parser = Parser::new();
-                let mut gas = Gas::default();
-                for i in 0..n {
-                    let pair = inner.at(i).expect("pair");
+                assert_eq!(
+                    inner.item_count().expect("inner count"),
+                    2,
+                    "inner list must contain [entries, views]"
+                );
+                let entries_rlp = inner.at(0).expect("entries list");
+                let views_rlp = inner.at(1).expect("views list");
+                let entries_n = entries_rlp.item_count().expect("entries count");
+                let mut entries = HashMap::with_capacity(entries_n);
+                for i in 0..entries_n {
+                    let pair = entries_rlp.at(i).expect("pair");
                     assert!(pair.is_list(), "expected pair to be a list");
                     assert_eq!(pair.item_count().expect("pair count"), 2);
                     let name_bytes: Vec<u8> =
@@ -591,45 +649,64 @@ mod tests {
                     let type_bytes: Vec<u8> =
                         pair.at(1).expect("type").as_val().expect("type val");
                     let name = String::from_utf8(name_bytes).expect("utf8 name");
-                    let micheline = Micheline::decode_raw(
-                        &parser.arena,
-                        &type_bytes,
-                        &mut Gas::default(),
-                    )
-                    .expect("unmetered Gas cannot OOG")
-                    .expect("decode micheline");
-                    let ty = micheline.parse_ty(&mut gas).expect("parse type");
-                    map.insert(name, ty);
+                    entries.insert(name, decode_type(&type_bytes, &mut gas));
                 }
-                Some(map)
+                let views_n = views_rlp.item_count().expect("views count");
+                let mut views = HashMap::with_capacity(views_n);
+                for i in 0..views_n {
+                    let triple = views_rlp.at(i).expect("triple");
+                    assert!(triple.is_list(), "expected triple to be a list");
+                    assert_eq!(triple.item_count().expect("triple count"), 3);
+                    let name_bytes: Vec<u8> =
+                        triple.at(0).expect("name").as_val().expect("name val");
+                    let param_bytes: Vec<u8> =
+                        triple.at(1).expect("param").as_val().expect("param val");
+                    let return_bytes: Vec<u8> =
+                        triple.at(2).expect("return").as_val().expect("return val");
+                    let name = String::from_utf8(name_bytes).expect("utf8 name");
+                    views.insert(
+                        name,
+                        (
+                            decode_type(&param_bytes, &mut gas),
+                            decode_type(&return_bytes, &mut gas),
+                        ),
+                    );
+                }
+                Some((entries, views))
             }
             n => panic!("unexpected outer RLP list length: {n}"),
         }
     }
 
-    /// Encode then decode a map, asserting the roundtrip preserves it.
+    /// Encode then decode a map of entrypoints (and no views),
+    /// asserting the roundtrip preserves it.
     fn assert_roundtrip(map: HashMap<Entrypoint, Type>) {
         let expected: HashMap<String, Type> = map
             .iter()
             .map(|(k, v)| (k.to_string(), v.clone()))
             .collect();
-        let encoded = encode_entrypoints_result(Some(map)).expect("encode ok");
-        let decoded = decode_result(&encoded).expect("roundtrip should be Some");
+        let encoded = encode_entrypoints_result(Some(map), vec![]).expect("encode ok");
+        let (decoded, views) = decode_result(&encoded).expect("roundtrip should be Some");
         assert_eq!(decoded, expected);
+        assert!(views.is_empty(), "no views expected");
     }
 
     #[test]
     fn test_encode_none() {
-        let result = encode_entrypoints_result(None).expect("encode ok");
+        let result = encode_entrypoints_result(None, vec![]).expect("encode ok");
         // RLP empty list: 0xc0
         assert_eq!(result, vec![0xc0]);
     }
 
     #[test]
     fn test_encode_empty_map() {
-        let result = encode_entrypoints_result(Some(HashMap::new())).expect("encode ok");
+        let result =
+            encode_entrypoints_result(Some(HashMap::new()), vec![]).expect("encode ok");
         // Must be distinct from None
-        assert_ne!(result, encode_entrypoints_result(None).expect("encode ok"));
+        assert_ne!(
+            result,
+            encode_entrypoints_result(None, vec![]).expect("encode ok")
+        );
         assert_roundtrip(HashMap::new());
     }
 
@@ -692,9 +769,9 @@ mod tests {
         }
 
         let encoded_forward =
-            encode_entrypoints_result(Some(forward)).expect("encode ok");
+            encode_entrypoints_result(Some(forward), vec![]).expect("encode ok");
         let encoded_reversed =
-            encode_entrypoints_result(Some(reversed)).expect("encode ok");
+            encode_entrypoints_result(Some(reversed), vec![]).expect("encode ok");
         assert_eq!(encoded_forward, encoded_reversed);
     }
 
@@ -711,13 +788,14 @@ mod tests {
         map.insert(Entrypoint::try_from("alpha").expect("valid"), Type::Unit);
         map.insert(Entrypoint::try_from("mike").expect("valid"), Type::Unit);
 
-        let encoded = encode_entrypoints_result(Some(map)).expect("encode ok");
+        let encoded = encode_entrypoints_result(Some(map), vec![]).expect("encode ok");
 
         let outer = rlp::Rlp::new(&encoded);
         let inner = outer.at(0).expect("inner list");
-        let names: Vec<String> = (0..inner.item_count().expect("entry count"))
+        let entries_rlp = inner.at(0).expect("entries");
+        let names: Vec<String> = (0..entries_rlp.item_count().expect("entry count"))
             .map(|i| {
-                let pair = inner.at(i).expect("pair");
+                let pair = entries_rlp.at(i).expect("pair");
                 let bytes: Vec<u8> =
                     pair.at(0).expect("name").as_val().expect("name val");
                 String::from_utf8(bytes).expect("utf8 name")
@@ -725,6 +803,57 @@ mod tests {
             .collect();
 
         assert_eq!(names, vec!["alpha", "mike", "zulu"]);
+    }
+
+    /// Sibling of the entrypoints determinism guarantee: views must
+    /// also be emitted in lexicographic byte order of their names so
+    /// the encoded bytes are canonical regardless of how the synthetic
+    /// view enumeration is ordered at its source.
+    #[test]
+    fn test_encode_emits_views_in_lexicographic_byte_order() {
+        let entries = HashMap::new();
+        let views = vec![
+            ("zulu", Type::Unit, Type::Unit),
+            ("alpha", Type::Unit, Type::Unit),
+            ("mike", Type::Unit, Type::Unit),
+        ];
+
+        let encoded = encode_entrypoints_result(Some(entries), views).expect("encode ok");
+
+        let outer = rlp::Rlp::new(&encoded);
+        let inner = outer.at(0).expect("inner list");
+        let views_rlp = inner.at(1).expect("views");
+        let names: Vec<String> = (0..views_rlp.item_count().expect("views count"))
+            .map(|i| {
+                let triple = views_rlp.at(i).expect("triple");
+                let bytes: Vec<u8> =
+                    triple.at(0).expect("name").as_val().expect("name val");
+                String::from_utf8(bytes).expect("utf8 name")
+            })
+            .collect();
+
+        assert_eq!(names, vec!["alpha", "mike", "zulu"]);
+    }
+
+    /// Round-trip a non-empty `views` list through the encoder.
+    #[test]
+    fn test_encode_views_roundtrip() {
+        let entries = HashMap::new();
+        let views = vec![(
+            "staticcall_evm",
+            Type::new_pair(Type::String, Type::Bytes),
+            Type::Bytes,
+        )];
+
+        let encoded = encode_entrypoints_result(Some(entries), views).expect("encode ok");
+        let (decoded_entries, decoded_views) =
+            decode_result(&encoded).expect("Some result expected");
+        assert!(decoded_entries.is_empty());
+        let (param_ty, return_ty) = decoded_views
+            .get("staticcall_evm")
+            .expect("view must be present");
+        assert_eq!(*param_ty, Type::new_pair(Type::String, Type::Bytes));
+        assert_eq!(*return_ty, Type::Bytes);
     }
 
     fn run_entrypoints_query(host: &mut MockHost, addr_hash: &[u8]) -> Vec<u8> {
@@ -742,12 +871,19 @@ mod tests {
             &mut host,
             &EnshrinedContracts::TezosXGateway.address_hash_bytes(),
         );
-        let decoded = decode_result(&result).expect("gateway has entrypoints");
-        assert_eq!(decoded.len(), 4);
-        assert!(decoded.contains_key("default"));
-        assert!(decoded.contains_key("call"));
-        assert!(decoded.contains_key("call_evm"));
-        assert!(decoded.contains_key("collect_result"));
+        let (entries, views) = decode_result(&result).expect("gateway has entrypoints");
+        assert_eq!(entries.len(), 4);
+        assert!(entries.contains_key("default"));
+        assert!(entries.contains_key("call"));
+        assert!(entries.contains_key("call_evm"));
+        assert!(entries.contains_key("collect_result"));
+        // Synthetic view `staticcall_evm`: (pair string bytes) -> bytes.
+        assert_eq!(views.len(), 1);
+        let (param_ty, return_ty) = views
+            .get("staticcall_evm")
+            .expect("staticcall_evm view must be exposed");
+        assert_eq!(*param_ty, Type::new_pair(Type::String, Type::Bytes));
+        assert_eq!(*return_ty, Type::Bytes);
     }
 
     #[test]
@@ -757,10 +893,13 @@ mod tests {
             &mut host,
             &EnshrinedContracts::ERC20Wrapper.address_hash_bytes(),
         );
-        let decoded = decode_result(&result).expect("ERC20 wrapper has entrypoints");
-        assert_eq!(decoded.len(), 2);
-        assert!(decoded.contains_key("transfer"));
-        assert!(decoded.contains_key("approve"));
+        let (entries, views) =
+            decode_result(&result).expect("ERC20 wrapper has entrypoints");
+        assert_eq!(entries.len(), 2);
+        assert!(entries.contains_key("transfer"));
+        assert!(entries.contains_key("approve"));
+        // ERC-20 wrapper has no synthetic views.
+        assert!(views.is_empty(), "ERC-20 wrapper has no synthetic views");
     }
 
     #[test]
