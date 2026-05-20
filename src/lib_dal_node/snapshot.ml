@@ -31,6 +31,41 @@ let ensure_tar_extension path =
 (** Tar entry filename for the skip list binary dump. *)
 let skip_list_binary_filename = Store.Stores_dirs.skip_list_cells // "cells.bin"
 
+(** [all_int fields] returns [true] iff every element of [fields] parses as an
+    integer. Used to validate the underscore-separated numeric components of
+    shard and slot tar-entry basenames. *)
+let all_int fields =
+  List.for_all (fun f -> Option.is_some (int_of_string_opt f)) fields
+
+(** [is_shard_entry filename] returns [true] iff [filename], as it would
+    appear inside a snapshot tar archive, is a shard entry. Used during
+    import to decide whether the entry must be processed by the shard
+    handler, and to skip it altogether when [--skip-shards] is set.
+
+    The check requires both the immediate parent directory to be the shard
+    store and the basename to match the on-disk shard file format
+    [<level>_<index>] (see {!Store.Shards_disk.make_file_layout}), so that
+    stray or unexpected files are not mistaken for shards. *)
+let is_shard_entry filename =
+  String.equal (Filename.dirname filename) Store.Stores_dirs.shard
+  &&
+  match String.split_on_char '_' (Filename.basename filename) with
+  | [_level; _index] as fields -> all_int fields
+  | _ -> false
+
+(** [is_slot_entry filename] returns [true] iff [filename], as it would
+    appear inside a snapshot tar archive, is a slot entry.
+
+    As for {!is_shard_entry}, the check requires both the parent directory to
+    be the slot store and the basename to match the on-disk slot file format
+    [<level>_<index>_<slot_size>] (see {!Store.Slots.make_file_layout}). *)
+let is_slot_entry filename =
+  String.equal (Filename.dirname filename) Store.Stores_dirs.slot
+  &&
+  match String.split_on_char '_' (Filename.basename filename) with
+  | [_level; _index; _slot_size] as fields -> all_int fields
+  | _ -> false
+
 (** Tar entry names for metadata values. *)
 let chain_id_filename = "chain_id"
 
@@ -600,9 +635,9 @@ module Merge = struct
     in
     Lwt.return res
 
-  let merge ~progress_display_mode ~frozen_only ~src_root_dir ~config_file
-      ~endpoint ~min_published_level ~max_published_level ~slots ~dst_root_dir
-      ~event_path ~event_kind =
+  let merge ~progress_display_mode ~skip_shards ~frozen_only ~src_root_dir
+      ~config_file ~endpoint ~min_published_level ~max_published_level ~slots
+      ~dst_root_dir ~event_path ~event_kind =
     let open Lwt_result_syntax in
     let* {
            min_published_level;
@@ -664,28 +699,30 @@ module Merge = struct
             proto_plugins)
     in
     (* Export shards *)
-    let shards_store_lru_size =
-      Constants.shards_store_lru_size
-        ~number_of_slots:head_proto_parameters.number_of_slots
-    in
     let* () =
-      let src_shard_dir = src_root_dir // Store.Stores_dirs.shard in
-      let dst_shard_dir = dst_root_dir // Store.Stores_dirs.shard in
-      Animation.display_progress
-        ~progress_display_mode
-        ~pp_print_step:(fun fmt i ->
-          Format.fprintf fmt "Copying shards: %d/%d levels" i total)
-        (fun notify ->
-          merge_shards
-            ~notify
-            ~src:src_shard_dir
-            ~dst:dst_shard_dir
-            ~min_published_level
-            ~max_published_level
-            ~slots
-            ~proto_plugins
-            ~shards_store_lru_size
-            ())
+      if skip_shards then return_unit
+      else
+        let shards_store_lru_size =
+          Constants.shards_store_lru_size
+            ~number_of_slots:head_proto_parameters.number_of_slots
+        in
+        let src_shard_dir = src_root_dir // Store.Stores_dirs.shard in
+        let dst_shard_dir = dst_root_dir // Store.Stores_dirs.shard in
+        Animation.display_progress
+          ~progress_display_mode
+          ~pp_print_step:(fun fmt i ->
+            Format.fprintf fmt "Copying shards: %d/%d levels" i total)
+          (fun notify ->
+            merge_shards
+              ~notify
+              ~src:src_shard_dir
+              ~dst:dst_shard_dir
+              ~min_published_level
+              ~max_published_level
+              ~slots
+              ~proto_plugins
+              ~shards_store_lru_size
+              ())
     in
     (* Export skip_list *)
     let* () =
@@ -939,8 +976,8 @@ module Export_tar = struct
 
   (** Main export function: reads from source store via KVS.Read,
       writes a tar archive. *)
-  let run ~progress_display_mode ~src_root_dir ~config_file ~endpoint
-      ~min_published_level ~max_published_level ~slots ~dst_tar_file =
+  let run ~progress_display_mode ~skip_shards ~src_root_dir ~config_file
+      ~endpoint ~min_published_level ~max_published_level ~slots ~dst_tar_file =
     let open Lwt_result_syntax in
     let* {
            min_published_level;
@@ -1017,26 +1054,31 @@ module Export_tar = struct
           Event.emit_snapshot_copying ~resource:"slots" ~step:"success"
         in
         (* Export shards *)
-        let*! () =
-          Event.emit_snapshot_copying ~resource:"shards" ~step:"start"
-        in
         let* () =
-          Animation.display_progress
-            ~progress_display_mode
-            ~pp_print_step:(fun fmt i ->
-              Format.fprintf fmt "Exporting shards: %d/%d levels" i total)
-            (fun notify ->
-              export_shards
-                ~notify
-                tar
-                ~src_shard_dir
-                ~min_published_level
-                ~max_published_level
-                ~slots
-                ~proto_plugins)
-        in
-        let*! () =
-          Event.emit_snapshot_copying ~resource:"shards" ~step:"success"
+          if skip_shards then return_unit
+          else
+            let*! () =
+              Event.emit_snapshot_copying ~resource:"shards" ~step:"start"
+            in
+            let* () =
+              Animation.display_progress
+                ~progress_display_mode
+                ~pp_print_step:(fun fmt i ->
+                  Format.fprintf fmt "Exporting shards: %d/%d levels" i total)
+                (fun notify ->
+                  export_shards
+                    ~notify
+                    tar
+                    ~src_shard_dir
+                    ~min_published_level
+                    ~max_published_level
+                    ~slots
+                    ~proto_plugins)
+            in
+            let*! () =
+              Event.emit_snapshot_copying ~resource:"shards" ~step:"success"
+            in
+            return_unit
         in
         (* Export metadata *)
         let*! () =
@@ -1368,8 +1410,9 @@ module Import_tar = struct
 
   (** Main import function: initializes stores, reads tar entries,
       and writes data using KVS/Store interfaces. *)
-  let run ~progress_display_mode ~dst_root_dir ~slots ~min_published_level
-      ~max_published_level ~config_file ~endpoint ~tar_file =
+  let run ~progress_display_mode ~skip_shards ~dst_root_dir ~slots
+      ~min_published_level ~max_published_level ~config_file ~endpoint ~tar_file
+      =
     let open Lwt_result_syntax in
     let* config, cctxt, header, proto_plugins, _proto_parameters =
       init_rpc_context ~config_file ~endpoint
@@ -1541,65 +1584,62 @@ module Import_tar = struct
                                   ~max_published_level
                                   filename)
                         then return_unit
-                        else
-                          let dirname = Filename.dirname filename in
-                          if dirname = Store.Stores_dirs.slot then
-                            import_slot_entry tar file ~dst_slot_store ~filename
-                          else if dirname = Store.Stores_dirs.shard then
+                        else if is_slot_entry filename then
+                          import_slot_entry tar file ~dst_slot_store ~filename
+                        else if is_shard_entry filename then
+                          if skip_shards then return_unit
+                          else
                             import_shard_entry tar file ~dst_shard_dir ~filename
-                          else if String.equal filename chain_id_filename then
-                            import_metadata_entry
+                        else if String.equal filename chain_id_filename then
+                          import_metadata_entry
+                            tar
+                            file
+                            ~root_dir:dst_root_dir
+                            ~name:"chain_id"
+                            (module Store.Chain_id)
+                            Chain_id.encoding
+                        else if String.equal filename first_seen_level_filename
+                        then
+                          let* tar_value =
+                            load_int32_metadata
                               tar
                               file
-                              ~root_dir:dst_root_dir
-                              ~name:"chain_id"
-                              (module Store.Chain_id)
-                              Chain_id.encoding
-                          else if
-                            String.equal filename first_seen_level_filename
-                          then
-                            let* tar_value =
-                              load_int32_metadata
-                                tar
-                                file
-                                ~name:first_seen_level_filename
-                            in
-                            let bounded =
-                              match min_published_level with
-                              | None -> tar_value
-                              | Some user_min -> max tar_value user_min
-                            in
-                            save_merged_level
-                              ~root_dir:dst_root_dir
-                              (module Store.First_seen_level)
-                              ~merge:min
-                              bounded
-                          else if
-                            String.equal filename last_processed_level_filename
-                          then
-                            let* tar_value =
-                              load_int32_metadata
-                                tar
-                                file
-                                ~name:last_processed_level_filename
-                            in
-                            let bounded =
-                              match max_published_level with
-                              | None -> tar_value
-                              | Some user_max -> min tar_value user_max
-                            in
-                            save_merged_level
-                              ~root_dir:dst_root_dir
-                              (module Store.Last_processed_level)
-                              ~merge:max
-                              bounded
-                          else if String.equal filename version_filename then
-                            (* Version was already validated before the loop. *)
-                            return_unit
-                          else
-                            failwith
-                              "Snapshot contains unknown file: %s"
-                              filename
+                              ~name:first_seen_level_filename
+                          in
+                          let bounded =
+                            match min_published_level with
+                            | None -> tar_value
+                            | Some user_min -> max tar_value user_min
+                          in
+                          save_merged_level
+                            ~root_dir:dst_root_dir
+                            (module Store.First_seen_level)
+                            ~merge:min
+                            bounded
+                        else if
+                          String.equal filename last_processed_level_filename
+                        then
+                          let* tar_value =
+                            load_int32_metadata
+                              tar
+                              file
+                              ~name:last_processed_level_filename
+                          in
+                          let bounded =
+                            match max_published_level with
+                            | None -> tar_value
+                            | Some user_max -> min tar_value user_max
+                          in
+                          save_merged_level
+                            ~root_dir:dst_root_dir
+                            (module Store.Last_processed_level)
+                            ~merge:max
+                            bounded
+                        else if String.equal filename version_filename then
+                          (* Version was already validated before the loop. *)
+                          return_unit
+                        else
+                          failwith "Snapshot contains unknown file: %s" filename
                       in
                       let*! () = notify () in
                       return_unit)
@@ -1639,8 +1679,8 @@ let init_logging () =
   Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
 
 let export ?(compress = false) ?(progress_display_mode = Animation.Auto)
-    ~data_dir ~config_file ~endpoint ~min_published_level ~max_published_level
-    ~slots dst =
+    ?(skip_shards = false) ~data_dir ~config_file ~endpoint ~min_published_level
+    ~max_published_level ~slots dst =
   let open Lwt_result_syntax in
   let*! () = init_logging () in
   let src_root_dir = store_path data_dir in
@@ -1658,6 +1698,7 @@ let export ?(compress = false) ?(progress_display_mode = Animation.Auto)
     let* () =
       Export_tar.run
         ~progress_display_mode
+        ~skip_shards
         ~src_root_dir
         ~config_file
         ~endpoint
@@ -1681,6 +1722,7 @@ let export ?(compress = false) ?(progress_display_mode = Animation.Auto)
     let* () =
       Merge.merge
         ~progress_display_mode
+        ~skip_shards
         ~frozen_only:true
         ~src_root_dir
         ~config_file
@@ -1697,8 +1739,8 @@ let export ?(compress = false) ?(progress_display_mode = Animation.Auto)
 let is_tar_file path = Filename.check_suffix path ".tar"
 
 let import ?(check = true) ?(progress_display_mode = Animation.Auto)
-    ~data_dir:dst ~config_file ~endpoint ~min_published_level
-    ~max_published_level ~slots src =
+    ?(skip_shards = false) ~data_dir:dst ~config_file ~endpoint
+    ~min_published_level ~max_published_level ~slots src =
   let open Lwt_result_syntax in
   let*! () = init_logging () in
   if check then
@@ -1719,6 +1761,7 @@ let import ?(check = true) ?(progress_display_mode = Animation.Auto)
       let* () =
         Import_tar.run
           ~progress_display_mode
+          ~skip_shards
           ~dst_root_dir
           ~slots
           ~min_published_level
@@ -1734,6 +1777,7 @@ let import ?(check = true) ?(progress_display_mode = Animation.Auto)
       let* () =
         Merge.merge
           ~progress_display_mode
+          ~skip_shards
           ~frozen_only:false
           ~src_root_dir
           ~config_file
@@ -1746,3 +1790,9 @@ let import ?(check = true) ?(progress_display_mode = Animation.Auto)
           ~event_kind:"data dir"
       in
       return_unit
+
+module Internal_for_tests = struct
+  let is_shard_entry = is_shard_entry
+
+  let is_slot_entry = is_slot_entry
+end

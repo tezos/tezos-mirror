@@ -97,5 +97,9 @@ Data Availability Layer (DAL)
 DAL node
 ~~~~~~~~
 
+- Added a ``--skip-shards`` flag to the ``snapshot export`` and ``snapshot
+  import`` commands. When set, shards are neither exported nor imported,
+  producing smaller snapshots for nodes that only need slot data.
+
 Miscellaneous
 -------------
