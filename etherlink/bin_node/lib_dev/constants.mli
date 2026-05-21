@@ -32,6 +32,10 @@ type kernel =
   | FarfadetR1
   | FarfadetR2
   | FarfadetR3
+  | Previewnet02
+  | Previewnet03
+  | Previewnet04
+  | Previewnet05
   | Latest
 
 val kernel_from_string : string -> kernel option

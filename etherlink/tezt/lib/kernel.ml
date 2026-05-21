@@ -31,15 +31,10 @@ let commit_of = function
   | Mainnet -> Some Constant.WASM.mainnet_commit
   | Previewnet -> Some Constant.WASM.previewnet_commit
 
-(* The previewnet kernel was built before V57 was introduced, so the
-   installer must produce the pre-V57 ("farfadet-r2") layout: EVM
-   config scalars at [/evm/X], block index at
-   [/evm/world_state/indexes/blocks/]. The V57 migration moves them on
-   first boot of the new kernel. *)
 let name_of = function
   | Latest -> None
-  | Mainnet -> Some "farfadet-r2"
-  | Previewnet -> Some "farfadet-r2"
+  | Previewnet -> Some "previewnet-0.3"
+  | Mainnet -> Some "farfadet-r3"
 
 let upgrade_to = function
   | Latest -> Latest
@@ -57,7 +52,7 @@ let supports_dal = function
    value for a network when that network's kernel is rebaked; treat this as
    the single source of truth when picking storage-version-gated paths in
    tezt. *)
-let storage_version = function Latest -> 58 | Previewnet -> 56 | Mainnet -> 45
+let storage_version = function Latest -> 58 | Previewnet -> 56 | Mainnet -> 46
 
 let of_tag tag =
   let contain_exp ~exp =
@@ -77,7 +72,7 @@ let of_tag tag =
    supporting configurable (overridable) EVM versions. *)
 let select_evm_version ?evm_version kernel =
   match (evm_version, kernel) with
-  | _, Mainnet -> Evm_version.Prague
+  | _, Mainnet -> Evm_version.Osaka
   | _, Previewnet -> Evm_version.Prague
   | None, Latest -> Evm_version.Osaka
   | Some v, Latest -> v

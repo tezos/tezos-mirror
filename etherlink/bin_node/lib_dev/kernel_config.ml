@@ -89,11 +89,8 @@ let make_l2 ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
     ?michelson_to_evm_gas_multiplier ?da_fee_per_byte ?sequencer_pool_address
     ?maximum_gas_per_transaction ?set_account_code ?world_state_path
     ~l2_chain_id ~l2_chain_family ~output () =
-  (* Phase 2 of the durable storage reorganization (storage version V53)
-     moves /evm/chain_configurations/<id>/* to /base/chain_configurations/<id>/*.
-     Match the same gate used by [make] for governance/config keys. *)
   let chain_configurations_root =
-    if Constants.(kernel_is_newer ~than:FarfadetR2 kernel_compat) then "base"
+    if Constants.(kernel_is_newer ~than:Previewnet02 kernel_compat) then "base"
     else "evm"
   in
   let make_l2_config_instr ?convert ~l2_chain_id config =
@@ -429,20 +426,16 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
           | Osaka -> Z.of_int 3 ))
       evm_version
   in
-  (* Phase 2 of the durable storage reorganization (storage version V53)
-     moves governance / sequencing / config installer-set paths from
-     /evm/ to /base/. Phase 3 (storage version V54) moves all feature
-     flags to /base/feature_flags/. Both ship on the same dev kernel, so
-     a single gate against [FarfadetR2] selects the new paths. *)
-  let newer_than_farfadet_r2 =
-    Constants.(kernel_is_newer ~than:FarfadetR2 kernel_compat)
+  let newer_than_previewnet02 =
+    Constants.(kernel_is_newer ~than:Previewnet02 kernel_compat)
   in
-  let governance_in_base = newer_than_farfadet_r2 in
-  let feature_flags_in_base = newer_than_farfadet_r2 in
-  (* Phase 6 (V58) moves EVM config scalars from /evm/ to /evm/world_state/.
-     This ships in [Latest] only — kernels strictly newer than [FarfadetR3]. *)
+  let newer_than_previewnet04 =
+    Constants.(kernel_is_newer ~than:Previewnet04 kernel_compat)
+  in
+  let governance_in_base = newer_than_previewnet02 in
+  let feature_flags_in_base = newer_than_previewnet02 in
   let evm_config_in_world_state =
-    Constants.(kernel_is_newer ~than:FarfadetR3 kernel_compat)
+    Constants.(kernel_is_newer ~than:Previewnet05 kernel_compat)
   in
   let base_or_evm_prefix = if governance_in_base then ["base"] else ["evm"] in
   let evm_config_prefix =
@@ -467,10 +460,7 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
     in
     make_instr ?convert ~path_prefix arg
   in
-  (* V57 moved /evm/michelson_runtime/{,target_}sunrise_level under
-     /tez/world_state/. V57 ships in the [Latest] kernel — i.e. on any
-     kernel_compat strictly newer than [FarfadetR2]. *)
-  let michelson_runtime_paths_in_world_state = newer_than_farfadet_r2 in
+  let michelson_runtime_paths_in_world_state = newer_than_previewnet04 in
   let with_runtimes =
     List.concat_map
       (fun (runtime, target_sunrise_level) ->
@@ -507,7 +497,7 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
     (if Constants.(kernel_is_newer ~than:Mainnet_beta kernel_compat) then
        make_instr ~path_prefix:["evm"; "world_state"] ticketer
      else make_instr ticketer)
-    @ (if Constants.(kernel_is_newer ~than:FarfadetR2 kernel_compat) then
+    @ (if newer_than_previewnet02 then
          make_instr ~path_prefix:["evm"; "world_state"] sequencer
        else make_instr sequencer)
     @ make_governance_instr
