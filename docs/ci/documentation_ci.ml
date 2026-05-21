@@ -64,8 +64,8 @@ let job_install_python =
   let os_distribution_name, image =
     let open Tezos_ci in
     match os_distribution with
-    | `ubuntu_22_04 -> ("22_04", Images.Base_images.ubuntu_24_04)
-    | `ubuntu_24_04 -> ("24_04", Images.Base_images.ubuntu_22_04)
+    | `ubuntu_22_04 -> ("22_04", Images.Base_images.ubuntu_22_04)
+    | `ubuntu_24_04 -> ("24_04", Images.Base_images.ubuntu_24_04)
     | `debian_bookworm -> ("bookworm", Images.Base_images.debian_bookworm)
   in
   let project, branch =
