@@ -25,7 +25,7 @@ use crate::ast::*;
 #[cfg(feature = "bls")]
 use crate::bls;
 use crate::context::{CtxTrait, TypecheckingCtx};
-use crate::gas::{interpret_cost, CompareError, CostOverflow, OutOfGas};
+use crate::gas::{interpret_cost, CompareError, CostOverflow, Gas, OutOfGas};
 use crate::interpreter::interpret_cost::SigCostError;
 use crate::irrefutable_match::irrefutable_match;
 use crate::lexer::Prim;
@@ -1567,7 +1567,7 @@ fn interpret_one<'a>(
             // In the Tezos implementation they also charge gas for the pass
             // that strips locations. We don't have it.
             let mich = v.into_micheline_optimized_legacy(&arena, ctx.gas())?;
-            let encoded = mich.encode_for_pack()?;
+            let encoded = mich.encode_for_pack(&mut Gas::unmetered())??;
             stack.push(V::Bytes(encoded));
         }
         I::Unpack(ty) => {

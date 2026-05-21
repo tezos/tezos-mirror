@@ -378,9 +378,10 @@ where
                 let dest_contract = contract_from_address(destination_address.hash)?;
                 let value =
                     param.into_micheline_optimized_legacy(&parser.arena, tc_ctx.gas())?;
-                let encoded_value = value.encode().map_err(|e| {
-                    TransferError::MichelineSerializationError(e.to_string())
-                })?;
+                let encoded_value =
+                    value.encode(&mut Gas::unmetered())?.map_err(|e| {
+                        TransferError::MichelineSerializationError(e.to_string())
+                    })?;
                 let content = TransferContent {
                     amount,
                     destination: dest_contract,
@@ -461,11 +462,13 @@ where
                     )
                 };
                 let script = Script {
-                    code: micheline_code.encode().map_err(encode_err)?,
+                    code: micheline_code
+                        .encode(&mut Gas::unmetered())?
+                        .map_err(encode_err)?,
                     storage: storage
                         .clone()
                         .into_micheline_optimized_legacy(&parser.arena, tc_ctx.gas())?
-                        .encode()
+                        .encode(&mut Gas::unmetered())?
                         .map_err(encode_err)?,
                 };
                 if failed.is_some() {
@@ -532,16 +535,18 @@ where
                 let payload = Some(
                     value
                         .into_micheline_optimized_legacy(&parser.arena, tc_ctx.gas())?
-                        .encode()
+                        .encode(&mut Gas::unmetered())?
                         .map_err(emit_err)?
                         .into(),
                 );
                 let ty = match arg_ty {
                     mir::ast::Or::Left(typ) => typ
                         .into_micheline_optimized_legacy(&parser.arena, tc_ctx.gas())?
-                        .encode()
+                        .encode(&mut Gas::unmetered())?
                         .map_err(emit_err)?,
-                    mir::ast::Or::Right(mic) => mic.encode().map_err(emit_err)?,
+                    mir::ast::Or::Right(mic) => {
+                        mic.encode(&mut Gas::unmetered())?.map_err(emit_err)?
+                    }
                 }
                 .into();
                 let result = if failed.is_some() {
@@ -1040,7 +1045,7 @@ fn handle_storage_with_big_maps<'a, Host: StorageV1, C: Context>(
     let lazy_storage_diff = convert_big_map_diff(std::mem::take(&mut ctx.big_map_diff));
     let storage = storage
         .into_micheline_optimized_legacy(&parser.arena, ctx.gas())?
-        .encode()
+        .encode(&mut Gas::unmetered())?
         .map_err(|e| OriginationError::MichelineSerializationError(e.to_string()))?;
     Ok((storage, lazy_storage_diff))
 }
@@ -1221,7 +1226,7 @@ fn execute_smart_contract_originated<'a>(
     // Encode the new storage
     let new_storage = new_storage
         .into_micheline_optimized_legacy(&parser.arena, ctx.gas())?
-        .encode()
+        .encode(&mut Gas::unmetered())?
         .map_err(|e| TransferError::MichelineSerializationError(e.to_string()))?;
 
     Ok((internal_operations, new_storage))
@@ -2254,8 +2259,14 @@ mod tests {
         account
             .init(
                 host,
-                &script_micheline.encode().unwrap(),
-                &storage_micheline.encode().unwrap(),
+                &script_micheline
+                    .encode(&mut Gas::unmetered())
+                    .unwrap()
+                    .unwrap(),
+                &storage_micheline
+                    .encode(&mut Gas::unmetered())
+                    .unwrap()
+                    .unwrap(),
             )
             .expect("Account initialisation should have succeeded");
 
@@ -2995,7 +3006,10 @@ mod tests {
             Parameters {
                 entrypoint: Entrypoint::try_from("fund")
                     .expect("Entrypoint should be valid"),
-                value: Micheline::from(requested_amount as i128).encode().unwrap(),
+                value: Micheline::from(requested_amount as i128)
+                    .encode(&mut Gas::unmetered())
+                    .unwrap()
+                    .unwrap(),
             },
         );
         let res = validate_and_apply_operation(
@@ -3035,7 +3049,13 @@ mod tests {
                     ],
                     result: ContentResult::Applied(TransferTarget::ToContrat(
                         TransferSuccess {
-                            storage: Some(storage.encode().unwrap().into()),
+                            storage: Some(
+                                storage
+                                    .encode(&mut Gas::unmetered())
+                                    .unwrap()
+                                    .unwrap()
+                                    .into()
+                            ),
                             lazy_storage_diff: None,
                             balance_updates: vec![],
                             ticket_receipt: vec![],
@@ -3054,7 +3074,10 @@ mod tests {
                                 destination: Contract::Implicit(src.pkh.clone()),
                                 parameters: Parameters {
                                     entrypoint: Entrypoint::default(),
-                                    value: Micheline::from(()).encode().unwrap(),
+                                    value: Micheline::from(())
+                                        .encode(&mut Gas::unmetered())
+                                        .unwrap()
+                                        .unwrap(),
                                 },
                             },
                             sender: Contract::Originated(desthash.clone()),
@@ -3220,7 +3243,10 @@ mod tests {
         let destination =
             init_contract(&mut host, &dest, SCRIPT, &initial_storage, &50_u64.into());
 
-        let storage_value = Micheline::from("Hello world").encode().unwrap();
+        let storage_value = Micheline::from("Hello world")
+            .encode(&mut Gas::unmetered())
+            .unwrap()
+            .unwrap();
         let operation = make_transfer_operation(
             15,
             1,
@@ -3356,7 +3382,10 @@ mod tests {
         let destination =
             init_contract(&mut host, &dest, SCRIPT, &initial_storage, &50_u64.into());
 
-        let storage_value = Micheline::from("Hello world").encode().unwrap();
+        let storage_value = Micheline::from("Hello world")
+            .encode(&mut Gas::unmetered())
+            .unwrap()
+            .unwrap();
         let new_storage_size = storage_value.len() as u64;
         let operation = make_transfer_operation(
             15,
@@ -3421,7 +3450,10 @@ mod tests {
             &50_u64.into(),
         );
 
-        let storage_value = Micheline::from("Hello world").encode().unwrap();
+        let storage_value = Micheline::from("Hello world")
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
         let operation = make_transfer_operation(
             15,
             1,
@@ -3516,7 +3548,10 @@ mod tests {
         assert_eq!(source.balance(&host).unwrap(), (50_u64 - 15).into());
         assert_eq!(
             destination.storage(&host).unwrap(),
-            initial_storage.encode().unwrap(),
+            initial_storage
+                .encode(&mut Gas::default())
+                .unwrap()
+                .unwrap(),
             "destination storage must roll back to pre-op value",
         );
     }
@@ -3778,7 +3813,10 @@ mod tests {
             Contract::Originated(dest),
             Parameters {
                 entrypoint: mir::ast::Entrypoint::default(),
-                value: Micheline::from(()).encode().unwrap(),
+                value: Micheline::from(())
+                    .encode(&mut Gas::unmetered())
+                    .unwrap()
+                    .unwrap(),
             },
         );
 
@@ -3839,7 +3877,10 @@ mod tests {
 
         assert_eq!(
             destination.storage(&host).unwrap(),
-            initial_storage.encode().unwrap(),
+            initial_storage
+                .encode(&mut Gas::unmetered())
+                .unwrap()
+                .unwrap(),
             "Storage should not have been updated"
         )
     }
@@ -3865,7 +3906,10 @@ mod tests {
             Contract::Implicit(dest.pkh),
             Parameters {
                 entrypoint: mir::ast::Entrypoint::default(),
-                value: Micheline::from(0).encode().unwrap(),
+                value: Micheline::from(0)
+                    .encode(&mut Gas::unmetered())
+                    .unwrap()
+                    .unwrap(),
             },
         );
 
@@ -3937,7 +3981,10 @@ mod tests {
             Parameters {
                 entrypoint: mir::ast::Entrypoint::try_from("non_default")
                     .expect("Entrypoint should be valid"),
-                value: Micheline::from(()).encode().unwrap(),
+                value: Micheline::from(())
+                    .encode(&mut Gas::unmetered())
+                    .unwrap()
+                    .unwrap(),
             },
         );
 
@@ -4302,7 +4349,10 @@ mod tests {
             destination: Contract::Originated(succ_dest.clone()),
             parameters: Parameters {
                 entrypoint: mir::ast::Entrypoint::default(),
-                value: Micheline::from("Hello world").encode().unwrap(),
+                value: Micheline::from("Hello world")
+                    .encode(&mut Gas::unmetered())
+                    .unwrap()
+                    .unwrap(),
             },
         });
 
@@ -4311,7 +4361,10 @@ mod tests {
             destination: Contract::Originated(fail_dest.clone()),
             parameters: Parameters {
                 entrypoint: mir::ast::Entrypoint::default(),
-                value: Micheline::from(()).encode().unwrap(),
+                value: Micheline::from(())
+                    .encode(&mut Gas::unmetered())
+                    .unwrap()
+                    .unwrap(),
             },
         });
 
@@ -4379,7 +4432,10 @@ mod tests {
         // Storage must have reverted
         assert!(
             succ_account.storage(&host).unwrap()
-                == Micheline::from("initial").encode().unwrap(),
+                == Micheline::from("initial")
+                    .encode(&mut Gas::unmetered())
+                    .unwrap()
+                    .unwrap(),
         );
 
         assert_eq!(
@@ -4671,7 +4727,10 @@ mod tests {
                     destination: Contract::Originated(contract_chapo_hash),
                     parameters: Parameters {
                         entrypoint: mir::ast::Entrypoint::default(),
-                        value: param_value.encode().unwrap(),
+                        value: param_value
+                            .encode(&mut Gas::unmetered())
+                            .unwrap()
+                            .unwrap(),
                     },
                 }),
             ],
@@ -4843,7 +4902,10 @@ mod tests {
             Contract::Originated(contract_hash.clone()),
             Parameters {
                 entrypoint: mir::ast::Entrypoint::default(),
-                value: Micheline::from(()).encode().unwrap(),
+                value: Micheline::from(())
+                    .encode(&mut Gas::unmetered())
+                    .unwrap()
+                    .unwrap(),
             },
         );
 
@@ -4867,7 +4929,8 @@ mod tests {
         assert_eq!(
             src_contract.storage(&host).unwrap(),
             Micheline::from(i128::from(transfer_amount))
-                .encode()
+                .encode(&mut Gas::unmetered())
+                .unwrap()
                 .unwrap(),
             "Storage should contain the amount sent"
         );
@@ -4915,7 +4978,10 @@ mod tests {
             Contract::Originated(contract_hash.clone()),
             Parameters {
                 entrypoint: mir::ast::Entrypoint::default(),
-                value: Micheline::from(()).encode().unwrap(),
+                value: Micheline::from(())
+                    .encode(&mut Gas::unmetered())
+                    .unwrap()
+                    .unwrap(),
             },
         );
 
@@ -4939,7 +5005,8 @@ mod tests {
         assert_eq!(
             src_contract.storage(&host).unwrap(),
             Micheline::from(i128::from(initial_balance + transfer_amount))
-                .encode()
+                .encode(&mut Gas::unmetered())
+                .unwrap()
                 .unwrap(),
             "Storage should contain the balance of the contract"
         );
@@ -4989,7 +5056,10 @@ mod tests {
             Contract::Originated(contract_hash.clone()),
             Parameters {
                 entrypoint: mir::ast::Entrypoint::default(),
-                value: Micheline::from(()).encode().unwrap(),
+                value: Micheline::from(())
+                    .encode(&mut Gas::unmetered())
+                    .unwrap()
+                    .unwrap(),
             },
         );
 
@@ -5012,7 +5082,10 @@ mod tests {
 
         assert_eq!(
             src_contract.storage(&host).unwrap(),
-            micheline_address.encode().unwrap(),
+            micheline_address
+                .encode(&mut Gas::unmetered())
+                .unwrap()
+                .unwrap(),
             "Storage should contain the self address of the contract"
         );
     }
@@ -5218,7 +5291,10 @@ mod tests {
                 destination: Contract::Originated(contract_chapo_hash.clone()),
                 parameters: Parameters {
                     entrypoint: mir::ast::Entrypoint::default(),
-                    value: Micheline::from(()).encode().unwrap(),
+                    value: Micheline::from(())
+                        .encode(&mut Gas::unmetered())
+                        .unwrap()
+                        .unwrap(),
                 },
             })],
         );
@@ -5273,8 +5349,14 @@ mod tests {
                     balance: 1000.into(),
                     delegate: None,
                     script: Script {
-                        code: parsed_script.encode().unwrap(),
-                        storage: Micheline::from(()).encode().unwrap(),
+                        code: parsed_script
+                            .encode(&mut Gas::unmetered())
+                            .unwrap()
+                            .unwrap(),
+                        storage: Micheline::from(())
+                            .encode(&mut Gas::unmetered())
+                            .unwrap()
+                            .unwrap(),
                     },
                 },
                 result: ContentResult::Applied(OriginationSuccess {
@@ -5427,7 +5509,10 @@ mod tests {
                 destination: Contract::Originated(contract_chapo_hash.clone()),
                 parameters: Parameters {
                     entrypoint: mir::ast::Entrypoint::default(),
-                    value: Micheline::from(()).encode().unwrap(),
+                    value: Micheline::from(())
+                        .encode(&mut Gas::unmetered())
+                        .unwrap()
+                        .unwrap(),
                 },
             })],
         );
@@ -5487,8 +5572,14 @@ mod tests {
                     balance: 0.into(),
                     delegate: None,
                     script: Script {
-                        code: parsed_script_3.encode().unwrap(),
-                        storage: Micheline::from(vec![]).encode().unwrap(),
+                        code: parsed_script_3
+                            .encode(&mut Gas::unmetered())
+                            .unwrap()
+                            .unwrap(),
+                        storage: Micheline::from(vec![])
+                            .encode(&mut Gas::unmetered())
+                            .unwrap()
+                            .unwrap(),
                     },
                 },
                 result: ContentResult::Applied(OriginationSuccess {
@@ -5539,9 +5630,13 @@ mod tests {
                     balance: 0.into(),
                     delegate: None,
                     script: Script {
-                        code: parsed_script_2.encode().unwrap(),
+                        code: parsed_script_2
+                            .encode(&mut Gas::unmetered())
+                            .unwrap()
+                            .unwrap(),
                         storage: Micheline::from(num_bigint::BigUint::from(1u32))
-                            .encode()
+                            .encode(&mut Gas::unmetered())
+                            .unwrap()
                             .unwrap(),
                     },
                 },
@@ -5621,9 +5716,13 @@ mod tests {
                 code: parser
                     .parse_top_level(UNIT_SCRIPT)
                     .unwrap()
-                    .encode()
+                    .encode(&mut Gas::unmetered())
+                    .unwrap()
                     .unwrap(),
-                storage: Micheline::from(()).encode().unwrap(),
+                storage: Micheline::from(())
+                    .encode(&mut Gas::unmetered())
+                    .unwrap()
+                    .unwrap(),
             },
         });
 
@@ -5635,9 +5734,13 @@ mod tests {
                 code: parser
                     .parse_top_level(UNIT_SCRIPT)
                     .unwrap()
-                    .encode()
+                    .encode(&mut Gas::unmetered())
+                    .unwrap()
                     .unwrap(),
-                storage: Micheline::from(()).encode().unwrap(),
+                storage: Micheline::from(())
+                    .encode(&mut Gas::unmetered())
+                    .unwrap()
+                    .unwrap(),
             },
         });
 
@@ -5649,9 +5752,13 @@ mod tests {
                 code: parser
                     .parse_top_level(UNIT_SCRIPT)
                     .unwrap()
-                    .encode()
+                    .encode(&mut Gas::unmetered())
+                    .unwrap()
                     .unwrap(),
-                storage: Micheline::from(()).encode().unwrap(),
+                storage: Micheline::from(())
+                    .encode(&mut Gas::unmetered())
+                    .unwrap()
+                    .unwrap(),
             },
         });
 
@@ -5945,9 +6052,13 @@ mod tests {
         let code = mir::parser::Parser::new()
             .parse_top_level(UNIT_SCRIPT)
             .expect("Should have succeeded to parse the script")
-            .encode()
+            .encode(&mut Gas::unmetered())
+            .unwrap()
             .unwrap();
-        let storage = Micheline::from(42).encode().unwrap();
+        let storage = Micheline::from(42)
+            .encode(&mut Gas::unmetered())
+            .unwrap()
+            .unwrap();
         let origination_content = OriginationContent {
             balance,
             delegate: None,
@@ -6088,7 +6199,10 @@ mod tests {
             Parameters {
                 entrypoint: Entrypoint::try_from("default")
                     .expect("Entrypoint should be valid"),
-                value: Micheline::from(()).encode().unwrap(),
+                value: Micheline::from(())
+                    .encode(&mut Gas::unmetered())
+                    .unwrap()
+                    .unwrap(),
             },
         );
         let receipts2 = ProcessedOperation::into_receipts(
@@ -6138,7 +6252,8 @@ mod tests {
                 entrypoint: Entrypoint::try_from("call")
                     .expect("Entrypoint should be valid"),
                 value: Micheline::from(src.clone().pkh.to_b58check())
-                    .encode()
+                    .encode(&mut Gas::unmetered())
+                    .unwrap()
                     .unwrap(),
             },
         );
@@ -6196,7 +6311,10 @@ mod tests {
             Parameters {
                 entrypoint: Entrypoint::try_from("call")
                     .expect("Entrypoint should be valid"),
-                value: Micheline::from(kt1_addr.to_b58check()).encode().unwrap(),
+                value: Micheline::from(kt1_addr.to_b58check())
+                    .encode(&mut Gas::unmetered())
+                    .unwrap()
+                    .unwrap(),
             },
         );
         let receipts4 = ProcessedOperation::into_receipts(
@@ -6510,7 +6628,10 @@ mod tests {
             Contract::Originated(sender_addr.clone()),
             Parameters {
                 entrypoint: Entrypoint::default(),
-                value: Micheline::from(CONTRACT_2).encode().unwrap(),
+                value: Micheline::from(CONTRACT_2)
+                    .encode(&mut Gas::unmetered())
+                    .unwrap()
+                    .unwrap(),
             },
         );
 
@@ -7065,7 +7186,8 @@ mod tests {
             Parameters {
                 entrypoint: Entrypoint::default(),
                 value: Micheline::from(receiver.kt1().to_base58_check())
-                    .encode()
+                    .encode(&mut Gas::unmetered())
+                    .unwrap()
                     .unwrap(),
             },
         );
@@ -7138,7 +7260,10 @@ mod tests {
             Contract::Originated(gateway_kt1.clone()),
             Parameters {
                 entrypoint: Entrypoint::default(),
-                value: params_micheline.encode().unwrap(),
+                value: params_micheline
+                    .encode(&mut Gas::unmetered())
+                    .unwrap()
+                    .unwrap(),
             },
         );
 
@@ -7437,7 +7562,8 @@ mod tests {
                 value: Micheline::String(
                     "0x1111111111111111111111111111111111111111".to_string(),
                 )
-                .encode()
+                .encode(&mut Gas::unmetered())
+                .unwrap()
                 .unwrap(),
             },
         );
@@ -7525,7 +7651,7 @@ mod tests {
             Contract::Originated(gateway_kt1),
             Parameters {
                 entrypoint: Entrypoint::try_from("call_evm").unwrap(),
-                value: call_value.encode().unwrap(),
+                value: call_value.encode(&mut Gas::unmetered()).unwrap().unwrap(),
             },
         );
 
@@ -7640,7 +7766,8 @@ mod tests {
                 value: Micheline::String(
                     "0x3333333333333333333333333333333333333333".to_string(),
                 )
-                .encode()
+                .encode(&mut Gas::unmetered())
+                .unwrap()
                 .unwrap(),
             },
         );
@@ -7912,7 +8039,10 @@ mod tests {
                 destination: Contract::Originated(target.clone()),
                 parameters: Parameters {
                     entrypoint: mir::ast::Entrypoint::default(),
-                    value: Micheline::from(()).encode().unwrap(),
+                    value: Micheline::from(())
+                        .encode(&mut Gas::unmetered())
+                        .unwrap()
+                        .unwrap(),
                 },
             })
         };
@@ -7925,7 +8055,10 @@ mod tests {
                 destination: Contract::Originated(chapo.clone()),
                 parameters: Parameters {
                     entrypoint: mir::ast::Entrypoint::default(),
-                    value: Micheline::Seq(addrs).encode().unwrap(),
+                    value: Micheline::Seq(addrs)
+                        .encode(&mut Gas::unmetered())
+                        .unwrap()
+                        .unwrap(),
                 },
             })]
         };

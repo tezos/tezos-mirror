@@ -13,6 +13,7 @@ use tezos_data_encoding::{
 use super::constants::*;
 use crate::{
     ast::{Annotation, Annotations, Micheline},
+    gas::{interpret_cost, Gas, OutOfGas},
     lexer::Prim,
 };
 
@@ -223,22 +224,29 @@ fn encode_micheline(mich: &Micheline, out: &mut Vec<u8>) -> BinResult {
 }
 
 impl Micheline<'_> {
-    /// Serialize a value.
-    pub fn encode(&self) -> Result<Vec<u8>, BinError> {
-        self.encode_starting_with(&[])
+    /// Serialize a value. Charges `interpret_cost::micheline_encoding`
+    /// (mirrors L1's `cost_ENCODING_MICHELINE`) against `gas` before
+    /// writing. The outer `Result` reports gas exhaustion; the inner
+    /// `Result` reports serialization failures.
+    pub fn encode(&self, gas: &mut Gas) -> Result<Result<Vec<u8>, BinError>, OutOfGas> {
+        self.encode_starting_with(&[], gas)
     }
 
-    /// Serialize a value like PACK does.
-    pub fn encode_for_pack(&self) -> Result<Vec<u8>, BinError> {
-        self.encode_starting_with(&[0x05])
+    /// Serialize a value like PACK does. Same gas semantics as [`Self::encode`].
+    pub fn encode_for_pack(&self, gas: &mut Gas) -> Result<Result<Vec<u8>, BinError>, OutOfGas> {
+        self.encode_starting_with(&[0x05], gas)
     }
 
-    /// Like [Value::encode], but allows specifying a prefix, useful for
+    /// Like [`Self::encode`], but allows specifying a prefix, useful for
     /// `PACK` implementation.
-    pub(crate) fn encode_starting_with(&self, start_bytes: &[u8]) -> Result<Vec<u8>, BinError> {
+    pub(crate) fn encode_starting_with(
+        &self,
+        start_bytes: &[u8],
+        gas: &mut Gas,
+    ) -> Result<Result<Vec<u8>, BinError>, OutOfGas> {
+        gas.consume(interpret_cost::micheline_encoding(self).map_err(|_| OutOfGas)?)?;
         let mut out = Vec::from(start_bytes);
-        encode_micheline(self, &mut out)?;
-        Ok(out)
+        Ok(encode_micheline(self, &mut out).map(|()| out))
     }
 }
 
@@ -252,7 +260,7 @@ mod test_encoding {
             .strip_prefix("0x")
             .unwrap_or_else(|| panic!("The `expected` argument must start from 0x"));
         assert_eq!(
-            v.into().encode().unwrap(),
+            v.into().encode(&mut Gas::unmetered()).unwrap().unwrap(),
             hex::decode(hex_bytes)
                 .unwrap_or_else(|_| panic!("Bad hex string in `expected` argument"))
         )
@@ -391,26 +399,26 @@ mod test_encoding {
     mod result_contract {
         use super::*;
 
-        /// Confirms `encode` returns `Ok` for a typical Micheline value, and
-        /// that the return type is `Result<Vec<u8>, BinError>` (compile-time
-        /// contract: the `?` operator can be used to chain).
+        /// Confirms `encode` returns `Ok(Ok(_))` for a typical Micheline
+        /// value: outer `Result` reports gas exhaustion, inner reports
+        /// serialization failures.
         #[test]
-        fn encode_returns_result_ok() {
-            fn try_encode<'a>(v: Micheline<'a>) -> Result<Vec<u8>, BinError> {
-                let bytes = v.encode()?;
-                Ok(bytes)
-            }
-            let bytes = try_encode(Micheline::Int(42.into())).expect("ok");
+        fn encode_returns_nested_ok() {
+            let bytes = Micheline::Int(42.into())
+                .encode(&mut Gas::unmetered())
+                .expect("no OOG with unmetered")
+                .expect("no BinError for Int");
             assert!(!bytes.is_empty());
         }
 
-        /// Confirms `encode_for_pack` likewise returns `Result` and prefixes
+        /// Confirms `encode_for_pack` likewise nests `Result`s and prefixes
         /// with `0x05`.
         #[test]
-        fn encode_for_pack_returns_result_ok() {
+        fn encode_for_pack_returns_nested_ok() {
             let bytes = Micheline::Int(0.into())
-                .encode_for_pack()
-                .expect("encode_for_pack ok");
+                .encode_for_pack(&mut Gas::unmetered())
+                .expect("no OOG with unmetered")
+                .expect("no BinError for Int");
             assert_eq!(bytes.first(), Some(&0x05));
         }
 

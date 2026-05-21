@@ -612,6 +612,7 @@ mod tests {
     use crate::transaction::TransactionContent::Ethereum;
     use crate::transaction::TransactionContent::EthereumDelayed;
     use crate::{retrieve_block_fees, retrieve_chain_id};
+    use mir::gas::Gas;
     use primitive_types::{H160, U256};
     use revm::primitives::hardfork::SpecId;
     use revm_etherlink::helpers::legacy::{alloy_to_u256, h160_to_alloy, u256_to_alloy};
@@ -1503,12 +1504,14 @@ mod tests {
             ",
             )
             .expect("Should have succeeded to parse the script")
-            .encode()
+            .encode(&mut Gas::unmetered())
+            .unwrap()
             .unwrap();
         let storage = parser
             .parse("Pair 0 0 0x00000000")
             .expect("Should have succeeded to parse the storage")
-            .encode()
+            .encode(&mut Gas::unmetered())
+            .unwrap()
             .unwrap();
 
         let boostrap1 = bootstrap1();

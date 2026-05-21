@@ -4,7 +4,7 @@
 
 use http::StatusCode;
 use mir::ast::big_map::BigMapId;
-use mir::gas::OutOfGas;
+use mir::gas::{Gas, OutOfGas};
 use primitive_types::U256;
 use std::collections::BTreeMap;
 use tezos_crypto_rs::{
@@ -226,17 +226,21 @@ fn build_crac_receipt(
             ast::annotations::NO_ANNS, ast::micheline::Micheline, ast::Entrypoint, lexer,
         };
         let ty = Micheline::App(lexer::Prim::string, &[], NO_ANNS)
-            .encode()
+            .encode(&mut Gas::unmetered())
+            .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
             .map_err(|e| {
                 TezosXRuntimeError::Custom(format!(
                     "Failed to encode CRAC event type: {e}"
                 ))
             })?;
-        let payload = Micheline::from(id.to_string()).encode().map_err(|e| {
-            TezosXRuntimeError::Custom(format!(
-                "Failed to encode CRAC event payload: {e}"
-            ))
-        })?;
+        let payload = Micheline::from(id.to_string())
+            .encode(&mut Gas::unmetered())
+            .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
+            .map_err(|e| {
+                TezosXRuntimeError::Custom(format!(
+                    "Failed to encode CRAC event payload: {e}"
+                ))
+            })?;
         let event_nonce = next_nonce;
         next_nonce = next_nonce.saturating_add(1);
         all_internal.push(InternalOperationSum::Event(InternalContentWithMetadata {
@@ -357,17 +361,21 @@ fn build_failed_crac_receipt(
             ast::annotations::NO_ANNS, ast::micheline::Micheline, ast::Entrypoint, lexer,
         };
         let ty = Micheline::App(lexer::Prim::string, &[], NO_ANNS)
-            .encode()
+            .encode(&mut Gas::unmetered())
+            .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
             .map_err(|e| {
                 TezosXRuntimeError::Custom(format!(
                     "Failed to encode CRAC event type: {e}"
                 ))
             })?;
-        let payload = Micheline::from(id.to_string()).encode().map_err(|e| {
-            TezosXRuntimeError::Custom(format!(
-                "Failed to encode CRAC event payload: {e}"
-            ))
-        })?;
+        let payload = Micheline::from(id.to_string())
+            .encode(&mut Gas::unmetered())
+            .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
+            .map_err(|e| {
+                TezosXRuntimeError::Custom(format!(
+                    "Failed to encode CRAC event payload: {e}"
+                ))
+            })?;
         let event_nonce = next_nonce;
         next_nonce = next_nonce.saturating_add(1);
         all_internal.push(InternalOperationSum::Event(InternalContentWithMetadata {
@@ -574,7 +582,8 @@ where
     // checks that param == Unit.
     let value = if body.is_empty() {
         mir::ast::micheline::Micheline::from(())
-            .encode()
+            .encode(&mut Gas::unmetered())
+            .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
             .map_err(|e| {
                 TezosXRuntimeError::Custom(format!("Failed to encode Unit: {e}"))
             })?
@@ -948,8 +957,9 @@ impl RuntimeInterface for TezosRuntime {
                 "Failed to decode forwarder code from hex: {e}"
             ))
         })?;
-        let storage =
-            alias_forwarder::forwarder_storage(native_address).map_err(|e| {
+        let storage = alias_forwarder::forwarder_storage(native_address)
+            .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
+            .map_err(|e| {
                 TezosXRuntimeError::Custom(format!(
                     "Failed to encode forwarder storage: {e}"
                 ))
@@ -1531,7 +1541,9 @@ mod tests {
         let account = context.originated_from_kt1(&kt1).unwrap();
 
         let storage = account.storage(&host).unwrap();
-        let expected = alias_forwarder::forwarder_storage(evm_address).unwrap();
+        let expected = alias_forwarder::forwarder_storage(evm_address)
+            .unwrap()
+            .unwrap();
         assert_eq!(storage, expected);
     }
 
@@ -1805,7 +1817,10 @@ mod tests {
         let amount = Narith(50_000_000u64.into()); // 50 tez in mutez
         let parameters = Parameters {
             entrypoint: mir::ast::Entrypoint::from_string_unchecked("swap".into()),
-            value: mir::ast::micheline::Micheline::from(()).encode().unwrap(),
+            value: mir::ast::micheline::Micheline::from(())
+                .encode(&mut Gas::unmetered())
+                .unwrap()
+                .unwrap(),
         };
         let target = TransferTarget::from(TransferSuccess::default());
 
@@ -1924,7 +1939,10 @@ mod tests {
         let amount = Narith(100_000_000u64.into());
         let parameters = Parameters {
             entrypoint: mir::ast::Entrypoint::default(),
-            value: mir::ast::micheline::Micheline::from(()).encode().unwrap(),
+            value: mir::ast::micheline::Micheline::from(())
+                .encode(&mut Gas::unmetered())
+                .unwrap()
+                .unwrap(),
         };
         let target = TransferTarget::from(TransferSuccess::default());
 
@@ -2016,7 +2034,10 @@ mod tests {
         let amount = Narith(50_000_000u64.into());
         let parameters = Parameters {
             entrypoint: mir::ast::Entrypoint::from_string_unchecked("swap".into()),
-            value: mir::ast::micheline::Micheline::from(()).encode().unwrap(),
+            value: mir::ast::micheline::Micheline::from(())
+                .encode(&mut Gas::unmetered())
+                .unwrap()
+                .unwrap(),
         };
         let error =
             TransferError::FailedToExecuteInternalOperation("test failure".into());

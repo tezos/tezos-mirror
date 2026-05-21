@@ -22,6 +22,7 @@ use std::rc::Rc;
 use mir::ast::big_map::BigMapId;
 use mir::ast::{AddressHash, IntoMicheline, Micheline, Type, TypedValue};
 use mir::context::{CtxTrait, TypecheckingCtx};
+use mir::gas::{Gas, OutOfGas};
 use mir::interpreter::{EnshrinedViewDispatchError, InterpretError};
 use mir::parser::Parser;
 use mir::typechecker::{typecheck_value, typecheck_view, TcError};
@@ -365,8 +366,9 @@ where
 
         result
             .into_micheline_optimized_legacy(&parser.arena, mir_ctx.gas())
-            .map_err(|_| TezosXRuntimeError::OutOfGas)?
-            .encode()
+            .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
+            .encode(&mut Gas::unmetered())
+            .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
             .map_err(|e| {
                 TezosXRuntimeError::Custom(format!("failed to encode view result: {e}"))
             })

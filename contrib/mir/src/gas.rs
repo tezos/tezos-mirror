@@ -72,6 +72,20 @@ impl Gas {
         }
     }
 
+    /// [Gas] counter sized to `u32::MAX` milligas: bounded, but high
+    /// enough that we don't expect to hit it in practice. Use as the
+    /// `&mut Gas` argument in places where no metering should apply,
+    /// typically tests, examples, and the TZT runner.
+    ///
+    /// For production paths that are not user-billed (kernel-synthesised
+    /// receipts, RPC handlers, etc.), prefer [`Gas::default`] over
+    /// [`Gas::unmetered`]: the standard L1 per-operation cap acts as a
+    /// real OOG safety bound on absurdly large inputs, instead of just
+    /// being a `u32::MAX` placeholder.
+    pub fn unmetered() -> Gas {
+        Gas::new(u32::MAX)
+    }
+
     /// Try to consume the specified milligas `cost`. If not enough gas left,
     /// or gas was previously exhausted, return [OutOfGas] and mark gas as
     /// exhausted.
@@ -869,6 +883,14 @@ pub mod interpret_cost {
         let mut size = MichelineSize::default();
         collect_micheline_size(mich, &mut size);
         micheline_encoding_by_size(size)
+    }
+
+    /// Mirrors L1's `cost_DECODING_MICHELINE_bytes`
+    /// (`src/proto_alpha/lib_protocol/script_repr_costs_generated.ml:23`):
+    /// 20 milligas/byte, with a 10-milligas floor.
+    pub fn micheline_decoding_bytes(bytes_len: usize) -> Result<u32, CostOverflow> {
+        let scaled = (Checked::from(bytes_len) * 20).as_gas_cost()?;
+        Ok(scaled.max(10))
     }
 
     fn micheline_encoding_by_size(size: MichelineSize) -> Result<u32, CostOverflow> {

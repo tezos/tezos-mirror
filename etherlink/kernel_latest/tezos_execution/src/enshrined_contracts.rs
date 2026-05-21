@@ -1501,9 +1501,13 @@ mod tests {
         };
 
         let ty = Micheline::App(lexer::Prim::string, &[], NO_ANNS)
-            .encode()
+            .encode(&mut Gas::unmetered())
+            .unwrap()
             .unwrap();
-        let payload = Micheline::from(crac_id.to_string()).encode().unwrap();
+        let payload = Micheline::from(crac_id.to_string())
+            .encode(&mut Gas::unmetered())
+            .unwrap()
+            .unwrap();
 
         InternalOperationSum::Event(InternalContentWithMetadata {
             content: EventContent {

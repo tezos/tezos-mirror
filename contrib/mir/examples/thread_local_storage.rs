@@ -58,7 +58,8 @@ fn run_contract(parameter: Micheline) {
             new_storage
                 .into_micheline_optimized_legacy(&Arena::new(), &mut Gas::default())
                 .unwrap()
-                .encode()
+                .encode(&mut Gas::unmetered())
+                .unwrap()
                 .unwrap()
         });
     });
