@@ -272,8 +272,8 @@ let job_install_bin_debian_bookworm =
 let make_systemd_test_job ~script ~distribution ~release =
   CI.job
     ~stage:Test_publication
-    ~image:Images_external.docker
-    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
+    ~image:Images.Base_images.alpine_docker_ci
+    ~services:[{name = Images.Base_images.dind_service}]
     ~variables:
       ([("DOCKER_VERSION", Docker.version)]
       @ make_debian_variables

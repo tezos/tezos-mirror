@@ -41,7 +41,7 @@ let job_docker_container_scanning =
       "Scan released Docker images for vulnerabilities using GCP Artifact \
        Registry scanning"
     ~stage:Publish
-    ~image:Images_external.docker
+    ~image:Images.Base_images.alpine_docker_ci
     ~needs:[(Job, job_docker_merge_manifests mode)]
     ~artifacts:
       (Gitlab_ci.Util.artifacts
@@ -74,7 +74,7 @@ let job_docker_promote_to_latest =
     "docker:promote_to_latest"
     ~__POS__
     ~description:"Add the latest tag to the new Docker images."
-    ~image:Images_external.docker
+    ~image:Images.Base_images.alpine_docker_ci
     ~stage:Publish
     ~needs:
       (match mode with
@@ -91,7 +91,7 @@ let job_docker_promote_to_latest =
              as it was created by another pipeline (the tag pipeline). *)
           [])
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
-    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
+    ~services:[{name = Images.Base_images.dind_service}]
     ~variables:
       ([
          ("DOCKER_VERSION", Docker.version);
@@ -379,12 +379,12 @@ let job_docker_promote_to_version =
     ~description:
       "Promote the Docker image from the packaging revision tag to the \
        canonical version tag (e.g., octez-v1.2 from octez-v1.2-1)"
-    ~image:Images_external.docker
+    ~image:Images.Base_images.alpine_docker_ci
     ~stage:Publish
     ~allow_failure:No
     ~needs:[(Job, job_docker_merge_manifests mode)]
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
-    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
+    ~services:[{name = Images.Base_images.dind_service}]
     ~variables:
       [
         ("DOCKER_VERSION", Docker.version);

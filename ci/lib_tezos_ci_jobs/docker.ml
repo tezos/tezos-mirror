@@ -9,11 +9,8 @@ module CI = Cacio.Shared
 
 (* This constant is meant to replace similar constants that are defined elsewhere,
    in particular the one in [job_docker_authenticated] in [ci/lib_tezos_ci/tezos_ci.ml].
-   During the migration to Cacio however, those other instances will continue to exist.
-
-   There is another Docker version being used by [base_images.ml]: 28.5.1.
-   We should probably try to use the same version everywhere. *)
-let version = "24.0.7"
+   During the migration to Cacio however, those other instances will continue to exist. *)
+let version = Tezos_ci.Images.Base_images.docker_version
 
 let make_job_docker ~__POS__ ~name ~description ~scripts contents mode arch =
   let arch_str = Tezos_ci.Runner.Arch.show_uniform arch in
@@ -33,13 +30,13 @@ let make_job_docker ~__POS__ ~name ~description ~scripts contents mode arch =
         when_ = [Script_failure; Runner_system_failure];
       }
     ~arch
-    ~image:Tezos_ci.Images_external.docker
+    ~image:Tezos_ci.Images.Base_images.alpine_docker_ci
     ~image_dependencies:
       (match contents with
       | `experimental_with_evm ->
           [Tezos_ci.Images.CI.runtime; Tezos_ci.Images.rust_toolchain]
       | `released | `experimental -> [Tezos_ci.Images.CI.runtime])
-    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
+    ~services:[{name = Tezos_ci.Images.Base_images.dind_service}]
     ~variables:
       [
         ("DOCKER_VERSION", version);
@@ -106,9 +103,9 @@ let make_job_docker_merge_manifests ~__POS__ ~name ~description ~needs ~scripts
     ~description
     ~stage:Publish
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
-    ~image:Tezos_ci.Images_external.docker
+    ~image:Tezos_ci.Images.Base_images.alpine_docker_ci
     ~needs
-    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
+    ~services:[{name = Tezos_ci.Images.Base_images.dind_service}]
     ~variables:
       [
         ("DOCKER_VERSION", version);
@@ -220,10 +217,10 @@ let job_script_docker_verify_image =
             `test
             arch );
       ]
-    ~image:Tezos_ci.Images_external.docker
+    ~image:Tezos_ci.Images.Base_images.alpine_docker_ci
     ~variables:
       [("DOCKER_VERSION", version); ("IMAGE_ARCH_PREFIX", arch_string ^ "_")]
-    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
+    ~services:[{name = Tezos_ci.Images.Base_images.dind_service}]
     ~script:
       [
         "./scripts/ci/docker_initialize.sh --image-names";

@@ -671,15 +671,16 @@ module Image = struct
 
   (** Register internal image for [image_path] built by [image_builder_amd64].
 
-      Optionally, a builder for an arm64 version of the image can be registered
-      by supplying [image_builder_arm64]. If [image_builder_arm64] is supplied,
-      then it must have a distinct name from [image_builder_amd64].
+      Optionally, a builder for an arm64 version of the image can be
+      registered by supplying [image_builder_arm64]. If
+      [image_builder_arm64] is supplied, then it must have a distinct
+      name from [image_builder_amd64].
 
-      Note: the name of the image builder(s) must uniquely identify the job
-      definition. If two image builders with the same name but differing job
-      definitions (as per polymorphic comparison of the underlying
-      {!Gitlab_ci.Types.job}) are registered, then this function throws a
-      run-time error. *)
+      Note: the name of the image builder(s) must uniquely identify the
+      job definition. If two image builders with the same name but
+      differing job definitions (as per polymorphic comparison of the
+      underlying {!Gitlab_ci.Types.job}) are registered, then this
+      function throws a run-time error. *)
   let mk_internal ?image_builder_arm64 ~image_builder_amd64 ~image_path () : t =
     let image =
       Internal
@@ -1398,19 +1399,11 @@ module Images_external = struct
       ~image_path:
         "nixos/nix:2.34.6@sha256:e2fe74e96e965653c7b8f16ac64d1e56581c63c84d7fa07fb0692fd055cd06b0"
 
-  (* Match GitLab executors version and directly use the Docker socket
-     The Docker daemon is already configured, experimental features are enabled
-     The following environment variables are already set:
-     - [BUILDKIT_PROGRESS]
-     - [DOCKER_DRIVER]
-     - [DOCKER_VERSION]
-     For more info, see {{:https://docs.gitlab.com/ee/ci/docker/using_docker_build.html#use-docker-socket-binding}} here.
-
-     This image is defined in {{:https://gitlab.com/tezos/docker-images/ci-docker}tezos/docker-images/ci-docker}. *)
+  (* Official Docker image from Docker Hub, used to bootstrap the
+     [alpine-docker-ci] base image. Pinned with SHA256 digest for
+     immutability. *)
   let docker =
-    Image.mk_external
-      ~image_path:
-        "${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0"
+    Image.mk_external ~image_path:(sf "docker:%s@%s" docker_version dind_digest)
 
   (* Image used in initial pipeline job that sends to Datadog useful
      info for CI visibility.
@@ -1568,8 +1561,8 @@ let opt_var name f = function Some value -> [(name, f value)] | None -> []
 
     It sets the appropriate image. Furthermore, it:
     - activates the Docker daemon as a service;
-    - sets up authentification with Docker registries in the job's
-      [before_script] section.
+    - sets up authentification with Docker registries
+    in the job's [before_script] section.
 
     If [ci_docker_hub] is set to [true], then the job will
     authenticate with Docker Hub provided the environment variable
@@ -1578,7 +1571,7 @@ let job_docker_authenticated ?ci_docker_hub ?artifacts ?(variables = []) ?rules
     ?(dependencies = Staged []) ?image_dependencies ?arch ?storage ?tag
     ?allow_failure ?parallel ?timeout ?retry ?description ?dev_infra ~__POS__
     ~stage ~name script : tezos_job =
-  let docker_version = "24.0.7" in
+  let docker_version = Base_images.docker_version in
   job
     ?rules
     ~dependencies
@@ -1594,13 +1587,13 @@ let job_docker_authenticated ?ci_docker_hub ?artifacts ?(variables = []) ?rules
     ?description
     ?dev_infra
     ~__POS__
-    ~image:Images_external.docker
+    ~image:Base_images.alpine_docker_ci
     ~variables:
       ([("DOCKER_VERSION", docker_version)]
       @ opt_var "CI_DOCKER_HUB" Bool.to_string ci_docker_hub
       @ variables)
     ~before_script:["./scripts/ci/docker_initialize.sh"]
-    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
+    ~services:[{name = Base_images.dind_service}]
     ~stage
     ~name
     script
@@ -1685,14 +1678,16 @@ end
 
 (** A set of internally and externally built images.
 
-    Use this module to register images built in the CI of [tezos/tezos] that are
-    also used in the same pipelines. See {!Images_external} for external images.
+    Use this module to register images built in the CI of
+    [tezos/tezos] that are also used in the same pipelines. See
+    {!Images_external} for external images.
 
-    To make the distinction between internal and external images transparent to
-    job definitions, this module also includes {!Images_external}.
+    To make the distinction between internal and external images
+    transparent to job definitions, this module also includes
+    {!Images_external}.
 
-    For documentation on the [CI] images and the [rust_toolchain] images, refer
-    to [images/README.md]. *)
+    For documentation on the [CI] images and the [rust_toolchain]
+    images, refer to [images/README.md]. *)
 module Images = struct
   (* Include external images here for convenience. *)
   include Images_external

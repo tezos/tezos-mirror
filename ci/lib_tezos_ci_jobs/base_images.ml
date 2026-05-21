@@ -413,14 +413,14 @@ let jobs ?start_job ?(changeset = false) () =
   in
   (* this base image is different from the others as we initialize the
      docker-ci image starting from scratch. It is the only job using
-     Images_external.docker . All other jobs will user
-     Images.Base_images.docker as default.
+     Images_external.docker . All other jobs will use
+     Images.Base_images.alpine_docker_ci as default.
      The changeset is also different to ensure this image is always up-to-date *)
   let job_docker_ci_based_images =
     (* use docker/docker image to bootstrap docker-ci base images. This is
        the upstream image for this image *)
     (* See also the comment on [let version] in [docker.ml]. *)
-    let docker_version = "28.5.1" in
+    let docker_version = Images.Base_images.docker_version in
     let variables =
       [
         ("RELEASE", docker_version);
@@ -448,7 +448,7 @@ let jobs ?start_job ?(changeset = false) () =
       ~__POS__
       ~image:Images_external.docker
       ~variables
-      ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
+      ~services:[{name = Images.Base_images.dind_service}]
       ~stage:Stages.build
       ?dependencies:(Option.map (fun j -> Dependent [Job j]) start_job)
       ~name:"images.alpine-docker-ci"
