@@ -1,0 +1,96 @@
+parameter (or (unit %run) (or (bytes %on_result) (unit %_incrementWitness))) ;
+storage (pair (nat %count) (pair (string %destination) (option %result bytes))) ;
+# Michelson-to-Michelson bridge with callback for capturing the
+# response body of a same-runtime CRAC.  The target is expected to
+# deposit bytes via the gateway's %collect_result entrypoint; those
+# bytes surface as the HTTP response body, which the gateway forwards
+# to this contract's %on_result entrypoint via the callback parameter.
+#
+# %run builds:
+#   url     = "http://tezos/" ++ destination ++ "/default"
+#   headers = {} (empty)
+#   body    = 0x (empty, target takes unit)
+#   method  = 1 (POST)
+#   callback = Some(SELF %on_result)
+# and calls gateway.%call.
+#
+# %on_result(bytes): stores received bytes in %result, increments count
+# %_incrementWitness: count++
+#
+# The gateway address (KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw) is the
+# enshrined CRAC contract with a deterministic address.
+code
+  { UNPAIR ;
+    IF_LEFT
+      { # run()
+        DROP ;
+        DUP ; CDR ; CAR ;
+        # destination : storage
+        PUSH string "http://tezos/" ;
+        CONCAT ;
+        PUSH string "/default" ;
+        SWAP ;
+        CONCAT ;
+        # url : storage
+        DIP { PUSH @gateway address "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw" ;
+              CONTRACT %call (pair string (pair (list (pair string string)) (pair bytes (pair nat (option (contract bytes)))))) ;
+              ASSERT_SOME } ;
+        # url : (contract %call ...) : storage
+        SELF %on_result ; SOME ;
+        # Some(SELF %on_result) : url : (contract ...) : storage
+        PUSH nat 1 ;  # method: 1 = POST
+        PAIR ;
+        # (1, Some callback) : url : (contract ...) : storage
+        PUSH bytes 0x ;  # empty body (target takes unit)
+        PAIR ;
+        # (0x, (1, Some callback)) : url : (contract ...) : storage
+        NIL (pair string string) ;
+        PAIR ;
+        # ([], (0x, (1, Some callback))) : url : (contract ...) : storage
+        SWAP ; PAIR ;
+        # Pair url (...) : (contract ...) : storage
+        AMOUNT ; SWAP ;
+        TRANSFER_TOKENS ;
+        # gateway_op : storage
+        # Build post-increment operation
+        SELF %_incrementWitness ;
+        PUSH mutez 0 ; UNIT ; TRANSFER_TOKENS ;
+        # post_incr : gateway_op : storage
+        NIL operation ; SWAP ; CONS ; SWAP ; CONS ;
+        # [gateway_op, post_incr] : storage
+        # Build pre-increment operation
+        SELF %_incrementWitness ;
+        PUSH mutez 0 ; UNIT ; TRANSFER_TOKENS ;
+        # pre_incr : [gateway_op, post_incr] : storage
+        CONS ;
+        # [pre_incr, gateway_op, post_incr] : storage
+        PAIR
+      }
+      { IF_LEFT
+          { # on_result(bytes): store received bytes, increment count
+            # Stack: bytes : storage
+            SOME ;
+            # Some bytes : storage
+            SWAP ; UNPAIR ; SWAP ;
+            # rest : count : Some bytes
+            CAR ;
+            # destination : count : Some bytes
+            DIG 2 ;
+            # Some bytes : destination : count
+            SWAP ; PAIR ;
+            # Pair destination (Some bytes) : count
+            SWAP ;
+            # count : Pair destination (Some bytes)
+            PUSH nat 1 ; ADD ;
+            # count+1 : Pair destination (Some bytes)
+            PAIR ;
+            # Pair (count+1) (Pair destination (Some bytes))
+            NIL operation ; PAIR
+          }
+          { # _incrementWitness()
+            DROP ;
+            UNPAIR ; PUSH nat 1 ; ADD ; PAIR ;
+            NIL operation ; PAIR
+          }
+      }
+  } ;

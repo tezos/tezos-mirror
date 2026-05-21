@@ -52,7 +52,7 @@ use tezosx_interfaces::{
     AliasInfo, CrossRuntimeContext, Origin, Registry, RuntimeId, RuntimeInterface,
     TezosXRuntimeError, X_TEZOS_GAS_CONSUMED,
 };
-use tezosx_journal::TezosXJournal;
+use tezosx_journal::{DispatchSlotError, TezosXJournal};
 
 use tezos_smart_rollup_host::path::RefPath;
 
@@ -99,11 +99,10 @@ pub fn crac_top_level_applied_result() -> ContentResult<TransferContent> {
 
 /// Build an HTTP response from the result of [`execute_request`].
 ///
-/// `frame_result` carries the payload deposited on the topmost CRAC
-/// frame — by Michelson via `%collect_result` for entrypoint calls, or
-/// by [`view::execute_view_call`] for view calls. Peeked by the caller
-/// before REVM commits or reverts the frame. On 4xx/5xx the frame is
-/// about to be reverted, so the payload is discarded.
+/// `frame_result` carries the `%collect_result` payload taken out of the
+/// dispatch slot that [`TezosRuntime::serve`] opened for this call. It is
+/// only surfaced on 2xx responses — on 4xx/5xx the operation is about to
+/// be reverted, so the payload is discarded.
 ///
 /// Request-level errors are turned into HTTP error responses:
 /// - `Ok(())` → 200, body = `frame_result` (or empty), `Content-Type: application/octet-stream`
@@ -149,6 +148,31 @@ fn build_response(
     // Safe to unwrap: status is a predefined constant, header names are
     // static ASCII strings, and the values are ASCII-only.
     builder.status(status).body(body).unwrap()
+}
+
+/// Reconcile the `execute_request` outcome with the dispatch-slot take
+/// and build the HTTP response.
+///
+/// The dispatch slot is opened at `serve` entry and taken here.
+/// `Err(NoSlot)` means the slot was popped by an intermediate caller
+/// — a kernel bug.  When `result` is `Ok(())` we escalate that case to
+/// a `Custom` error so the response is a 500 rather than an empty 2xx
+/// that hides the inconsistency; when `result` is already `Err` the
+/// request error takes precedence and the dispatch payload (if any)
+/// is dropped on the floor, as it would be for any non-2xx.
+fn finalize_response(
+    result: Result<(), TezosXRuntimeError>,
+    consumed_milligas: u64,
+    dispatch: Result<Option<Vec<u8>>, DispatchSlotError>,
+) -> http::Response<Vec<u8>> {
+    let result = match (result, &dispatch) {
+        (Ok(()), Err(e)) => Err(TezosXRuntimeError::Custom(format!(
+            "dispatch slot inconsistency: {e}"
+        ))),
+        (other, _) => other,
+    };
+    let frame_result = dispatch.ok().flatten();
+    build_response(result, consumed_milligas, frame_result)
 }
 
 /// Build a serialized two-step receipt for an incoming CRAC (EVM → Michelson).
@@ -493,7 +517,7 @@ where
         http::Method::GET => {
             // The view path doesn't mutate storage or push a CRAC
             // receipt, but it still deposits its Micheline result into
-            // the topmost frame's `frame_result` slot (same slot the
+            // the dispatch slot opened by `serve` (same slot the
             // entrypoint path fills via `%collect_result`), so the
             // journal is threaded through. The registry is threaded
             // too so the view can issue nested cross-runtime reads
@@ -1025,6 +1049,13 @@ impl RuntimeInterface for TezosRuntime {
     where
         Host: StorageV1,
     {
+        // Open a dispatch slot for this CRAC entry so that any inner
+        // %collect_result deposits land here. The slot is owned by
+        // `serve` and is disjoint from REVM's external_checkpoints
+        // stack — durable-state isolation across CRAC boundaries is
+        // handled separately by `cross_runtime_transfer`'s own
+        // snapshot mechanism.
+        journal.michelson.push_dispatch_slot();
         // Default to max: if execute_request fails before writing the
         // actual value (early setup error), the caller sees full gas
         // consumption rather than a free call.
@@ -1037,11 +1068,11 @@ impl RuntimeInterface for TezosRuntime {
             request,
             &mut consumed_milligas,
         );
-        // Peek the topmost frame's %collect_result payload before REVM
-        // unwinds the checkpoint on commit/revert. `build_response` only
-        // surfaces it on 2xx; on 4xx/5xx it is discarded.
-        let frame_result = journal.michelson.frame_result().map(|b| b.to_vec());
-        build_response(result, consumed_milligas, frame_result)
+        finalize_response(
+            result,
+            consumed_milligas,
+            journal.michelson.take_dispatch_result(),
+        )
     }
 
     fn host(&self) -> &'static str {
@@ -1256,6 +1287,82 @@ mod tests {
                 .get(X_TEZOS_GAS_CONSUMED)
                 .and_then(|v| v.to_str().ok()),
             Some("0")
+        );
+    }
+
+    // --- finalize_response tests ---
+    //
+    // Four cases of `(execute_request result, dispatch slot take)`:
+    // success+payload, error+payload, success+unbalanced, error+
+    // unbalanced.  Pin the contract that `finalize_response` reconciles
+    // them as serve's tail.
+
+    // Happy path: execution succeeded and the dispatch slot holds a
+    // payload — 200 with the payload as body.
+    #[test]
+    fn finalize_response_success_with_payload() {
+        let resp = finalize_response(Ok(()), 42, Ok(Some(b"collected".to_vec())));
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(resp.body(), b"collected");
+        assert_eq!(
+            resp.headers()
+                .get(http::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok()),
+            Some("application/octet-stream")
+        );
+    }
+
+    // Execute_request returned an error while the dispatch slot still
+    // holds a payload: the request error wins, the payload is dropped,
+    // and no Content-Type is set on the error body.
+    #[test]
+    fn finalize_response_error_discards_payload() {
+        let resp = finalize_response(
+            Err(TezosXRuntimeError::BadRequest("nope".into())),
+            0,
+            Ok(Some(b"leaked".to_vec())),
+        );
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        assert!(
+            !resp.body().windows(6).any(|w| w == b"leaked"),
+            "dispatch payload must not leak into error body"
+        );
+        assert!(
+            resp.headers().get(http::header::CONTENT_TYPE).is_none(),
+            "Content-Type must not be set on error responses"
+        );
+    }
+
+    // Kernel bug: execute_request returned `Ok` but the dispatch slot
+    // is missing — escalate to 500 rather than masking as an empty
+    // 2xx response.
+    #[test]
+    fn finalize_response_success_with_unbalanced_slot_escalates_to_500() {
+        let resp = finalize_response(Ok(()), 7, Err(DispatchSlotError::NoSlot));
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert!(
+            String::from_utf8_lossy(resp.body()).contains("dispatch slot inconsistency"),
+            "body should explain the inconsistency: {:?}",
+            String::from_utf8_lossy(resp.body())
+        );
+    }
+
+    // Kernel bug coincident with a request error: the request error
+    // takes precedence over the dispatch-slot inconsistency.  We don't
+    // need to surface both; the user-visible failure is the request,
+    // and the slot bug is a separate concern best caught by tests and
+    // assertions elsewhere.
+    #[test]
+    fn finalize_response_error_with_unbalanced_slot_preserves_request_error() {
+        let resp = finalize_response(
+            Err(TezosXRuntimeError::NotFound("KT1 missing".into())),
+            0,
+            Err(DispatchSlotError::NoSlot),
+        );
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        assert!(
+            String::from_utf8_lossy(resp.body()).contains("KT1 missing"),
+            "original request error must dominate"
         );
     }
 
@@ -1964,22 +2071,23 @@ mod tests {
         assert!(transfer.result.is_failed(), "transfer must be failed");
     }
 
-    // `serve` must peek `frame_result` before REVM unwinds, but
-    // `build_response` must drop it on 4xx/5xx. This test threads both
-    // through the full `serve` path: pre-seed the journal, issue a
-    // request that parses but fails at URL-host validation, and verify
-    // the seeded bytes never appear in the error body.
+    // `serve` opens its own dispatch slot and only takes from that one;
+    // an outer slot sitting on the stack must survive untouched.  This
+    // test fails at URL parsing, so it does NOT exercise serve's
+    // error-with-payload tail (covered separately by the
+    // `finalize_response_*` tests above); the property it pins is the
+    // slot-stack discipline.
     #[test]
-    fn serve_error_does_not_leak_frame_result() {
+    fn serve_does_not_touch_outer_dispatch_slot() {
         let mut host = MockKernelHost::default();
         let runtime = test_runtime();
         let registry = StubRegistry;
 
         let mut journal = TezosXJournal::default();
-        journal.michelson.push_external_checkpoint();
+        journal.michelson.push_dispatch_slot();
         journal
             .michelson
-            .set_frame_result(b"TOP-SECRET".to_vec())
+            .set_dispatch_result(b"TOP-SECRET".to_vec())
             .unwrap();
 
         // `http://evm/...` has the wrong authority for the Tezos runtime;
@@ -1994,11 +2102,17 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
         assert!(
             !resp.body().windows(10).any(|w| w == b"TOP-SECRET"),
-            "seeded frame_result must not appear in error body"
+            "seeded dispatch result must not appear in error body"
         );
         assert!(
             resp.headers().get(http::header::CONTENT_TYPE).is_none(),
             "Content-Type must not be set on error responses"
+        );
+        // The outer slot is untouched: `serve` opened its own slot and
+        // took only that one.
+        assert_eq!(
+            journal.michelson.take_dispatch_result(),
+            Ok(Some(b"TOP-SECRET".to_vec()))
         );
     }
 }

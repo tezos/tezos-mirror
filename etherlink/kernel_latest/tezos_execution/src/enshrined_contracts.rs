@@ -257,12 +257,12 @@ where
                 dispatch_callback(ctx, callback, body).map_err(Into::into)
             } else if entrypoint.as_str() == "collect_result" {
                 // %collect_result lets a Michelson adapter deposit a
-                // result payload on the current CRAC frame so the kernel
-                // can later surface it as the HTTP response body to the
-                // EVM gateway, giving EVM callers a synchronous return
-                // value. Unlike the other gateway entrypoints it does not
-                // trigger an HTTP round-trip, so `charge_gateway_base_cost`
-                // does not apply.
+                // result payload on the current dispatch slot so the
+                // kernel can later surface it as the HTTP response body
+                // to the EVM gateway, giving EVM callers a synchronous
+                // return value.  Unlike the other gateway entrypoints
+                // it does not trigger an HTTP round-trip, so
+                // `charge_gateway_base_cost` does not apply.
                 //
                 // Reject any non-zero amount. %collect_result is not a
                 // CRAC and has no recipient: allowing tez through it
@@ -291,7 +291,7 @@ where
                     .map_err(TransferError::OutOfGas)?;
                 ctx.journal()
                     .michelson
-                    .set_frame_result(payload)
+                    .set_dispatch_result(payload)
                     .map_err(|e| {
                         TransferError::GatewayError(format!("collect_result: {e}"))
                     })?;
@@ -1442,9 +1442,9 @@ pub(crate) fn get_enshrined_contract_entrypoint(
             );
             // %collect_result: bytes
             //   Raw bytes payload to return to the EVM caller via the
-            //   current CRAC frame.  Actual storage in the frame is
-            //   handled in a follow-up issue; for now we accept and
-            //   discard the value.
+            //   current dispatch slot; deposited by
+            //   `set_dispatch_result` in the entrypoint handler and
+            //   surfaced by `serve` as the HTTP response body.
             entrypoints.insert(Entrypoint::try_from("collect_result").ok()?, Type::Bytes);
             Some(entrypoints)
         }
@@ -1477,7 +1477,7 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_tezlink::operation_result::{ContentResult, InternalOperationSum};
     use tezosx_interfaces::{Origin, RuntimeId};
-    use tezosx_journal::TezosXJournal;
+    use tezosx_journal::{DispatchSlotError, TezosXJournal};
 
     use super::*;
     use crate::mir_ctx::mock::MockCtx;
@@ -2617,9 +2617,9 @@ mod tests {
         .unwrap();
 
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
-        // %collect_result writes to the current CRAC frame's slot, which
-        // the calling EVM frame would have created.  Simulate that here.
-        journal.michelson.push_external_checkpoint();
+        // %collect_result writes to the dispatch slot opened by `serve`.
+        // Simulate that here.
+        journal.michelson.push_dispatch_slot();
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         let value = Micheline::Bytes(vec![0xCA, 0xFE]);
         let result = execute_enshrined_contract(
@@ -2631,8 +2631,11 @@ mod tests {
         assert!(result.is_ok());
         // No serve calls are made: %collect_result only deposits bytes.
         assert!(registry.serve_calls.borrow().is_empty());
-        // The payload is now observable on the current frame.
-        assert_eq!(journal.michelson.frame_result(), Some(&[0xCA, 0xFE][..]));
+        // The payload is now observable on the dispatch slot.
+        assert_eq!(
+            journal.michelson.take_dispatch_result(),
+            Ok(Some(vec![0xCA, 0xFE]))
+        );
     }
 
     #[test]
@@ -2647,9 +2650,9 @@ mod tests {
         .unwrap();
 
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
-        // %collect_result writes to the current CRAC frame's slot, which
-        // the calling EVM frame would have created.  Simulate that here.
-        journal.michelson.push_external_checkpoint();
+        // %collect_result writes to the dispatch slot opened by `serve`.
+        // Simulate that here.
+        journal.michelson.push_dispatch_slot();
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         let value = Micheline::Bytes(vec![]);
         let result = execute_enshrined_contract(
@@ -2659,7 +2662,7 @@ mod tests {
             &mut ctx,
         );
         assert!(result.is_ok());
-        assert_eq!(journal.michelson.frame_result(), Some(&[][..]));
+        assert_eq!(journal.michelson.take_dispatch_result(), Ok(Some(vec![])));
     }
 
     #[test]
@@ -2673,8 +2676,8 @@ mod tests {
         ])
         .unwrap();
 
-        // No `push_external_checkpoint` — dispatching %collect_result
-        // outside a CRAC frame must surface the journal invariant as a
+        // No `push_dispatch_slot` — dispatching %collect_result outside
+        // a `serve` invocation must surface the journal invariant as a
         // gateway error so the operation reverts cleanly.
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
@@ -2688,8 +2691,8 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(
-            err.to_string().contains("no active external checkpoint"),
-            "error should mention missing frame: {err}"
+            err.to_string().contains("no active dispatch slot"),
+            "error should mention missing slot: {err}"
         );
         assert!(registry.serve_calls.borrow().is_empty());
     }
@@ -2706,9 +2709,9 @@ mod tests {
         .unwrap();
 
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
-        // %collect_result writes to the current CRAC frame's slot, which
-        // the calling EVM frame would have created.  Simulate that here.
-        journal.michelson.push_external_checkpoint();
+        // %collect_result writes to the dispatch slot opened by `serve`.
+        // Simulate that here.
+        journal.michelson.push_dispatch_slot();
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         // First dispatch deposits the payload.
         let first = execute_enshrined_contract(
@@ -2718,8 +2721,9 @@ mod tests {
             &mut ctx,
         );
         assert!(first.is_ok());
-        // Second dispatch on the same frame must fail: the slot is
-        // write-once per frame, and a retry signals a misbehaving adapter.
+        // Second dispatch on the same slot must fail: the slot is
+        // write-once per dispatch, and a retry signals a misbehaving
+        // adapter.
         let second = execute_enshrined_contract(
             EnshrinedContracts::TezosXGateway,
             &Entrypoint::try_from("collect_result").unwrap(),
@@ -2729,12 +2733,15 @@ mod tests {
         assert!(second.is_err());
         let err = second.unwrap_err();
         assert!(
-            err.to_string().contains("frame result already set"),
+            err.to_string().contains("dispatch result already set"),
             "error should mention already-set slot: {err}"
         );
         // The original payload is preserved — a failing retry doesn't
-        // clobber what the frame already holds.
-        assert_eq!(journal.michelson.frame_result(), Some(&[0xCA, 0xFE][..]));
+        // clobber what the slot already holds.
+        assert_eq!(
+            journal.michelson.take_dispatch_result(),
+            Ok(Some(vec![0xCA, 0xFE]))
+        );
         assert!(registry.serve_calls.borrow().is_empty());
     }
 
@@ -2750,9 +2757,9 @@ mod tests {
         .unwrap();
 
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
-        // Frame is set up; the rejection must happen even when a frame
-        // exists, so it isn't masked by the no-frame check.
-        journal.michelson.push_external_checkpoint();
+        // Dispatch slot is set up; the rejection must happen even when
+        // a slot exists, so it isn't masked by the no-slot check.
+        journal.michelson.push_dispatch_slot();
         // Non-zero amount: %collect_result has no recipient and is not
         // a CRAC, so any positive amount must fail.
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 1);
@@ -2769,9 +2776,9 @@ mod tests {
             err.to_string().contains("collect_result: amount must be 0"),
             "error should mention non-zero amount rejection: {err}"
         );
-        // The frame's result slot stays empty — a rejected deposit must
-        // not leak any payload into the response body.
-        assert_eq!(journal.michelson.frame_result(), None);
+        // The dispatch slot stays empty — a rejected deposit must not
+        // leak any payload into the response body.
+        assert_eq!(journal.michelson.take_dispatch_result(), Ok(None));
         assert!(registry.serve_calls.borrow().is_empty());
     }
 
@@ -2791,7 +2798,7 @@ mod tests {
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
-        journal.michelson.push_external_checkpoint();
+        journal.michelson.push_dispatch_slot();
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         ctx.operation_gas =
             crate::gas::TezlinkOperationGas::start_milligas(100_000).unwrap();
@@ -2813,7 +2820,7 @@ mod tests {
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
-        journal.michelson.push_external_checkpoint();
+        journal.michelson.push_dispatch_slot();
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         ctx.operation_gas = crate::gas::TezlinkOperationGas::start_milligas(
             TYPECHECK_VALUE_STEP_MILLIGAS + COLLECT_RESULT_SIZE_BASE_MILLIGAS,
@@ -2830,15 +2837,15 @@ mod tests {
     }
 
     // Budget covers the typecheck step but nothing more: the handler's
-    // size charge trips OutOfGas before `set_frame_result`, so the
-    // frame's result slot stays empty.
+    // size charge trips OutOfGas before `set_dispatch_result`, so the
+    // dispatch slot stays empty.
     #[test]
     fn test_collect_result_out_of_gas_on_size_charge() {
         let mut host = MockKernelHost::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
-        journal.michelson.push_external_checkpoint();
+        journal.michelson.push_dispatch_slot();
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         ctx.operation_gas = crate::gas::TezlinkOperationGas::start_milligas(
             TYPECHECK_VALUE_STEP_MILLIGAS,
@@ -2857,7 +2864,7 @@ mod tests {
             err,
             CracError::Operation(TransferError::OutOfGas(OutOfGas))
         ));
-        assert!(journal.michelson.frame_result().is_none());
+        assert_eq!(journal.michelson.take_dispatch_result(), Ok(None));
     }
 
     // Direct probe of the cost function. Pins the size formula at the
@@ -2878,15 +2885,15 @@ mod tests {
         assert!(max >= COLLECT_RESULT_SIZE_BASE_MILLIGAS);
     }
 
-    // The size charge fires before `set_frame_result`. If the write
-    // then fails (here: no active frame), the gas stays consumed —
-    // the kernel did the validation work and the caller pays for it.
+    // The size charge fires before `set_dispatch_result`. If the write
+    // then fails (here: no active slot), the gas stays consumed — the
+    // kernel did the validation work and the caller pays for it.
     #[test]
     fn test_collect_result_charges_gas_when_no_frame() {
         let mut host = MockKernelHost::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
-        // No `push_external_checkpoint` — `set_frame_result` fails.
+        // No `push_dispatch_slot` — `set_dispatch_result` fails.
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         ctx.operation_gas =
@@ -2900,19 +2907,22 @@ mod tests {
         assert!(result.is_err());
         // typecheck (100) + size base (460) + 1.5 * 256 (384) = 944.
         assert_eq!(ctx.operation_gas().total_milligas_consumed() as u64, 944);
-        assert!(journal.michelson.frame_result().is_none());
+        assert_eq!(
+            journal.michelson.take_dispatch_result(),
+            Err(DispatchSlotError::NoSlot)
+        );
     }
 
     // The size charge also fires on the failing second deposit when
-    // the frame slot is already set: gas is consumed before the
-    // `AlreadySet` branch of `set_frame_result` is reached.
+    // the dispatch slot is already set: gas is consumed before the
+    // `AlreadySet` branch of `set_dispatch_result` is reached.
     #[test]
     fn test_collect_result_charges_gas_when_already_set() {
         let mut host = MockKernelHost::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
-        journal.michelson.push_external_checkpoint();
+        journal.michelson.push_dispatch_slot();
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         ctx.operation_gas =
             crate::gas::TezlinkOperationGas::start_milligas(100_000).unwrap();
@@ -2941,7 +2951,10 @@ mod tests {
             after_first + 944
         );
         // Original payload is preserved.
-        assert_eq!(journal.michelson.frame_result(), Some(&[0xCA, 0xFE][..]));
+        assert_eq!(
+            journal.michelson.take_dispatch_result(),
+            Ok(Some(vec![0xCA, 0xFE]))
+        );
     }
 
     fn make_test_address() -> Address {

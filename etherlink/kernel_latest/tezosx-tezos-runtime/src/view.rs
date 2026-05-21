@@ -7,10 +7,10 @@
 //!
 //! A view call is an HTTP GET on `http://tezos/<kt1>/<view_name>`. The
 //! request body carries the view's input as Micheline bytes (empty body →
-//! `Unit`). The Micheline-encoded result is deposited on the topmost
-//! external checkpoint of the CRAC journal (same `frame_result` slot the
-//! Michelson `%collect_result` entry fills for entrypoint calls); the
-//! outer `serve()` peeks that slot to build the HTTP response body.
+//! `Unit`). The Micheline-encoded result is deposited on the dispatch
+//! slot of the CRAC journal (same slot the Michelson `%collect_result`
+//! entry fills for entrypoint calls); the outer `serve()` takes that
+//! slot to build the HTTP response body.
 //!
 //! Views are read-only: no value transfer is accepted, no CRAC receipt is
 //! produced, and MIR rejects side-effectful instructions inside view code
@@ -135,15 +135,16 @@ fn classify_interpret_error(e: InterpretError) -> TezosXRuntimeError {
 /// account are rejected. `X-Tezos-Amount` must be `0` — views cannot
 /// receive value.
 ///
-/// The Micheline-encoded result is deposited on the topmost external
-/// checkpoint of the CRAC [`TezosXJournal`] via
-/// [`MichelsonJournal::set_frame_result`] — exactly the slot that the
-/// entrypoint path fills via the Michelson `%collect_result` entry.
-/// [`TezosRuntime::serve`] peeks that slot to build the HTTP body, so
-/// view and entrypoint results travel through the same mechanism. This
-/// also means the view observes the same journal state that an
-/// entrypoint call would (storage writes are revertible through the
-/// journal) rather than reading out of the operation-start snapshot.
+/// The Micheline-encoded result is deposited on the CRAC
+/// [`TezosXJournal`]'s dispatch slot via
+/// [`MichelsonJournal::set_dispatch_result`] — exactly the slot that
+/// the entrypoint path fills via the Michelson `%collect_result`
+/// entry. [`TezosRuntime::serve`] takes that slot to build the HTTP
+/// body, so view and entrypoint results travel through the same
+/// mechanism. This also means the view observes the same journal
+/// state that an entrypoint call would (storage writes are revertible
+/// through the journal) rather than reading out of the
+/// operation-start snapshot.
 ///
 /// `consumed_milligas` is updated with the gas consumed during
 /// typechecking and interpretation, so the caller can report it back
@@ -379,20 +380,22 @@ where
 
     let encoded = mir_result?;
 
-    // Deposit the encoded view result on the topmost external
-    // checkpoint so `TezosRuntime::serve` surfaces it through the
-    // same `frame_result` slot that the entrypoint path uses. A
-    // `NoFrame` error would only happen if `serve` were called
-    // without REVM pushing a checkpoint first (current callers
-    // always do); `AlreadySet` is impossible because the view path
-    // writes the slot exactly once per frame and Michelson view
-    // code cannot emit a `%collect_result` operation (typechecker
-    // forbids side-effectful instructions with `in_view = true`).
-    journal.michelson.set_frame_result(encoded).map_err(|e| {
-        TezosXRuntimeError::Custom(format!(
-            "failed to deposit view result into journal: {e}"
-        ))
-    })?;
+    // Deposit the encoded view result on the dispatch slot that
+    // `TezosRuntime::serve` opened for this call — the same slot the
+    // entrypoint path fills via `%collect_result`. `NoSlot` is
+    // impossible because `serve` always pushes the slot at entry;
+    // `AlreadySet` is impossible because the view path writes the
+    // slot exactly once per dispatch and Michelson view code cannot
+    // emit a `%collect_result` operation (typechecker forbids
+    // side-effectful instructions with `in_view = true`).
+    journal
+        .michelson
+        .set_dispatch_result(encoded)
+        .map_err(|e| {
+            TezosXRuntimeError::Custom(format!(
+                "failed to deposit view result into journal: {e}"
+            ))
+        })?;
     Ok(())
 }
 
