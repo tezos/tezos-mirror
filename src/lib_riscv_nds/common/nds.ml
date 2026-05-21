@@ -64,3 +64,13 @@ let value_length (T {impl = (module M); value; _}) ~db_index ~key =
 
 let hash (T {impl = (module M); value; _}) ~db_index =
   M.Database.hash value ~db_index
+
+let with_verification t f =
+  Lwt.catch
+    (fun () ->
+      let open Lwt_syntax in
+      let* result = f t in
+      return_ok result)
+    (function
+      | Nds_errors.Verification_failed v -> Lwt.return_error v
+      | exn -> Lwt.reraise exn)

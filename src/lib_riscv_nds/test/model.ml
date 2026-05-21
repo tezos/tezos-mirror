@@ -111,10 +111,10 @@ module Registry = struct
     let (Tezos_hacl.Hacl.Blake2b.Hash h) =
       Tezos_hacl.Hacl.Blake2b.direct (Bytes.of_string (Buffer.contents buf)) 32
     in
-    Ok h
+    h
 
   (** [size r] returns the number of databases in the registry. *)
-  let size r = Ok (Int64.of_int (Array.length r.dbs))
+  let size r = Int64.of_int (Array.length r.dbs)
 
   (** [resize r n] adjusts the registry to contain exactly [n]
       databases.

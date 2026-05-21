@@ -15,19 +15,13 @@ open Intf
 (** {1 Backend abstraction} *)
 
 (** Module type satisfied by both memory and disk backends for Normal mode,
-    extended with a creation helper. Both backends share the common
-    {!Nds_errors.invalid_argument_error} type in their results. *)
+    extended with a creation helper. *)
 module type BACKEND = sig
   val name : string
 
-  module Registry :
-    REGISTRY
-      with type invalid_argument_error := Nds_errors.invalid_argument_error
+  module Registry : REGISTRY
 
-  module Database :
-    DATABASE
-      with type registry := Registry.t
-       and type invalid_argument_error := Nds_errors.invalid_argument_error
+  module Database : DATABASE with type registry := Registry.t
 
   val create_registry_with_dbs : int -> Registry.t
 end
@@ -296,8 +290,8 @@ let pp_result (type a) (op : a op)
     the model, because the DATABASE interface has no key enumeration. *)
 let check_state_full (type r) (model_reg : Model.registry)
     (module Nds : BACKEND with type Registry.t = r) (nds : r) _idx _op =
-  let^? nds_size = Nds.Registry.size nds in
-  let^? model_size = Model.Registry.size model_reg in
+  let nds_size = Nds.Registry.size nds in
+  let model_size = Model.Registry.size model_reg in
   if not (Int64.equal nds_size model_size) then
     Test.fail
       "State check: registry size mismatch: model=%Ld nds=%Ld"
@@ -334,8 +328,8 @@ let check_state_full (type r) (model_reg : Model.registry)
 let check_state_hash (type r1) (type r2)
     (module Nds1 : BACKEND with type Registry.t = r1) (nds1 : r1)
     (module Nds2 : BACKEND with type Registry.t = r2) (nds2 : r2) idx op =
-  let^? size1 = Nds1.Registry.size nds1 in
-  let^? size2 = Nds2.Registry.size nds2 in
+  let size1 = Nds1.Registry.size nds1 in
+  let size2 = Nds2.Registry.size nds2 in
   if not (Int64.equal size1 size2) then
     Test.fail
       "Hash state check: registry size mismatch at op %d: %a (%Ld vs %Ld)"

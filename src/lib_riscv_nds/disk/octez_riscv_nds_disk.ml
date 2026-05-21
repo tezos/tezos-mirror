@@ -48,11 +48,9 @@ module Normal = struct
   module Registry = struct
     type t = Api.registry
 
-    let hash registry =
-      Ok (Api.octez_riscv_durable_on_disk_registry_hash registry)
+    let hash registry = Api.octez_riscv_durable_on_disk_registry_hash registry
 
-    let size registry =
-      Ok (Api.octez_riscv_durable_on_disk_registry_size registry)
+    let size registry = Api.octez_riscv_durable_on_disk_registry_size registry
 
     let resize registry n =
       Api.octez_riscv_durable_on_disk_registry_resize registry n |> wrap_error
@@ -133,9 +131,9 @@ module Prove = struct
   module Registry = struct
     type t = Api.registry_prove
 
-    let hash t = Ok (Api.octez_riscv_durable_on_disk_prove_registry_hash t)
+    let hash t = Api.octez_riscv_durable_on_disk_prove_registry_hash t
 
-    let size t = Ok (Api.octez_riscv_durable_on_disk_prove_registry_size t)
+    let size t = Api.octez_riscv_durable_on_disk_prove_registry_size t
 
     let resize t n =
       Api.octez_riscv_durable_on_disk_prove_registry_resize t n |> wrap_error
@@ -211,16 +209,26 @@ let unwrap_prove nds : Prove.Registry.t option =
 
 let convert_verification = function Api.Not_found -> Not_found
 
-let convert_verification_argument = function
-  | Api.Invalid_argument e ->
-      Verification_invalid_argument (convert_invalid_argument e)
-  | Api.Verification e -> Verification (convert_verification e)
+(** Mirror of [octez_riscv_nds_memory]'s exception-based escape:
+    [Verification _] errors raise {!Nds_errors.Verification_failed}
+    out-of-band so Verify-mode operations expose the same
+    [invalid_argument_error] return type as [NORMAL]. *)
+let raise_on_verification_argument r =
+  Result.map_error
+    (function
+      | Api.Invalid_argument e -> convert_invalid_argument e
+      | Api.Verification v ->
+          raise (Verification_failed (convert_verification v)))
+    r
 
-let wrap_verification_error r =
-  Result.map_error (fun e -> Verification (convert_verification e)) r
-
-let wrap_verification_argument_error r =
-  Result.map_error convert_verification_argument r
+(** The [registry_hash] / [registry_size] FFI primitives return only
+    a [verification_error].  Translate the Error path into
+    {!Verification_failed} and unwrap the Ok payload so callers see
+    plain [bytes] / [int64] matching the infallible {!REGISTRY}
+    signature. *)
+let raise_and_extract_verification = function
+  | Ok v -> v
+  | Error v -> raise (Verification_failed (convert_verification v))
 
 module Verify = struct
   module Registry = struct
@@ -228,37 +236,37 @@ module Verify = struct
 
     let hash t =
       Api.octez_riscv_durable_on_disk_verify_registry_hash t
-      |> wrap_verification_error
+      |> raise_and_extract_verification
 
     let size t =
       Api.octez_riscv_durable_on_disk_verify_registry_size t
-      |> wrap_verification_error
+      |> raise_and_extract_verification
 
     let resize t n =
       Api.octez_riscv_durable_on_disk_verify_registry_resize t n
-      |> wrap_verification_argument_error
+      |> raise_on_verification_argument
 
     let copy_database t ~src ~dst =
       Api.octez_riscv_durable_on_disk_verify_registry_copy t src dst
-      |> wrap_verification_argument_error
+      |> raise_on_verification_argument
 
     let move_database t ~src ~dst =
       Api.octez_riscv_durable_on_disk_verify_registry_move t src dst
-      |> wrap_verification_argument_error
+      |> raise_on_verification_argument
 
     let clear t db_index =
       Api.octez_riscv_durable_on_disk_verify_registry_clear t db_index
-      |> wrap_verification_argument_error
+      |> raise_on_verification_argument
   end
 
   module Database = struct
     let exists t ~db_index ~key =
       Api.octez_riscv_durable_on_disk_verify_database_exists t db_index key
-      |> wrap_verification_argument_error
+      |> raise_on_verification_argument
 
     let set t ~db_index ~key ~value =
       Api.octez_riscv_durable_on_disk_verify_database_set t db_index key value
-      |> wrap_verification_argument_error
+      |> raise_on_verification_argument
 
     let write t ~db_index ~key ~offset ~value =
       Api.octez_riscv_durable_on_disk_verify_database_write
@@ -267,7 +275,7 @@ module Verify = struct
         key
         offset
         value
-      |> wrap_verification_argument_error
+      |> raise_on_verification_argument
 
     let read t ~db_index ~key ~offset ~len =
       Api.octez_riscv_durable_on_disk_verify_database_read
@@ -276,22 +284,22 @@ module Verify = struct
         key
         offset
         len
-      |> wrap_verification_argument_error
+      |> raise_on_verification_argument
 
     let value_length t ~db_index ~key =
       Api.octez_riscv_durable_on_disk_verify_database_value_length
         t
         db_index
         key
-      |> wrap_verification_argument_error
+      |> raise_on_verification_argument
 
     let delete t ~db_index ~key =
       Api.octez_riscv_durable_on_disk_verify_database_delete t db_index key
-      |> wrap_verification_argument_error
+      |> raise_on_verification_argument
 
     let hash t ~db_index =
       Api.octez_riscv_durable_on_disk_verify_database_hash t db_index
-      |> wrap_verification_argument_error
+      |> raise_on_verification_argument
   end
 
   let start_verify proof = Api.octez_riscv_durable_on_disk_start_verify proof

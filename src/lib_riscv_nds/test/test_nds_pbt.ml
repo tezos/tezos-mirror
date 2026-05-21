@@ -28,7 +28,7 @@ let unit_test name f = (name, f)
 let test_fresh_size_zero =
   unit_test "fresh registry has size 0" @@ fun (module B : BACKEND) ->
   let r = B.create_registry_with_dbs 0 in
-  let^? sz = B.Registry.size r in
+  let sz = B.Registry.size r in
   Check.((Int64.to_int sz = 0) int) ~error_msg:"expected size 0, got %L" ;
   unit
 
@@ -39,13 +39,13 @@ let test_resize_by_one =
     let^? () = B.Registry.resize r (Int64.of_int i) in
     ()
   done ;
-  let^? sz = B.Registry.size r in
+  let sz = B.Registry.size r in
   Check.((Int64.to_int sz = 3) int) ~error_msg:"expected size 3, got %L" ;
   for i = 2 downto 0 do
     let^? () = B.Registry.resize r (Int64.of_int i) in
     ()
   done ;
-  let^? sz = B.Registry.size r in
+  let sz = B.Registry.size r in
   Check.((Int64.to_int sz = 0) int) ~error_msg:"expected size 0, got %L" ;
   unit
 
@@ -257,8 +257,8 @@ let test_registry_hash_determinism ?long_factor (module B : BACKEND) =
   let r2 = B.create_registry_with_dbs 1 in
   let^? () = B.Database.set r1 ~db_index:0L ~key ~value in
   let^? () = B.Database.set r2 ~db_index:0L ~key ~value in
-  let^? h1 = B.Registry.hash r1 in
-  let^? h2 = B.Registry.hash r2 in
+  let h1 = B.Registry.hash r1 in
+  let h2 = B.Registry.hash r2 in
   Bytes.equal h1 h2
 
 (** Hash revert: set(k, v1), set(k, v2), set(k, v1) restores original hash *)
@@ -294,8 +294,8 @@ let test_sequence_hash_determinism ?long_factor (module B : BACKEND) =
   let r2 = B.create_registry_with_dbs num_dbs in
   apply_ops (module B) r1 ops ;
   apply_ops (module B) r2 ops ;
-  let^? h1 = B.Registry.hash r1 in
-  let^? h2 = B.Registry.hash r2 in
+  let h1 = B.Registry.hash r1 in
+  let h2 = B.Registry.hash r2 in
   Bytes.equal h1 h2
 
 (** Commutativity: operations on different databases commute. *)
@@ -312,11 +312,11 @@ let test_independent_ops_commute ?long_factor (module B : BACKEND) =
   let r1 = B.create_registry_with_dbs 2 in
   let^? () = B.Database.set r1 ~db_index:0L ~key ~value:v0 in
   let^? () = B.Database.set r1 ~db_index:1L ~key ~value:v1 in
-  let^? h1 = B.Registry.hash r1 in
+  let h1 = B.Registry.hash r1 in
   let r2 = B.create_registry_with_dbs 2 in
   let^? () = B.Database.set r2 ~db_index:1L ~key ~value:v1 in
   let^? () = B.Database.set r2 ~db_index:0L ~key ~value:v0 in
-  let^? h2 = B.Registry.hash r2 in
+  let h2 = B.Registry.hash r2 in
   Bytes.equal h1 h2
 
 (** {2 Disk-only properties} *)
@@ -336,10 +336,10 @@ let test_commit_checkout_roundtrip ?long_factor =
   let r = Registry.create repo in
   let^? () = Registry.resize r 1L in
   let^? () = Database.set r ~db_index:0L ~key ~value in
-  let^? h_before = Registry.hash r in
+  let h_before = Registry.hash r in
   let commit_id = Registry.commit r in
   let r2 = Registry.checkout repo commit_id in
-  let^? h_after = Registry.hash r2 in
+  let h_after = Registry.hash r2 in
   Bytes.equal h_before h_after
 
 (** multiple commits are independent *)
@@ -360,12 +360,12 @@ let test_multiple_commits ?long_factor =
   let r = Registry.create repo in
   let^? () = Registry.resize r 1L in
   let^? () = Database.set r ~db_index:0L ~key ~value:v1 in
-  let^? h1 = Registry.hash r in
+  let h1 = Registry.hash r in
   let commit1 = Registry.commit r in
   let^? () = Database.set r ~db_index:0L ~key ~value:v2 in
   let _commit2 = Registry.commit r in
   let r_restored = Registry.checkout repo commit1 in
-  let^? h_restored = Registry.hash r_restored in
+  let h_restored = Registry.hash r_restored in
   Bytes.equal h1 h_restored
 
 (** Commit/checkout snapshot: commit after a random sequence, do more ops,
@@ -407,11 +407,11 @@ let test_commit_checkout_snapshot ?long_factor =
   let r = Registry.create repo in
   grow_registry Registry.resize r num_dbs ;
   apply_ops (module Disk_backend) r ops_before ;
-  let^? h_at_commit = Registry.hash r in
+  let h_at_commit = Registry.hash r in
   let commit_id = Registry.commit r in
   apply_ops (module Disk_backend) r ops_after ;
   let r2 = Registry.checkout repo commit_id in
-  let^? h_restored = Registry.hash r2 in
+  let h_restored = Registry.hash r2 in
   Bytes.equal h_at_commit h_restored
 
 (** {2 Model-based (stateful) properties} *)

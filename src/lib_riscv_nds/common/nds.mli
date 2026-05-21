@@ -63,7 +63,7 @@ val unpack : t -> packed
     wrapped backend. *)
 
 (** [size t] returns the number of databases in the registry. *)
-val size : t -> (int64, Nds_errors.invalid_argument_error) result
+val size : t -> int64
 
 (** [resize t n] adjusts the registry to contain exactly [n] databases. *)
 val resize : t -> int64 -> (unit, Nds_errors.invalid_argument_error) result
@@ -86,7 +86,7 @@ val move_database :
 val clear : t -> int64 -> (unit, Nds_errors.invalid_argument_error) result
 
 (** [registry_hash t] returns the Merkle root hash of the registry. *)
-val registry_hash : t -> (bytes, Nds_errors.invalid_argument_error) result
+val registry_hash : t -> bytes
 
 (** [exists t ~db_index ~key] checks whether [key] exists in database
     [db_index]. *)
@@ -146,3 +146,16 @@ val value_length :
     [db_index]. *)
 val hash :
   t -> db_index:int64 -> (bytes, Nds_errors.invalid_argument_error) result
+
+(** {2 Verify-mode boundary} *)
+
+(** [with_verification t f] runs [f t] catching
+    {!Nds_errors.Verification_failed}.  For Normal- and Prove-backed
+    [t] the [Error] arm is structurally unreachable but the return
+    type stays uniform.  The intended use is wrapping a kernel-step
+    replay so a mid-step proof mismatch becomes a clean
+    [Error verification_error] at a single, well-defined boundary,
+    rather than each call site needing to install its own
+    [Lwt.catch]. *)
+val with_verification :
+  t -> (t -> 'a Lwt.t) -> ('a, Nds_errors.verification_error) result Lwt.t

@@ -33,3 +33,13 @@ type verification_argument_error =
   | Verification of verification_error
 
 type error += Verification_argument_error of verification_argument_error
+
+(** Raised by Verify-mode backends when a host-function operation
+    diverges from what the proof recorded.  Consumers (notably the
+    WASM PVM's [verify_proof]) catch this at the boundary of the
+    kernel-step replay via [Lwt.catch], turning a mid-stream
+    proof-mismatch into a clean rejection.
+
+    Lives in the common layer so both memory and disk backends raise
+    a single, uniformly-catchable exception. *)
+exception Verification_failed of verification_error

@@ -34,9 +34,7 @@ module Proof : PROOF
 (** Normal mode: registry and database operations. *)
 module Normal : sig
   module Registry : sig
-    include
-      REGISTRY
-        with type invalid_argument_error := Nds_errors.invalid_argument_error
+    include REGISTRY
 
     (** [create repo] creates a new, empty registry backed by [repo]. *)
     val create : Repo.t -> t

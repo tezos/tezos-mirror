@@ -22,9 +22,7 @@ module Proof : PROOF
 (** Normal mode: registry and database operations. *)
 module Normal : sig
   module Registry : sig
-    include
-      REGISTRY
-        with type invalid_argument_error := Nds_errors.invalid_argument_error
+    include REGISTRY
 
     (** [create ()] allocates a new, empty in-memory registry with no
         databases. Use {!resize} to add databases. *)
