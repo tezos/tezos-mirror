@@ -5,8 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let data_model = Tezlink_durable_storage.Path
-
 let make (ctxt : Evm_ro_context.t) =
   (module struct
     type block_param =
@@ -100,7 +98,7 @@ let make (ctxt : Evm_ro_context.t) =
       let open Lwt_result_syntax in
       let `Main = chain in
       let* state = get_state ~block in
-      Tezlink_durable_storage.balance state ~data_model c
+      Tezlink_durable_storage.balance state c
 
     let list_contracts chain block =
       let open Lwt_result_syntax in
@@ -147,7 +145,7 @@ let make (ctxt : Evm_ro_context.t) =
          Support non-default chain and block parameters. *)
       let `Main = chain in
       let* state = get_state ~block in
-      let* manager_opt = Tezlink_durable_storage.manager state ~data_model c in
+      let* manager_opt = Tezlink_durable_storage.manager state c in
       match manager_opt with
       | Some (Public_key k) -> return_some k
       | _ -> return_none
@@ -158,7 +156,7 @@ let make (ctxt : Evm_ro_context.t) =
          Support non-default chain and block parameters. *)
       let `Main = chain in
       let* state = get_state ~block in
-      Tezlink_durable_storage.counter state ~data_model c
+      Tezlink_durable_storage.counter state c
 
     let big_map_get chain block id key_hash =
       let open Lwt_result_syntax in

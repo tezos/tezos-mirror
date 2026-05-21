@@ -7,18 +7,6 @@
 (*****************************************************************************)
 open Tezos_types
 
-type implicit_account_data_model =
-  | Rlp
-      (** One entry per account, the value is RLP-encoded and contains
-          three fields: balance, nonce (aka. counter), and optional
-          pkh.
-
-          This data model is used to reduce the number of IOs in the
-          kernel at the cost of Tezos compatibility. *)
-  | Path
-      (** One directory per account, the balance, counter, and manager
-          are stored at distinct subpaths. *)
-
 module Path = struct
   (** [to_path encoding value] uses [encoding] to encode [value] in
       hexadecimal *)
@@ -49,67 +37,47 @@ end
 
 let contract_of_path = Contract.of_hex
 
-let balance state ~data_model (c : Contract.t) =
+let balance state (c : Contract.t) =
   let open Lwt_result_syntax in
-  match data_model with
-  | Rlp -> (
-      match c with
-      | Originated _ ->
-          Durable_storage.read_or_default
-            ~default:Tez.zero
-            (Tezlink_balance c)
-            state
-      | Implicit pkh -> (
-          let* info_opt =
-            Durable_storage.read_opt (Tezos_account_info pkh) state
-          in
-          match info_opt with
-          | None -> return Tez.zero
-          | Some info -> return info.balance))
-  | Path ->
+  match c with
+  | Originated _ ->
       Durable_storage.read_or_default
-        ~default:Tezos_types.Tez.zero
+        ~default:Tez.zero
         (Tezlink_balance c)
         state
+  | Implicit pkh -> (
+      let* info_opt = Durable_storage.read_opt (Tezos_account_info pkh) state in
+      match info_opt with
+      | None -> return Tez.zero
+      | Some info -> return info.balance)
 
-let balance_z state ~data_model c =
+let balance_z state c =
   let open Lwt_result_syntax in
-  let* b = balance state ~data_model c in
+  let* b = balance state c in
   return @@ Tezos_types.Tez.to_mutez_z b
 
-let manager state ~data_model (c : Contract.t) =
+let manager state (c : Contract.t) =
   let open Lwt_result_syntax in
-  match data_model with
-  | Rlp -> (
-      match c with
-      | Originated _ -> return_none
-      | Implicit pkh -> (
-          let* info_opt =
-            Durable_storage.read_opt (Tezos_account_info pkh) state
-          in
-          match info_opt with
+  match c with
+  | Originated _ -> return_none
+  | Implicit pkh -> (
+      let* info_opt = Durable_storage.read_opt (Tezos_account_info pkh) state in
+      match info_opt with
+      | None -> return_none
+      | Some info -> (
+          match info.public_key with
           | None -> return_none
-          | Some info -> (
-              match info.public_key with
-              | None -> return_none
-              | Some public_key -> return_some (Manager.Public_key public_key)))
-      )
-  | Path -> Durable_storage.read_opt (Tezlink_manager c) state
+          | Some public_key -> return_some (Manager.Public_key public_key)))
 
-let counter state ~data_model (c : Contract.t) =
+let counter state (c : Contract.t) =
   let open Lwt_result_syntax in
-  match data_model with
-  | Rlp -> (
-      match c with
-      | Originated _ -> return_none
-      | Implicit pkh -> (
-          let* info_opt =
-            Durable_storage.read_opt (Tezos_account_info pkh) state
-          in
-          match info_opt with
-          | None -> return_none
-          | Some info -> return_some (Z.of_int64 info.nonce)))
-  | Path -> Durable_storage.read_opt (Tezlink_counter c) state
+  match c with
+  | Originated _ -> return_none
+  | Implicit pkh -> (
+      let* info_opt = Durable_storage.read_opt (Tezos_account_info pkh) state in
+      match info_opt with
+      | None -> return_none
+      | Some info -> return_some (Z.of_int64 info.nonce))
 
 let big_map_get state id key_hash =
   Durable_storage.read_opt (Tezos_big_map_value (id, key_hash)) state

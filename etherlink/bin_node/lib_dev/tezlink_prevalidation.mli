@@ -56,12 +56,11 @@
     e.g. octez-client.
 *)
 
-(** [parse_and_validate_for_queue state ~data_model raw_op]
+(** [parse_and_validate_for_queue state raw_op]
     parses [raw_op] into an operation, and checks that the operation
     is valid on its own. [state] is the EVM state used to check
     information about the source in the current context (counter,
-    balance, public key); [data_model] is used to know which data
-    model (path-based or RLP-based) to use when checking information.
+    balance, public key).
     This first validation pass should be done at insertion in the
     [tx_queue].
 
@@ -90,7 +89,6 @@ val parse_and_validate_for_queue :
   simulator_mode:Tezlink_backend_sig.simulator_mode ->
   nanotez_per_michelson_gas:Tezos_types.Tez.nanotez ->
   state:Evm_state.t ->
-  data_model:Tezlink_durable_storage.implicit_account_data_model ->
   string ->
   (Tezos_types.Operation.t, string) result tzresult Lwt.t
 
@@ -99,13 +97,10 @@ val parse_and_validate_for_queue :
 val gas_limit_could_fit :
   Validation_types.validation_state -> Tezos_types.Operation.t -> bool
 
-(** [init_blueprint_validation state ~data_model ()] creates an empty
+(** [init_blueprint_validation state ()] creates an empty
     validation state, from the EVM [state]. *)
 val init_blueprint_validation :
-  Evm_state.t ->
-  data_model:Tezlink_durable_storage.implicit_account_data_model ->
-  unit ->
-  Validation_types.validation_state
+  Evm_state.t -> unit -> Validation_types.validation_state
 
 (** [validate_for_blueprint state operation] finishes the validation of
     [operation] and checks that it can it be added to the blueprint. Returns

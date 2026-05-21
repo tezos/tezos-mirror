@@ -648,8 +648,7 @@ module Handlers = struct
     ctxt.session <- session ;
     return_unit
 
-  let is_tezlink_tx_valid ~data_model ~simulator_mode ctxt session
-      raw_transaction :
+  let is_tezlink_tx_valid ~simulator_mode ctxt session raw_transaction :
       (Tezos_types.Operation.t prevalidation_result, string) result tzresult
       Lwt.t =
     let open Lwt_result_syntax in
@@ -670,7 +669,6 @@ module Handlers = struct
         ~simulator_mode
         ~nanotez_per_michelson_gas
         ~state:session.state
-        ~data_model
         raw_transaction
     in
     return (Ok {next_nonce = Qty op.first_counter; transaction_object = op})
@@ -685,18 +683,8 @@ module Handlers = struct
         protect @@ fun () -> is_tx_valid ctxt session raw_transaction
     | Refresh_state -> protect @@ fun () -> refresh_state ctxt session
     | Prevalidate_raw_transaction_tezlink {raw_transaction; simulator_mode} ->
-        let data_model =
-          match ctxt.chain_family with
-          | Ex_chain_family Michelson -> Tezlink_durable_storage.Path
-          | Ex_chain_family EVM -> Tezlink_durable_storage.Rlp
-        in
         protect @@ fun () ->
-        is_tezlink_tx_valid
-          ctxt
-          session
-          raw_transaction
-          ~data_model
-          ~simulator_mode
+        is_tezlink_tx_valid ctxt session raw_transaction ~simulator_mode
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
       =
