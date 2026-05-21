@@ -1635,7 +1635,7 @@ pub(crate) fn typecheck_instruction<'a>(
             let mut ctx = crate::context::PushableTypecheckingContext { gas };
             let v = typecheck_value(v, &mut ctx, &t)?;
             stack.push(t);
-            I::Push(v)
+            I::Push(Rc::new(v))
         }
         (App(PUSH, expect_args!(2), _), _) => unexpected_micheline!(),
 
@@ -3438,7 +3438,7 @@ mod typecheck_tests {
         let mut gas = Gas::default();
         assert_eq!(
             typecheck_instruction(&parse("PUSH int 1").unwrap(), &mut gas, &mut stack),
-            Ok(Push(TypedValue::int(1)))
+            Ok(Push(Rc::new(TypedValue::int(1))))
         );
         assert_eq!(stack, expected_stack);
         assert!(gas.milligas().unwrap() < Gas::default().milligas().unwrap());
@@ -3451,7 +3451,7 @@ mod typecheck_tests {
         let mut gas = Gas::default();
         assert_eq!(
             typecheck_instruction(&parse("DIP 1 {PUSH nat 6}").unwrap(), &mut gas, &mut stack),
-            Ok(Dip(Some(1), vec![Push(TypedValue::nat(6))]))
+            Ok(Dip(Some(1), vec![Push(Rc::new(TypedValue::nat(6)))]))
         );
         assert_eq!(stack, expected_stack);
         assert!(gas.milligas().unwrap() < Gas::default().milligas().unwrap());
@@ -3750,7 +3750,7 @@ mod typecheck_tests {
                 &mut gas,
                 &mut stack
             ),
-            Ok(Loop(vec![Push(TypedValue::Bool(true))]))
+            Ok(Loop(vec![Push(Rc::new(TypedValue::Bool(true)))]))
         );
         assert_eq!(stack, expected_stack);
         assert!(gas.milligas().unwrap() < Gas::default().milligas().unwrap());
@@ -3807,7 +3807,7 @@ mod typecheck_tests {
             ),
             Ok(LoopLeft(vec![
                 Drop(None),
-                Push(TypedValue::new_or(Or::Right(TypedValue::nat(123))))
+                Push(Rc::new(TypedValue::new_or(Or::Right(TypedValue::nat(123)))))
             ]))
         );
         assert_eq!(stack, expected_stack);
@@ -4080,7 +4080,7 @@ mod typecheck_tests {
             Ok(Map(
                 overloads::Map::List,
                 vec![
-                    Push(TypedValue::Bool(true)),
+                    Push(Rc::new(TypedValue::Bool(true))),
                     If(vec![ISome], vec![Failwith(Type::Int)])
                 ]
             ))
@@ -4097,7 +4097,7 @@ mod typecheck_tests {
             Ok(Map(
                 overloads::Map::List,
                 vec![
-                    Push(TypedValue::Bool(true)),
+                    Push(Rc::new(TypedValue::Bool(true))),
                     If(vec![Failwith(Type::Int)], vec![ISome])
                 ]
             ))
@@ -4200,7 +4200,7 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::String("foo".to_owned())))
+            Ok(Push(Rc::new(TypedValue::String("foo".to_owned()))))
         );
         assert_eq!(stack, tc_stk![Type::String]);
     }
@@ -4214,8 +4214,8 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::Bls12381Fr(bls::Fr::from_big_int(
-                &100500.into()
+            Ok(Push(Rc::new(TypedValue::Bls12381Fr(
+                bls::Fr::from_big_int(&100500.into())
             ))))
         );
         assert_eq!(stack, tc_stk![Type::Bls12381Fr]);
@@ -4230,9 +4230,9 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::Bls12381Fr(
+            Ok(Push(Rc::new(TypedValue::Bls12381Fr(
                 bls::Fr::from_bytes(&[1]).unwrap()
-            )))
+            ))))
         );
         assert_eq!(stack, tc_stk![Type::Bls12381Fr]);
     }
@@ -4260,9 +4260,9 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::new_bls12381_g1(
+            Ok(Push(Rc::new(TypedValue::new_bls12381_g1(
                 bls::G1::from_bytes(&hex::decode(hex_val).unwrap()).unwrap()
-            )))
+            ))))
         );
     }
 
@@ -4310,9 +4310,9 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::new_bls12381_g2(
+            Ok(Push(Rc::new(TypedValue::new_bls12381_g2(
                 bls::G2::from_bytes(&hex::decode(hex_val).unwrap()).unwrap()
-            )))
+            ))))
         );
     }
 
@@ -4359,7 +4359,7 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::Unit))
+            Ok(Push(Rc::new(TypedValue::Unit)))
         );
         assert_eq!(stack, tc_stk![Type::Unit]);
     }
@@ -4383,10 +4383,10 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::new_pair(
+            Ok(Push(Rc::new(TypedValue::new_pair(
                 TypedValue::int(-5),
                 TypedValue::new_pair(TypedValue::nat(3), TypedValue::Bool(false))
-            )))
+            ))))
         );
         assert_eq!(
             stack,
@@ -4406,7 +4406,9 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::new_or(or::Or::Left(TypedValue::int(1)))))
+            Ok(Push(Rc::new(TypedValue::new_or(or::Or::Left(
+                TypedValue::int(1)
+            )))))
         );
         assert_eq!(stack, tc_stk![Type::new_or(Type::Int, Type::Bool)]);
     }
@@ -4420,8 +4422,8 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::new_or(or::Or::Right(TypedValue::Bool(
-                false
+            Ok(Push(Rc::new(TypedValue::new_or(or::Or::Right(
+                TypedValue::Bool(false)
             )))))
         );
         assert_eq!(stack, tc_stk![Type::new_or(Type::Int, Type::Bool)]);
@@ -4436,7 +4438,9 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::new_option(Some(TypedValue::nat(3)))))
+            Ok(Push(Rc::new(TypedValue::new_option(Some(
+                TypedValue::nat(3)
+            )))))
         );
         assert_eq!(stack, tc_stk![Type::new_option(Type::Nat)]);
     }
@@ -4450,7 +4454,7 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::new_option(None)))
+            Ok(Push(Rc::new(TypedValue::new_option(None))))
         );
         assert_eq!(stack, tc_stk![Type::new_option(Type::Nat)]);
     }
@@ -4465,10 +4469,10 @@ mod typecheck_tests {
                 &mut stack
             ),
             Ok(Seq(vec![
-                Push(TypedValue::new_pair(
+                Push(Rc::new(TypedValue::new_pair(
                     TypedValue::int(-5),
                     TypedValue::new_pair(TypedValue::nat(3), TypedValue::Bool(false))
-                )),
+                ))),
                 Car
             ]))
         );
@@ -4485,10 +4489,10 @@ mod typecheck_tests {
                 &mut stack
             ),
             Ok(Seq(vec![
-                Push(TypedValue::new_pair(
+                Push(Rc::new(TypedValue::new_pair(
                     TypedValue::int(-5),
                     TypedValue::new_pair(TypedValue::nat(3), TypedValue::Bool(false))
-                )),
+                ))),
                 Cdr
             ]))
         );
@@ -4768,7 +4772,7 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(IfNone(vec![Push(TypedValue::int(5))], vec![]))
+            Ok(IfNone(vec![Push(Rc::new(TypedValue::int(5)))], vec![]))
         );
         assert_eq!(stack, tc_stk![Type::Int]);
     }
@@ -4968,9 +4972,9 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::List(
+            Ok(Push(Rc::new(TypedValue::List(
                 vec![TypedValue::int(1), TypedValue::int(2), TypedValue::int(3),].into()
-            )))
+            ))))
         );
         assert_eq!(stack, tc_stk![Type::new_list(Type::Int)]);
     }
@@ -5109,12 +5113,12 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::Set(
+            Ok(Push(Rc::new(TypedValue::Set(
                 [TypedValue::int(1), TypedValue::int(2)]
                     .into_iter()
                     .map(Rc::new)
                     .collect()
-            )))
+            ))))
         );
         assert_eq!(stack, tc_stk![Type::new_set(Type::Int)]);
     }
@@ -5186,7 +5190,7 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::Map(
+            Ok(Push(Rc::new(TypedValue::Map(
                 [
                     (TypedValue::int(1), TypedValue::String("foo".to_owned())),
                     (TypedValue::int(2), TypedValue::String("bar".to_owned()))
@@ -5194,7 +5198,7 @@ mod typecheck_tests {
                 .into_iter()
                 .map(|(key, value)| (Rc::new(key), Rc::new(value)))
                 .collect()
-            )))
+            ))))
         );
         assert_eq!(stack, tc_stk![Type::new_map(Type::Int, Type::String)]);
     }
@@ -6848,10 +6852,10 @@ mod typecheck_tests {
                     Car,
                     Nil,
                     Pair,
-                    Push(TypedValue::Address(addr::Address
+                    Push(Rc::new(TypedValue::Address(addr::Address
                         { hash: AddressHash::try_from("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq").unwrap(),
                           entrypoint: Entrypoint::default() }
-                        )),
+                        ))),
                     Unit,
                     IView { name: "hello_view".into(), return_type: Type::String }, Drop(None)]),
                 annotations: HashMap::from([(
@@ -6918,7 +6922,7 @@ mod typecheck_tests {
     fn test_push_address() {
         #[track_caller]
         fn test_ok(lit: &str, bytes: &str, exp: addr::Address) {
-            let exp = Ok(Push(TypedValue::Address(exp)));
+            let exp = Ok(Push(Rc::new(TypedValue::Address(exp))));
             assert_eq!(
                 &typecheck_instruction(
                     &parse(&format!("PUSH address {lit}")).unwrap(),
@@ -7170,9 +7174,9 @@ mod typecheck_tests {
     fn test_push_chain_id() {
         let bytes = "f3d48554";
         let exp = hex::decode(bytes).unwrap();
-        let exp = Ok(Push(TypedValue::ChainId(
+        let exp = Ok(Push(Rc::new(TypedValue::ChainId(
             super::ChainId::try_from(exp).unwrap(),
-        )));
+        ))));
         let lit = "NetXynUjJNZm7wi";
         assert_eq!(
             &typecheck_instruction(
@@ -7553,7 +7557,9 @@ mod typecheck_tests {
             parse("PUSH bytes 0xdeadf00d")
                 .unwrap()
                 .typecheck_instruction(&mut Gas::default(), None, &[]),
-            Ok(Push(TypedValue::Bytes(hex::decode("deadf00d").unwrap())))
+            Ok(Push(Rc::new(TypedValue::Bytes(
+                hex::decode("deadf00d").unwrap()
+            ))))
         );
     }
 
@@ -7563,11 +7569,11 @@ mod typecheck_tests {
             parse("PUSH key \"p2pk67K1dwkDFPB63RZU5H3SoMCvmJdKZDZszc7U4FiGKN2YypKdDCB\"")
                 .unwrap()
                 .typecheck_instruction(&mut Gas::default(), None, &[]),
-            Ok(Push(TypedValue::Key(
+            Ok(Push(Rc::new(TypedValue::Key(
                 "p2pk67K1dwkDFPB63RZU5H3SoMCvmJdKZDZszc7U4FiGKN2YypKdDCB"
                     .try_into()
                     .unwrap()
-            )))
+            ))))
         );
         assert_eq!(
             parse(
@@ -7575,11 +7581,11 @@ mod typecheck_tests {
             )
             .unwrap()
             .typecheck_instruction(&mut Gas::default(), None, &[]),
-            Ok(Push(TypedValue::Key(
+            Ok(Push(Rc::new(TypedValue::Key(
                 "sppk7Ze7NMs6EHF2uB8qq8GrEgJvE9PWYkUijN3LcesafzQuGyniHBD"
                     .try_into()
                     .unwrap()
-            )))
+            ))))
         );
     }
 
@@ -7589,17 +7595,17 @@ mod typecheck_tests {
             parse("PUSH key_hash \"tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw\"")
                 .unwrap()
                 .typecheck_instruction(&mut Gas::default(), None, &[]),
-            Ok(Push(TypedValue::KeyHash(
+            Ok(Push(Rc::new(TypedValue::KeyHash(
                 "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw".try_into().unwrap()
-            )))
+            ))))
         );
         assert_eq!(
             parse("PUSH key_hash 0x036342f30484dd46b6074373aa6ddca9dfb70083d6")
                 .unwrap()
                 .typecheck_instruction(&mut Gas::default(), None, &[]),
-            Ok(Push(TypedValue::KeyHash(
+            Ok(Push(Rc::new(TypedValue::KeyHash(
                 "tz4J46gb6DxDFYxkex8k9sKiYZwjuiaoNSqN".try_into().unwrap()
-            )))
+            ))))
         );
     }
 
@@ -7609,11 +7615,11 @@ mod typecheck_tests {
             parse("PUSH signature \"p2sigRmXDp38VNVaEQH28LYukfLPn8QB5hPEberhvQrrUpRscDZJrrApbRh2u46PTVTwKXjxTLKNN9dyLhPQU6U6jWPGxe4d9v\"")
             .unwrap()
             .typecheck_instruction(&mut Gas::default(), None, &[]),
-            Ok(Push(TypedValue::Signature(
+            Ok(Push(Rc::new(TypedValue::Signature(
                         "p2sigRmXDp38VNVaEQH28LYukfLPn8QB5hPEberhvQrrUpRscDZJrrApbRh2u46PTVTwKXjxTLKNN9dyLhPQU6U6jWPGxe4d9v"
                         .try_into()
                         .unwrap()
-                        )))
+                        ))))
             );
         // NB: bytes are always treated as a generic signature
         assert_eq!(
@@ -7622,11 +7628,11 @@ mod typecheck_tests {
                 )
             .unwrap()
             .typecheck_instruction(&mut Gas::default(), None, &[]),
-            Ok(Push(TypedValue::Signature(
+            Ok(Push(Rc::new(TypedValue::Signature(
                         "sigSTJNiwaPuZXmU2FscxNy9scPjjwpbxpPD5rY1QRBbyb4gHXYU7jN9Wcbs9sE4GMzuiSSG5S2egeyJhUjW1uJEgw4AWAXj"
                         .try_into()
                         .unwrap()
-                        )))
+                        ))))
             );
     }
 
@@ -7985,10 +7991,12 @@ mod typecheck_tests {
             parse("PUSH (lambda unit unit) { DROP ; UNIT }")
                 .unwrap()
                 .typecheck_instruction(&mut Gas::default(), None, &[]),
-            Ok(Push(TypedValue::Lambda(Closure::Lambda(Lambda::Lambda {
-                micheline_code: parse("{DROP; UNIT}").unwrap(),
-                code: vec![Drop(None), Unit].into()
-            }))))
+            Ok(Push(Rc::new(TypedValue::Lambda(Closure::Lambda(
+                Lambda::Lambda {
+                    micheline_code: parse("{DROP; UNIT}").unwrap(),
+                    code: vec![Drop(None), Unit].into()
+                }
+            )))))
         );
         assert_eq!(
             parse("LAMBDA unit unit { DROP ; UNIT }")
@@ -8087,14 +8095,14 @@ mod typecheck_tests {
             parse("PUSH (lambda unit unit) (Lambda_rec { SWAP ; DROP })")
                 .unwrap()
                 .typecheck_instruction(&mut Gas::default(), None, &[]),
-            Ok(Push(TypedValue::Lambda(Closure::Lambda(
+            Ok(Push(Rc::new(TypedValue::Lambda(Closure::Lambda(
                 Lambda::LambdaRec {
                     micheline_code: parse("{SWAP; DROP}").unwrap(),
                     code: vec![Swap, Drop(None)].into(),
                     in_ty: Type::Unit,
                     out_ty: Type::Unit
                 }
-            ))))
+            )))))
         );
         assert_eq!(
             parse("LAMBDA_REC unit unit { SWAP ; DROP }")
@@ -8556,7 +8564,7 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 stk
             ),
-            Ok(Push(TypedValue::timestamp(1571659294)))
+            Ok(Push(Rc::new(TypedValue::timestamp(1571659294))))
         );
 
         let stk = &mut tc_stk![];
@@ -8566,7 +8574,7 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 stk
             ),
-            Ok(Push(TypedValue::timestamp(1571659294)))
+            Ok(Push(Rc::new(TypedValue::timestamp(1571659294))))
         );
 
         let stk = &mut tc_stk![];
@@ -8576,7 +8584,7 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 stk
             ),
-            Ok(Push(TypedValue::timestamp(1571659294)))
+            Ok(Push(Rc::new(TypedValue::timestamp(1571659294))))
         );
 
         let stk = &mut tc_stk![];

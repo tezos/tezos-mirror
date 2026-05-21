@@ -2936,7 +2936,7 @@ mod interpreter_tests {
         let mut stack = stk![V::nat(20), V::nat(10)];
         let expected_stack = stk![V::nat(20), V::nat(10), V::nat(0)];
         let mut ctx = Ctx::default();
-        assert!(interpret_one(&Push(V::nat(0)), &mut ctx, &mut stack).is_ok());
+        assert!(interpret_one(&Push(Rc::new(V::nat(0))), &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
     }
 
@@ -2947,9 +2947,9 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert!(interpret_one(
             &Loop(vec![
-                Push(V::nat(1)),
+                Push(Rc::new(V::nat(1))),
                 Add(overloads::Add::NatNat),
-                Push(V::Bool(false))
+                Push(Rc::new(V::Bool(false)))
             ]),
             &mut ctx,
             &mut stack,
@@ -2965,9 +2965,9 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert!(interpret_one(
             &Loop(vec![
-                Push(V::nat(1)),
+                Push(Rc::new(V::nat(1))),
                 Add(overloads::Add::NatNat),
-                Push(V::Bool(false))
+                Push(Rc::new(V::Bool(false)))
             ]),
             &mut ctx,
             &mut stack,
@@ -2983,7 +2983,7 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert!(interpret_one(
             &Loop(vec![
-                Push(V::int(-1)),
+                Push(Rc::new(V::int(-1))),
                 Add(overloads::Add::IntInt),
                 Dup(None),
                 Gt
@@ -3012,7 +3012,10 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert_eq!(
             interpret_one(
-                &LoopLeft(vec![Drop(None), Push(V::new_or(Or::Right(V::int(1))))]),
+                &LoopLeft(vec![
+                    Drop(None),
+                    Push(Rc::new(V::new_or(Or::Right(V::int(1)))))
+                ]),
                 &mut ctx,
                 &mut stack
             ),
@@ -3325,7 +3328,7 @@ mod interpreter_tests {
         let mut stack = Stack::new();
         assert_eq!(
             interpret(
-                &[Push(V::String("foo".to_owned()))],
+                &[Push(Rc::new(V::String("foo".to_owned())))],
                 &mut Ctx::default(),
                 &mut stack
             ),
@@ -3338,7 +3341,7 @@ mod interpreter_tests {
     fn push_unit_value() {
         let mut stack = Stack::new();
         assert_eq!(
-            interpret(&[Push(V::Unit)], &mut Ctx::default(), &mut stack),
+            interpret(&[Push(Rc::new(V::Unit))], &mut Ctx::default(), &mut stack),
             Ok(())
         );
         assert_eq!(stack, stk![V::Unit]);
@@ -3363,10 +3366,10 @@ mod interpreter_tests {
         let mut stack = Stack::new();
         let mut ctx = Ctx::default();
         assert!(interpret(
-            &[Push(V::new_pair(
+            &[Push(Rc::new(V::new_pair(
                 V::int(-5),
                 V::new_pair(V::nat(3), V::Bool(false))
-            ))],
+            )))],
             &mut ctx,
             &mut stack
         )
@@ -3391,7 +3394,7 @@ mod interpreter_tests {
         let mut stack = Stack::new();
         let mut ctx = Ctx::default();
         assert!(interpret(
-            &[Push(V::new_option(Some(V::int(-5))))],
+            &[Push(Rc::new(V::new_option(Some(V::int(-5)))))],
             &mut ctx,
             &mut stack
         )
@@ -3411,10 +3414,10 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert!(interpret(
             &[
-                Push(V::new_pair(
+                Push(Rc::new(V::new_pair(
                     V::int(-5),
                     V::new_pair(V::nat(3), V::Bool(false))
-                )),
+                ))),
                 Car
             ],
             &mut ctx,
@@ -3437,10 +3440,10 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert!(interpret(
             &[
-                Push(V::new_pair(
+                Push(Rc::new(V::new_pair(
                     V::new_pair(V::nat(3), V::Bool(false)),
                     V::int(-5),
-                )),
+                ))),
                 Cdr
             ],
             &mut ctx,
@@ -3551,7 +3554,7 @@ mod interpreter_tests {
 
     #[test]
     fn if_none_1() {
-        let code = vec![IfNone(vec![Push(V::int(5))], vec![])];
+        let code = vec![IfNone(vec![Push(Rc::new(V::int(5)))], vec![])];
         // with Some
         let mut stack = stk![V::new_option(Some(V::int(42)))];
         let mut ctx = Ctx::default();
@@ -3567,7 +3570,7 @@ mod interpreter_tests {
 
     #[test]
     fn if_none_2() {
-        let code = vec![IfNone(vec![Push(V::int(5))], vec![])];
+        let code = vec![IfNone(vec![Push(Rc::new(V::int(5)))], vec![])];
         // with None
         let mut stack = stk![V::new_option(None)];
         let mut ctx = Ctx::default();
@@ -3584,7 +3587,10 @@ mod interpreter_tests {
 
     #[test]
     fn if_cons_cons() {
-        let code = vec![IfCons(vec![Swap, Drop(None)], vec![Push(V::int(0))])];
+        let code = vec![IfCons(
+            vec![Swap, Drop(None)],
+            vec![Push(Rc::new(V::int(0)))],
+        )];
         let mut stack = stk![V::List(vec![V::int(1), V::int(2)].into())];
         let mut ctx = Ctx::default();
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
@@ -3601,7 +3607,10 @@ mod interpreter_tests {
 
     #[test]
     fn if_cons_nil() {
-        let code = vec![IfCons(vec![Swap, Drop(None)], vec![Push(V::int(0))])];
+        let code = vec![IfCons(
+            vec![Swap, Drop(None)],
+            vec![Push(Rc::new(V::int(0)))],
+        )];
         let mut stack = stk![V::List(MichelsonList::new())];
         let mut ctx = Ctx::default();
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
@@ -3617,7 +3626,7 @@ mod interpreter_tests {
 
     #[test]
     fn if_left_left() {
-        let code = vec![IfLeft(vec![], vec![Drop(None), Push(V::int(0))])];
+        let code = vec![IfLeft(vec![], vec![Drop(None), Push(Rc::new(V::int(0)))])];
         let mut stack = stk![V::new_or(or::Or::Left(V::int(1)))];
         let mut ctx = Ctx::default();
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
@@ -3632,7 +3641,7 @@ mod interpreter_tests {
 
     #[test]
     fn if_left_right() {
-        let code = vec![IfLeft(vec![], vec![Drop(None), Push(V::int(0))])];
+        let code = vec![IfLeft(vec![], vec![Drop(None), Push(Rc::new(V::int(0)))])];
         let mut stack = stk![V::new_or(or::Or::Right(V::Unit))];
         let mut ctx = Ctx::default();
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
@@ -3728,7 +3737,9 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert_eq!(
             interpret(
-                &[Push(V::List(vec![V::int(1), V::int(2), V::int(3),].into()))],
+                &[Push(Rc::new(V::List(
+                    vec![V::int(1), V::int(2), V::int(3),].into()
+                )))],
                 &mut ctx,
                 &mut stack
             ),
@@ -3783,7 +3794,7 @@ mod interpreter_tests {
             (V::int(2), V::String("bar".to_owned())),
         ]);
         assert_eq!(
-            interpret(&[Push(V::Map(map.clone()))], &mut ctx, &mut stack),
+            interpret(&[Push(Rc::new(V::Map(map.clone())))], &mut ctx, &mut stack),
             Ok(())
         );
         assert_eq!(stack, stk![V::Map(map)]);
@@ -5273,7 +5284,7 @@ mod interpreter_tests {
                     vec![
                         Dup(None),
                         Add(overloads::Add::NatNat),
-                        Push(TypedValue::Bool(false)),
+                        Push(Rc::new(TypedValue::Bool(false))),
                         Pair,
                         Exec,
                     ],
@@ -5305,7 +5316,7 @@ mod interpreter_tests {
                     vec![
                         Dup(None),
                         Add(overloads::Add::NatNat),
-                        Push(TypedValue::Bool(false)),
+                        Push(Rc::new(TypedValue::Bool(false))),
                         Pair,
                         Exec,
                     ],
@@ -5392,7 +5403,7 @@ mod interpreter_tests {
                     vec![
                         Dup(None),
                         Add(overloads::Add::NatNat),
-                        Push(TypedValue::Bool(false)),
+                        Push(Rc::new(TypedValue::Bool(false))),
                         Pair,
                         Exec,
                     ],
@@ -5438,7 +5449,7 @@ mod interpreter_tests {
                     vec![
                         Dup(None),
                         Add(overloads::Add::NatNat),
-                        Push(TypedValue::Bool(false)),
+                        Push(Rc::new(TypedValue::Bool(false))),
                         Pair,
                         Exec,
                     ],

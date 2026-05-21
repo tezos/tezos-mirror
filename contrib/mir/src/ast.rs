@@ -654,7 +654,10 @@ pub enum Instruction<'a> {
     Abs,
     IsNat,
     Loop(Vec<Self>),
-    Push(TypedValue<'a>),
+    /// `PUSH ty v`. The literal is wrapped in [`Rc`] so the hot path of the
+    /// interpreter is a refcount bump rather than a deep clone of the value
+    /// (which can be expensive for big-num literals like `PUSH nat 10^18`).
+    Push(Rc<TypedValue<'a>>),
     Swap,
     Failwith(Type),
     Never,
