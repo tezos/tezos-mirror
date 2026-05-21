@@ -1458,6 +1458,93 @@ module Images_external = struct
         "aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c"
 end
 
+(* Register base images.
+
+   Use this module to register images that are built in the base
+   image pipelines of [tezos/tezos] and pushed to the protected
+   registry. *)
+module Base_images = struct
+  let path_prefix = "${GCP_PROTECTED_REGISTRY}/tezos/tezos"
+
+  let make_img distro version =
+    Image.mk_external ~image_path:(sf "%s/%s-%s" path_prefix distro version)
+
+  (* DEB packaging *)
+
+  (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2491675993
+     May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
+     https://gitlab.com/tezos/tezos/-/commit/05e36a5c/pipelines *)
+  let debian_version = "master-05e36a5c"
+
+  let debian_bookworm = make_img "debian:bookworm" debian_version
+
+  let debian_trixie = make_img "debian:trixie" debian_version
+
+  let debian_build_trixie = make_img "debian-build:trixie" debian_version
+
+  let ubuntu_22_04 = make_img "ubuntu:22.04" debian_version
+
+  let ubuntu_24_04 = make_img "ubuntu:24.04" debian_version
+
+  let ubuntu_build_24_04 = make_img "ubuntu-build:24.04" debian_version
+
+  let ubuntu_26_04 = make_img "ubuntu:26.04" debian_version
+
+  (* RPM packaging *)
+
+  (* Version created by
+     https://gitlab.com/tezos/tezos/-/pipelines/2412618967
+
+     NB: these images are currently not build in our regular
+     pipelines. If we build them again, we will need to build fresh
+     ones.
+
+     Pipelines of the commit.
+     https://gitlab.com/tezos/tezos/-/commit/d79172a8/pipelines *)
+  let rpm_version = "master-d79172a8"
+
+  let rockylinux_9 = make_img "rockylinux:9" rpm_version
+
+  let rockylinux_10 = make_img "rockylinux:10" rpm_version
+
+  let fedora_39 = make_img "fedora:39" rpm_version
+
+  let fedora_42 = make_img "fedora:42" rpm_version
+
+  (* [debian-jsonnet-trixie] *)
+  (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2439598666
+     after https://gitlab.com/tezos/tezos/-/merge_requests/21554 was merged *)
+  let debian_jsonnet_trixie = make_img "debian-jsonnet:trixie" "master-d70f7d37"
+
+  (* [debian-homebrew-trixie] *)
+  (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
+     May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
+     https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines *)
+  let debian_homebrew_trixie =
+    make_img "debian-homebrew:trixie" "master-be43e621"
+
+  (* [debian-rust-trixie] *)
+  (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2481391601
+     which contains libclang for building rocksdb in CI.
+     May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
+     https://gitlab.com/tezos/tezos/-/commit/8afd610a/pipelines *)
+  let debian_rust_trixie = make_img "debian-rust:trixie" "master-8afd610a"
+
+  (* [ci-release] *)
+  (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
+     May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
+     https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines *)
+  (* FIXME: currently not used. + make name consistent *)
+  let _ci_release_version = "master-be43e621"
+
+  let ci_release =
+    Image.mk_external
+      ~image_path:
+        "${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-release:v1.8.0"
+
+  let pp = Image.pp
+end
+
 let opt_var name f = function Some value -> [(name, f value)] | None -> []
 
 (** {2 Job makers} *)
@@ -1596,89 +1683,7 @@ end
 module Images = struct
   (* Include external images here for convenience. *)
   include Images_external
-
-  module Base_images = struct
-    let path_prefix = "${GCP_PROTECTED_REGISTRY}/tezos/tezos"
-
-    let make_img distro version =
-      Image.mk_external ~image_path:(sf "%s/%s-%s" path_prefix distro version)
-
-    (* DEB packaging *)
-
-    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2491675993
-       May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
-       https://gitlab.com/tezos/tezos/-/commit/05e36a5c/pipelines *)
-    let debian_version = "master-05e36a5c"
-
-    let debian_bookworm = make_img "debian:bookworm" debian_version
-
-    let debian_trixie = make_img "debian:trixie" debian_version
-
-    let debian_build_trixie = make_img "debian-build:trixie" debian_version
-
-    let ubuntu_22_04 = make_img "ubuntu:22.04" debian_version
-
-    let ubuntu_24_04 = make_img "ubuntu:24.04" debian_version
-
-    let ubuntu_build_24_04 = make_img "ubuntu-build:24.04" debian_version
-
-    let ubuntu_26_04 = make_img "ubuntu:26.04" debian_version
-
-    (* RPM packaging *)
-
-    (* Version created by
-       https://gitlab.com/tezos/tezos/-/pipelines/2412618967
-
-       NB: these images are currently not build in our regular
-       pipelines. If we build them again, we will need to build fresh
-       ones.
-
-       Pipelines of the commit.
-       https://gitlab.com/tezos/tezos/-/commit/d79172a8/pipelines *)
-    let rpm_version = "master-d79172a8"
-
-    let rockylinux_9 = make_img "rockylinux:9" rpm_version
-
-    let rockylinux_10 = make_img "rockylinux:10" rpm_version
-
-    let fedora_39 = make_img "fedora:39" rpm_version
-
-    let fedora_42 = make_img "fedora:42" rpm_version
-
-    (* [debian-jsonnet-trixie] *)
-    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2439598666
-       after https://gitlab.com/tezos/tezos/-/merge_requests/21554 was merged *)
-    let debian_jsonnet_trixie =
-      make_img "debian-jsonnet:trixie" "master-d70f7d37"
-
-    (* [debian-homebrew-trixie] *)
-    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
-       May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
-       https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines *)
-    let debian_homebrew_trixie =
-      make_img "debian-homebrew:trixie" "master-be43e621"
-
-    (* [debian-rust-trixie] *)
-    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2481391601
-       which contains libclang for building rocksdb in CI.
-       May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
-       https://gitlab.com/tezos/tezos/-/commit/8afd610a/pipelines *)
-    let debian_rust_trixie = make_img "debian-rust:trixie" "master-8afd610a"
-
-    (* [ci-release] *)
-    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
-       May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
-       https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines *)
-    (* FIXME: currently not used. + make name consistent *)
-    let _ci_release_version = "master-be43e621"
-
-    let ci_release =
-      Image.mk_external
-        ~image_path:
-          "${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-release:v1.8.0"
-
-    let pp = Image.pp
-  end
+  module Base_images = Base_images
 
   (* Internal images are built in the stage {!Stages.images}. *)
   let stage = Stages.images
