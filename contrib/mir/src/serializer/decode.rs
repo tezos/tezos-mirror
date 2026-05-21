@@ -72,7 +72,7 @@ impl<'a> Micheline<'a> {
         bytes: &[u8],
         gas: &mut Gas,
     ) -> Result<Result<Micheline<'a>, DecodeError>, OutOfGas> {
-        gas.consume(interpret_cost::micheline_decoding_bytes(bytes.len())?)?;
+        gas.consume(interpret_cost::micheline_decoding_bytes(bytes.len()).map_err(|_| OutOfGas)?)?;
         Ok(Self::decode_raw_unmetered(bytes, arena))
     }
 
@@ -104,7 +104,7 @@ impl<'a> Micheline<'a> {
         bytes: &[u8],
         gas: &mut Gas,
     ) -> Result<Result<(Micheline<'a>, usize), DecodeError>, OutOfGas> {
-        gas.consume(interpret_cost::micheline_decoding_bytes(bytes.len())?)?;
+        gas.consume(interpret_cost::micheline_decoding_bytes(bytes.len()).map_err(|_| OutOfGas)?)?;
         let mut it: BytesIt = bytes.into();
         Ok(decode_micheline(arena, &mut it).map(|res| (res, bytes.len() - it.0.len())))
     }
@@ -119,7 +119,7 @@ impl<'a> Micheline<'a> {
         bytes: &[u8],
         gas: &mut Gas,
     ) -> Result<Result<Micheline<'a>, DecodeError>, OutOfGas> {
-        gas.consume(interpret_cost::micheline_decoding_bytes(bytes.len())?)?;
+        gas.consume(interpret_cost::micheline_decoding_bytes(bytes.len()).map_err(|_| OutOfGas)?)?;
         if bytes.first() != Some(&0x05) {
             return Ok(Err(DecodeError::NoPackTag));
         }

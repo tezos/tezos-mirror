@@ -378,10 +378,9 @@ where
                 let dest_contract = contract_from_address(destination_address.hash)?;
                 let value =
                     param.into_micheline_optimized_legacy(&parser.arena, tc_ctx.gas())?;
-                let encoded_value =
-                    value.encode(&mut Gas::unmetered())?.map_err(|e| {
-                        TransferError::MichelineSerializationError(e.to_string())
-                    })?;
+                let encoded_value = value.encode(tc_ctx.gas())?.map_err(|e| {
+                    TransferError::MichelineSerializationError(e.to_string())
+                })?;
                 let content = TransferContent {
                     amount,
                     destination: dest_contract,
@@ -462,13 +461,11 @@ where
                     )
                 };
                 let script = Script {
-                    code: micheline_code
-                        .encode(&mut Gas::unmetered())?
-                        .map_err(encode_err)?,
+                    code: micheline_code.encode(tc_ctx.gas())?.map_err(encode_err)?,
                     storage: storage
                         .clone()
                         .into_micheline_optimized_legacy(&parser.arena, tc_ctx.gas())?
-                        .encode(&mut Gas::unmetered())?
+                        .encode(tc_ctx.gas())?
                         .map_err(encode_err)?,
                 };
                 if failed.is_some() {
@@ -535,17 +532,17 @@ where
                 let payload = Some(
                     value
                         .into_micheline_optimized_legacy(&parser.arena, tc_ctx.gas())?
-                        .encode(&mut Gas::unmetered())?
+                        .encode(tc_ctx.gas())?
                         .map_err(emit_err)?
                         .into(),
                 );
                 let ty = match arg_ty {
                     mir::ast::Or::Left(typ) => typ
                         .into_micheline_optimized_legacy(&parser.arena, tc_ctx.gas())?
-                        .encode(&mut Gas::unmetered())?
+                        .encode(tc_ctx.gas())?
                         .map_err(emit_err)?,
                     mir::ast::Or::Right(mic) => {
-                        mic.encode(&mut Gas::unmetered())?.map_err(emit_err)?
+                        mic.encode(tc_ctx.gas())?.map_err(emit_err)?
                     }
                 }
                 .into();
@@ -842,12 +839,9 @@ where
         operation_ctx.source.contract()
     );
     let entrypoint = &parameters.entrypoint;
-    let value =
-        Micheline::decode_raw(&parser.arena, &parameters.value, &mut Gas::unmetered())
-            .map_err(|out_of_gas: OutOfGas| {
-                CracError::Operation(TransferError::OutOfGas(out_of_gas))
-            })?
-            .map_err(|e| CracError::Operation(TransferError::from(e)))?;
+    let value = Micheline::decode_raw(&parser.arena, &parameters.value, tc_ctx.gas())
+        .map_err(|oog: OutOfGas| CracError::Operation(oog.into()))?
+        .map_err(|e| CracError::Operation(TransferError::from(e)))?;
 
     transfer(
         tc_ctx,
@@ -927,12 +921,9 @@ where
     Host: StorageV1,
 {
     let entrypoint = &parameters.entrypoint;
-    let value =
-        Micheline::decode_raw(&parser.arena, &parameters.value, &mut Gas::unmetered())
-            .map_err(|out_of_gas: OutOfGas| {
-                CracTransferError::from(TransferError::OutOfGas(out_of_gas))
-            })?
-            .map_err(|e| CracTransferError::from(TransferError::from(e)))?;
+    let value = Micheline::decode_raw(&parser.arena, &parameters.value, tc_ctx.gas())
+        .map_err(|oog: OutOfGas| CracTransferError::from(TransferError::from(oog)))?
+        .map_err(|e| CracTransferError::from(TransferError::from(e)))?;
 
     let world_state = tc_ctx.context.path();
     let checkpoint_index = journal
@@ -1021,8 +1012,8 @@ pub fn typecheck_code_and_storage<'a, Host: StorageV1, C: Context>(
     script: &Script,
 ) -> Result<TypedValue<'a>, OriginationError> {
     let contract_micheline =
-        Micheline::decode_raw(&parser.arena, &script.code, &mut Gas::unmetered())
-            .map_err(|out_of_gas: OutOfGas| OriginationError::OutOfGas(out_of_gas))?
+        Micheline::decode_raw(&parser.arena, &script.code, ctx.gas())
+            .map_err(OriginationError::from)?
             .map_err(|e| OriginationError::MichelineSerializationError(e.to_string()))?;
     let allow_lazy_storage_in_storage = true;
     let contract_typechecked = contract_micheline
@@ -1033,8 +1024,8 @@ pub fn typecheck_code_and_storage<'a, Host: StorageV1, C: Context>(
         .typecheck_script(ctx.gas(), allow_lazy_storage_in_storage, true)
         .map_err(|e| OriginationError::MirTypecheckingError(format!("Script : {e}")))?;
     let storage_micheline =
-        Micheline::decode_raw(&parser.arena, &script.storage, &mut Gas::unmetered())
-            .map_err(|out_of_gas: OutOfGas| OriginationError::OutOfGas(out_of_gas))?
+        Micheline::decode_raw(&parser.arena, &script.storage, ctx.gas())
+            .map_err(OriginationError::from)?
             .map_err(|e| OriginationError::MichelineSerializationError(e.to_string()))?;
     contract_typechecked
         .typecheck_storage(ctx, &storage_micheline)
@@ -1059,7 +1050,7 @@ fn handle_storage_with_big_maps<'a, Host: StorageV1, C: Context>(
     let lazy_storage_diff = convert_big_map_diff(std::mem::take(&mut ctx.big_map_diff));
     let storage = storage
         .into_micheline_optimized_legacy(&parser.arena, ctx.gas())?
-        .encode(&mut Gas::unmetered())?
+        .encode(ctx.gas())?
         .map_err(|e| OriginationError::MichelineSerializationError(e.to_string()))?;
     Ok((storage, lazy_storage_diff))
 }
@@ -1221,14 +1212,12 @@ fn execute_smart_contract_originated<'a>(
     ctx: &mut impl CtxTrait<'a>,
 ) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), TransferError> {
     // Parse and typecheck the contract
-    let contract_micheline =
-        Micheline::decode_raw(&parser.arena, &code, &mut Gas::unmetered())??;
+    let contract_micheline = Micheline::decode_raw(&parser.arena, &code, ctx.gas())??;
     let contract_typechecked =
         contract_micheline
             .split_script()?
             .typecheck_script(ctx.gas(), true, false)?;
-    let storage_micheline =
-        Micheline::decode_raw(&parser.arena, &storage, &mut Gas::unmetered())??;
+    let storage_micheline = Micheline::decode_raw(&parser.arena, &storage, ctx.gas())??;
 
     // Execute the contract
     let (internal_operations, new_storage) = contract_typechecked.interpret(
@@ -1242,7 +1231,7 @@ fn execute_smart_contract_originated<'a>(
     // Encode the new storage
     let new_storage = new_storage
         .into_micheline_optimized_legacy(&parser.arena, ctx.gas())?
-        .encode(&mut Gas::unmetered())?
+        .encode(ctx.gas())?
         .map_err(|e| TransferError::MichelineSerializationError(e.to_string()))?;
 
     Ok((internal_operations, new_storage))
@@ -2853,7 +2842,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 2168615_u64.into(),
+                        consumed_milligas: 2168655_u64.into(),
                         storage_size: 0_u64.into(),
                         paid_storage_size_diff: 0_u64.into(),
                         allocated_destination_contract: false,
@@ -2952,7 +2941,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 2168615_u64.into(),
+                        consumed_milligas: 2168655_u64.into(),
                         storage_size: 0_u64.into(),
                         paid_storage_size_diff: 0_u64.into(),
                         allocated_destination_contract: false,
@@ -3076,7 +3065,7 @@ mod tests {
                             balance_updates: vec![],
                             ticket_receipt: vec![],
                             originated_contracts: vec![],
-                            consumed_milligas: 176161_u64.into(),
+                            consumed_milligas: 177701_u64.into(),
                             storage_size: 69_u64.into(), // code (67) + unit (2)
                             paid_storage_size_diff: 0_u64.into(), // unit unchanged
                             allocated_destination_contract: false,
@@ -3120,7 +3109,7 @@ mod tests {
                                     ],
                                     ticket_receipt: vec![],
                                     originated_contracts: vec![],
-                                    consumed_milligas: 2_100_100_u64.into(),
+                                    consumed_milligas: 2_100_200_u64.into(),
                                     storage_size: 0_u64.into(),
                                     paid_storage_size_diff: 0_u64.into(),
                                     allocated_destination_contract: false,
@@ -3347,7 +3336,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 172133_u64.into(),
+                        consumed_milligas: 173463_u64.into(),
                         storage_size: 44_u64.into(), // code (33) + "Hello world" (11)
                         paid_storage_size_diff: 4_u64.into(), // "Hello world" (11) − "initial" (7)
                         allocated_destination_contract: false,
@@ -3546,7 +3535,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 172133_u64.into(),
+                        consumed_milligas: 173463_u64.into(),
                         storage_size: 44_u64.into(), // code (33) + "Hello world" (11)
                         paid_storage_size_diff: 4_u64.into(), // "Hello world" (11) − "initial" (7)
                         allocated_destination_contract: false,
@@ -3662,7 +3651,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 2_168_648_u64.into(),
+                        consumed_milligas: 2_168_688_u64.into(),
                         storage_size: 0_u64.into(),
                         paid_storage_size_diff: 0_u64.into(),
                         allocated_destination_contract: true,
@@ -3771,7 +3760,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 2_168_648_u64.into(),
+                        consumed_milligas: 2_168_688_u64.into(),
                         storage_size: 0_u64.into(),
                         paid_storage_size_diff: 0_u64.into(),
                         allocated_destination_contract: true,
@@ -4170,7 +4159,7 @@ mod tests {
                             ],
                             ticket_receipt: vec![],
                             originated_contracts: vec![],
-                            consumed_milligas: 2100000_u64.into(),
+                            consumed_milligas: 2100040_u64.into(),
                             storage_size: 0_u64.into(),
                             paid_storage_size_diff: 0_u64.into(),
                             allocated_destination_contract: false,
@@ -4216,7 +4205,7 @@ mod tests {
                             ],
                             ticket_receipt: vec![],
                             originated_contracts: vec![],
-                            consumed_milligas: 2100000_u64.into(),
+                            consumed_milligas: 2100040_u64.into(),
                             storage_size: 0_u64.into(),
                             paid_storage_size_diff: 0_u64.into(),
                             allocated_destination_contract: false,
@@ -4602,7 +4591,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_kt1.clone(),
                     }],
-                    consumed_milligas: 171960u64.into(),
+                    consumed_milligas: 172870u64.into(),
                     storage_size: 38u64.into(),
                     paid_storage_size_diff: 38u64.into(),
                     lazy_storage_diff: None,
@@ -5224,7 +5213,7 @@ mod tests {
                         originated_contracts: vec![Originated {
                             contract: expected_kt1.clone(),
                         }],
-                        consumed_milligas: 171_960_u64.into(),
+                        consumed_milligas: 172_870_u64.into(),
                         storage_size: 38_u64.into(),
                         paid_storage_size_diff: 38_u64.into(),
                         lazy_storage_diff: None,
@@ -5422,7 +5411,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_address.clone(),
                     }],
-                    consumed_milligas: 100200_u64.into(),
+                    consumed_milligas: 101500_u64.into(),
                     storage_size: 30_u64.into(),
                     paid_storage_size_diff: 30_u64.into(),
                     lazy_storage_diff: None,
@@ -5628,7 +5617,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_address_3,
                     },],
-                    consumed_milligas: 100200_u64.into(),
+                    consumed_milligas: 101500_u64.into(),
                     storage_size: 33_u64.into(),
                     paid_storage_size_diff: 33_u64.into(),
                     lazy_storage_diff: None,
@@ -5686,7 +5675,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_address_2,
                     }],
-                    consumed_milligas: 100250_u64.into(),
+                    consumed_milligas: 101600_u64.into(),
                     storage_size: 30_u64.into(),
                     paid_storage_size_diff: 30_u64.into(),
                     lazy_storage_diff: None,
@@ -5903,7 +5892,7 @@ mod tests {
                             originated_contracts: vec![Originated {
                                 contract: expected_kt1_1.clone(),
                             }],
-                            consumed_milligas: 102500_u64.into(),
+                            consumed_milligas: 103200_u64.into(),
                             storage_size: 30.into(),
                             paid_storage_size_diff: 30.into(),
                             lazy_storage_diff: None,
@@ -5971,7 +5960,7 @@ mod tests {
                             originated_contracts: vec![Originated {
                                 contract: expected_kt1_2.clone(),
                             }],
-                            consumed_milligas: 102500u64.into(),
+                            consumed_milligas: 103200u64.into(),
                             storage_size: 30.into(),
                             paid_storage_size_diff: 30.into(),
                             lazy_storage_diff: None,
