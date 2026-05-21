@@ -23,10 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* This function checks that in case the history mode is [Rolling { Some b }]
-   on a node that supports refutations, [b] is at least [storage_period].
-   On other profiles, [history_mode] governs slot retention only and has no
-   effect: there is nothing to compare against. *)
+(* This function checks the configured [history_mode]. It enforces that a
+   [Rolling { Some b }] window for an operator profile is at least
+   [storage_period]. It also emits a warning when a non-default
+   [history_mode] is set on a node that has no operator profile, because
+   [history_mode] now governs slot retention only and non-operator nodes
+   have no slots to retain. *)
 let check_history_mode config profile_ctxt proto_parameters =
   let open Lwt_result_syntax in
   let supports_refutations =
@@ -38,13 +40,15 @@ let check_history_mode config profile_ctxt proto_parameters =
       proto_parameters
   in
   match config.Configuration_file.history_mode with
-  | Rolling {blocks = `Some b} when supports_refutations ->
-      if b < storage_period then
-        tzfail
-        @@ Errors.Not_enough_history
-             {stored_levels = b; minimal_levels = storage_period}
-      else return_unit
-  | Rolling _ | Archive -> return_unit
+  | Archive -> return_unit
+  | Rolling _ when not supports_refutations ->
+      let*! () = Event.emit_history_mode_ignored () in
+      return_unit
+  | Rolling {blocks = `Some b} when b < storage_period ->
+      tzfail
+      @@ Errors.Not_enough_history
+           {stored_levels = b; minimal_levels = storage_period}
+  | Rolling _ -> return_unit
 
 (* We need more levels because [store_skip_list_cells level] needs the plugin
    for [attestation_lag + 1] levels in the past wrt to the target [level]. Note

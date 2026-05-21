@@ -357,6 +357,18 @@ open struct
       ("stored_levels", Data_encoding.int31)
       ("storage_period", Data_encoding.int31)
 
+  let history_mode_ignored =
+    declare_0
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"history_mode_ignored"
+      ~msg:
+        "--history-mode has no effect on a node without an operator profile: \
+         it only governs slot-payload retention, and slot payloads are only \
+         stored for slot indices in the operator profile. Ignoring the value."
+      ~level:Warning
+      ()
+
   let configuration_loaded =
     declare_0
       ~section
@@ -1561,6 +1573,8 @@ let emit_failed_to_fetch_block ~type_ ~level ~last_notified ~error =
 
 let emit_history_mode_warning ~stored_levels ~storage_period =
   emit history_mode_warning (stored_levels, storage_period)
+
+let emit_history_mode_ignored () = emit history_mode_ignored ()
 
 let emit_configuration_loaded () = emit configuration_loaded ()
 
