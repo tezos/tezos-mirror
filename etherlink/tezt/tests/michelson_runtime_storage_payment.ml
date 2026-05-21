@@ -146,6 +146,11 @@ module Tezos_JSON = struct
   let allocated_destination_contract_of_result result =
     result |-> "allocated_destination_contract" |> as_opt |> Option.map as_bool
     |> Option.value ~default:false
+
+  let error_messages_of_result result =
+    result |-> "errors" |> as_opt |> Option.map as_list
+    |> Option.value ~default:[]
+    |> List.map (fun err -> err |-> "error_message" |> as_string)
 end
 
 (** Cost of one byte burned to the storage-fees sink (`COST_PER_BYTES`
@@ -638,6 +643,19 @@ let test_partial_internal_burn_failure_backtracks_all () =
       string
       ~error_msg:"Expected main op status %R, got %L") ;
 
+  let top_level_errors = Tezos_JSON.error_messages_of_result operation_result in
+  Check.(
+    (List.length top_level_errors = 1)
+      int
+      ~error_msg:"Expected exactly one error on top-level, got %L") ;
+  let error_msg = List.hd top_level_errors in
+  Check.is_true
+    (String.starts_with ~prefix:"CannotPayStorageFee" error_msg)
+    ~error_msg:
+      (sf
+         "Expected top-level error to start with CannotPayStorageFee, got: %s"
+         error_msg) ;
+
   let paid_storage_size_diff =
     Tezos_JSON.get_operation_content_paid_storage_size_diff content
   in
@@ -703,10 +721,164 @@ let test_partial_internal_burn_failure_backtracks_all () =
          (expected %R)") ;
   unit
 
+(** Scenario: same setup as
+    {!test_two_internal_transfers_burn_each}, but the call passes a
+    `storage_limit` that fits the top-level burn and the first slot
+    allocation, yet trips [OperationQuotaExceeded] on the second
+    internal. Receipt shape mirrors
+    {!test_partial_internal_burn_failure_backtracks_all} (source
+    loses only the call fee). *)
+let test_partial_internal_storage_limit_overshoot_backtracks_all () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~title:
+      "partial internal storage_limit overshoot: top-level keeps burn pair, \
+       internals lose theirs"
+    ~tags:["transfer"; "internal"; "backtracked"; "quota"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun evm_node ->
+  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
+  let* tez_client = tezlink_client_from_evm_node evm_node () in
+
+  let initial_storage = "" in
+  let* kt1 =
+    Contract.Double_send.originate
+      ~alias:"double_send"
+      ~amount:(Tez.of_mutez_int 10)
+      ~src:Constant.bootstrap1.public_key_hash
+      ~burn_cap:Tez.one
+      ~initial_storage
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block evm_node in
+
+  let* initial_balance =
+    Client.get_balance_for
+      ~account:Constant.bootstrap1.public_key_hash
+      tez_client
+  in
+
+  let new_storage = "bigger storage" in
+  (* This storage-limit will trigger the fail on the second internal operation because it need `origination_size` more *)
+  let storage_limit = String.length new_storage + origination_size in
+  let call_fee = Tez.of_mutez_int 200 in
+  let* () =
+    Contract.Double_send.call
+      ~amount:Tez.zero
+      ~fee:call_fee
+      ~gas_limit:5000
+      ~storage_limit
+      ~giver:Constant.bootstrap1.alias
+      ~burn_cap:Tez.one
+      ~force:true
+      ~dest1:Constant.bootstrap2.public_key_hash
+      ~dest2:Constant.bootstrap3.public_key_hash
+      ~new_storage
+      kt1
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block evm_node in
+
+  let* balance_after_call =
+    Client.get_balance_for
+      ~account:Constant.bootstrap1.public_key_hash
+      tez_client
+  in
+  let delta_balance = Tez.(initial_balance - balance_after_call) in
+
+  let* content = get_first_manager_operations_content ~tez_endpoint in
+  let operation_result = Tezos_JSON.get_operation_result content in
+  let status = Tezos_JSON.status_of_result operation_result in
+  Check.(
+    (status = "backtracked")
+      string
+      ~error_msg:"Expected main op status %R, got %L") ;
+
+  let top_level_errors = Tezos_JSON.error_messages_of_result operation_result in
+  Check.(
+    (List.length top_level_errors = 1)
+      int
+      ~error_msg:"Expected exactly one error on top-level, got %L") ;
+  let error_msg = List.hd top_level_errors in
+  Check.is_true
+    (String.starts_with ~prefix:"OperationQuotaExceeded" error_msg)
+    ~error_msg:
+      (sf
+         "Expected top-level error to start with OperationQuotaExceeded, got: \
+          %s"
+         error_msg) ;
+
+  let paid_storage_size_diff =
+    Tezos_JSON.get_operation_content_paid_storage_size_diff content
+  in
+  let variable_burn = paid_storage_size_diff * cost_per_byte in
+  Check.(
+    (variable_burn > 0)
+      int
+      ~error_msg:"Expected top-level variable burn > 0 (storage grew), got %L") ;
+
+  let top_level_op_balance_updates =
+    Tezos_JSON.balance_updates_of_result operation_result
+  in
+  let expected_top_level_op_balance_updates =
+    BalanceUpdate.
+      [
+        Contract_change
+          {pkh = Constant.bootstrap1.public_key_hash; change = -variable_burn};
+        Burned_change {category = "storage fees"; change = variable_burn};
+      ]
+  in
+  Check.(top_level_op_balance_updates = expected_top_level_op_balance_updates)
+    (Check.list BalanceUpdate.typ)
+    ~error_msg:"Expected top-level operation balance updates %R, got %L" ;
+
+  let internal_ops = Tezos_JSON.get_internal_operation_results content in
+  Check.(
+    (List.length internal_ops = 2)
+      int
+      ~error_msg:"Expected 2 internal operations, got %L") ;
+  List.iteri
+    (fun i (internal_op, dest) ->
+      let result = JSON.(internal_op |-> "result") in
+      let st = Tezos_JSON.status_of_result result in
+      Check.(
+        (st = "backtracked")
+          string
+          ~error_msg:(sf "Expected internal op %d to be backtracked, got %%L" i)) ;
+
+      let internal_op_balance_updates =
+        Tezos_JSON.balance_updates_of_result result
+      in
+      let expected_internal_op_balance_updates =
+        BalanceUpdate.
+          [
+            Contract_change {pkh = kt1; change = -1};
+            Contract_change {pkh = dest; change = 1};
+          ]
+      in
+      Check.(internal_op_balance_updates = expected_internal_op_balance_updates)
+        (Check.list BalanceUpdate.typ)
+        ~error_msg:(sf "Expected internal op %d balance updates %%R, got %%L" i))
+    (List.combine
+       internal_ops
+       [
+         Constant.bootstrap2.public_key_hash; Constant.bootstrap3.public_key_hash;
+       ]) ;
+
+  Check.(
+    (delta_balance = call_fee)
+      Tez.typ
+      ~error_msg:
+        "Expected only the call fee to be consumed, but lost %L mutez \
+         (expected %R)") ;
+  unit
+
 let () =
   test_origination_receipt_exposes_storage_fields () ;
   test_transfer_with_growth_exposes_delta () ;
   test_transfer_with_shrink_exposes_zero_diff () ;
   test_transfer_to_fresh_implicit_burns_slot () ;
   test_two_internal_transfers_burn_each () ;
-  test_partial_internal_burn_failure_backtracks_all ()
+  test_partial_internal_burn_failure_backtracks_all () ;
+  test_partial_internal_storage_limit_overshoot_backtracks_all ()

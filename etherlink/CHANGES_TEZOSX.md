@@ -94,6 +94,17 @@
   originating shared-inbox message. (!21877)
 - Deposits targeting a Tezos implicit account now emit balance updates.
   (!21877)
+- Storage burn now fires on Michelson manager operations: transfer-
+  to-contract pays a variable burn proportional to
+  `paid_storage_size_diff`, origination pays the variable burn plus
+  a fixed slot burn of `origination_size × cost_per_byte`, and the
+  first credit to an unallocated implicit account also pays the
+  slot burn and flips `allocated_destination_contract` to `true` on
+  the receipt. When the source cannot cover a burn, the operation
+  is marked `Backtracked` with a new
+  `ApplyOperationError::CannotPayStorageFee` error trace,
+  `SafeStorage` rolls back the batch, and `Applied` internals are
+  cascade-demoted so the manager-operation tree stays L1-coherent. (!21840)
 
 ### Internals
 

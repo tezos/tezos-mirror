@@ -1627,9 +1627,12 @@ where
         }
     };
 
-    if let Err(errors) =
-        storage_fees::burn_manager_storage_fees(tc_ctx.host, source_account, &mut receipt)
-    {
+    if let Err(errors) = storage_fees::burn_manager_storage_fees(
+        tc_ctx.host,
+        source_account,
+        &validated_operation.content.storage_limit,
+        &mut receipt,
+    ) {
         log!(Debug, "Storage burn failed: {errors:?}");
         receipt.transform_applied_into_backtracked_with_errors(errors.into());
     }
@@ -3533,7 +3536,7 @@ mod tests {
             15,
             1,
             21010,
-            5,
+            300,
             src.clone(),
             30_u64.into(),
             Contract::Implicit(dest.pkh.clone()),
@@ -3608,7 +3611,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 2_168_615_u64.into(),
+                        consumed_milligas: 2_168_648_u64.into(),
                         storage_size: 0_u64.into(),
                         paid_storage_size_diff: 0_u64.into(),
                         allocated_destination_contract: true,
@@ -3644,7 +3647,7 @@ mod tests {
             15,
             1,
             21010,
-            5,
+            300,
             src.clone(),
             30_u64.into(),
             Contract::Implicit(dest.pkh.clone()),
@@ -3717,7 +3720,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 2_168_615_u64.into(),
+                        consumed_milligas: 2_168_648_u64.into(),
                         storage_size: 0_u64.into(),
                         paid_storage_size_diff: 0_u64.into(),
                         allocated_destination_contract: true,
@@ -4316,7 +4319,7 @@ mod tests {
             10_u64,
             1,
             21010,
-            0,
+            100,
             src.clone(),
             vec![reveal_content, succ_transfer, fail_transfer],
         );
@@ -4432,7 +4435,7 @@ mod tests {
             fee,
             1,
             1040,
-            5,
+            500,
             src.clone(),
             smart_contract_balance,
             Script {
@@ -4527,7 +4530,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_kt1.clone(),
                     }],
-                    consumed_milligas: 171927u64.into(),
+                    consumed_milligas: 171960u64.into(),
                     storage_size: 38u64.into(),
                     paid_storage_size_diff: 38u64.into(),
                     lazy_storage_diff: None,
@@ -5057,7 +5060,7 @@ mod tests {
             fee,
             1,
             1040,
-            5,
+            500,
             src.clone(),
             smart_contract_balance,
             Script { code, storage },
@@ -5132,7 +5135,7 @@ mod tests {
                         originated_contracts: vec![Originated {
                             contract: expected_kt1.clone(),
                         }],
-                        consumed_milligas: 171_927_u64.into(),
+                        consumed_milligas: 171_960_u64.into(),
                         storage_size: 38_u64.into(),
                         paid_storage_size_diff: 38_u64.into(),
                         lazy_storage_diff: None,
@@ -5208,7 +5211,7 @@ mod tests {
             10,
             1,
             22100,
-            0,
+            500,
             src.clone(),
             vec![OperationContent::Transfer(TransferContent {
                 amount: 1000.into(),
@@ -5417,7 +5420,7 @@ mod tests {
             10,
             1,
             22300,
-            0,
+            2000,
             src.clone(),
             vec![OperationContent::Transfer(TransferContent {
                 amount: 0.into(),
@@ -5663,7 +5666,7 @@ mod tests {
             5,
             1,
             21040,
-            0,
+            10_000,
             src.clone(),
             vec![
                 reveal_content,
@@ -5713,7 +5716,7 @@ mod tests {
                         },
                     ],
                     result: ContentResult::BackTracked(backtrack_result(RevealSuccess {
-                        consumed_milligas: 177493_u64.into(),
+                        consumed_milligas: 177658_u64.into(),
                     })),
                     internal_operation_results: vec![],
                 }),
@@ -6808,7 +6811,7 @@ mod tests {
             0,
             1,
             21040,
-            5,
+            10_000,
             tz1.clone(),
             0.into(),
             Contract::Originated(originator_addr),

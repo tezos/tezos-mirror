@@ -153,7 +153,7 @@ module TezContract = struct
               ~fee:1000
               ~counter
               ~gas_limit:10000
-              ~storage_limit:1000
+              ~storage_limit:60000
               ~source
               (origination ~code ~init_storage ~init_balance ());
           ])
