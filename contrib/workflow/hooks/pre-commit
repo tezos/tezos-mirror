@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# pre-commit hook: validates that the git branch name matches the cue
+# workflow conventions documented in contrib/workflow/git.md.
+#
+# During the `poc` step, the branch must be `poc@<task-name>`.
+# During the `test`, `execution`, and `documentation` steps, the
+# branch must be `<task-name>`.
+set -euo pipefail
+
+# Skip when running inside the cue store's own git repository (cue's
+# internal bookkeeping commits): this hook is intended for the main
+# repository only.
+REPO_TOPLEVEL="$(git rev-parse --show-toplevel)"
+if [[ "$(basename "$REPO_TOPLEVEL")" == ".cue-store" ]]; then
+  exit 0
+fi
+
+# Require cue to be available
+if ! command -v cue &> /dev/null; then
+  echo "cue workflow: cue command not found" >&2
+  exit 1
+fi
+
+# Get the claimed task
+TASK_NAME="$(cue claim)" || {
+  echo "cue workflow: failed to claim task" >&2
+  exit 1
+}
+if [[ -z "$TASK_NAME" ]]; then
+  echo "cue workflow: no task claimed" >&2
+  exit 1
+fi
+
+# Get the task status
+STATUS="$(cue get "$TASK_NAME" status)" || {
+  echo "cue workflow: failed to get task status" >&2
+  exit 1
+}
+if [[ -z "$STATUS" ]]; then
+  echo "cue workflow: task status not found" >&2
+  exit 1
+fi
+
+# Get the current branch
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+if [[ -z "$BRANCH" ]]; then
+  echo "cue workflow: failed to determine current git branch" >&2
+  exit 1
+fi
+
+# Validate status and branch name together
+case "$STATUS" in
+poc)
+  EXPECTED="poc@${TASK_NAME}"
+  if [[ "$BRANCH" != "$EXPECTED" ]]; then
+    echo "cue workflow: branch must be '$EXPECTED' during poc step (current: '$BRANCH')" >&2
+    exit 1
+  fi
+  ;;
+test | execution | documentation)
+  if [[ "$BRANCH" != "$TASK_NAME" ]]; then
+    echo "cue workflow: branch must be '$TASK_NAME' during $STATUS step (current: '$BRANCH')" >&2
+    exit 1
+  fi
+  ;;
+*)
+  echo "cue workflow: invalid status '$STATUS' for git commit (expected: poc, test, execution, or documentation)" >&2
+  exit 1
+  ;;
+esac
+
+exit 0

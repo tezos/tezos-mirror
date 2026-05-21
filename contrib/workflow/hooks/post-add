@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# post-add hook: finish initializing a newly-created task.
+#
+# - Preserve authorship: inherit the author from the currently-claimed task.
+# - Set the initial status to 'triage'.
+set -euo pipefail
+
+TASK_NAME="$1"
+
+PARENT_AUTHOR="$(cue get author 2>/dev/null || true)"
+if [[ -n "$PARENT_AUTHOR" ]]; then
+    cue set "$TASK_NAME" author="$PARENT_AUTHOR"
+fi
+
+cue set "$TASK_NAME" status=triage

@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# post-set hook: performs actions after a cue set operation
+set -euo pipefail
+
+TASK_NAME="$1"
+shift 2
+ASSIGNMENTS=("$@")
+
+STATUS_CHANGED=0
+for assignment in "${ASSIGNMENTS[@]}"; do
+    if [[ "$assignment" == status=* ]]; then
+        STATUS_CHANGED=1
+        break
+    fi
+done
+
+# After a status transition, record the run id so pre-set can reject a
+# second transition within the same run. CUE_HOOK_INTERNAL tells pre-set
+# that this particular assignment comes from a hook, not an agent.
+if [[ $STATUS_CHANGED -eq 1 && -n "${CUE_RUN_ID:-}" ]]; then
+    CUE_HOOK_INTERNAL=1 cue set "$TASK_NAME" last-transition-run-id="$CUE_RUN_ID"
+fi
+
+# When the task transitions to human-review, assign it to the author.
+if [[ $STATUS_CHANGED -eq 1 ]]; then
+    STATUS="$(cue get "$TASK_NAME" status)"
+    if [[ "$STATUS" == "human-review" ]]; then
+        AUTHOR="$(cue get "$TASK_NAME" author)"
+        if [[ -n "$AUTHOR" ]]; then
+            cue set "$TASK_NAME" assignee="$AUTHOR"
+        fi
+    fi
+fi

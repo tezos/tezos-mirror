@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# commit-msg hook: validates commit message format per AGENTS.md.
+#
+# Rules enforced:
+# - First line must be under 72 characters
+# - First line must match the pattern: <Component>: <message>
+#
+# Merge commits and fixup/squash commits are excluded from validation.
+set -euo pipefail
+
+MSG_FILE="$1"
+FIRST_LINE="$(head -1 "$MSG_FILE")"
+
+# Skip merge commits
+if [[ "$FIRST_LINE" =~ ^Merge\ |^Revert\  ]]; then
+    exit 0
+fi
+
+# Skip fixup/squash commits (used during history rewriting)
+if [[ "$FIRST_LINE" =~ ^(fixup|squash)!\  ]]; then
+    exit 0
+fi
+
+# Check first line length
+if [[ "${#FIRST_LINE}" -gt 72 ]]; then
+    echo "cue workflow: commit message first line must be under 72 characters (got ${#FIRST_LINE})" >&2
+    exit 1
+fi
+
+# Check format: <Component>: <message>
+if ! [[ "$FIRST_LINE" =~ ^[A-Za-z][A-Za-z0-9/_-]*:\ .+ ]]; then
+    echo "cue workflow: commit message must match '<Component>: <message>' format" >&2
+    echo "  Got: $FIRST_LINE" >&2
+    echo "  Examples: 'Shell: fix bug in RPC handler', 'Workflow: add pre-commit hook'" >&2
+    exit 1
+fi
+
+exit 0
