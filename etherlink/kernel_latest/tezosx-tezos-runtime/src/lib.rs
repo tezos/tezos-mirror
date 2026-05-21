@@ -1198,7 +1198,7 @@ impl TezosRuntime {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "testing"))]
 mod tests {
     use tezos_crypto_rs::hash::HashTrait;
 
@@ -1425,57 +1425,8 @@ mod tests {
 
     use tezos_crypto_rs::hash::ChainId;
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezosx_interfaces::testing::NotWiredRegistry;
     use tezosx_interfaces::{AliasInfo, RuntimeId};
-
-    struct StubRegistry;
-
-    impl Registry for StubRegistry {
-        fn ensure_alias<Host>(
-            &self,
-            _host: &mut Host,
-            _journal: &mut TezosXJournal,
-            _alias_info: AliasInfo,
-            _native_public_key: Option<&[u8]>,
-            target_runtime: RuntimeId,
-            _context: CrossRuntimeContext,
-            _gas_remaining: u64,
-        ) -> Result<(String, u64), TezosXRuntimeError>
-        where
-            Host: StorageV1,
-        {
-            Err(TezosXRuntimeError::RuntimeNotFound(target_runtime))
-        }
-
-        fn compute_alias(
-            &self,
-            alias_info: AliasInfo,
-        ) -> Result<String, TezosXRuntimeError> {
-            Err(TezosXRuntimeError::RuntimeNotFound(alias_info.runtime))
-        }
-
-        fn address_from_string(
-            &self,
-            _address_str: &str,
-            runtime_id: RuntimeId,
-        ) -> Result<Vec<u8>, TezosXRuntimeError> {
-            Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
-        }
-
-        fn serve<Host>(
-            &self,
-            _host: &mut Host,
-            _journal: &mut TezosXJournal,
-            _request: http::Request<Vec<u8>>,
-        ) -> http::Response<Vec<u8>>
-        where
-            Host: StorageV1,
-        {
-            http::Response::builder()
-                .status(http::StatusCode::INTERNAL_SERVER_ERROR)
-                .body(b"stub".to_vec())
-                .expect("stub response must build")
-        }
-    }
 
     fn test_context() -> CrossRuntimeContext {
         CrossRuntimeContext {
@@ -1504,7 +1455,7 @@ mod tests {
 
         let alias = runtime
             .ensure_alias(
-                &StubRegistry,
+                &NotWiredRegistry,
                 &mut host,
                 &mut journal,
                 evm_alias_info("0x1234567890abcdef1234567890abcdef12345678"),
@@ -1531,7 +1482,7 @@ mod tests {
 
         runtime
             .ensure_alias(
-                &StubRegistry,
+                &NotWiredRegistry,
                 &mut host,
                 &mut journal,
                 evm_alias_info(evm_address),
@@ -1569,7 +1520,7 @@ mod tests {
 
         runtime
             .ensure_alias(
-                &StubRegistry,
+                &NotWiredRegistry,
                 &mut host,
                 &mut journal,
                 evm_alias_info(evm_address),
@@ -1602,7 +1553,7 @@ mod tests {
 
         runtime
             .ensure_alias(
-                &StubRegistry,
+                &NotWiredRegistry,
                 &mut host,
                 &mut journal,
                 evm_alias_info(evm_address),
@@ -1628,7 +1579,7 @@ mod tests {
 
         let alias1 = runtime
             .ensure_alias(
-                &StubRegistry,
+                &NotWiredRegistry,
                 &mut host1,
                 &mut journal,
                 evm_alias_info(evm_address),
@@ -1639,7 +1590,7 @@ mod tests {
             .unwrap();
         let alias2 = runtime
             .ensure_alias(
-                &StubRegistry,
+                &NotWiredRegistry,
                 &mut host2,
                 &mut journal,
                 evm_alias_info(evm_address),
@@ -1660,7 +1611,7 @@ mod tests {
 
         let alias1 = runtime
             .ensure_alias(
-                &StubRegistry,
+                &NotWiredRegistry,
                 &mut host,
                 &mut journal,
                 evm_alias_info("0x1111111111111111111111111111111111111111"),
@@ -1671,7 +1622,7 @@ mod tests {
             .unwrap();
         let alias2 = runtime
             .ensure_alias(
-                &StubRegistry,
+                &NotWiredRegistry,
                 &mut host,
                 &mut journal,
                 evm_alias_info("0x2222222222222222222222222222222222222222"),
@@ -1697,7 +1648,7 @@ mod tests {
 
         let first = runtime
             .ensure_alias(
-                &StubRegistry,
+                &NotWiredRegistry,
                 &mut host,
                 &mut journal,
                 evm_alias_info(evm_address),
@@ -1709,7 +1660,7 @@ mod tests {
 
         let second = runtime
             .ensure_alias(
-                &StubRegistry,
+                &NotWiredRegistry,
                 &mut host,
                 &mut journal,
                 evm_alias_info(evm_address),
@@ -1750,7 +1701,7 @@ mod tests {
 
         runtime
             .ensure_alias(
-                &StubRegistry,
+                &NotWiredRegistry,
                 &mut host,
                 &mut journal,
                 evm_alias_info(evm_address),
@@ -1776,7 +1727,7 @@ mod tests {
         // Run again. The patch branch must re-record the classification.
         runtime
             .ensure_alias(
-                &StubRegistry,
+                &NotWiredRegistry,
                 &mut host,
                 &mut journal,
                 evm_alias_info(evm_address),
@@ -1815,7 +1766,7 @@ mod tests {
         set_origin_at(&mut host, &account.path().clone(), &Origin::Native).unwrap();
 
         let res = runtime.ensure_alias(
-            &StubRegistry,
+            &NotWiredRegistry,
             &mut host,
             &mut journal,
             evm_alias_info(evm_address),
@@ -2151,7 +2102,7 @@ mod tests {
     fn serve_does_not_touch_outer_dispatch_slot() {
         let mut host = MockKernelHost::default();
         let runtime = test_runtime();
-        let registry = StubRegistry;
+        let registry = NotWiredRegistry;
 
         let mut journal = TezosXJournal::default();
         journal.michelson.push_dispatch_slot();

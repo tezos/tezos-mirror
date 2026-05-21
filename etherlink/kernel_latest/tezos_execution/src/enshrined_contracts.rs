@@ -1497,7 +1497,7 @@ mod tests {
 
     use super::*;
     use crate::mir_ctx::mock::MockCtx;
-    use crate::test_utils::{MockRegistry, MockRegistryWithStatus};
+    use crate::test_utils::MockRegistry;
 
     const GATEWAY_KT1: &str = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw";
     const ERC20_WRAPPER_KT1: &str = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVKvCChb";
@@ -2179,11 +2179,8 @@ mod tests {
     #[test]
     fn test_cross_runtime_call_non_success_response() {
         let mut host = MockKernelHost::default();
-        let registry = MockRegistryWithStatus::new(
-            "KT1_mock_alias".to_string(),
-            500,
-            b"internal server error".to_vec(),
-        );
+        let registry = MockRegistry::new("KT1_mock_alias")
+            .with_serve_response(500, b"internal server error".to_vec());
 
         let source = AddressHash::from_bytes(&[
             0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
@@ -2207,11 +2204,8 @@ mod tests {
     #[test]
     fn test_cross_runtime_call_400_response() {
         let mut host = MockKernelHost::default();
-        let registry = MockRegistryWithStatus::new(
-            "KT1_mock_alias".to_string(),
-            400,
-            b"bad request".to_vec(),
-        );
+        let registry = MockRegistry::new("KT1_mock_alias")
+            .with_serve_response(400, b"bad request".to_vec());
 
         let source = AddressHash::from_bytes(&[
             0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,

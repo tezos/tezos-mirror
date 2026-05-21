@@ -656,7 +656,7 @@ impl RuntimeInterface for EthereumRuntime {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "testing"))]
 mod tests {
     use alloy_primitives::{hex::FromHex, Bytes, Keccak256};
     use revm::primitives::Address;
@@ -668,62 +668,11 @@ mod tests {
     };
     use tezos_ethereum::block::BlockConstants;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_smart_rollup_host::storage::StorageV1;
-    use tezosx_interfaces::{
-        AliasInfo, CrossRuntimeContext, Registry, RuntimeId, RuntimeInterface,
-        TezosXRuntimeError,
-    };
+    use tezosx_interfaces::testing::UnimplementedRegistry;
+    use tezosx_interfaces::{RuntimeInterface, TezosXRuntimeError};
     use tezosx_journal::TezosXJournal;
 
     use crate::EthereumRuntime;
-
-    /// Minimal Registry stub for testing EthereumRuntime in isolation.
-    struct StubRegistry;
-
-    impl Registry for StubRegistry {
-        fn ensure_alias<Host>(
-            &self,
-            _host: &mut Host,
-            _journal: &mut TezosXJournal,
-            _alias_info: AliasInfo,
-            _native_public_key: Option<&[u8]>,
-            _target_runtime: RuntimeId,
-            _context: CrossRuntimeContext,
-            _gas_remaining: u64,
-        ) -> Result<(String, u64), TezosXRuntimeError>
-        where
-            Host: StorageV1,
-        {
-            unimplemented!("not needed for this test")
-        }
-
-        fn compute_alias(
-            &self,
-            _alias_info: AliasInfo,
-        ) -> Result<String, TezosXRuntimeError> {
-            unimplemented!("not needed for this test")
-        }
-
-        fn address_from_string(
-            &self,
-            _address_str: &str,
-            _runtime_id: RuntimeId,
-        ) -> Result<Vec<u8>, TezosXRuntimeError> {
-            unimplemented!("not needed for this test")
-        }
-
-        fn serve<Host>(
-            &self,
-            _host: &mut Host,
-            _journal: &mut TezosXJournal,
-            _request: http::Request<Vec<u8>>,
-        ) -> http::Response<Vec<u8>>
-        where
-            Host: StorageV1,
-        {
-            unimplemented!("not needed for this test")
-        }
-    }
 
     /// Build an HTTP request for the Ethereum runtime's `serve()` method.
     fn build_serve_request(
@@ -762,7 +711,7 @@ mod tests {
         let mut host = MockKernelHost::default();
         let runtime = EthereumRuntime::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
-        let registry = StubRegistry;
+        let registry = UnimplementedRegistry;
 
         let sender = Address::from_slice(&[0x11; 20]);
         let destination = Address::from_slice(&[0x22; 20]);
@@ -794,7 +743,7 @@ mod tests {
         let mut host = MockKernelHost::default();
         let runtime = EthereumRuntime::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
-        let registry = StubRegistry;
+        let registry = UnimplementedRegistry;
 
         let sender = Address::from_slice(&[0x11; 20]);
         let contract = Address::from_slice(&[0x22; 20]);
@@ -847,7 +796,7 @@ mod tests {
     fn test_serve_with_value_sets_correct_msg_value() {
         let mut host = MockKernelHost::default();
         let runtime = EthereumRuntime::default();
-        let registry = StubRegistry;
+        let registry = UnimplementedRegistry;
         let block_constants = BlockConstants::test_block_with_no_fees();
 
         let sender = Address::from_slice(&[0x11; 20]);
@@ -1159,7 +1108,7 @@ mod tests {
         let mut host = MockKernelHost::default();
         let runtime = EthereumRuntime::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
-        let registry = StubRegistry;
+        let registry = UnimplementedRegistry;
 
         let sender = Address::from_slice(&[0x11; 20]);
         let destination = Address::from_slice(&[0x22; 20]);
@@ -1188,7 +1137,7 @@ mod tests {
         let mut host = MockKernelHost::default();
         let runtime = EthereumRuntime::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
-        let registry = StubRegistry;
+        let registry = UnimplementedRegistry;
 
         let sender = Address::from_slice(&[0x11; 20]);
         let destination = Address::from_slice(&[0x22; 20]);
@@ -1217,7 +1166,7 @@ mod tests {
     fn test_serve_calls_contract() {
         let mut host = MockKernelHost::default();
         let runtime = EthereumRuntime::default();
-        let registry = StubRegistry;
+        let registry = UnimplementedRegistry;
 
         let contract = Address::from_slice(&[0x33; 20]);
 
@@ -1341,7 +1290,7 @@ mod tests {
     fn test_serve_unsupported_method_returns_405() {
         let mut host = MockKernelHost::default();
         let runtime = EthereumRuntime::default();
-        let registry = StubRegistry;
+        let registry = UnimplementedRegistry;
 
         let sender = Address::from_slice(&[0x11; 20]);
         let destination = Address::from_slice(&[0x22; 20]);
@@ -1374,7 +1323,7 @@ mod tests {
     fn test_static_call_with_nonzero_amount_is_rejected() {
         let mut host = MockKernelHost::default();
         let runtime = EthereumRuntime::default();
-        let registry = StubRegistry;
+        let registry = UnimplementedRegistry;
 
         let sender = Address::from_slice(&[0x11; 20]);
         let destination = Address::from_slice(&[0x22; 20]);
@@ -1406,7 +1355,7 @@ mod tests {
 
         let mut host = MockKernelHost::default();
         let runtime = EthereumRuntime::default();
-        let registry = StubRegistry;
+        let registry = UnimplementedRegistry;
 
         let sender = Address::from_slice(&[0x11; 20]);
         let destination = Address::from_slice(&[0x33; 20]);
@@ -1454,7 +1403,7 @@ mod tests {
         let mut host = MockKernelHost::default();
         let runtime = EthereumRuntime::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
-        let registry = StubRegistry;
+        let registry = UnimplementedRegistry;
 
         let sender = Address::from_slice(&[0x11; 20]);
         let destination = Address::from_slice(&[0x44; 20]);
@@ -1508,7 +1457,7 @@ mod tests {
 
         let mut host = MockKernelHost::default();
         let runtime = EthereumRuntime::default();
-        let registry = StubRegistry;
+        let registry = UnimplementedRegistry;
 
         let sender = Address::from_slice(&[0x11; 20]);
         let destination = Address::from_slice(&[0x55; 20]);

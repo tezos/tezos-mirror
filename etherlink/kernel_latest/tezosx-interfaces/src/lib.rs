@@ -149,3 +149,6 @@ pub trait RuntimeInterface {
         address: &[u8],
     ) -> Result<U256, TezosXRuntimeError>;
 }
+
+#[cfg(feature = "testing")]
+pub mod testing;
