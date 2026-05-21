@@ -73,6 +73,6 @@ let of_tag tag =
 let select_evm_version ?evm_version kernel =
   match (evm_version, kernel) with
   | _, Mainnet -> Evm_version.Osaka
-  | _, Previewnet -> Evm_version.Prague
+  | _, Previewnet -> Evm_version.Osaka
   | None, Latest -> Evm_version.Osaka
   | Some v, Latest -> v
