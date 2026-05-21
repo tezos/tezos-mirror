@@ -25,7 +25,7 @@ use crate::ast::*;
 #[cfg(feature = "bls")]
 use crate::bls;
 use crate::context::{CtxTrait, TypecheckingCtx};
-use crate::gas::{interpret_cost, OutOfGas};
+use crate::gas::{interpret_cost, CompareError, CostOverflow, OutOfGas};
 use crate::interpreter::interpret_cost::SigCostError;
 use crate::irrefutable_match::irrefutable_match;
 use crate::lexer::Prim;
@@ -78,7 +78,20 @@ pub enum InterpretError<'a> {
     /// Error when typechecking unserialized data
     #[error(transparent)]
     TcError(#[from] TcError),
-    /// Stack index was out of bounds when it shouldn't have been.
+    /// A cost-helper overflowed while computing a gas cost (the helpers do
+    /// pure cost arithmetic; gas is charged separately at the call site).
+    /// Distinct from [`InterpretError::OutOfGas`] (a direct `Gas::consume`
+    /// exhaustion) and kept structure-preserving rather than flattened.
+    #[error(transparent)]
+    CostOverflow(#[from] CostOverflow),
+    /// Comparison-cost failure (cost computation, or an attempt to compare
+    /// incomparable values).
+    #[error(transparent)]
+    CompareError(#[from] CompareError),
+    /// A stack access went out of bounds inside the interpreter. Stays a
+    /// structured variant resolved at the right depth: stack errors that
+    /// spawn in the interpreter propagate directly via `?` instead of
+    /// detouring through `TcError`.
     #[error(transparent)]
     StackOob(#[from] StackOob),
     #[allow(missing_docs)]
@@ -7512,6 +7525,26 @@ mod interpreter_tests {
                 0
             ),
             ContractKt1Hash::try_from("KT1UvfyLytrt71jh63YV4Yex5SmbNXpWHxtg").unwrap(),
+        );
+    }
+
+    // -- Conversion impls for the formerly-panicking error paths --
+
+    #[test]
+    fn stack_oob_converts_to_stack_oob_variant() {
+        // Stack errors that spawn in the interpreter propagate directly
+        // via `From<StackOob> for InterpretError` (no detour through
+        // `TcError`); the value stays structured.
+        let err: InterpretError = StackOob.into();
+        assert_eq!(err, InterpretError::StackOob(StackOob));
+    }
+
+    #[test]
+    fn compare_error_incomparable_converts_to_compare_error_variant() {
+        let err: InterpretError = CompareError::Incomparable.into();
+        assert_eq!(
+            err,
+            InterpretError::CompareError(CompareError::Incomparable)
         );
     }
 }

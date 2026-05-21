@@ -82,19 +82,25 @@ impl<'a> Micheline<'a> {
 
     /// Construct the Int case.
     pub fn int(i: BigInt, gas: &mut Gas) -> Result<Micheline<'a>, OutOfGas> {
-        gas.consume(unparsing_cost::int(&i)?)?;
+        // The `unparsing_cost` helpers return `CostOverflow` (a pure
+        // cost-arithmetic error). The `IntoMicheline` API these
+        // constructors serve is `OutOfGas`-typed, so a cost that is
+        // unrepresentably large is surfaced as out-of-gas here (it is
+        // catchable like OOG). Folding it into a structured error would
+        // mean widening `IntoMicheline` across all its callers — deferred.
+        gas.consume(unparsing_cost::int(&i).map_err(|_| OutOfGas)?)?;
         Ok(Self::Int(i))
     }
 
     /// Construct the String case.
     pub fn string(s: String, gas: &mut Gas) -> Result<Micheline<'a>, OutOfGas> {
-        gas.consume(unparsing_cost::string(&s)?)?;
+        gas.consume(unparsing_cost::string(&s).map_err(|_| OutOfGas)?)?;
         Ok(Self::String(s))
     }
 
     /// Construct the Bytes case.
     pub fn bytes(s: Vec<u8>, gas: &mut Gas) -> Result<Micheline<'a>, OutOfGas> {
-        gas.consume(unparsing_cost::bytes(&s)?)?;
+        gas.consume(unparsing_cost::bytes(&s).map_err(|_| OutOfGas)?)?;
         Ok(Self::Bytes(s))
     }
 
@@ -231,7 +237,7 @@ impl<'a> Micheline<'a> {
     pub fn annotate(&mut self, annotation: Annotation<'a>, gas: &mut Gas) -> Result<(), OutOfGas> {
         match self {
             Self::App(_prim, _args, ref mut annots) => {
-                gas.consume(unparsing_cost::annotation(&annotation)?)?;
+                gas.consume(unparsing_cost::annotation(&annotation).map_err(|_| OutOfGas)?)?;
                 annots.push(annotation);
                 Ok(())
             }

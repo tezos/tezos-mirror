@@ -8,6 +8,8 @@
 
 - Aliases originated as part of a native atomic calls are now surfaced via
   dedicated receipts. (!21904)
+- MIR: harden the Michelson runtime — internal aborts now surface as
+  structured errors. (!21867)
 
 ### Native Atomic Composability
 
