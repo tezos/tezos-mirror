@@ -671,16 +671,15 @@ module Image = struct
 
   (** Register internal image for [image_path] built by [image_builder_amd64].
 
-      Optionally, a builder for an arm64 version of the image can be
-      registered by supplying [image_builder_arm64]. If
-      [image_builder_arm64] is supplied, then it must have a distinct
-      name from [image_builder_amd64].
+      Optionally, a builder for an arm64 version of the image can be registered
+      by supplying [image_builder_arm64]. If [image_builder_arm64] is supplied,
+      then it must have a distinct name from [image_builder_amd64].
 
-      Note: the name of the image builder(s) must uniquely identify the
-      job definition. If two image builders with the same name but
-      differing job definitions (as per polymorphic comparison of the
-      underlying {!Gitlab_ci.Types.job}) are registered, then this
-      function throws a run-time error. *)
+      Note: the name of the image builder(s) must uniquely identify the job
+      definition. If two image builders with the same name but differing job
+      definitions (as per polymorphic comparison of the underlying
+      {!Gitlab_ci.Types.job}) are registered, then this function throws a
+      run-time error. *)
   let mk_internal ?image_builder_arm64 ~image_builder_amd64 ~image_path () : t =
     let image =
       Internal
@@ -1379,6 +1378,15 @@ module Stages = struct
   let manual = Stage.register "manual"
 end
 
+(* The docker version used in Docker-in-Docker CI jobs.
+   This is the version of the Docker daemon available in the
+   [alpine_docker_ci] base image (alpine-docker-ci).
+   https://hub.docker.com/layers/library/docker/28.5.1-dind/images/sha256-bfb73322f4302ed5d380fcba01957ba871458a32245d0862758b08e0fe7916d4 *)
+let docker_version = "28.5.1"
+
+let dind_digest =
+  "sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd"
+
 (* Register external images.
 
    Use this module to register images that are as built outside the
@@ -1530,6 +1538,13 @@ module Base_images = struct
      https://gitlab.com/tezos/tezos/-/commit/8afd610a/pipelines *)
   let debian_rust_trixie = make_img "debian-rust:trixie" "master-8afd610a"
 
+  let docker_version = docker_version
+
+  let dind_service = sf "docker:%s-dind@%s" docker_version dind_digest
+
+  let alpine_docker_ci =
+    make_img (sf "alpine-docker-ci:%s" docker_version) "master-be43e621"
+
   (* [ci-release] *)
   (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
      May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
@@ -1553,8 +1568,8 @@ let opt_var name f = function Some value -> [(name, f value)] | None -> []
 
     It sets the appropriate image. Furthermore, it:
     - activates the Docker daemon as a service;
-    - sets up authentification with Docker registries
-    in the job's [before_script] section.
+    - sets up authentification with Docker registries in the job's
+      [before_script] section.
 
     If [ci_docker_hub] is set to [true], then the job will
     authenticate with Docker Hub provided the environment variable
@@ -1670,16 +1685,14 @@ end
 
 (** A set of internally and externally built images.
 
-    Use this module to register images built in the CI of
-    [tezos/tezos] that are also used in the same pipelines. See
-    {!Images_external} for external images.
+    Use this module to register images built in the CI of [tezos/tezos] that are
+    also used in the same pipelines. See {!Images_external} for external images.
 
-    To make the distinction between internal and external images
-    transparent to job definitions, this module also includes
-    {!Images_external}.
+    To make the distinction between internal and external images transparent to
+    job definitions, this module also includes {!Images_external}.
 
-    For documentation on the [CI] images and the [rust_toolchain]
-    images, refer to [images/README.md]. *)
+    For documentation on the [CI] images and the [rust_toolchain] images, refer
+    to [images/README.md]. *)
 module Images = struct
   (* Include external images here for convenience. *)
   include Images_external

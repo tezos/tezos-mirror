@@ -640,6 +640,19 @@ module Images : sig
 
     val debian_rust_trixie : Image.t
 
+    (** The Docker version used in Docker-in-Docker CI jobs
+        (e.g. ["28.5.1"]). *)
+    val docker_version : string
+
+    (** The fully pinned [docker:<version>-dind@sha256:...] service
+        image reference for Docker-in-Docker CI jobs. *)
+    val dind_service : string
+
+    (** Base image providing Docker-in-Docker for CI jobs that need
+        to build or push Docker images. Based on Alpine Linux,
+        includes the Docker daemon, gcloud, hadolint and regctl. *)
+    val alpine_docker_ci : Image.t
+
     val ci_release : Image.t
   end
 end
