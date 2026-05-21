@@ -17,11 +17,19 @@ val publisher_is_ready : unit -> unit Lwt.t
     will not accept requests anymore. *)
 val publisher_shutdown : unit -> unit Lwt.t
 
-(** [blueprint_applied block execution_gas duration] advertizes that a blueprint
-    leading to [block] requiring [execution_gas] to be executed has been
-    applied in [duration] time onto the local state. *)
+(** [blueprint_applied block execution_gas ~evm_execution_gas
+    ~michelson_execution_gas duration] advertises that the blueprint
+    leading to [block] was applied in [duration].
+
+    [execution_gas] is the EVM-equivalent weighted sum:
+    [evm_execution_gas + michelson_execution_gas * multiplier]. *)
 val blueprint_applied :
-  'transaction_object L2_types.block -> Z.t -> Time.System.Span.t -> unit Lwt.t
+  'transaction_object L2_types.block ->
+  Z.t ->
+  evm_execution_gas:Z.t ->
+  michelson_execution_gas:Z.t ->
+  Time.System.Span.t ->
+  unit Lwt.t
 
 (** [blueprint_replayed ~execution_gas ~process_time ~diverged number]
     advertises that the node was able to replay the blueprint for level [number]. *)

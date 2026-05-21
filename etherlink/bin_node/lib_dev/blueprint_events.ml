@@ -25,8 +25,14 @@ let publisher_shutdown =
     ~level:Info
     ()
 
+(** Raw EVM and Michelson execution gas (gas units, not milligas).
+    [execution_gas = evm + michelson * michelson_to_evm_gas_multiplier]. *)
+let runtime_execution_gas_encoding =
+  Data_encoding.(
+    obj2 (req "evm" Data_encoding.z) (req "michelson" Data_encoding.z))
+
 let blueprint_application =
-  declare_7
+  declare_8
     ~name:"blueprint_application"
     ~section
     ~msg:"head is now {level}, applied in {process_time}{timestamp}"
@@ -38,13 +44,17 @@ let blueprint_application =
         let age = Ptime.diff now timestamp in
         Format.fprintf fmt " (%a old)" Ptime.Span.pp age
       else ())
-    ~pp7:Time.System.Span.pp_hum
+    ~pp8:Time.System.Span.pp_hum
     ("level", Data_encoding.n)
     ("timestamp", Time.Protocol.rfc_encoding)
     ("txs_nb", Data_encoding.int31)
     ("gas_used", Data_encoding.z)
     ("block_hash", Ethereum_types.block_hash_encoding)
+    (* EVM-equivalent weighted sum of the two values in
+       [runtime_execution_gas] (Michelson part scaled by
+       michelson_to_evm_gas_multiplier). *)
     ("execution_gas", Data_encoding.z)
+    ("runtime_execution_gas", runtime_execution_gas_encoding)
     ("process_time", Time.System.Span.encoding)
 
 let blueprint_replayed =
@@ -188,8 +198,10 @@ let blueprint_injected_on_DAL ~level ~nb_chunks =
 let blueprint_injection_failed level trace =
   emit blueprint_injection_failure (level, trace)
 
-let blueprint_applied block execution_gas process_time =
+let blueprint_applied block execution_gas ~evm_execution_gas
+    ~michelson_execution_gas process_time =
   let open Ethereum_types in
+  let runtime_execution_gas = (evm_execution_gas, michelson_execution_gas) in
   match block with
   | L2_types.Eth block ->
       let count_txs = function
@@ -204,6 +216,7 @@ let blueprint_applied block execution_gas process_time =
           Qty.to_z block.gasUsed,
           block.hash,
           execution_gas,
+          runtime_execution_gas,
           process_time )
   | Tez block ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/7866 *)
@@ -215,6 +228,7 @@ let blueprint_applied block execution_gas process_time =
           Z.zero,
           block.hash,
           execution_gas,
+          runtime_execution_gas,
           process_time )
 
 let blueprint_replayed ~execution_gas:(Ethereum_types.Qty execution_gas)
