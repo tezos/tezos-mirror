@@ -11,14 +11,51 @@
     existential type so that callers can work with NDS generically.
     Since all backends share the common
     {!Nds_errors.invalid_argument_error} type in their results, no error
-    conversion is required. *)
+    conversion is required.
+
+    Each wrap also carries an extensible {!tag} that lets backend-aware
+    callers recover the concrete registry value via a backend-defined
+    {!unpack} pattern match.  The tag taxonomy lives in each backend
+    (e.g. memory's [Normal_tag | Prove_tag | Verify_tag]) so the common
+    layer never names backend-specific types. *)
+
+(** Extensible tag carrying type equality between the tag and the
+    wrapped registry.  Backends extend this type with their own
+    constructors that refine ['a] to a concrete [Registry.t]. *)
+type 'a tag = ..
 
 (** Opaque NDS handle that erases the concrete backend type. *)
 type t
 
-(** [wrap impl value] packages a concrete NDS backend [impl] and its
-    state [value] into an opaque {!t} handle. *)
-val wrap : (module Intf.NORMAL with type Registry.t = 'a) -> 'a -> t
+(** [wrap tag impl value] packages a concrete NDS backend [impl] and its
+    state [value] into an opaque {!t} handle, carrying the [tag] that
+    identifies the concrete backend mode.
+
+    The [tag], [impl] and [value] are constrained to share the same
+    [Registry.t], so a pattern match on [tag] inside the owning backend
+    refines the type of [value] back to the concrete registry type. *)
+val wrap : 'a tag -> (module Intf.NORMAL with type Registry.t = 'a) -> 'a -> t
+
+(** Existential view of a wrapped handle, re-exposing the three
+    components ([tag], [impl], [value]) for a pattern match in the
+    owning backend.  This is the type-safe alternative to a direct
+    [unwrap : 'a tag -> t -> 'a option], which cannot be written in the
+    common layer because matching extensible-tag constructors here
+    would force the common layer to enumerate every backend's mode. *)
+type packed =
+  | Packed : {
+      tag : 'a tag;
+      impl : (module Intf.NORMAL with type Registry.t = 'a);
+      value : 'a;
+    }
+      -> packed
+
+(** [unpack t] re-exposes the three components of [t] for a typed
+    pattern match in the owning backend.  Within a [match] on the
+    returned [tag], OCaml refines the existentially-bound type
+    variable, so [value] becomes usable at its concrete registry
+    type. *)
+val unpack : t -> packed
 
 (** {2 Dispatchers}
 

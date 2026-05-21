@@ -31,6 +31,7 @@ let make_nds_handle () =
   | Ok () -> ()
   | Error _ -> Stdlib.failwith "make_nds_handle: resize to 1 failed") ;
   Octez_riscv_nds_common.Nds.wrap
+    Octez_riscv_nds_memory.Normal_tag
     (module Octez_riscv_nds_memory.Normal)
     registry
 

@@ -67,3 +67,30 @@ module Prove :
     {b Note}: Currently a stub (TZX-114). All operations will raise a
     runtime error if called. *)
 module Verify : VERIFY with type proof := Proof.t
+
+(** {2 Typed mode-switching}
+
+    These constructors extend the common {!Nds.tag} type with this
+    backend's three mode tags, refining the wrapped registry type to a
+    concrete on-disk variant.  They let backend-aware callers recover
+    the concrete {!Registry.t} from an opaque {!Nds.t} via the
+    [unwrap_*] helpers below. *)
+
+type _ Nds.tag +=
+  | Normal_tag : Normal.Registry.t Nds.tag
+  | Prove_tag : Prove.Registry.t Nds.tag
+  | Verify_tag : Verify.Registry.t Nds.tag
+
+(** [unwrap_normal nds] returns [Some r] if [nds] was wrapped with
+    {!Normal_tag}, [None] otherwise.  Callers that need the concrete
+    {!Normal.Registry.t} (e.g. to call {!Prove.start_proof}) use this
+    helper to escape the existential. *)
+val unwrap_normal : Nds.t -> Normal.Registry.t option
+
+(** [unwrap_prove nds] returns [Some r] if [nds] was wrapped with
+    {!Prove_tag}, [None] otherwise. *)
+val unwrap_prove : Nds.t -> Prove.Registry.t option
+
+(** [unwrap_verify nds] returns [Some r] if [nds] was wrapped with
+    {!Verify_tag}, [None] otherwise. *)
+val unwrap_verify : Nds.t -> Verify.Registry.t option
