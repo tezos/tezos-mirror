@@ -1379,6 +1379,15 @@ module Stages = struct
   let manual = Stage.register "manual"
 end
 
+(* The docker version used in Docker-in-Docker CI jobs.
+   This is the version of the Docker daemon available in the
+   [alpine_docker_ci] base image (alpine-docker-ci).
+   https://hub.docker.com/layers/library/docker/28.5.1-dind/images/sha256-bfb73322f4302ed5d380fcba01957ba871458a32245d0862758b08e0fe7916d4 *)
+let docker_version = "28.5.1"
+
+let dind_digest =
+  "sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd"
+
 (* Register external images.
 
    Use this module to register images that are as built outside the
@@ -1390,19 +1399,11 @@ module Images_external = struct
       ~image_path:
         "nixos/nix:2.34.6@sha256:e2fe74e96e965653c7b8f16ac64d1e56581c63c84d7fa07fb0692fd055cd06b0"
 
-  (* Match GitLab executors version and directly use the Docker socket
-     The Docker daemon is already configured, experimental features are enabled
-     The following environment variables are already set:
-     - [BUILDKIT_PROGRESS]
-     - [DOCKER_DRIVER]
-     - [DOCKER_VERSION]
-     For more info, see {{:https://docs.gitlab.com/ee/ci/docker/using_docker_build.html#use-docker-socket-binding}} here.
-
-     This image is defined in {{:https://gitlab.com/tezos/docker-images/ci-docker}tezos/docker-images/ci-docker}. *)
+  (* Official Docker image from Docker Hub, used to bootstrap the
+     [alpine-docker-ci] base image. Pinned with SHA256 digest for
+     immutability. *)
   let docker =
-    Image.mk_external
-      ~image_path:
-        "${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0"
+    Image.mk_external ~image_path:(sf "docker:%s@%s" docker_version dind_digest)
 
   (* Image used in initial pipeline job that sends to Datadog useful
      info for CI visibility.
@@ -1458,6 +1459,100 @@ module Images_external = struct
         "aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c"
 end
 
+(* Register base images.
+
+   Use this module to register images that are built in the base
+   image pipelines of [tezos/tezos] and pushed to the protected
+   registry. *)
+module Base_images = struct
+  let path_prefix = "${GCP_PROTECTED_REGISTRY}/tezos/tezos"
+
+  let make_img distro version =
+    Image.mk_external ~image_path:(sf "%s/%s-%s" path_prefix distro version)
+
+  (* DEB packaging *)
+
+  (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2491675993
+     May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
+     https://gitlab.com/tezos/tezos/-/commit/05e36a5c/pipelines *)
+  let debian_version = "master-05e36a5c"
+
+  let debian_bookworm = make_img "debian:bookworm" debian_version
+
+  let debian_trixie = make_img "debian:trixie" debian_version
+
+  let debian_build_trixie = make_img "debian-build:trixie" debian_version
+
+  let ubuntu_22_04 = make_img "ubuntu:22.04" debian_version
+
+  let ubuntu_24_04 = make_img "ubuntu:24.04" debian_version
+
+  let ubuntu_build_24_04 = make_img "ubuntu-build:24.04" debian_version
+
+  let ubuntu_26_04 = make_img "ubuntu:26.04" debian_version
+
+  (* RPM packaging *)
+
+  (* Version created by
+     https://gitlab.com/tezos/tezos/-/pipelines/2412618967
+
+     NB: these images are currently not build in our regular
+     pipelines. If we build them again, we will need to build fresh
+     ones.
+
+     Pipelines of the commit.
+     https://gitlab.com/tezos/tezos/-/commit/d79172a8/pipelines *)
+  let rpm_version = "master-d79172a8"
+
+  let rockylinux_9 = make_img "rockylinux:9" rpm_version
+
+  let rockylinux_10 = make_img "rockylinux:10" rpm_version
+
+  let fedora_39 = make_img "fedora:39" rpm_version
+
+  let fedora_42 = make_img "fedora:42" rpm_version
+
+  (* [debian-jsonnet-trixie] *)
+  (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2439598666
+     after https://gitlab.com/tezos/tezos/-/merge_requests/21554 was merged *)
+  let debian_jsonnet_trixie = make_img "debian-jsonnet:trixie" "master-d70f7d37"
+
+  (* [debian-homebrew-trixie] *)
+  (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
+     May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
+     https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines *)
+  let debian_homebrew_trixie =
+    make_img "debian-homebrew:trixie" "master-be43e621"
+
+  (* [debian-rust-trixie] *)
+  (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2481391601
+     which contains libclang for building rocksdb in CI.
+     May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
+     https://gitlab.com/tezos/tezos/-/commit/8afd610a/pipelines *)
+  let debian_rust_trixie = make_img "debian-rust:trixie" "master-8afd610a"
+
+  let docker_version = docker_version
+
+  let dind_service = sf "docker:%s-dind@%s" docker_version dind_digest
+
+  let alpine_docker_ci =
+    make_img (sf "alpine-docker-ci:%s" docker_version) "master-be43e621"
+
+  (* [ci-release] *)
+  (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
+     May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
+     https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines *)
+  (* FIXME: currently not used. + make name consistent *)
+  let _ci_release_version = "master-be43e621"
+
+  let ci_release =
+    Image.mk_external
+      ~image_path:
+        "${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-release:v1.8.0"
+
+  let pp = Image.pp
+end
+
 let opt_var name f = function Some value -> [(name, f value)] | None -> []
 
 (** {2 Job makers} *)
@@ -1476,7 +1571,7 @@ let job_docker_authenticated ?ci_docker_hub ?artifacts ?(variables = []) ?rules
     ?(dependencies = Staged []) ?image_dependencies ?arch ?storage ?tag
     ?allow_failure ?parallel ?timeout ?retry ?description ?dev_infra ~__POS__
     ~stage ~name script : tezos_job =
-  let docker_version = "24.0.7" in
+  let docker_version = Base_images.docker_version in
   job
     ?rules
     ~dependencies
@@ -1492,13 +1587,13 @@ let job_docker_authenticated ?ci_docker_hub ?artifacts ?(variables = []) ?rules
     ?description
     ?dev_infra
     ~__POS__
-    ~image:Images_external.docker
+    ~image:Base_images.alpine_docker_ci
     ~variables:
       ([("DOCKER_VERSION", docker_version)]
       @ opt_var "CI_DOCKER_HUB" Bool.to_string ci_docker_hub
       @ variables)
     ~before_script:["./scripts/ci/docker_initialize.sh"]
-    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
+    ~services:[{name = Base_images.dind_service}]
     ~stage
     ~name
     script
@@ -1596,89 +1691,7 @@ end
 module Images = struct
   (* Include external images here for convenience. *)
   include Images_external
-
-  module Base_images = struct
-    let path_prefix = "${GCP_PROTECTED_REGISTRY}/tezos/tezos"
-
-    let make_img distro version =
-      Image.mk_external ~image_path:(sf "%s/%s-%s" path_prefix distro version)
-
-    (* DEB packaging *)
-
-    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2491675993
-       May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
-       https://gitlab.com/tezos/tezos/-/commit/05e36a5c/pipelines *)
-    let debian_version = "master-05e36a5c"
-
-    let debian_bookworm = make_img "debian:bookworm" debian_version
-
-    let debian_trixie = make_img "debian:trixie" debian_version
-
-    let debian_build_trixie = make_img "debian-build:trixie" debian_version
-
-    let ubuntu_22_04 = make_img "ubuntu:22.04" debian_version
-
-    let ubuntu_24_04 = make_img "ubuntu:24.04" debian_version
-
-    let ubuntu_build_24_04 = make_img "ubuntu-build:24.04" debian_version
-
-    let ubuntu_26_04 = make_img "ubuntu:26.04" debian_version
-
-    (* RPM packaging *)
-
-    (* Version created by
-       https://gitlab.com/tezos/tezos/-/pipelines/2412618967
-
-       NB: these images are currently not build in our regular
-       pipelines. If we build them again, we will need to build fresh
-       ones.
-
-       Pipelines of the commit.
-       https://gitlab.com/tezos/tezos/-/commit/d79172a8/pipelines *)
-    let rpm_version = "master-d79172a8"
-
-    let rockylinux_9 = make_img "rockylinux:9" rpm_version
-
-    let rockylinux_10 = make_img "rockylinux:10" rpm_version
-
-    let fedora_39 = make_img "fedora:39" rpm_version
-
-    let fedora_42 = make_img "fedora:42" rpm_version
-
-    (* [debian-jsonnet-trixie] *)
-    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2439598666
-       after https://gitlab.com/tezos/tezos/-/merge_requests/21554 was merged *)
-    let debian_jsonnet_trixie =
-      make_img "debian-jsonnet:trixie" "master-d70f7d37"
-
-    (* [debian-homebrew-trixie] *)
-    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
-       May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
-       https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines *)
-    let debian_homebrew_trixie =
-      make_img "debian-homebrew:trixie" "master-be43e621"
-
-    (* [debian-rust-trixie] *)
-    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2481391601
-       which contains libclang for building rocksdb in CI.
-       May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
-       https://gitlab.com/tezos/tezos/-/commit/8afd610a/pipelines *)
-    let debian_rust_trixie = make_img "debian-rust:trixie" "master-8afd610a"
-
-    (* [ci-release] *)
-    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
-       May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
-       https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines *)
-    (* FIXME: currently not used. + make name consistent *)
-    let _ci_release_version = "master-be43e621"
-
-    let ci_release =
-      Image.mk_external
-        ~image_path:
-          "${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-release:v1.8.0"
-
-    let pp = Image.pp
-  end
+  module Base_images = Base_images
 
   (* Internal images are built in the stage {!Stages.images}. *)
   let stage = Stages.images

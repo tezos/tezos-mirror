@@ -7,7 +7,7 @@ stages:
 - build
 
 oc.docker:ci:amd64:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: images
   tags:
   - gcp
@@ -24,9 +24,9 @@ oc.docker:ci:amd64:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
-  - docker:${DOCKER_VERSION}-dind
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 24.0.7
+    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "false"
     ARCH: amd64
     GCLOUD_VERSION: 543.0.0

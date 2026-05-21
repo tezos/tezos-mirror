@@ -69,19 +69,19 @@ let job_docker_build =
     ~image_dependencies:[Images.CI.runtime]
     ~__POS__
     ~stage:Build
-    ~image:Images_external.docker
+    ~image:Images.Base_images.alpine_docker_ci
     ~arch
     ?cpu:(match arch with Amd64 -> Some Very_high | Arm64 -> None)
     ?storage:(if arch = Arm64 then Some Ramfs else None)
     ~variables:
       [
         ("DOCKER_BUILD_TARGET", "without-evm-artifacts");
-        ("DOCKER_VERSION", "24.0.7");
+        ("DOCKER_VERSION", Images.Base_images.docker_version);
         ("CI_DOCKER_HUB", match test with `test -> "false" | `real -> "true");
         ("IMAGE_ARCH_PREFIX", arch_string ^ "_");
         ("EXECUTABLE_FILES", "script-inputs/octez-evm-node-executable");
       ]
-    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
+    ~services:[{name = Images.Base_images.dind_service}]
     ~description:(sf "Build EVM node docker image for %s." arch_string)
     ~script:
       [
@@ -399,7 +399,7 @@ let job_docker_merge =
     "docker:merge_manifests"
     ~__POS__
     ~stage:Publish
-    ~image:Images_external.docker
+    ~image:Images.Base_images.alpine_docker_ci
       (* This job merges the images produced in the jobs
          [docker:{amd64,arm64}] into a single multi-architecture image, and
          so must be run after these jobs. *)
@@ -407,11 +407,11 @@ let job_docker_merge =
       [(Job, job_docker_build Amd64 test); (Job, job_docker_build Arm64 test)]
     ~variables:
       [
-        ("DOCKER_VERSION", "24.0.7");
+        ("DOCKER_VERSION", Images.Base_images.docker_version);
         ("CI_DOCKER_HUB", match test with `real -> "true" | `test -> "false");
       ]
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
-    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
+    ~services:[{name = Images.Base_images.dind_service}]
     ~description:"Merge manifest for arm64 and arm64 docker images."
     ~script:
       [
@@ -426,11 +426,11 @@ let job_docker_promote_to_latest =
     ~__POS__
     ~needs:[(Job, job_docker_merge test)]
     ~stage:Publish
-    ~image:Images_external.docker
-    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
+    ~image:Images.Base_images.alpine_docker_ci
+    ~services:[{name = Images.Base_images.dind_service}]
     ~variables:
       [
-        ("DOCKER_VERSION", "24.0.7");
+        ("DOCKER_VERSION", Images.Base_images.docker_version);
         ("CI_DOCKER_HUB", match test with `real -> "true" | `test -> "false");
       ]
     ~description:"Promote the docker images to octez-evm-node-latest."

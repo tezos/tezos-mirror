@@ -8,7 +8,7 @@ stages:
 - publish
 
 oc.docker:ci:amd64:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: images
   tags:
   - gcp
@@ -25,9 +25,9 @@ oc.docker:ci:amd64:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
-  - docker:${DOCKER_VERSION}-dind
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 24.0.7
+    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "false"
     ARCH: amd64
     GCLOUD_VERSION: 543.0.0
@@ -36,7 +36,7 @@ oc.docker:ci:amd64:
       dotenv: ci_image_tag.env
 
 oc.docker:ci:arm64:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: images
   tags:
   - gcp_arm64
@@ -53,9 +53,9 @@ oc.docker:ci:arm64:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
-  - docker:${DOCKER_VERSION}-dind
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 24.0.7
+    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "false"
     ARCH: arm64
     GCLOUD_VERSION: 543.0.0
@@ -235,7 +235,7 @@ oc.build:static-x86_64-linux-released-binaries:
     - octez-binaries/$ARCH/*
 
 oc.docker:arm64:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: build
   tags:
   - gcp_arm64
@@ -257,9 +257,9 @@ oc.docker:arm64:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
-  - docker:${DOCKER_VERSION}-dind
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 24.0.7
+    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "true"
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: arm64_
@@ -271,7 +271,7 @@ oc.docker:arm64:
     - runner_system_failure
 
 oc.docker:amd64:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: build
   tags:
   - gcp
@@ -293,9 +293,9 @@ oc.docker:amd64:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
-  - docker:${DOCKER_VERSION}-dind
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 24.0.7
+    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "true"
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: amd64_
@@ -307,7 +307,7 @@ oc.docker:amd64:
     - runner_system_failure
 
 docker:merge_manifests:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -328,9 +328,9 @@ docker:merge_manifests:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
-  - docker:${DOCKER_VERSION}-dind
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 24.0.7
+    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "true"
   retry: 0
 
@@ -736,7 +736,7 @@ octez-smart-rollup-node.build:static-x86_64-binaries:
     - octez-binaries/$ARCH/*
 
 octez-smart-rollup-node.docker:arm64:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: build
   tags:
   - gcp_arm64
@@ -757,16 +757,16 @@ octez-smart-rollup-node.docker:arm64:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
-  - docker:${DOCKER_VERSION}-dind
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 24.0.7
+    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "true"
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
 
 octez-smart-rollup-node.docker:amd64:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: build
   tags:
   - gcp
@@ -787,16 +787,16 @@ octez-smart-rollup-node.docker:amd64:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
-  - docker:${DOCKER_VERSION}-dind
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 24.0.7
+    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "true"
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: amd64_
     EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
 
 octez-smart-rollup-node.docker:merge_manifests:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -817,8 +817,8 @@ octez-smart-rollup-node.docker:merge_manifests:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
-  - docker:${DOCKER_VERSION}-dind
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 24.0.7
+    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "true"
   retry: 0

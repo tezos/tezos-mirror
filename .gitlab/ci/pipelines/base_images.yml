@@ -43,7 +43,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 images.debian:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -62,9 +62,9 @@ images.debian:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
-  - docker:${DOCKER_VERSION}-dind
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 24.0.7
+    DOCKER_VERSION: 28.5.1
     DISTRIBUTION: debian
     IMAGE_PATH: debian:$RELEASE
     PLATFORM: linux/amd64,linux/arm64
@@ -75,7 +75,7 @@ images.debian:
       - trixie
 
 images.ubuntu:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -94,9 +94,9 @@ images.ubuntu:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
-  - docker:${DOCKER_VERSION}-dind
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 24.0.7
+    DOCKER_VERSION: 28.5.1
     DISTRIBUTION: ubuntu
     IMAGE_PATH: ubuntu:$RELEASE
     PLATFORM: linux/amd64,linux/arm64
@@ -108,7 +108,7 @@ images.ubuntu:
       - "26.04"
 
 images.debian-rust:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: build
   tags:
   - $TAGS
@@ -129,9 +129,9 @@ images.debian-rust:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
-  - docker:${DOCKER_VERSION}-dind
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 24.0.7
+    DOCKER_VERSION: 28.5.1
     DISTRIBUTION: debian-rust
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: ""
@@ -144,7 +144,7 @@ images.debian-rust:
       - gcp_arm64
 
 images.debian-rust.merge:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: build
   tags:
   - gcp
@@ -165,14 +165,14 @@ images.debian-rust.merge:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
-  - docker:${DOCKER_VERSION}-dind
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 24.0.7
+    DOCKER_VERSION: 28.5.1
     RELEASE: trixie
     IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/debian-rust
 
 images.debian-homebrew:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -193,9 +193,9 @@ images.debian-homebrew:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
-  - docker:${DOCKER_VERSION}-dind
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 24.0.7
+    DOCKER_VERSION: 28.5.1
     DISTRIBUTION: debian-homebrew
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: linux/amd64
@@ -205,7 +205,7 @@ images.debian-homebrew:
       - trixie
 
 images.alpine-docker-ci:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: docker:28.5.1@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -227,7 +227,7 @@ images.alpine-docker-ci:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
-  - docker:${DOCKER_VERSION}-dind
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
     RELEASE: 28.5.1
     DISTRIBUTION: alpine-docker-ci
@@ -240,7 +240,7 @@ images.alpine-docker-ci:
     CI_DOCKER_HUB: "false"
 
 images.debian-build:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: build
   tags:
   - $TAGS
@@ -261,9 +261,9 @@ images.debian-build:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
-  - docker:${DOCKER_VERSION}-dind
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 24.0.7
+    DOCKER_VERSION: 28.5.1
     DISTRIBUTION: debian-build
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: ""
@@ -277,7 +277,7 @@ images.debian-build:
       - gcp_arm64
 
 images.debian-build.merge:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: build
   tags:
   - gcp
@@ -298,9 +298,9 @@ images.debian-build.merge:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
-  - docker:${DOCKER_VERSION}-dind
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 24.0.7
+    DOCKER_VERSION: 28.5.1
     IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/debian-build
   parallel:
     matrix:
@@ -309,7 +309,7 @@ images.debian-build.merge:
       - trixie
 
 images.ubuntu-build:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: build
   tags:
   - $TAGS
@@ -330,9 +330,9 @@ images.ubuntu-build:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
-  - docker:${DOCKER_VERSION}-dind
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 24.0.7
+    DOCKER_VERSION: 28.5.1
     DISTRIBUTION: ubuntu-build
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/ubuntu:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: ""
@@ -347,7 +347,7 @@ images.ubuntu-build:
       - gcp_arm64
 
 images.ubuntu-build.merge:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: build
   tags:
   - gcp
@@ -368,9 +368,9 @@ images.ubuntu-build.merge:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
-  - docker:${DOCKER_VERSION}-dind
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 24.0.7
+    DOCKER_VERSION: 28.5.1
     IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/ubuntu-build
   parallel:
     matrix:
@@ -380,7 +380,7 @@ images.ubuntu-build.merge:
       - "26.04"
 
 images.debian-systemd:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -401,9 +401,9 @@ images.debian-systemd:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
-  - docker:${DOCKER_VERSION}-dind
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 24.0.7
+    DOCKER_VERSION: 28.5.1
     DISTRIBUTION: debian-systemd
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: linux/amd64
@@ -414,7 +414,7 @@ images.debian-systemd:
       - trixie
 
 images.ubuntu-systemd:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -435,9 +435,9 @@ images.ubuntu-systemd:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
-  - docker:${DOCKER_VERSION}-dind
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 24.0.7
+    DOCKER_VERSION: 28.5.1
     DISTRIBUTION: ubuntu-systemd
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/ubuntu:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: linux/amd64
@@ -449,7 +449,7 @@ images.ubuntu-systemd:
       - "26.04"
 
 images.debian-jsonnet:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -470,9 +470,9 @@ images.debian-jsonnet:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
-  - docker:${DOCKER_VERSION}-dind
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 24.0.7
+    DOCKER_VERSION: 28.5.1
     DISTRIBUTION: debian-jsonnet
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: linux/amd64
@@ -482,7 +482,7 @@ images.debian-jsonnet:
       - trixie
 
 images.ci-release:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -501,9 +501,9 @@ images.ci-release:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
-  - docker:${DOCKER_VERSION}-dind
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 24.0.7
+    DOCKER_VERSION: 28.5.1
     DISTRIBUTION: ci-release
     IMAGE_PATH: debian:$RELEASE
     PLATFORM: linux/amd64
