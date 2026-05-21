@@ -66,7 +66,7 @@ let job_install_python =
     match os_distribution with
     | `ubuntu_22_04 -> ("22_04", Images.Base_images.ubuntu_22_04)
     | `ubuntu_24_04 -> ("24_04", Images.Base_images.ubuntu_24_04)
-    | `debian_bookworm -> ("bookworm", Images.Base_images.debian_bookworm)
+    | `debian_trixie -> ("trixie", Images.Base_images.debian_trixie)
   in
   let project, branch =
     match branch with
@@ -251,7 +251,7 @@ let register () =
   Cacio.register_merge_request_jobs
     [
       (Immediate, job_rst_check);
-      (Auto, job_install_python `debian_bookworm `current_branch);
+      (Auto, job_install_python `debian_trixie `current_branch);
       (Auto, job_build_all `lite);
       (Manual, job_linkcheck `lite);
     ] ;
@@ -262,7 +262,7 @@ let register () =
       (Auto, job_rst_check);
       (Auto, job_install_python `ubuntu_22_04 `master);
       (Auto, job_install_python `ubuntu_24_04 `master);
-      (Auto, job_install_python `debian_bookworm `master);
+      (Auto, job_install_python `debian_trixie `master);
       (Auto, job_build_all `lite);
       (Auto, job_linkcheck `lite);
     ] ;
