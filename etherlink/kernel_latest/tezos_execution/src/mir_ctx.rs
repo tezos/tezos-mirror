@@ -1004,14 +1004,17 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
                     .encode()?;
                 let new_value_size = encoded.len() as u64;
                 let current = total_bytes(self.host, self.context, id)?;
-                let new_total_bytes = if self.host.store_has(&value_path)?.is_none() {
-                    // We should write the key in the list only if it's an add in the big_map not an update
-                    BigMapKeys::add_key(self.host, self.context, id, &key_hashed)?;
-                    Zarith(current.0 + (BYTES_SIZE_FOR_BIG_MAP_KEY + new_value_size))
-                } else {
-                    let previous_value_size =
-                        self.host.store_value_size(&value_path)? as u64;
-                    Zarith(current.0 + new_value_size - previous_value_size)
+                let new_total_bytes = match self.host.store_value_size(&value_path) {
+                    Err(RuntimeError::PathNotFound) => {
+                        // We should write the key in the list only if it's an add in the big_map not an update
+                        BigMapKeys::add_key(self.host, self.context, id, &key_hashed)?;
+                        Zarith(current.0 + (BYTES_SIZE_FOR_BIG_MAP_KEY + new_value_size))
+                    }
+                    Ok(previous_value_size) => {
+                        let previous_value_size = previous_value_size as u64;
+                        Zarith(current.0 + new_value_size - previous_value_size)
+                    }
+                    Err(err) => return Err(err.into()),
                 };
                 set_total_bytes(self.host, self.context, id, &new_total_bytes)?;
 
