@@ -1050,7 +1050,7 @@ pub mod interpret_cost {
 /// to cover the cost of allocating the Micheline tree (the memory but
 /// also the time spent to allocate).
 pub mod unparsing_cost {
-    use super::{AsGasCost, BigInt, BigIntByteSize, OutOfGas};
+    use super::{AsGasCost, BigInt, BigIntByteSize, CostOverflow};
     use crate::ast::annotations::Annotation;
     use checked::Checked;
 
@@ -1058,29 +1058,29 @@ pub mod unparsing_cost {
     pub const NODE: u32 = 100;
 
     /// Cost for allocating a Micheline Int node: 100 mg + 25 mg/byte.
-    pub fn int(i: &BigInt) -> Result<u32, OutOfGas> {
+    pub fn int(i: &BigInt) -> Result<u32, CostOverflow> {
         let size = Checked::from(i.byte_size());
-        (100 + size * 25).as_gas_cost().map_err(|_| OutOfGas)
+        (100 + size * 25).as_gas_cost()
     }
 
     /// Cost for allocating a Micheline String node: 100 mg + 10 mg/byte
-    pub fn string(string: &str) -> Result<u32, OutOfGas> {
+    pub fn string(string: &str) -> Result<u32, CostOverflow> {
         let size = Checked::from(string.len());
-        (100 + size * 10).as_gas_cost().map_err(|_| OutOfGas)
+        (100 + size * 10).as_gas_cost()
     }
 
     /// Cost for allocating a Micheline Bytes node: 100mg + 10 mg/byte
-    pub fn bytes(bytes: &[u8]) -> Result<u32, OutOfGas> {
+    pub fn bytes(bytes: &[u8]) -> Result<u32, CostOverflow> {
         let size = Checked::from(bytes.len());
-        (100 + size * 10).as_gas_cost().map_err(|_| OutOfGas)
+        (100 + size * 10).as_gas_cost()
     }
 
     /// Cost for allocating a Micheline annotation: 10 mg/byte. No
     /// cost for allocating a Micheline node in this case because
     /// annotations are not Micheline nodes.
-    pub fn annotation(annot: &Annotation) -> Result<u32, OutOfGas> {
+    pub fn annotation(annot: &Annotation) -> Result<u32, CostOverflow> {
         let size = Checked::from(annot.len());
-        (size * 10).as_gas_cost().map_err(|_| OutOfGas)
+        (size * 10).as_gas_cost()
     }
 }
 
