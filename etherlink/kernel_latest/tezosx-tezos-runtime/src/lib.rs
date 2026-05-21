@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use http::StatusCode;
-use mir::ast::big_map::BigMapId;
+use mir::ast::{big_map::BigMapId, AddressHash};
 use mir::gas::{Gas, OutOfGas};
 use primitive_types::U256;
 use std::collections::BTreeMap;
@@ -49,8 +49,8 @@ use tezos_tezlink::{
     },
 };
 use tezosx_interfaces::{
-    AliasInfo, CrossRuntimeContext, Origin, Registry, RuntimeId, RuntimeInterface,
-    TezosXRuntimeError, X_TEZOS_GAS_CONSUMED,
+    AliasInfo, Classification, CrossRuntimeContext, Origin, Registry, RuntimeId,
+    RuntimeInterface, TezosXRuntimeError, X_TEZOS_GAS_CONSUMED,
 };
 use tezosx_journal::{DispatchSlotError, TezosXJournal};
 
@@ -1150,6 +1150,30 @@ impl RuntimeInterface for TezosRuntime {
         })
     }
 
+    fn read_origin<Host>(
+        &self,
+        host: &Host,
+        addr: &str,
+        gas: u64,
+    ) -> Result<(Classification, u64), TezosXRuntimeError>
+    where
+        Host: StorageV1,
+    {
+        // Malformed address → Unknown, no charge, no extra read.
+        let contract = match Contract::from_b58check(addr) {
+            Ok(c) => c,
+            Err(_) => return Ok((Classification::Unknown, gas)),
+        };
+        let address_hash = match contract {
+            Contract::Implicit(pkh) => AddressHash::Implicit(pkh),
+            Contract::Originated(kt1) => AddressHash::Kt1(kt1),
+        };
+        let context =
+            TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)?;
+        let origin = context.read_origin_for_address(host, &address_hash)?;
+        Ok((Classification::from(origin), gas))
+    }
+
     // Need to implement this only for IDE. Not needed in compilation or tests.
     #[cfg(feature = "testing")]
     fn get_balance(
@@ -2135,5 +2159,126 @@ mod tests {
             journal.michelson.take_dispatch_result(),
             Ok(Some(b"TOP-SECRET".to_vec()))
         );
+    }
+
+    // ── TezosRuntime::read_origin tests ──────────────────────────────────
+
+    mod read_origin_tests {
+        use super::*;
+        use tezos_crypto_rs::hash::ChainId;
+        use tezos_evm_runtime::runtime::MockKernelHost;
+        use tezosx_interfaces::{
+            AliasInfo, Classification, Origin, RuntimeId, RuntimeInterface,
+        };
+
+        use crate::{
+            account::{set_origin_at, set_origin_for_implicit},
+            TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
+        };
+
+        fn test_runtime() -> TezosRuntime {
+            TezosRuntime::new(ChainId::default())
+        }
+
+        // (a) Storage hit on implicit address (tz1) → Native, gas unchanged
+        #[test]
+        fn read_origin_implicit_native_returns_native() {
+            use tezos_crypto_rs::public_key_hash::PublicKeyHash;
+
+            let mut host = MockKernelHost::default();
+            let runtime = test_runtime();
+            let pkh =
+                PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+                    .unwrap();
+            set_origin_for_implicit(&mut host, &pkh, &Origin::Native).unwrap();
+
+            let budget = 50_000;
+            let (class, remaining) = runtime
+                .read_origin(&host, "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx", budget)
+                .unwrap();
+            assert_eq!(class, Classification::Native);
+            assert_eq!(remaining, budget); // no charge
+        }
+
+        // (b) Storage hit with Alias classification
+        #[test]
+        fn read_origin_alias_returns_alias() {
+            use tezos_crypto_rs::public_key_hash::PublicKeyHash;
+
+            let mut host = MockKernelHost::default();
+            let runtime = test_runtime();
+            let pkh =
+                PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+                    .unwrap();
+            let alias_info = AliasInfo {
+                runtime: RuntimeId::Ethereum,
+                native_address: b"0xdeadbeef".to_vec(),
+            };
+            set_origin_for_implicit(&mut host, &pkh, &Origin::Alias(alias_info.clone()))
+                .unwrap();
+
+            let budget = 50_000;
+            let (class, remaining) = runtime
+                .read_origin(&host, "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx", budget)
+                .unwrap();
+            assert_eq!(class, Classification::Alias(alias_info));
+            assert_eq!(remaining, budget);
+        }
+
+        // (c) Storage miss → Unknown, gas unchanged (no back-stop in Tezos)
+        #[test]
+        fn read_origin_unrecorded_address_returns_unknown() {
+            let host = MockKernelHost::default();
+            let runtime = test_runtime();
+
+            let budget = 50_000;
+            let (class, remaining) = runtime
+                .read_origin(&host, "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx", budget)
+                .unwrap();
+            assert_eq!(class, Classification::Unknown);
+            assert_eq!(remaining, budget); // no back-stop charge on Tezos
+        }
+
+        // (d) Malformed address → Unknown, no charge
+        #[test]
+        fn read_origin_malformed_address_returns_unknown_no_charge() {
+            let host = MockKernelHost::default();
+            let runtime = test_runtime();
+
+            let budget = 50_000;
+            let (class, remaining) = runtime
+                .read_origin(&host, "not-a-tezos-address", budget)
+                .unwrap();
+            assert_eq!(class, Classification::Unknown);
+            assert_eq!(remaining, budget);
+        }
+
+        // (e) KT1 address with recorded classification
+        #[test]
+        fn read_origin_kt1_address_returns_native() {
+            use tezos_crypto_rs::hash::ContractKt1Hash;
+
+            let mut host = MockKernelHost::default();
+            let runtime = test_runtime();
+
+            let context = crate::context::TezosRuntimeContext::from_root(
+                &TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
+            )
+            .unwrap();
+            // Use a real-looking KT1 derived from blake2b to avoid parse errors.
+            let kt1 = ContractKt1Hash::from(tezos_crypto_rs::blake2b::digest_160(
+                b"test_kt1_seed",
+            ));
+            let kt1_b58 = kt1.to_base58_check();
+            let account = context.originated_from_kt1(&kt1).unwrap();
+            let account_path = account.path().clone();
+            set_origin_at(&mut host, &account_path, &Origin::Native).unwrap();
+
+            let budget = 50_000;
+            let (class, remaining) =
+                runtime.read_origin(&host, &kt1_b58, budget).unwrap();
+            assert_eq!(class, Classification::Native);
+            assert_eq!(remaining, budget);
+        }
     }
 }

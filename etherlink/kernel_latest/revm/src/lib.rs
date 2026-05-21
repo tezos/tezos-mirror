@@ -763,6 +763,22 @@ mod test {
                 }
             }
 
+            fn read_origin<Host>(
+                &self,
+                host: &Host,
+                addr_runtime: RuntimeId,
+                addr: &str,
+                gas: u64,
+            ) -> Result<(tezosx_interfaces::Classification, u64), TezosXRuntimeError>
+            where
+                Host: StorageV1,
+            {
+                match addr_runtime {
+                    RuntimeId::Tezos => self.mock_tezos.read_origin(host, addr, gas),
+                    RuntimeId::Ethereum => self.ethereum.read_origin(host, addr, gas),
+                }
+            }
+
             fn serve<Host>(
                 &self,
                 host: &mut Host,
@@ -909,6 +925,19 @@ mod test {
                 contract
                     .to_bytes()
                     .map_err(|e| TezosXRuntimeError::ConversionError(format!("{e}")))
+            }
+
+            fn read_origin<Host>(
+                &self,
+                _host: &Host,
+                _addr: &str,
+                gas: u64,
+            ) -> Result<(tezosx_interfaces::Classification, u64), TezosXRuntimeError>
+            where
+                Host: StorageV1,
+            {
+                // Mock: always return Unknown with gas unchanged.
+                Ok((tezosx_interfaces::Classification::Unknown, gas))
             }
 
             fn string_from_address(

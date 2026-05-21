@@ -137,6 +137,43 @@ pub enum Origin {
     Alias(AliasInfo),
 }
 
+/// Query-result type for origin lookups across runtimes.
+///
+/// An address is either absent from the registry (`Unknown`), native to
+/// its runtime (`Native`), or an alias whose underlying account lives
+/// in another runtime (`Alias`). Never stored on-disk — use [`Origin`]
+/// for the stored form.
+///
+/// `Unknown` means no classification record exists *and* no back-stop
+/// evidence (e.g. positive EVM nonce) promoted the address to `Native`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Classification {
+    /// No classification record found and no back-stop evidence.
+    Unknown,
+    /// Address is recorded (or inferred) as native to its runtime.
+    Native,
+    /// Address is an alias whose native account lives in another runtime.
+    Alias(AliasInfo),
+}
+
+impl From<Origin> for Classification {
+    fn from(o: Origin) -> Self {
+        match o {
+            Origin::Native => Classification::Native,
+            Origin::Alias(info) => Classification::Alias(info),
+        }
+    }
+}
+
+impl From<Option<Origin>> for Classification {
+    fn from(o: Option<Origin>) -> Self {
+        match o {
+            Some(origin) => Classification::from(origin),
+            None => Classification::Unknown,
+        }
+    }
+}
+
 /// How a source's translation toward a chosen target runtime should be routed.
 pub enum RoutingDecision {
     /// Source is recorded as an alias of an account in the target

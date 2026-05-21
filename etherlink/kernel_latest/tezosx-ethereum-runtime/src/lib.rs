@@ -11,8 +11,11 @@ use alloy_sol_types::{sol, SolCall};
 use http::StatusCode;
 use primitive_types::U256;
 use revm::context::result::{ExecutionResult, HaltReason, Output};
+use revm::primitives::KECCAK_EMPTY;
 use revm::state::Bytecode;
-use revm_etherlink::precompiles::constants::RUNTIME_GATEWAY_PRECOMPILE_ADDRESS;
+use revm_etherlink::precompiles::constants::{
+    CODE_BACKSTOP_COST, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+};
 use revm_etherlink::{
     precompiles::constants::{
         ALIAS_FORWARDER_PRECOMPILE_ADDRESS, ALIAS_FORWARDER_SOL_CONTRACT,
@@ -27,7 +30,7 @@ use revm_etherlink::{
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::{
-    AliasInfo, CrossRuntimeContext, Origin, Registry, RuntimeInterface,
+    AliasInfo, Classification, CrossRuntimeContext, Origin, Registry, RuntimeInterface,
     TezosXRuntimeError, X_TEZOS_GAS_CONSUMED,
 };
 use tezosx_journal::TezosXJournal;
@@ -637,6 +640,59 @@ impl RuntimeInterface for EthereumRuntime {
             TezosXRuntimeError::Custom(format!("Invalid address string: {e}"))
         })?;
         Ok(address.0.to_vec())
+    }
+
+    fn read_origin<Host>(
+        &self,
+        host: &Host,
+        addr: &str,
+        gas: u64,
+    ) -> Result<(Classification, u64), TezosXRuntimeError>
+    where
+        Host: StorageV1,
+    {
+        // Malformed address → Unknown, no charge, no extra read.
+        let address = match Address::from_hex(addr) {
+            Ok(a) => a,
+            Err(_) => return Ok((Classification::Unknown, gas)),
+        };
+
+        let account = StorageAccount::from_address(&address)?;
+        let origin = account.get_origin(host).map_err(|e| {
+            TezosXRuntimeError::Custom(format!("Failed to read origin: {e}"))
+        })?;
+
+        // Recorded origin short-circuits the back-stop.
+        if let Some(o) = origin {
+            return Ok((Classification::from(o), gas));
+        }
+
+        // No classification record — fall back to a code-presence check.
+        // Any account exposing non-empty bytecode either originated as a
+        // CREATE contract or had code installed by an EIP-7702 SET_CODE
+        // delegation; in both cases the account exists natively in this
+        // runtime even though its origin was never written explicitly.
+        // Reading the account info costs one extra cold-SLOAD-equivalent,
+        // so deduct CODE_BACKSTOP_COST before the read; return OutOfGas
+        // if the budget is insufficient.
+        //
+        // Caveat: legacy alias accounts that pre-date the explicit
+        // origin record also expose forwarder bytecode and will be
+        // misclassified as Native here. Accepted compromise — only
+        // Previewnet aliases hit this path.
+        let gas_after_backstop = gas
+            .checked_sub(CODE_BACKSTOP_COST)
+            .ok_or(TezosXRuntimeError::OutOfGas)?;
+
+        let info = account.info_without_migration(host).map_err(|e| {
+            TezosXRuntimeError::Custom(format!("Failed to read account info: {e}"))
+        })?;
+
+        if matches!(info, Some(ref i) if i.code_hash != KECCAK_EMPTY) {
+            Ok((Classification::Native, gas_after_backstop))
+        } else {
+            Ok((Classification::Unknown, gas_after_backstop))
+        }
     }
 
     // Need to implement this only for IDE. Not needed in compilation or tests.
@@ -1473,5 +1529,197 @@ mod tests {
         );
         let resp = runtime.serve(&registry, &mut host, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::BAD_REQUEST);
+    }
+
+    // ── EthereumRuntime::read_origin tests ───────────────────────────────
+
+    mod read_origin_tests {
+        use super::*;
+        use revm::state::AccountInfo;
+        use revm_etherlink::{
+            helpers::storage::bytes_hash, precompiles::constants::CODE_BACKSTOP_COST,
+            storage::world_state_handler::StorageAccount,
+        };
+        use tezosx_interfaces::{
+            AliasInfo, Classification, Origin, RuntimeId, RuntimeInterface,
+        };
+
+        fn evm_addr(byte: u8) -> (Address, String) {
+            let addr = Address::from_slice(&[byte; 20]);
+            let addr_str = format!("0x{}", alloy_primitives::hex::encode(addr.0 .0));
+            (addr, addr_str)
+        }
+
+        // Helper: write an account whose only relevant field is a
+        // non-empty `code_hash`, so the back-stop's code-presence check
+        // fires. The bytecode body itself is not needed by `read_origin`,
+        // which only inspects the hash.
+        fn set_account_with_code(host: &mut MockKernelHost, addr: &Address) {
+            let bytecode_raw = Bytes::from_static(&[0x60, 0x00]); // PUSH1 0x00
+            let code_hash = bytes_hash(&bytecode_raw);
+            let mut account = StorageAccount::from_address(addr).unwrap();
+            account
+                .set_info(
+                    host,
+                    AccountInfo {
+                        code_hash,
+                        ..AccountInfo::default()
+                    },
+                )
+                .unwrap();
+        }
+
+        // (a) No /origin record, account has non-empty code → back-stop
+        //     fires → (Native, gas - COST). Covers both CREATE contracts
+        //     and EIP-7702 SET_CODE delegations.
+        #[test]
+        fn backstop_fires_on_account_with_code() {
+            let mut host = MockKernelHost::default();
+            let runtime = EthereumRuntime::default();
+            let (addr, addr_str) = evm_addr(0xbb);
+
+            set_account_with_code(&mut host, &addr);
+
+            let budget = 100_000;
+            let (class, remaining) =
+                runtime.read_origin(&host, &addr_str, budget).unwrap();
+            assert_eq!(class, Classification::Native);
+            assert_eq!(remaining, budget - CODE_BACKSTOP_COST);
+        }
+
+        // (b) No /origin record, account exists but has empty code →
+        //     back-stop read executed but negative → Unknown, COST charged.
+        //     A positive nonce (a sign-only EOA) must not be enough on its
+        //     own — only code presence promotes to Native.
+        #[test]
+        fn backstop_charged_but_empty_code_returns_unknown() {
+            let mut host = MockKernelHost::default();
+            let runtime = EthereumRuntime::default();
+            let (addr, addr_str) = evm_addr(0xcc);
+
+            let mut account = StorageAccount::from_address(&addr).unwrap();
+            account
+                .set_info(
+                    &mut host,
+                    AccountInfo {
+                        nonce: 5,
+                        ..AccountInfo::default()
+                    },
+                )
+                .unwrap();
+
+            let budget = 100_000;
+            let (class, remaining) =
+                runtime.read_origin(&host, &addr_str, budget).unwrap();
+            assert_eq!(class, Classification::Unknown);
+            assert_eq!(remaining, budget - CODE_BACKSTOP_COST);
+        }
+
+        // (c) No /origin record, account does not exist → Unknown, COST deducted
+        #[test]
+        fn backstop_no_account_returns_unknown() {
+            let host = MockKernelHost::default();
+            let runtime = EthereumRuntime::default();
+            let (_, addr_str) = evm_addr(0xdd);
+
+            let budget = 100_000;
+            let (class, remaining) =
+                runtime.read_origin(&host, &addr_str, budget).unwrap();
+            assert_eq!(class, Classification::Unknown);
+            assert_eq!(remaining, budget - CODE_BACKSTOP_COST);
+        }
+
+        // (d) Recorded /origin = Native → short-circuits back-stop → Native, no charge
+        #[test]
+        fn recorded_native_origin_short_circuits_backstop() {
+            let mut host = MockKernelHost::default();
+            let runtime = EthereumRuntime::default();
+            let (addr, addr_str) = evm_addr(0xee);
+
+            let mut account = StorageAccount::from_address(&addr).unwrap();
+            account.set_origin(&mut host, &Origin::Native).unwrap();
+
+            let budget = 100_000;
+            let (class, remaining) =
+                runtime.read_origin(&host, &addr_str, budget).unwrap();
+            assert_eq!(class, Classification::Native);
+            assert_eq!(remaining, budget); // no CODE_BACKSTOP_COST charged
+        }
+
+        // (e) Recorded /origin = Alias → short-circuits back-stop → Alias, no charge
+        #[test]
+        fn recorded_alias_origin_short_circuits_backstop() {
+            let mut host = MockKernelHost::default();
+            let runtime = EthereumRuntime::default();
+            let (addr, addr_str) = evm_addr(0xff);
+
+            let alias_info = AliasInfo {
+                runtime: RuntimeId::Tezos,
+                native_address: b"tz1ABC".to_vec(),
+            };
+            let origin = Origin::Alias(alias_info.clone());
+            let mut account = StorageAccount::from_address(&addr).unwrap();
+            account.set_origin(&mut host, &origin).unwrap();
+
+            let budget = 100_000;
+            let (class, remaining) =
+                runtime.read_origin(&host, &addr_str, budget).unwrap();
+            assert_eq!(class, Classification::Alias(alias_info));
+            assert_eq!(remaining, budget); // no CODE_BACKSTOP_COST charged
+        }
+
+        // (f) Malformed hex address → Unknown, no charge, no extra read
+        #[test]
+        fn malformed_address_returns_unknown_no_charge() {
+            let host = MockKernelHost::default();
+            let runtime = EthereumRuntime::default();
+
+            let budget = 100_000;
+            let (class, remaining) =
+                runtime.read_origin(&host, "not-hex", budget).unwrap();
+            assert_eq!(class, Classification::Unknown);
+            assert_eq!(remaining, budget); // no charge
+        }
+
+        // (g) Wrong-length hex address → Unknown, no charge
+        #[test]
+        fn wrong_length_hex_returns_unknown_no_charge() {
+            let host = MockKernelHost::default();
+            let runtime = EthereumRuntime::default();
+
+            let budget = 100_000;
+            let (class, remaining) = runtime
+                .read_origin(&host, "0x00112233445566778899aabbccddeeff0011", budget)
+                .unwrap();
+            assert_eq!(class, Classification::Unknown);
+            assert_eq!(remaining, budget); // no charge
+        }
+
+        // (h) Insufficient budget for back-stop read → OutOfGas
+        #[test]
+        fn insufficient_budget_returns_out_of_gas() {
+            let host = MockKernelHost::default();
+            let runtime = EthereumRuntime::default();
+            let (_, addr_str) = evm_addr(0x11);
+
+            // Budget below CODE_BACKSTOP_COST: no /origin record → back-stop path
+            let budget = CODE_BACKSTOP_COST - 1;
+            let err = runtime.read_origin(&host, &addr_str, budget).unwrap_err();
+            assert_eq!(err, tezosx_interfaces::TezosXRuntimeError::OutOfGas);
+        }
+
+        // (i) Budget exactly CODE_BACKSTOP_COST → succeeds with 0 remaining
+        #[test]
+        fn exact_budget_for_backstop_succeeds() {
+            let host = MockKernelHost::default();
+            let runtime = EthereumRuntime::default();
+            let (_, addr_str) = evm_addr(0x22);
+
+            let budget = CODE_BACKSTOP_COST;
+            let (class, remaining) =
+                runtime.read_origin(&host, &addr_str, budget).unwrap();
+            assert_eq!(class, Classification::Unknown);
+            assert_eq!(remaining, 0);
+        }
     }
 }

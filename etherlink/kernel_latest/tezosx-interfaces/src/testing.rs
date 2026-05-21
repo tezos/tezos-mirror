@@ -55,6 +55,19 @@ impl Registry for UnimplementedRegistry {
         unimplemented!("UnimplementedRegistry::address_from_string")
     }
 
+    fn read_origin<Host>(
+        &self,
+        _host: &Host,
+        _addr_runtime: RuntimeId,
+        _addr: &str,
+        _gas: u64,
+    ) -> Result<(crate::Classification, u64), TezosXRuntimeError>
+    where
+        Host: StorageV1,
+    {
+        unimplemented!("UnimplementedRegistry::read_origin")
+    }
+
     fn serve<Host>(
         &self,
         _host: &mut Host,
@@ -102,6 +115,19 @@ impl Registry for NotWiredRegistry {
         runtime_id: RuntimeId,
     ) -> Result<Vec<u8>, TezosXRuntimeError> {
         Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
+    }
+
+    fn read_origin<Host>(
+        &self,
+        _host: &Host,
+        addr_runtime: RuntimeId,
+        _addr: &str,
+        _gas: u64,
+    ) -> Result<(crate::Classification, u64), TezosXRuntimeError>
+    where
+        Host: StorageV1,
+    {
+        Err(TezosXRuntimeError::RuntimeNotFound(addr_runtime))
     }
 
     fn serve<Host>(
@@ -189,6 +215,19 @@ impl Registry for MockRegistry {
         _runtime_id: RuntimeId,
     ) -> Result<Vec<u8>, TezosXRuntimeError> {
         Ok(address_str.as_bytes().to_vec())
+    }
+
+    fn read_origin<Host>(
+        &self,
+        _host: &Host,
+        _addr_runtime: RuntimeId,
+        _addr: &str,
+        gas: u64,
+    ) -> Result<(crate::Classification, u64), TezosXRuntimeError>
+    where
+        Host: StorageV1,
+    {
+        Ok((crate::Classification::Unknown, gas))
     }
 
     fn serve<Host>(

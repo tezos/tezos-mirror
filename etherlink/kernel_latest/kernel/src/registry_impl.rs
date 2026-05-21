@@ -91,6 +91,29 @@ impl Registry for RegistryImpl {
         }
     }
 
+    fn read_origin<Host>(
+        &self,
+        host: &Host,
+        addr_runtime: tezosx_interfaces::RuntimeId,
+        addr: &str,
+        gas: u64,
+    ) -> Result<
+        (tezosx_interfaces::Classification, u64),
+        tezosx_interfaces::TezosXRuntimeError,
+    >
+    where
+        Host: StorageV1,
+    {
+        match addr_runtime {
+            tezosx_interfaces::RuntimeId::Tezos => {
+                self.tezos.read_origin(host, addr, gas)
+            }
+            tezosx_interfaces::RuntimeId::Ethereum => {
+                self.ethereum.read_origin(host, addr, gas)
+            }
+        }
+    }
+
     fn serve<Host>(
         &self,
         host: &mut Host,
@@ -124,8 +147,16 @@ impl Registry for RegistryImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_primitives::{hex::FromHex, Address, Bytes};
+    use revm::state::AccountInfo;
+    use revm_etherlink::helpers::storage::bytes_hash;
+    use revm_etherlink::precompiles::constants::CODE_BACKSTOP_COST;
+    use revm_etherlink::storage::world_state_handler::StorageAccount;
+    use tezos_crypto_rs::public_key_hash::PublicKeyHash;
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezosx_interfaces::{Classification, Origin, RuntimeId};
     use tezosx_journal::TezosXJournal;
+    use tezosx_tezos_runtime::account::set_origin_for_implicit;
 
     #[test]
     fn test_serve_unknown_host_returns_404() {
@@ -159,5 +190,99 @@ mod tests {
         assert_eq!(response.status(), http::StatusCode::NOT_FOUND);
         let body = String::from_utf8(response.into_body()).unwrap();
         assert!(body.contains("(none)"));
+    }
+
+    // ── Registry::read_origin dispatch tests ─────────────────────────────
+
+    #[test]
+    fn read_origin_dispatches_to_ethereum_runtime() {
+        let mut host = MockKernelHost::default();
+        let registry = RegistryImpl::default();
+
+        let addr =
+            Address::from_hex("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").unwrap();
+        let addr_str = format!("0x{}", alloy_primitives::hex::encode(addr.0 .0));
+
+        let mut account = StorageAccount::from_address(&addr).unwrap();
+        account.set_origin(&mut host, &Origin::Native).unwrap();
+
+        let budget = 100_000;
+        let (class, remaining) = registry
+            .read_origin(&host, RuntimeId::Ethereum, &addr_str, budget)
+            .unwrap();
+        assert_eq!(class, Classification::Native);
+        assert_eq!(remaining, budget); // recorded origin → no back-stop charge
+    }
+
+    #[test]
+    fn read_origin_dispatches_to_tezos_runtime() {
+        let mut host = MockKernelHost::default();
+        let registry = RegistryImpl::default();
+
+        let pkh =
+            PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
+        set_origin_for_implicit(&mut host, &pkh, &Origin::Native).unwrap();
+
+        let budget = 100_000;
+        let (class, remaining) = registry
+            .read_origin(
+                &host,
+                RuntimeId::Tezos,
+                "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+                budget,
+            )
+            .unwrap();
+        assert_eq!(class, Classification::Native);
+        assert_eq!(remaining, budget); // Tezos: no back-stop charge
+    }
+
+    #[test]
+    fn read_origin_ethereum_unknown_address_fires_backstop() {
+        let mut host = MockKernelHost::default();
+        let registry = RegistryImpl::default();
+
+        let addr =
+            Address::from_hex("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb").unwrap();
+        let addr_str = format!("0x{}", alloy_primitives::hex::encode(addr.0 .0));
+
+        // Account with non-empty bytecode, no /origin record — exercises
+        // the code-presence back-stop.
+        let bytecode_raw = Bytes::from_static(&[0x60, 0x00]);
+        let code_hash = bytes_hash(&bytecode_raw);
+        let mut account = StorageAccount::from_address(&addr).unwrap();
+        account
+            .set_info(
+                &mut host,
+                AccountInfo {
+                    code_hash,
+                    ..AccountInfo::default()
+                },
+            )
+            .unwrap();
+
+        let budget = 100_000;
+        let (class, remaining) = registry
+            .read_origin(&host, RuntimeId::Ethereum, &addr_str, budget)
+            .unwrap();
+        assert_eq!(class, Classification::Native);
+        assert_eq!(remaining, budget - CODE_BACKSTOP_COST);
+    }
+
+    #[test]
+    fn read_origin_tezos_unknown_address_no_backstop_charge() {
+        let host = MockKernelHost::default();
+        let registry = RegistryImpl::default();
+
+        let budget = 100_000;
+        let (class, remaining) = registry
+            .read_origin(
+                &host,
+                RuntimeId::Tezos,
+                "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+                budget,
+            )
+            .unwrap();
+        assert_eq!(class, Classification::Unknown);
+        assert_eq!(remaining, budget); // Tezos never charges a back-stop
     }
 }
