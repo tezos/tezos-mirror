@@ -33,7 +33,7 @@ let commit_of = function
 
 let name_of = function
   | Latest -> None
-  | Previewnet -> Some "previewnet-0.3"
+  | Previewnet -> Some "previewnet-0.5"
   | Mainnet -> Some "farfadet-r3"
 
 let upgrade_to = function
