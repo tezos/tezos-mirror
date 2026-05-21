@@ -57,6 +57,18 @@ let job_audit_riscv_deps =
     ~description:"Run 'make audit' in 'src/riscv' and 'src/lib_riscv/kernels'."
     ~only_if_changed:Files.kernels
     ~image:Tezos_ci.Images.Base_images.debian_rust_trixie
+    ~cache:
+      [
+        Gitlab_ci.Util.cache
+          ~key:
+            ("cargo-advisory-db-"
+            ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
+          [
+            (* Cache the RustSec advisory database to avoid
+               cargo-audit failures when GitHub is down. *)
+            Tezos_ci.Cache.cargo_home // "advisory-db";
+          ];
+      ]
     ~script:["make -C src/riscv audit"; "make -C src/lib_riscv/kernels audit"]
 
 let job_test_kernels =
