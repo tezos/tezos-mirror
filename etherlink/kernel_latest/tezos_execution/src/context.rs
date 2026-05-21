@@ -179,6 +179,8 @@ pub mod big_maps {
 
     const KEYS: RefPath = RefPath::assert_from(b"/keys");
 
+    const TOTAL_BYTES_PATH: RefPath = RefPath::assert_from(b"/total_bytes");
+
     fn root<C: Context>(context: &C) -> Result<OwnedPath, PathError> {
         concat(&context.path(), &BIG_MAP_PATH)
     }
@@ -213,6 +215,13 @@ pub mod big_maps {
         id: &BigMapId,
     ) -> Result<OwnedPath, PathError> {
         concat(&big_map_path(context, id)?, &VALUE_TYPE_PATH)
+    }
+
+    pub fn total_bytes_path<C: Context>(
+        context: &C,
+        id: &BigMapId,
+    ) -> Result<OwnedPath, PathError> {
+        concat(&big_map_path(context, id)?, &TOTAL_BYTES_PATH)
     }
 
     pub fn value_path<C: Context>(

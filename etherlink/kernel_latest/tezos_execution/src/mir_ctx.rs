@@ -704,6 +704,9 @@ fn remove_big_map<Host: StorageV1, C: Context>(
     // Removing the content of the big_map
     BigMapKeys::remove_keys_in_storage(host, context, id)?;
 
+    let total_bytes_path = total_bytes_path(context, id)?;
+    host.store_delete_value(&total_bytes_path)?;
+
     Ok(())
 }
 
@@ -872,6 +875,63 @@ impl BigMapKeys {
     }
 }
 
+/// Flat per-entry forfait L1 charges to cover the on-disk cost of
+/// indexing a big-map entry.
+///
+/// Value from `src/proto_023_PtSeouLo/lib_protocol/lazy_storage_diff.ml`.
+const BYTES_SIZE_FOR_BIG_MAP_KEY: u64 = 65;
+
+/// Reconstruct the `total_bytes` counter for a big-map allocated
+/// before the counter existed. Walks the persisted keys list and
+/// sums `BYTES_SIZE_FOR_BIG_MAP_KEY` plus each value's stored size,
+/// then persists the result so subsequent reads are O(1).
+fn init_total_bytes_from_existing<C: Context>(
+    host: &mut impl StorageV1,
+    context: &C,
+    id: &BigMapId,
+) -> Result<Zarith, LazyStorageError> {
+    let keys_path = keys_of_big_map(context, id)?;
+    let keys: BigMapKeys = read_optional_nom_value(host, &keys_path)
+        .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?
+        .unwrap_or(BigMapKeys { keys: vec![] });
+    let mut total: u64 = 0;
+    for key_hash in &keys.keys {
+        let vp = value_path(context, id, key_hash)?;
+        let size = host.store_value_size(&vp)? as u64;
+        total = total.saturating_add(BYTES_SIZE_FOR_BIG_MAP_KEY + size);
+    }
+    let migrated = Zarith(total.into());
+    set_total_bytes(host, context, id, &migrated)?;
+    Ok(migrated)
+}
+
+/// Read the `total_bytes` counter persisted for a big-map. Lazily
+/// migrates pre-counter big-maps via `init_total_bytes_from_existing`.
+fn total_bytes<C: Context>(
+    host: &mut impl StorageV1,
+    context: &C,
+    id: &BigMapId,
+) -> Result<Zarith, LazyStorageError> {
+    let path = total_bytes_path(context, id)?;
+    match read_optional_nom_value::<Zarith>(host, &path) {
+        Ok(Some(total)) => Ok(total),
+        Ok(None) => init_total_bytes_from_existing(host, context, id),
+        Err(e) => Err(LazyStorageError::NomReadError(e.to_string())),
+    }
+}
+
+/// Write the `total_bytes` counter persisted for a big-map.
+fn set_total_bytes<C: Context>(
+    host: &mut impl StorageV1,
+    context: &C,
+    id: &BigMapId,
+    value: &Zarith,
+) -> Result<(), LazyStorageError> {
+    let path = total_bytes_path(context, id)?;
+    store_bin(value, host, &path).map_err(storage_error_to_lazy)?;
+    Ok(())
+}
+
 impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
     fn big_map_get(
         &mut self,
@@ -921,8 +981,16 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         match value {
             None => {
                 if self.host.store_has(&value_path)?.is_some() {
+                    let previous_value_size =
+                        self.host.store_value_size(&value_path)? as u64;
                     self.host.store_delete(&value_path)?;
                     BigMapKeys::remove_key(self.host, self.context, id, &key_hashed)?;
+
+                    let current = total_bytes(self.host, self.context, id)?;
+                    let new_total_bytes = Zarith(
+                        current.0 - (BYTES_SIZE_FOR_BIG_MAP_KEY + previous_value_size),
+                    );
+                    set_total_bytes(self.host, self.context, id, &new_total_bytes)?;
                 }
 
                 // Write the update in the big_map_diff
@@ -934,10 +1002,21 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
                 let encoded = v
                     .into_micheline_optimized_legacy(&arena, self.gas())?
                     .encode()?;
-                if self.host.store_has(&value_path)?.is_none() {
-                    // We should write the key in the list only if it's an add in the big_map not an update
-                    BigMapKeys::add_key(self.host, self.context, id, &key_hashed)?;
-                }
+                let new_value_size = encoded.len() as u64;
+                let current = total_bytes(self.host, self.context, id)?;
+                let new_total_bytes = match self.host.store_value_size(&value_path) {
+                    Err(RuntimeError::PathNotFound) => {
+                        // We should write the key in the list only if it's an add in the big_map not an update
+                        BigMapKeys::add_key(self.host, self.context, id, &key_hashed)?;
+                        Zarith(current.0 + (BYTES_SIZE_FOR_BIG_MAP_KEY + new_value_size))
+                    }
+                    Ok(previous_value_size) => {
+                        let previous_value_size = previous_value_size as u64;
+                        Zarith(current.0 + new_value_size - previous_value_size)
+                    }
+                    Err(err) => return Err(err.into()),
+                };
+                set_total_bytes(self.host, self.context, id, &new_total_bytes)?;
 
                 self.host.store_write_all(&value_path, &encoded)?;
 
@@ -1005,6 +1084,9 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
 
         // Copy the content of the big_map
         BigMapKeys::copy_keys_in_storage(self.host, self.context, id, &dest_id)?;
+
+        let source_total_bytes = total_bytes(self.host, self.context, id)?;
+        set_total_bytes(self.host, self.context, &dest_id, &source_total_bytes)?;
 
         // Write in the diff that there was a copy
         self.big_map_diff_copy(dest_id.value.clone(), id.value.clone());
@@ -1516,6 +1598,417 @@ pub mod tests {
             matches!(result, Ok(None)),
             "expected Ok(None) for never-originated KT1, got {result:?}",
         );
+    }
+
+    fn encoded_size(v: &TypedValue) -> u64 {
+        let arena = Arena::new();
+        let mut gas = Gas::default();
+        v.clone()
+            .into_micheline_optimized_legacy(&arena, &mut gas)
+            .unwrap()
+            .encode()
+            .unwrap()
+            .len() as u64
+    }
+
+    #[test]
+    fn big_map_new_initializes_total_bytes_to_zero() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+
+        let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+
+        assert_eq!(total_bytes(ctx.host, ctx.context, &id).unwrap(), 0.into());
+    }
+
+    #[test]
+    fn big_map_update_insert_adds_key_forfait_plus_value_size() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        let value = TypedValue::String("hello".into());
+        let value_size = encoded_size(&value);
+        let old_total_bytes = total_bytes(ctx.host, ctx.context, &id).unwrap();
+
+        ctx.big_map_update(&id, TypedValue::int(1), Some(value))
+            .unwrap();
+
+        assert_eq!(
+            total_bytes(ctx.host, ctx.context, &id).unwrap(),
+            (old_total_bytes.0 + (BYTES_SIZE_FOR_BIG_MAP_KEY + value_size)).into()
+        );
+    }
+
+    #[test]
+    fn big_map_update_overwrite_grows_by_value_diff() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        let small = TypedValue::String("hi".into());
+        let small_size = encoded_size(&small);
+
+        ctx.big_map_update(&id, TypedValue::int(1), Some(small))
+            .unwrap();
+
+        let old_total_bytes = total_bytes(ctx.host, ctx.context, &id).unwrap();
+
+        let big = TypedValue::String("hello, world".into());
+        let big_size = encoded_size(&big);
+
+        ctx.big_map_update(&id, TypedValue::int(1), Some(big))
+            .unwrap();
+
+        assert_eq!(
+            total_bytes(ctx.host, ctx.context, &id).unwrap(),
+            (old_total_bytes.0 + big_size - small_size).into()
+        );
+    }
+
+    #[test]
+    fn big_map_update_overwrite_shrinks_by_value_diff() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        let big = TypedValue::String("hello, world".into());
+        let big_size = encoded_size(&big);
+
+        ctx.big_map_update(&id, TypedValue::int(1), Some(big))
+            .unwrap();
+
+        let old_total_bytes = total_bytes(ctx.host, ctx.context, &id).unwrap();
+
+        let small = TypedValue::String("hi".into());
+        let small_size = encoded_size(&small);
+
+        ctx.big_map_update(&id, TypedValue::int(1), Some(small))
+            .unwrap();
+
+        assert_eq!(
+            total_bytes(ctx.host, ctx.context, &id).unwrap(),
+            (old_total_bytes.0 + small_size - big_size).into()
+        );
+    }
+
+    #[test]
+    fn big_map_update_delete_existing_subtracts_key_forfait_plus_prev_size() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        let value = TypedValue::String("hello".into());
+        let value_size = encoded_size(&value);
+
+        ctx.big_map_update(&id, TypedValue::int(1), Some(value))
+            .unwrap();
+
+        let old_total_bytes = total_bytes(ctx.host, ctx.context, &id).unwrap();
+
+        ctx.big_map_update(&id, TypedValue::int(1), None).unwrap();
+
+        assert_eq!(
+            total_bytes(ctx.host, ctx.context, &id).unwrap(),
+            (old_total_bytes.0 - (BYTES_SIZE_FOR_BIG_MAP_KEY + value_size)).into()
+        );
+    }
+
+    #[test]
+    fn big_map_update_delete_absent_is_noop() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        let old_total_bytes = total_bytes(ctx.host, ctx.context, &id).unwrap();
+
+        ctx.big_map_update(&id, TypedValue::int(42), None).unwrap();
+
+        assert_eq!(
+            total_bytes(ctx.host, ctx.context, &id).unwrap(),
+            old_total_bytes
+        );
+    }
+
+    #[test]
+    fn big_map_copy_replicates_source_total_bytes() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let src = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        ctx.big_map_update(
+            &src,
+            TypedValue::int(1),
+            Some(TypedValue::String("a".into())),
+        )
+        .unwrap();
+        ctx.big_map_update(
+            &src,
+            TypedValue::int(2),
+            Some(TypedValue::String("bb".into())),
+        )
+        .unwrap();
+        let src_total = total_bytes(ctx.host, ctx.context, &src).unwrap();
+
+        let dest = ctx.big_map_copy(&src, false).unwrap();
+
+        assert_eq!(
+            total_bytes(ctx.host, ctx.context, &dest).unwrap(),
+            src_total
+        );
+    }
+
+    #[test]
+    fn big_map_update_insert_then_delete_returns_to_zero() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+
+        ctx.big_map_update(
+            &id,
+            TypedValue::int(1),
+            Some(TypedValue::String("hello".into())),
+        )
+        .unwrap();
+        ctx.big_map_update(&id, TypedValue::int(1), None).unwrap();
+
+        assert_eq!(
+            total_bytes(ctx.host, ctx.context, &id).unwrap(),
+            0u64.into()
+        );
+    }
+
+    #[test]
+    fn big_map_update_multi_key_cumul_matches_sum() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+
+        let values = [
+            TypedValue::String("a".into()),
+            TypedValue::String("bb".into()),
+            TypedValue::String("ccc".into()),
+            TypedValue::String("dddd".into()),
+        ];
+        let mut expected = num_bigint::BigInt::from(0u64);
+        for (i, v) in values.iter().enumerate() {
+            let size = encoded_size(v);
+            ctx.big_map_update(&id, TypedValue::int(i as i64), Some(v.clone()))
+                .unwrap();
+            expected += BYTES_SIZE_FOR_BIG_MAP_KEY + size;
+        }
+
+        assert_eq!(
+            total_bytes(ctx.host, ctx.context, &id).unwrap(),
+            Zarith(expected)
+        );
+    }
+
+    #[test]
+    fn big_map_copy_then_modify_source_leaves_dest_counter_unchanged() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let src = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        ctx.big_map_update(
+            &src,
+            TypedValue::int(1),
+            Some(TypedValue::String("a".into())),
+        )
+        .unwrap();
+        let dest = ctx.big_map_copy(&src, false).unwrap();
+        let dest_total_after_copy = total_bytes(ctx.host, ctx.context, &dest).unwrap();
+
+        ctx.big_map_update(
+            &src,
+            TypedValue::int(2),
+            Some(TypedValue::String("bigger value".into())),
+        )
+        .unwrap();
+        ctx.big_map_update(&src, TypedValue::int(1), None).unwrap();
+
+        assert_eq!(
+            total_bytes(ctx.host, ctx.context, &dest).unwrap(),
+            dest_total_after_copy
+        );
+    }
+
+    #[test]
+    fn big_map_realistic_cross_hook_sequence_stays_consistent() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+
+        let src = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        let inserts = [
+            (1i64, TypedValue::String("x".into())),
+            (2, TypedValue::String("yy".into())),
+            (3, TypedValue::String("zzz".into())),
+        ];
+        for (k, v) in inserts.iter() {
+            ctx.big_map_update(&src, TypedValue::int(*k), Some(v.clone()))
+                .unwrap();
+        }
+        let src_total_after_inserts = total_bytes(ctx.host, ctx.context, &src).unwrap();
+
+        let dest = ctx.big_map_copy(&src, false).unwrap();
+
+        ctx.big_map_update(
+            &src,
+            TypedValue::int(1),
+            Some(TypedValue::String("xx".into())),
+        )
+        .unwrap();
+        let extra = encoded_size(&TypedValue::String("xx".into()))
+            - encoded_size(&TypedValue::String("x".into()));
+        assert_eq!(
+            total_bytes(ctx.host, ctx.context, &src).unwrap(),
+            Zarith(src_total_after_inserts.0.clone() + extra)
+        );
+
+        ctx.big_map_update(
+            &dest,
+            TypedValue::int(4),
+            Some(TypedValue::String("wwww".into())),
+        )
+        .unwrap();
+        let added =
+            BYTES_SIZE_FOR_BIG_MAP_KEY + encoded_size(&TypedValue::String("wwww".into()));
+        assert_eq!(
+            total_bytes(ctx.host, ctx.context, &dest).unwrap(),
+            Zarith(src_total_after_inserts.0 + added)
+        );
+
+        ctx.big_map_remove(&src).unwrap();
+        let src_path = total_bytes_path(ctx.context, &src).unwrap();
+        assert!(ctx.host.store_has(&src_path).unwrap().is_none());
+
+        assert!(total_bytes(ctx.host, ctx.context, &dest).unwrap().0 > 0u64.into());
+    }
+
+    #[test]
+    fn big_map_update_shrink_then_delete_returns_to_zero() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+
+        ctx.big_map_update(
+            &id,
+            TypedValue::int(1),
+            Some(TypedValue::String("hello, world".into())),
+        )
+        .unwrap();
+        ctx.big_map_update(
+            &id,
+            TypedValue::int(1),
+            Some(TypedValue::String("hi".into())),
+        )
+        .unwrap();
+        ctx.big_map_update(&id, TypedValue::int(1), None).unwrap();
+
+        assert_eq!(
+            total_bytes(ctx.host, ctx.context, &id).unwrap(),
+            0u64.into()
+        );
+    }
+
+    #[test]
+    fn big_map_remove_clears_total_bytes_path() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        ctx.big_map_update(
+            &id,
+            TypedValue::int(1),
+            Some(TypedValue::String("hello".into())),
+        )
+        .unwrap();
+        let path = total_bytes_path(ctx.context, &id).unwrap();
+        assert!(ctx.host.store_has(&path).unwrap().is_some());
+
+        ctx.big_map_remove(&id).unwrap();
+
+        assert!(ctx.host.store_has(&path).unwrap().is_none());
+    }
+
+    #[test]
+    fn total_bytes_lazily_migrates_pre_counter_big_map() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        let entries = [
+            TypedValue::String("a".into()),
+            TypedValue::String("bb".into()),
+            TypedValue::String("ccc".into()),
+        ];
+        let mut expected_sum: u64 = 0;
+        for (i, v) in entries.iter().enumerate() {
+            ctx.big_map_update(&id, TypedValue::int(i as i64), Some(v.clone()))
+                .unwrap();
+            expected_sum += BYTES_SIZE_FOR_BIG_MAP_KEY + encoded_size(v);
+        }
+
+        // Simulate a pre-counter big-map: drop the `total_bytes` path,
+        // leaving the keys list and the values intact.
+        let path = total_bytes_path(ctx.context, &id).unwrap();
+        ctx.host.store_delete(&path).unwrap();
+        assert!(ctx.host.store_has(&path).unwrap().is_none());
+
+        // First read triggers the lazy migration.
+        let migrated = total_bytes(ctx.host, ctx.context, &id).unwrap();
+        assert_eq!(migrated, Zarith(expected_sum.into()));
+
+        // Migration persisted the counter so subsequent reads are O(1).
+        assert!(ctx.host.store_has(&path).unwrap().is_some());
+        assert_eq!(total_bytes(ctx.host, ctx.context, &id).unwrap(), migrated);
+
+        // Maintenance hooks now operate from the correct baseline: an
+        // overwrite produces the expected delta against the migrated value.
+        let new_value = TypedValue::String("dddd".into());
+        let new_size = encoded_size(&new_value);
+        let old_size = encoded_size(&entries[0]);
+        ctx.big_map_update(&id, TypedValue::int(0), Some(new_value))
+            .unwrap();
+        assert_eq!(
+            total_bytes(ctx.host, ctx.context, &id).unwrap(),
+            Zarith((expected_sum + new_size - old_size).into()),
+        );
+    }
+
+    #[test]
+    fn clear_temporary_big_maps_removes_total_bytes_paths() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let temp1 = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
+        let temp2 = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
+        ctx.big_map_update(
+            &temp1,
+            TypedValue::int(1),
+            Some(TypedValue::String("hello".into())),
+        )
+        .unwrap();
+        ctx.big_map_update(
+            &temp2,
+            TypedValue::int(2),
+            Some(TypedValue::String("world".into())),
+        )
+        .unwrap();
+        let path1 = total_bytes_path(ctx.context, &temp1).unwrap();
+        let path2 = total_bytes_path(ctx.context, &temp2).unwrap();
+        assert!(ctx.host.store_has(&path1).unwrap().is_some());
+        assert!(ctx.host.store_has(&path2).unwrap().is_some());
+
+        clear_temporary_big_maps(ctx.host, ctx.context, ctx.next_temporary_id).unwrap();
+
+        assert!(ctx.host.store_has(&path1).unwrap().is_none());
+        assert!(ctx.host.store_has(&path2).unwrap().is_none());
     }
 }
 
