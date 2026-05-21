@@ -77,7 +77,7 @@ let of_tag tag =
    supporting configurable (overridable) EVM versions. *)
 let select_evm_version ?evm_version kernel =
   match (evm_version, kernel) with
-  | _, Mainnet -> Evm_version.Prague
+  | _, Mainnet -> Evm_version.Osaka
   | _, Previewnet -> Evm_version.Prague
   | None, Latest -> Evm_version.Osaka
   | Some v, Latest -> v
