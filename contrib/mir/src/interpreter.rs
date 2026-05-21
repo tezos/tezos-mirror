@@ -1567,7 +1567,7 @@ fn interpret_one<'a>(
             // In the Tezos implementation they also charge gas for the pass
             // that strips locations. We don't have it.
             let mich = v.into_micheline_optimized_legacy(&arena, ctx.gas())?;
-            let encoded = mich.encode_for_pack(&mut Gas::unmetered())??;
+            let encoded = mich.encode_for_pack(ctx.gas())??;
             stack.push(V::Bytes(encoded));
         }
         I::Unpack(ty) => {
@@ -1575,7 +1575,7 @@ fn interpret_one<'a>(
             ctx.gas()
                 .consume(interpret_cost::unpack(bytes.as_slice())?)?;
             let mut try_unpack = || -> Option<TypedValue> {
-                let mich = Micheline::decode_packed(arena, &bytes, &mut Gas::unmetered())
+                let mich = Micheline::decode_packed(arena, &bytes, ctx.gas())
                     .ok()?
                     .ok()?;
                 crate::interpreter::typecheck_value(&mich, ctx, ty).ok()
@@ -1981,7 +1981,7 @@ fn interpret_one<'a>(
             let storage_ty_micheline =
                 storage_ty.into_micheline_optimized_legacy(arena, ctx.gas())?;
 
-            let storage = Micheline::decode_raw(arena, &view_storage, &mut Gas::unmetered())??
+            let storage = Micheline::decode_raw(arena, &view_storage, ctx.gas())??
                 .typecheck_value(ctx, &storage_ty_micheline)?;
 
             let input_type = view.input_type.parse_ty(ctx.gas())?;
