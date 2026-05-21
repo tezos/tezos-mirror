@@ -253,6 +253,9 @@ module Image : sig
 
   (** Register an external image of the given [image_path]. *)
   val mk_external : image_path:string -> t
+
+  (** Pretty-print the image path. *)
+  val pp : Format.formatter -> t -> unit
 end
 
 (** Changesets are used to specify [changes:] clauses in rules.
@@ -613,6 +616,10 @@ module Images : sig
     val ubuntu_24_04 : Image.t
 
     val ubuntu_26_04 : Image.t
+
+    val debian_build_trixie : Image.t
+
+    val ubuntu_build_24_04 : Image.t
 
     val rockylinux_9 : Image.t
 
