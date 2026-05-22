@@ -779,17 +779,16 @@ where
 
 fn get_originated_contract_entrypoint(
     code: Vec<u8>,
+    gas: &mut Gas,
 ) -> Option<HashMap<Entrypoint, mir::ast::Type>> {
     let parser = Parser::new();
-    let mut gas = Gas::default();
-    let micheline = Micheline::decode_raw(&parser.arena, &code, &mut gas)
+    let micheline = Micheline::decode_raw(&parser.arena, &code, gas)
         .ok()?
         .ok()?;
-    // TODO (Linear issue L2-383): handle gas consumption here.
     let typechecked = micheline
         .split_script()
         .ok()?
-        .typecheck_script(&mut gas, true, false)
+        .typecheck_script(gas, true, false)
         .ok()?;
     let entrypoints_annotations = typechecked.annotations;
     // Cast  the entry_points_annotations to the expected type
@@ -808,12 +807,13 @@ pub fn get_contract_entrypoint<C: Context>(
     host: &impl StorageV1,
     context: &C,
     address: &AddressHash,
+    gas: &mut Gas,
 ) -> Option<HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
     let contract = contract_from_address(address.clone()).ok()?;
     let contract_account = context.originated_from_contract(&contract).ok()?;
     let code = contract_account.code(host).ok()?;
     match code {
-        Code::Code(code) => get_originated_contract_entrypoint(code),
+        Code::Code(code) => get_originated_contract_entrypoint(code, gas),
         Code::Enshrined(contract) => get_enshrined_contract_entrypoint(contract),
     }
 }

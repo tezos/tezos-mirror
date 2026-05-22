@@ -475,8 +475,17 @@ fn handle_query_entrypoints_to<Host, R>(
                 return;
             }
         };
-    let entrypoints =
-        tezos_execution::get_contract_entrypoint(&*host, &context, &address);
+    // RPC inspection path: no on-chain operation gas to bill against.
+    // Gas::default() is the L1 max per op, but the L2 per-op cap depends
+    // on the conversion coefficient and is currently larger, so default
+    // would reject RPC calls that would succeed in an operation. Use
+    // Gas::unmetered() instead.
+    let entrypoints = tezos_execution::get_contract_entrypoint(
+        &*host,
+        &context,
+        &address,
+        &mut Gas::unmetered(),
+    );
     let views = tezos_execution::get_enshrined_contract_views(&*host, &context, &address)
         .unwrap_or_default();
     let result = match encode_entrypoints_result(entrypoints, views) {
