@@ -10,6 +10,19 @@
   dedicated receipts. (!21904)
 - MIR: harden the Michelson runtime — internal aborts now surface as
   structured errors. (!21867)
+- The kernel's `tezosx_michelson_entrypoints` entrypoint now also
+  returns the enshrined contract's synthetic views — currently the
+  gateway's `staticcall_evm` view, declared as `view "staticcall_evm"
+  (pair string bytes) bytes` at the script level (the `option bytes`
+  described in !21875 is the caller-side type pushed by the MIR
+  `VIEW` opcode, which wraps the body's return in `option`; the
+  declaration itself returns `bytes`). The RLP result shape changes
+  from `[entries]` to `[entries, views]`, where `views` is a list of
+  `[name, parameter_type, return_type]` triples. The EVM node
+  consumes this to embed `view` declarations in the synthesized stub
+  `/script`, so wallets, indexers, and block explorers discover
+  synthetic views through standard Tezos contract introspection.
+  (!21936)
 
 ### Native Atomic Composability
 

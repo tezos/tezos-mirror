@@ -818,6 +818,31 @@ pub fn get_contract_entrypoint<C: Context>(
     }
 }
 
+/// Look up the synthetic views declared by an enshrined contract.
+///
+/// Returns `Some(views)` (possibly empty) for enshrined contracts,
+/// `None` for unknown addresses or for originated contracts — the
+/// latter already expose their views inside their on-chain Michelson
+/// code, so off-chain tooling discovers them through `/script`
+/// directly. See
+/// [`crate::mir_ctx::enshrined_synthetic_views`] for the source of
+/// truth.
+pub fn get_enshrined_contract_views<C: Context>(
+    host: &impl StorageV1,
+    context: &C,
+    address: &AddressHash,
+) -> Option<Vec<(&'static str, mir::ast::Type, mir::ast::Type)>> {
+    let contract = contract_from_address(address.clone()).ok()?;
+    let contract_account = context.originated_from_contract(&contract).ok()?;
+    let code = contract_account.code(host).ok()?;
+    match code {
+        Code::Code(_) => None,
+        Code::Enshrined(contract) => {
+            Some(crate::mir_ctx::enshrined_synthetic_views(contract))
+        }
+    }
+}
+
 // Handles manager transfer operations.
 #[allow(clippy::too_many_arguments)]
 fn transfer_external<'a, Host, C: Context>(

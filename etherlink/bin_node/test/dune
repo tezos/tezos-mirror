@@ -9,7 +9,8 @@
   test_wasm_runtime
   test_blueprint_roundtrip
   test_bitset_nonce
-  test_compact_receipt_encoding)
+  test_compact_receipt_encoding
+  test_entrypoints_decoder)
  (libraries
   octez-evm-node-libs.evm_node_rust_deps
   bls12-381.archive
@@ -109,3 +110,12 @@
   invalidRLPTest.json
   ../../kernel_latest/kernel/tests/resources/mainnet_kernel.wasm)
  (action (run %{dep:./test_compact_receipt_encoding.exe})))
+
+(rule
+ (alias runtest)
+ (package octez-evm-node-tests)
+ (deps
+  rlptest.json
+  invalidRLPTest.json
+  ../../kernel_latest/kernel/tests/resources/mainnet_kernel.wasm)
+ (action (run %{dep:./test_entrypoints_decoder.exe})))

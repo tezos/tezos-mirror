@@ -399,18 +399,67 @@ impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> CtxTrait<'
         _arena: &'a typed_arena::Arena<Micheline<'a>>,
     ) -> Option<Result<Option<TypedValue<'a>>, mir::interpreter::InterpretError<'a>>>
     {
-        let Some(crate::enshrined_contracts::EnshrinedContracts::TezosXGateway) =
-            crate::enshrined_contracts::from_kt1(kt1)
-        else {
+        let contract = crate::enshrined_contracts::from_kt1(kt1)?;
+        // Gate on [`enshrined_synthetic_views`] so the off-chain
+        // `/script` synthesizer (which mirrors that enumeration) and
+        // the on-chain dispatch below stay in lockstep. An
+        // unenumerated name falls through to the standard view-code
+        // dispatch by returning `None`; an enumerated name that has
+        // no matching arm below trips `unreachable!()` —
+        // [`enshrined_synthetic_views_dispatch_in_sync`] exercises
+        // this for every enumerated view.
+        if !enshrined_synthetic_views(contract)
+            .iter()
+            .any(|(n, _, _)| *n == name)
+        {
             return None;
-        };
-        // Dispatched by view name so adding a future synthetic view
-        // on the gateway is just a new arm. Unknown names fall
-        // through to the standard view-code dispatch.
-        match name {
-            "staticcall_evm" => self.dispatch_staticcall_evm_view(input, return_type),
-            _ => None,
         }
+        match (contract, name) {
+            (
+                crate::enshrined_contracts::EnshrinedContracts::TezosXGateway,
+                "staticcall_evm",
+            ) => self.dispatch_staticcall_evm_view(input, return_type),
+            _ => unreachable!(
+                "synthetic view {name:?} on {contract:?} is enumerated in \
+                 enshrined_synthetic_views but has no dispatch arm in \
+                 try_dispatch_enshrined_view"
+            ),
+        }
+    }
+}
+
+/// Enumeration of the synthetic views exposed by an enshrined
+/// contract, as `(view_name, parameter_type, return_type)` triples.
+///
+/// This is the **single source of truth**:
+/// [`CtxTrait::try_dispatch_enshrined_view`] gates on this list, so a
+/// name absent from it never reaches the dispatch match (the view is
+/// invisible to both off-chain `/script` consumers and the on-chain
+/// hook), while a name present here without a matching dispatch arm
+/// trips `unreachable!()` — see
+/// [`tests::enshrined_synthetic_views_dispatch_in_sync`], which
+/// exercises the hook for every enumerated view.
+///
+/// Returning a `Vec` (rather than a `&'static`) keeps the API simple
+/// for `Type` values, whose `Rc`-wrapped sub-types are not `const`.
+pub fn enshrined_synthetic_views(
+    contract: crate::enshrined_contracts::EnshrinedContracts,
+) -> Vec<(&'static str, Type, Type)> {
+    match contract {
+        crate::enshrined_contracts::EnshrinedContracts::TezosXGateway => vec![
+            // view "staticcall_evm" (pair string bytes) bytes
+            //   Cross-runtime GET to an EVM destination; the real
+            //   implementation lives in
+            //   [`Ctx::dispatch_staticcall_evm_view`]. The view body
+            //   in the synthesized script is `FAILWITH` — the
+            //   stub is for discoverability only.
+            (
+                "staticcall_evm",
+                Type::new_pair(Type::String, Type::Bytes),
+                Type::Bytes,
+            ),
+        ],
+        crate::enshrined_contracts::EnshrinedContracts::ERC20Wrapper => vec![],
     }
 }
 
@@ -2035,6 +2084,186 @@ pub mod tests {
 
         assert!(ctx.host.store_has(&path1).unwrap().is_none());
         assert!(ctx.host.store_has(&path2).unwrap().is_none());
+    }
+
+    /// The TezosX gateway exposes a single synthetic view today,
+    /// `staticcall_evm`, with input type `(pair string bytes)` and
+    /// return type `bytes`. This test pins the enumeration so
+    /// off-chain consumers of the synthesized `/script` get a stable
+    /// schema; any change to the enumeration must also update the
+    /// matching dispatch arm in
+    /// [`CtxTrait::try_dispatch_enshrined_view`].
+    #[test]
+    fn test_gateway_synthetic_views_enumeration() {
+        let views = enshrined_synthetic_views(
+            crate::enshrined_contracts::EnshrinedContracts::TezosXGateway,
+        );
+        assert_eq!(views.len(), 1);
+        let (name, param_ty, return_ty) = &views[0];
+        assert_eq!(*name, "staticcall_evm");
+        assert_eq!(*param_ty, Type::new_pair(Type::String, Type::Bytes));
+        assert_eq!(*return_ty, Type::Bytes);
+    }
+
+    /// The ERC-20 wrapper has no synthetic views today; pin this so
+    /// the encoded `views` list is empty for that contract.
+    #[test]
+    fn test_erc20_wrapper_has_no_synthetic_views() {
+        let views = enshrined_synthetic_views(
+            crate::enshrined_contracts::EnshrinedContracts::ERC20Wrapper,
+        );
+        assert!(views.is_empty());
+    }
+
+    /// Enforce that every view enumerated in
+    /// [`enshrined_synthetic_views`] has a matching dispatch arm in
+    /// [`CtxTrait::try_dispatch_enshrined_view`]. Without this test,
+    /// adding a view to the enumeration without wiring up the
+    /// dispatch arm would silently ship a `view "name" T1 T2`
+    /// declaration in `/script` that the kernel refuses to serve at
+    /// runtime — discoverability would break in the worst possible
+    /// way.
+    ///
+    /// Mechanism: with `return_type = Type::Unit`, the
+    /// `dispatch_staticcall_evm_view` body short-circuits to
+    /// `Some(Ok(None))` before touching gas, the host, or the EVM
+    /// runtime, so we can probe the hook safely with placeholder
+    /// inputs. A missing dispatch arm trips the `unreachable!()` in
+    /// the hook (rather than returning `None`), turning the desync
+    /// into a hard test failure.
+    #[test]
+    fn enshrined_synthetic_views_dispatch_in_sync() {
+        use crate::account_storage::{TezlinkImplicitAccount, TezlinkOriginatedAccount};
+        use crate::address::OriginationNonce;
+        use crate::enshrined_contracts::EnshrinedContracts;
+        use mir::ast::michelson_address::AddressHash;
+        use tezos_crypto_rs::hash::HashTrait;
+        use tezos_smart_rollup_host::path::RefPath;
+
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(tc_ctx, &mut host, &context);
+
+        // OperationCtx + ExecCtx fields are unread by the
+        // `return_type = Unit` early-exit path. Use placeholder
+        // values for everything that is not under test.
+        let bootstrap_pkh =
+            PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
+        let placeholder_kt1 = ContractKt1Hash::from([0u8; 20]);
+        let source = TezlinkImplicitAccount {
+            path: RefPath::assert_from(b"/mock_source").into(),
+            pkh: bootstrap_pkh.clone(),
+        };
+        let mut origination_nonce = OriginationNonce::default();
+        let mut counter = 0u128;
+        let level = BlockNumber { block_number: 0 };
+        let now = Timestamp::from(0);
+        let chain_id = ChainId::from([0, 0, 0, 0]);
+        let source_public_key: Vec<u8> = Vec::new();
+
+        let mut operation_ctx = OperationCtx {
+            source: &source,
+            origination_nonce: &mut origination_nonce,
+            counter: &mut counter,
+            level: &level,
+            now: &now,
+            chain_id: &chain_id,
+            source_public_key: &source_public_key,
+        };
+
+        let exec_ctx = ExecCtx {
+            sender: AddressHash::Implicit(bootstrap_pkh),
+            amount: 0,
+            self_address: AddressHash::Kt1(placeholder_kt1.clone()),
+            balance: 0,
+            contract_account: TezlinkOriginatedAccount {
+                path: RefPath::assert_from(b"/mock_self").into(),
+                kt1: placeholder_kt1,
+            },
+        };
+
+        struct StubRegistry;
+        impl tezosx_interfaces::Registry for StubRegistry {
+            fn ensure_alias<Host>(
+                &self,
+                _host: &mut Host,
+                _journal: &mut tezosx_journal::TezosXJournal,
+                _alias_info: tezosx_interfaces::AliasInfo,
+                _native_public_key: Option<&[u8]>,
+                _target_runtime: tezosx_interfaces::RuntimeId,
+                _context: tezosx_interfaces::CrossRuntimeContext,
+                _gas_remaining: u64,
+            ) -> Result<(String, u64), tezosx_interfaces::TezosXRuntimeError>
+            where
+                Host: StorageV1,
+            {
+                Ok((String::new(), 0))
+            }
+            fn compute_alias(
+                &self,
+                _alias_info: tezosx_interfaces::AliasInfo,
+            ) -> Result<String, tezosx_interfaces::TezosXRuntimeError> {
+                Ok(String::new())
+            }
+            fn address_from_string(
+                &self,
+                _address_str: &str,
+                _runtime_id: tezosx_interfaces::RuntimeId,
+            ) -> Result<Vec<u8>, tezosx_interfaces::TezosXRuntimeError> {
+                Ok(Vec::new())
+            }
+            fn serve<Host>(
+                &self,
+                _host: &mut Host,
+                _journal: &mut tezosx_journal::TezosXJournal,
+                _request: http::Request<Vec<u8>>,
+            ) -> http::Response<Vec<u8>>
+            where
+                Host: StorageV1,
+            {
+                http::Response::new(Vec::new())
+            }
+        }
+        let mut journal =
+            tezosx_journal::TezosXJournal::new(tezosx_journal::CracId::new(1, 0));
+        let registry = StubRegistry;
+        let mut ctx = Ctx {
+            tc_ctx: &mut tc_ctx,
+            exec_ctx,
+            operation_ctx: &mut operation_ctx,
+            journal: &mut journal,
+            registry: &registry,
+        };
+
+        // Recover each enshrined contract's KT1 from its 22-byte
+        // address-hash encoding (`[0x01][20-byte hash][0x00]`).
+        let arena = Arena::new();
+        for contract in [
+            EnshrinedContracts::TezosXGateway,
+            EnshrinedContracts::ERC20Wrapper,
+        ] {
+            let bytes = contract.address_hash_bytes();
+            let kt1 = ContractKt1Hash::try_from_bytes(&bytes[1..21]).unwrap();
+            for (name, _, _) in enshrined_synthetic_views(contract) {
+                let result = ctx.try_dispatch_enshrined_view(
+                    &kt1,
+                    name,
+                    &TypedValue::Unit,
+                    // `Type::Unit` (not `Type::Bytes`) makes the
+                    // `staticcall_evm` body short-circuit to
+                    // `Some(Ok(None))`, avoiding any gas charge or
+                    // EVM runtime call.
+                    &Type::Unit,
+                    &arena,
+                );
+                assert!(
+                    result.is_some(),
+                    "synthetic view {name:?} on {contract:?} is enumerated \
+                     in enshrined_synthetic_views but try_dispatch_enshrined_view \
+                     returned None (no dispatch arm)"
+                );
+            }
+        }
     }
 }
 

@@ -1,0 +1,188 @@
+{
+  "code": [
+    {
+      "prim": "parameter",
+      "args": [
+        {
+          "prim": "or",
+          "args": [
+            {
+              "prim": "pair",
+              "args": [
+                {
+                  "prim": "string"
+                },
+                {
+                  "prim": "list",
+                  "args": [
+                    {
+                      "prim": "pair",
+                      "args": [
+                        {
+                          "prim": "string"
+                        },
+                        {
+                          "prim": "string"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "prim": "bytes"
+                },
+                {
+                  "prim": "nat"
+                },
+                {
+                  "prim": "option",
+                  "args": [
+                    {
+                      "prim": "contract",
+                      "args": [
+                        {
+                          "prim": "bytes"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "annots": [
+                "%call"
+              ]
+            },
+            {
+              "prim": "or",
+              "args": [
+                {
+                  "prim": "pair",
+                  "args": [
+                    {
+                      "prim": "string"
+                    },
+                    {
+                      "prim": "string"
+                    },
+                    {
+                      "prim": "bytes"
+                    },
+                    {
+                      "prim": "option",
+                      "args": [
+                        {
+                          "prim": "contract",
+                          "args": [
+                            {
+                              "prim": "bytes"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ],
+                  "annots": [
+                    "%call_evm"
+                  ]
+                },
+                {
+                  "prim": "or",
+                  "args": [
+                    {
+                      "prim": "bytes",
+                      "annots": [
+                        "%collect_result"
+                      ]
+                    },
+                    {
+                      "prim": "string",
+                      "annots": [
+                        "%default"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "prim": "storage",
+      "args": [
+        {
+          "prim": "unit"
+        }
+      ]
+    },
+    {
+      "prim": "code",
+      "args": [
+        [
+          {
+            "prim": "DROP"
+          },
+          {
+            "prim": "PUSH",
+            "args": [
+              {
+                "prim": "string"
+              },
+              {
+                "string": "Enshrined contract"
+              }
+            ]
+          },
+          {
+            "prim": "FAILWITH"
+          }
+        ]
+      ]
+    },
+    {
+      "prim": "view",
+      "args": [
+        {
+          "string": "staticcall_evm"
+        },
+        {
+          "prim": "pair",
+          "args": [
+            {
+              "prim": "string"
+            },
+            {
+              "prim": "bytes"
+            }
+          ]
+        },
+        {
+          "prim": "bytes"
+        },
+        [
+          {
+            "prim": "DROP"
+          },
+          {
+            "prim": "PUSH",
+            "args": [
+              {
+                "prim": "string"
+              },
+              {
+                "string": "Enshrined contract"
+              }
+            ]
+          },
+          {
+            "prim": "FAILWITH"
+          }
+        ]
+      ]
+    }
+  ],
+  "storage": {
+    "prim": "Unit"
+  }
+}
