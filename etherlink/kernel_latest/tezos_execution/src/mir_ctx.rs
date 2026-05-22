@@ -144,7 +144,12 @@ impl<'a, Host: StorageV1, C: Context> TypecheckingCtx<'a> for TcCtx<'a, Host, C>
         &mut self,
         address: &AddressHash,
     ) -> Option<std::collections::HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
-        get_contract_entrypoint(self.host, self.context, address)
+        get_contract_entrypoint(
+            self.host,
+            self.context,
+            address,
+            &mut self.operation_gas.remaining,
+        )
     }
 
     fn big_map_get_type(
