@@ -8,7 +8,6 @@
 use chrono::prelude::DateTime;
 use num_bigint::{BigInt, BigUint, TryFromBigIntError};
 use num_traits::{Signed, Zero};
-use regex::Regex;
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
@@ -193,7 +192,23 @@ pub enum TcError {
     /// rather than flattened into a stringly error.
     #[error(transparent)]
     StackOob(#[from] StackOob),
+    /// Internal invariant violation surfaced by the `pop!` / `stack_get!` /
+    /// `stack_top_mut!` macros (empty-stack pop, out-of-range access, or a
+    /// popped value of an unexpected type). Unreachable for valid Micheline
+    /// — the typechecker establishes the stack shape and element types
+    /// before these run. Carries a descriptive message until !21872 turns
+    /// it into a structured `InternalErrorKind`.
+    #[error("internal typechecker error: {0}")]
+    InternalError(String),
 }
+
+// Empty-stack message produced by the `pop!` macro. Lifted to a module-level
+// `const` so the macro and its contract test share the string and a wording
+// drift can't go unnoticed — `pop!` is a local macro whose empty-stack arm is
+// unreachable through the public API, so it can't be tested by calling it.
+// (The `stack_get` / `stack_top_mut` helpers are plain functions and are
+// exercised directly by their tests, so they need no such const.)
+pub(crate) const MSG_EMPTY_TYPE_STACK_POP: &str = "attempted to pop from an empty type stack";
 
 impl From<TryFromBigIntError<()>> for TcError {
     fn from(error: TryFromBigIntError<()>) -> Self {
@@ -279,8 +294,19 @@ pub struct TypesNotEqual(Type, Type);
 
 /// Check that name is a valid view name
 pub fn check_view_name(name: &str) -> Result<(), TcError> {
-    let re = Regex::new(r"^[a-zA-Z0-9_.%@]*$").expect("view name regex should be valid");
-    if name.len() > 31 || !re.is_match(name) {
+    let is_valid = name.bytes().all(|b| {
+        matches!(
+            b,
+            b'a'..=b'z'
+                | b'A'..=b'Z'
+                | b'0'..=b'9'
+                | b'_'
+                | b'.'
+                | b'%'
+                | b'@'
+        )
+    });
+    if name.len() > 31 || !is_valid {
         return Err(TcError::InvalidViewName(name.to_owned()));
     };
     Ok(())
@@ -765,6 +791,26 @@ macro_rules! nothing_to_none {
 ///
 /// Entrypoint map is carried as an argument, not as part of context, because it
 /// has to be locally overridden during typechecking.
+/// Element at `idx` from the top of the type stack. Maps an out-of-range
+/// access to a descriptive [`TcError::InternalError`] — unreachable for valid
+/// Micheline, since the typechecker establishes the stack shape before access.
+fn stack_get(stack: &TypeStack, idx: usize) -> Result<&Type, TcError> {
+    stack.get(idx).map_err(|_| {
+        TcError::InternalError(format!(
+            "type stack too short: attempted to access index {idx}, len {}",
+            stack.len()
+        ))
+    })
+}
+
+/// Mutable reference to the top of the type stack. Maps an empty stack to
+/// [`TcError::InternalError`] — unreachable for valid Micheline.
+fn stack_top_mut(stack: &mut TypeStack) -> Result<&mut Type, TcError> {
+    stack
+        .get_mut(0)
+        .map_err(|_| TcError::InternalError("type stack unexpectedly empty".to_owned()))
+}
+
 pub(crate) fn typecheck_instruction<'a>(
     i: &Micheline<'a>,
     gas: &mut Gas,
@@ -779,25 +825,29 @@ pub(crate) fn typecheck_instruction<'a>(
     let stack = opt_stack.access_mut(TcError::FailNotInTail)?;
 
     // helper to reduce boilerplate. Usage:
-    // `pop!()` force-pops the top elements from the stack (panics if nothing to
-    // pop), returning it
-    // `let x = pop!()` is roughly equivalent to `let x = stack.pop().unwrap()`
-    // but with a clear error message
-    // `pop!(T::Foo)` force-pops the stack and unwraps `T::Foo(x)`, returning
-    // `x`
-    // `let x = pop!(T::Foo)` is roughly equivalent to `let T::Foo(x) = pop!()
-    // else {panic!()}` but with a clear error message
-    // `pop!(T::Bar, x, y, z)` force-pops the stack, unwraps `T::Bar(x, y, z)`
-    // and binds those to `x, y, z` in the surrounding scope
-    // `pop!(T::Bar, x, y, z)` is roughly equivalent to `let T::Bar(x, y, z) =
-    // pop!() else {panic!()}` but with a clear error message.
+    // `pop!()` pops the top of the stack and returns it; if the stack is
+    // empty, returns TcError::InternalError via `?`.
+    // `pop!(T::Foo)` pops the stack, expects a `T::Foo(x)`, and returns `x`;
+    // a non-matching value returns TcError::InternalError via `?`.
     macro_rules! pop {
-        ($($args:tt)*) => {
-            irrefutable_match!(
-                stack.pop().expect("pop from empty stack!");
-                $($args)*
-                )
-        };
+        () => {{
+            stack
+                .pop()
+                .ok_or_else(|| TcError::InternalError(MSG_EMPTY_TYPE_STACK_POP.to_owned()))?
+        }};
+        ($p:path) => {{
+            let v = pop!();
+            match v {
+                #[allow(unused_parens)]
+                $p(i) => i,
+                other => {
+                    return Err(TcError::InternalError(format!(
+                        "type mismatch: expected {}, got {other:?}",
+                        stringify!($p(_))
+                    )))
+                }
+            }
+        }};
     }
 
     // Error handling when stack isn't matched for an instruction. Two forms:
@@ -902,7 +952,7 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(ADD, [], _), [.., T::Nat, T::Int]) => {
             pop!();
-            *stack.get_mut(0)? = T::Int;
+            *stack_top_mut(stack)? = T::Int;
             I::Add(overloads::Add::IntNat)
         }
         (App(ADD, [], _), [.., T::Int, T::Nat]) => {
@@ -934,7 +984,7 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(ADD, [], _), [.., T::Int, T::Timestamp]) => {
             pop!();
-            *stack.get_mut(0)? = T::Timestamp;
+            *stack_top_mut(stack)? = T::Timestamp;
             I::Add(overloads::Add::TimestampInt)
         }
         (App(ADD, [], _), [.., _, _]) => no_overload!(ADD),
@@ -1012,32 +1062,32 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(EDIV, [], _), [.., T::Nat, T::Nat]) => {
             pop!();
-            *stack.get_mut(0)? = T::new_option(T::new_pair(T::Nat, T::Nat));
+            *stack_top_mut(stack)? = T::new_option(T::new_pair(T::Nat, T::Nat));
             I::EDiv(overloads::EDiv::NatNat)
         }
         (App(EDIV, [], _), [.., T::Int, T::Nat]) => {
             pop!();
-            *stack.get_mut(0)? = T::new_option(T::new_pair(T::Int, T::Nat));
+            *stack_top_mut(stack)? = T::new_option(T::new_pair(T::Int, T::Nat));
             I::EDiv(overloads::EDiv::NatInt)
         }
         (App(EDIV, [], _), [.., T::Nat, T::Int]) => {
             pop!();
-            *stack.get_mut(0)? = T::new_option(T::new_pair(T::Int, T::Nat));
+            *stack_top_mut(stack)? = T::new_option(T::new_pair(T::Int, T::Nat));
             I::EDiv(overloads::EDiv::IntNat)
         }
         (App(EDIV, [], _), [.., T::Int, T::Int]) => {
             pop!();
-            *stack.get_mut(0)? = T::new_option(T::new_pair(T::Int, T::Nat));
+            *stack_top_mut(stack)? = T::new_option(T::new_pair(T::Int, T::Nat));
             I::EDiv(overloads::EDiv::IntInt)
         }
         (App(EDIV, [], _), [.., T::Nat, T::Mutez]) => {
             pop!();
-            *stack.get_mut(0)? = T::new_option(T::new_pair(T::Mutez, T::Mutez));
+            *stack_top_mut(stack)? = T::new_option(T::new_pair(T::Mutez, T::Mutez));
             I::EDiv(overloads::EDiv::MutezNat)
         }
         (App(EDIV, [], _), [.., T::Mutez, T::Mutez]) => {
             pop!();
-            *stack.get_mut(0)? = T::new_option(T::new_pair(T::Nat, T::Mutez));
+            *stack_top_mut(stack)? = T::new_option(T::new_pair(T::Nat, T::Mutez));
             I::EDiv(overloads::EDiv::MutezMutez)
         }
         (App(EDIV, [], _), [.., _, _]) => no_overload!(EDIV),
@@ -1045,7 +1095,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(EDIV, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(NEG, [], _), [.., T::Nat]) => {
-            *stack.get_mut(0)? = T::Int;
+            *stack_top_mut(stack)? = T::Int;
             I::Neg(overloads::Neg::Nat)
         }
         // NB: stack type doesn't change in these NEG overloads
@@ -1062,7 +1112,7 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(SUB, [], _), [.., T::Nat, T::Nat]) => {
             pop!();
-            *stack.get_mut(0)? = T::Int;
+            *stack_top_mut(stack)? = T::Int;
             I::Sub(overloads::Sub::NatNat)
         }
         (App(SUB, [], _), [.., T::Int, T::Nat]) => {
@@ -1071,7 +1121,7 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(SUB, [], _), [.., T::Nat, T::Int]) => {
             pop!();
-            *stack.get_mut(0)? = T::Int;
+            *stack_top_mut(stack)? = T::Int;
             I::Sub(overloads::Sub::IntNat)
         }
         (App(SUB, [], _), [.., T::Int, T::Int]) => {
@@ -1080,12 +1130,12 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(SUB, [], _), [.., T::Int, T::Timestamp]) => {
             pop!();
-            *stack.get_mut(0)? = T::Timestamp;
+            *stack_top_mut(stack)? = T::Timestamp;
             I::Sub(overloads::Sub::TimestampInt)
         }
         (App(SUB, [], _), [.., T::Timestamp, T::Timestamp]) => {
             pop!();
-            *stack.get_mut(0)? = T::Int;
+            *stack_top_mut(stack)? = T::Int;
             I::Sub(overloads::Sub::TimestampTimestamp)
         }
         (App(SUB, [], _), [.., _, _]) => no_overload!(SUB),
@@ -1094,7 +1144,7 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(SUB_MUTEZ, [], _), [.., T::Mutez, T::Mutez]) => {
             pop!();
-            *stack.get_mut(0)? = Type::new_option(T::Mutez);
+            *stack_top_mut(stack)? = Type::new_option(T::Mutez);
             I::SubMutez
         }
         (App(SUB_MUTEZ, [], _), [.., _, _]) => no_overload!(SUB_MUTEZ),
@@ -1151,7 +1201,7 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(LSL, [], _), [.., T::Nat, T::Bytes]) => {
             pop!();
-            *stack.get_mut(0)? = T::Bytes;
+            *stack_top_mut(stack)? = T::Bytes;
             I::Lsl(overloads::Lsl::Bytes)
         }
         (App(LSL, [], _), [.., _, _]) => no_overload!(LSL),
@@ -1164,7 +1214,7 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(LSR, [], _), [.., T::Nat, T::Bytes]) => {
             pop!();
-            *stack.get_mut(0)? = T::Bytes;
+            *stack_top_mut(stack)? = T::Bytes;
             I::Lsr(overloads::Lsr::Bytes)
         }
         (App(LSR, [], _), [.., _, _]) => no_overload!(LSR),
@@ -1174,7 +1224,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(NOT, [], _), [.., T::Bool]) => I::Not(overloads::Not::Bool),
         (App(NOT, [], _), [.., T::Int]) => I::Not(overloads::Not::Int),
         (App(NOT, [], _), [.., T::Nat]) => {
-            *stack.get_mut(0)? = T::Int;
+            *stack_top_mut(stack)? = T::Int;
             I::Not(overloads::Not::Nat)
         }
         (App(NOT, [], _), [.., T::Bytes]) => I::Not(overloads::Not::Bytes),
@@ -1226,7 +1276,7 @@ pub(crate) fn typecheck_instruction<'a>(
             };
             let dup_height: usize = opt_height.unwrap_or(1) as usize;
             ensure_stack_len(Prim::DUP, stack, dup_height)?;
-            let ty = stack.get(dup_height - 1)?;
+            let ty = stack_get(stack, dup_height - 1)?;
             ty.ensure_prop(gas, TypeProperty::Duplicable)?;
             stack.push(ty.clone());
             I::Dup(opt_height)
@@ -1259,7 +1309,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(DUG, expect_args!(1), _), _) => unexpected_micheline!(),
 
         (App(GT, [], _), [.., T::Int]) => {
-            *stack.get_mut(0)? = T::Bool;
+            *stack_top_mut(stack)? = T::Bool;
             I::Gt
         }
         (App(GT, [], _), [.., t]) => no_overload!(GT, TypesNotEqual(T::Int, (*t).clone())),
@@ -1267,7 +1317,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(GT, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(GE, [], _), [.., T::Int]) => {
-            *stack.get_mut(0)? = T::Bool;
+            *stack_top_mut(stack)? = T::Bool;
             I::Ge
         }
         (App(GE, [], _), [.., t]) => no_overload!(GE, TypesNotEqual(T::Int, (*t).clone())),
@@ -1275,7 +1325,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(GE, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(EQ, [], _), [.., T::Int]) => {
-            *stack.get_mut(0)? = T::Bool;
+            *stack_top_mut(stack)? = T::Bool;
             I::Eq
         }
         (App(EQ, [], _), [.., t]) => no_overload!(EQ, TypesNotEqual(T::Int, (*t).clone())),
@@ -1283,7 +1333,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(EQ, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(NEQ, [], _), [.., T::Int]) => {
-            *stack.get_mut(0)? = T::Bool;
+            *stack_top_mut(stack)? = T::Bool;
             I::Neq
         }
         (App(NEQ, [], _), [.., t]) => no_overload!(NEQ, TypesNotEqual(T::Int, (*t).clone())),
@@ -1291,7 +1341,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(NEQ, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(LE, [], _), [.., T::Int]) => {
-            *stack.get_mut(0)? = T::Bool;
+            *stack_top_mut(stack)? = T::Bool;
             I::Le
         }
         (App(LE, [], _), [.., t]) => no_overload!(LE, TypesNotEqual(T::Int, (*t).clone())),
@@ -1299,7 +1349,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(LE, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(LT, [], _), [.., T::Int]) => {
-            *stack.get_mut(0)? = T::Bool;
+            *stack_top_mut(stack)? = T::Bool;
             I::Lt
         }
         (App(LT, [], _), [.., t]) => no_overload!(LT, TypesNotEqual(T::Int, (*t).clone())),
@@ -1402,16 +1452,16 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(IF_LEFT, expect_args!(2 seq), _), _) => unexpected_micheline!(),
 
         (App(INT, [], _), [.., T::Nat]) => {
-            *stack.get_mut(0)? = Type::Int;
+            *stack_top_mut(stack)? = Type::Int;
             I::Int(overloads::Int::Nat)
         }
         #[cfg(feature = "bls")]
         (App(INT, [], _), [.., T::Bls12381Fr]) => {
-            *stack.get_mut(0)? = Type::Int;
+            *stack_top_mut(stack)? = Type::Int;
             I::Int(overloads::Int::Bls12381Fr)
         }
         (App(INT, [], _), [.., T::Bytes]) => {
-            *stack.get_mut(0)? = Type::Int;
+            *stack_top_mut(stack)? = Type::Int;
             I::Int(overloads::Int::Bytes)
         }
         (App(INT, [], _), [.., _]) => no_overload!(INT),
@@ -1419,7 +1469,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(INT, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(NAT, [], _), [.., T::Bytes]) => {
-            *stack.get_mut(0)? = Type::Nat;
+            *stack_top_mut(stack)? = Type::Nat;
             I::Nat
         }
         (App(NAT, [], _), [.., _]) => no_overload!(NAT),
@@ -1427,11 +1477,11 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(NAT, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(BYTES, [], _), [.., T::Int]) => {
-            *stack.get_mut(0)? = Type::Bytes;
+            *stack_top_mut(stack)? = Type::Bytes;
             I::Bytes(overloads::Bytes::Int)
         }
         (App(BYTES, [], _), [.., T::Nat]) => {
-            *stack.get_mut(0)? = Type::Bytes;
+            *stack_top_mut(stack)? = Type::Bytes;
             I::Bytes(overloads::Bytes::Nat)
         }
         (App(BYTES, [], _), [.., _]) => no_overload!(BYTES),
@@ -1439,7 +1489,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(BYTES, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(ABS, [], _), [.., T::Int]) => {
-            *stack.get_mut(0)? = Type::Nat;
+            *stack_top_mut(stack)? = Type::Nat;
             I::Abs
         }
         (App(ABS, [], _), [.., t]) => no_overload!(ABS, TypesNotEqual(T::Int, (*t).clone())),
@@ -1447,7 +1497,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(ABS, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(ISNAT, [], _), [.., T::Int]) => {
-            *stack.get_mut(0)? = Type::new_option(Type::Nat);
+            *stack_top_mut(stack)? = Type::new_option(Type::Nat);
             I::IsNat
         }
         (App(ISNAT, [], _), [.., t]) => no_overload!(ISNAT, TypesNotEqual(T::Int, (*t).clone())),
@@ -1734,7 +1784,7 @@ pub(crate) fn typecheck_instruction<'a>(
             })?;
             t.ensure_prop(gas, TypeProperty::Comparable)?;
             pop!();
-            *stack.get_mut(0)? = T::Int;
+            *stack_top_mut(stack)? = T::Int;
             I::Compare
         }
         (App(COMPARE, [], _), [] | [_]) => no_overload!(COMPARE, len 2),
@@ -1777,7 +1827,7 @@ pub(crate) fn typecheck_instruction<'a>(
                 T::Bytes => overloads::Concat::ListOfBytes,
                 _ => no_overload!(CONCAT),
             };
-            *stack.get_mut(0)? = ty.clone(); // cheap clone, `ty` is either `String` or `Bytes`
+            *stack_top_mut(stack)? = ty.clone(); // cheap clone, `ty` is either `String` or `Bytes`
             I::Concat(overload)
         }
         (App(CONCAT, [], _), [.., _]) => no_overload!(CONCAT),
@@ -1856,7 +1906,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(GET, [Micheline::Int(n)], _), [.., _]) => {
             // NB: it's important to NOT pop from the stack here, otherwise
             // no_overload! below won't report the type on the top of the stack.
-            let ty = stack.get_mut(0)?;
+            let ty = stack_top_mut(stack)?;
             let n = validate_u10(n)?;
             gas.consume(tc_cost::get_n(n as usize)?)?;
             let res = match get_nth_field_ref(n, ty) {
@@ -1864,7 +1914,8 @@ pub(crate) fn typecheck_instruction<'a>(
                 Err(ty) => no_overload!(GET, NMOR::ExpectedPair(ty)),
             };
             // this is a bit hacky, but borrow rules leave few other options
-            *stack.get_mut(0)? = std::mem::replace(res, T::Unit);
+            let extracted = std::mem::replace(res, T::Unit);
+            *ty = extracted;
             I::GetN(n)
         }
         (App(GET, [Micheline::Int(_)], _), []) => no_overload!(GET, len 1),
@@ -1896,7 +1947,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(UPDATE, [Micheline::Int(n)], _), [.., _, _]) => {
             let n = validate_u10(n)?;
             let new_val = pop!();
-            let old_val = match get_nth_field_ref(n, stack.get_mut(0)?) {
+            let old_val = match get_nth_field_ref(n, stack_top_mut(stack)?) {
                 Ok(res) => res,
                 Err(ty) => {
                     // restores the initial stack
@@ -1930,23 +1981,23 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(GET_AND_UPDATE, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(SIZE, [], _), [.., T::String]) => {
-            *stack.get_mut(0)? = T::Nat;
+            *stack_top_mut(stack)? = T::Nat;
             I::Size(overloads::Size::String)
         }
         (App(SIZE, [], _), [.., T::Bytes]) => {
-            *stack.get_mut(0)? = T::Nat;
+            *stack_top_mut(stack)? = T::Nat;
             I::Size(overloads::Size::Bytes)
         }
         (App(SIZE, [], _), [.., T::List(_)]) => {
-            *stack.get_mut(0)? = T::Nat;
+            *stack_top_mut(stack)? = T::Nat;
             I::Size(overloads::Size::List)
         }
         (App(SIZE, [], _), [.., T::Set(_)]) => {
-            *stack.get_mut(0)? = T::Nat;
+            *stack_top_mut(stack)? = T::Nat;
             I::Size(overloads::Size::Set)
         }
         (App(SIZE, [], _), [.., T::Map(..)]) => {
-            *stack.get_mut(0)? = T::Nat;
+            *stack_top_mut(stack)? = T::Nat;
             I::Size(overloads::Size::Map)
         }
         (App(SIZE, [], _), [.., _]) => no_overload!(SIZE),
@@ -2002,7 +2053,7 @@ pub(crate) fn typecheck_instruction<'a>(
             // constraint is seemingly "pushable", as "pushable" is just
             // "packable" without `contract _`
             ty.ensure_prop(gas, TypeProperty::Pushable)?;
-            *stack.get_mut(0)? = T::new_option(ty.clone());
+            *stack_top_mut(stack)? = T::new_option(ty.clone());
             I::Unpack(ty)
         }
         (App(UNPACK, [_], _), [.., ty]) => {
@@ -2038,7 +2089,7 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(CHECK_SIGNATURE, [], _), [.., T::Bytes, T::Signature, T::Key]) => {
             stack.drop_top(2);
-            *stack.get_mut(0)? = T::Bool;
+            *stack_top_mut(stack)? = T::Bool;
             I::CheckSignature
         }
         (App(CHECK_SIGNATURE, [], _), [.., _, _, _]) => no_overload!(CHECK_SIGNATURE),
@@ -2047,12 +2098,12 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(SLICE, [], _), [.., T::String, T::Nat, T::Nat]) => {
             stack.drop_top(2);
-            *stack.get_mut(0)? = T::new_option(T::String);
+            *stack_top_mut(stack)? = T::new_option(T::String);
             I::Slice(overloads::Slice::String)
         }
         (App(SLICE, [], _), [.., T::Bytes, T::Nat, T::Nat]) => {
             stack.drop_top(2);
-            *stack.get_mut(0)? = T::new_option(T::Bytes);
+            *stack_top_mut(stack)? = T::new_option(T::Bytes);
             I::Slice(overloads::Slice::Bytes)
         }
         (App(SLICE, [], _), [.., _, _, _]) => no_overload!(SLICE),
@@ -2098,7 +2149,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(EXEC, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(HASH_KEY, [], _), [.., T::Key]) => {
-            *stack.get_mut(0)? = T::KeyHash;
+            *stack_top_mut(stack)? = T::KeyHash;
             I::HashKey
         }
         (App(HASH_KEY, [], _), [.., t]) => {
@@ -2130,7 +2181,7 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(TICKET, [], _), [.., T::Nat, _]) => {
             let content_ty = pop!();
-            *stack.get_mut(0)? = T::new_option(T::new_ticket(content_ty.clone()));
+            *stack_top_mut(stack)? = T::new_option(T::new_ticket(content_ty.clone()));
             I::Ticket(content_ty)
         }
         (App(TICKET, [], _), [.., _, _]) => no_overload!(TICKET),
@@ -2152,7 +2203,7 @@ pub(crate) fn typecheck_instruction<'a>(
             if matches!(n.as_ref(), (T::Nat, T::Nat)) =>
         {
             let typ = pop!();
-            *stack.get_mut(0)? = Type::new_option(Type::new_pair(typ.clone(), typ));
+            *stack_top_mut(stack)? = Type::new_option(Type::new_pair(typ.clone(), typ));
             I::SplitTicket
         }
         (App(SPLIT_TICKET, [], _), [.., _, _]) => no_overload!(SPLIT_TICKET),
@@ -2166,7 +2217,7 @@ pub(crate) fn typecheck_instruction<'a>(
             let rt = irrefutable_match!(&tickets.1; Type::Ticket);
 
             ensure_ty_eq(gas, lt, rt)?;
-            *stack.get_mut(0)? = Type::new_option(tickets.0.clone());
+            *stack_top_mut(stack)? = Type::new_option(tickets.0.clone());
             I::JoinTickets
         }
         (App(JOIN_TICKETS, [], _), [.., _]) => no_overload!(JOIN_TICKETS),
@@ -2257,7 +2308,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(NOW, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(IMPLICIT_ACCOUNT, [], _), [.., T::KeyHash]) => {
-            *stack.get_mut(0)? = T::new_contract(T::Unit);
+            *stack_top_mut(stack)? = T::new_contract(T::Unit);
             I::ImplicitAccount
         }
         (App(IMPLICIT_ACCOUNT, [], _), [.., _]) => no_overload!(IMPLICIT_ACCOUNT),
@@ -2265,7 +2316,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(IMPLICIT_ACCOUNT, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(IS_IMPLICIT_ACCOUNT, [], _), [.., T::Address]) => {
-            *stack.get_mut(0)? = T::new_option(T::KeyHash);
+            *stack_top_mut(stack)? = T::new_option(T::KeyHash);
             I::IsImplicitAccount
         }
         (App(IS_IMPLICIT_ACCOUNT, [], _), [.., _]) => no_overload!(IS_IMPLICIT_ACCOUNT),
@@ -2279,7 +2330,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(TOTAL_VOTING_POWER, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(VOTING_POWER, [], _), [.., T::KeyHash]) => {
-            *stack.get_mut(0)? = T::Nat;
+            *stack_top_mut(stack)? = T::Nat;
             I::VotingPower
         }
         (App(VOTING_POWER, [], _), [.., _]) => no_overload!(VOTING_POWER),
@@ -2332,7 +2383,7 @@ pub(crate) fn typecheck_instruction<'a>(
                 _ => false,
             } =>
         {
-            *stack.get_mut(0)? = T::Bool;
+            *stack_top_mut(stack)? = T::Bool;
             I::PairingCheck
         }
         #[cfg(feature = "bls")]
@@ -9234,5 +9285,117 @@ mod typecheck_tests {
     fn cost_overflow_converts_to_cost_overflow_variant() {
         let ovf: TcError = CostOverflow.into();
         assert_eq!(ovf, TcError::CostOverflow(CostOverflow));
+    }
+
+    // -- View-name validation: lock in byte-loop replacement of the regex --
+
+    #[test]
+    fn check_view_name_accepts_empty() {
+        assert_eq!(check_view_name(""), Ok(()));
+    }
+
+    #[test]
+    fn check_view_name_accepts_all_allowed_chars() {
+        assert_eq!(
+            check_view_name("aZ0_.%@"),
+            Ok(()),
+            "all allowed character classes must be accepted"
+        );
+    }
+
+    #[test]
+    fn check_view_name_accepts_31_chars() {
+        let name = "a".repeat(31);
+        assert_eq!(check_view_name(&name), Ok(()));
+    }
+
+    #[test]
+    fn check_view_name_rejects_32_chars() {
+        let name = "a".repeat(32);
+        assert_eq!(check_view_name(&name), Err(TcError::InvalidViewName(name)));
+    }
+
+    #[test]
+    fn check_view_name_rejects_disallowed_ascii() {
+        for c in ['?', '!', '-', '+', '/', ' ', '\n', '*', '#'] {
+            let name = format!("name{c}");
+            assert_eq!(
+                check_view_name(&name),
+                Err(TcError::InvalidViewName(name.clone())),
+                "expected {c:?} to be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn check_view_name_rejects_non_ascii() {
+        // Multibyte UTF-8 must be rejected at the byte level.
+        let name = "café";
+        assert_eq!(
+            check_view_name(name),
+            Err(TcError::InvalidViewName(name.to_owned()))
+        );
+    }
+
+    // -- Macro error-message contract --
+    //
+    // The pop!, stack_get!, stack_top_mut! macros live inside
+    // typecheck_instruction and their error arms are unreachable for any
+    // valid Micheline (the outer match patterns guarantee the
+    // preconditions). The tests below lock in the exact InternalError
+    // wording each macro will produce if its arm is ever reached, so a
+    // future refactor that drifts the strings is caught here instead of
+    // shipping a silent diagnostic change.
+
+    #[test]
+    fn pop_empty_internal_error_message() {
+        // pop!() on an empty type stack produces this exact error.
+        let err: TcError = TcError::InternalError(MSG_EMPTY_TYPE_STACK_POP.to_owned());
+        assert_eq!(
+            format!("{err}"),
+            "internal typechecker error: attempted to pop from an empty type stack"
+        );
+    }
+
+    #[test]
+    fn stack_top_mut_empty_internal_error_message() {
+        // stack_top_mut() on an empty type stack returns this exact error.
+        // Unreachable for valid Micheline, so exercised directly here.
+        let mut stack = crate::stack::TypeStack::new();
+        let err = super::stack_top_mut(&mut stack).expect_err("empty stack must error");
+        assert_eq!(
+            format!("{err}"),
+            "internal typechecker error: type stack unexpectedly empty"
+        );
+    }
+
+    #[test]
+    fn pop_type_mismatch_internal_error_format() {
+        // pop!(T::Foo) on a value that isn't T::Foo produces an InternalError
+        // shaped like "type mismatch: expected <Pattern>, got <Debug>". Lock
+        // the format so the macro's stringify!/Debug interpolation is
+        // observable and stable.
+        let err: TcError = TcError::InternalError(format!(
+            "type mismatch: expected {}, got {:?}",
+            stringify!(Type::Nat(_)),
+            Type::Bool,
+        ));
+        assert_eq!(
+            format!("{err}"),
+            "internal typechecker error: type mismatch: expected Type::Nat(_), got Bool"
+        );
+    }
+
+    #[test]
+    fn stack_get_oob_internal_error_format() {
+        // stack_get(idx) out-of-bounds returns an InternalError shaped like
+        // "type stack too short: attempted to access index <idx>, len <len>".
+        // Unreachable for valid Micheline, so exercised directly here.
+        let stack = crate::stack::TypeStack::new();
+        let err = super::stack_get(&stack, 3).expect_err("out-of-range access must error");
+        assert_eq!(
+            format!("{err}"),
+            "internal typechecker error: type stack too short: attempted to access index 3, len 0"
+        );
     }
 }

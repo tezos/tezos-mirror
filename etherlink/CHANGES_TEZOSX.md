@@ -9,7 +9,7 @@
 - Aliases originated as part of a native atomic calls are now surfaced via
   dedicated receipts. (!21904)
 - MIR: harden the Michelson runtime — internal aborts now surface as
-  structured errors. (!21867)
+  structured errors. (!21867, !21868)
 - The kernel's `tezosx_michelson_entrypoints` entrypoint now also
   returns the enshrined contract's synthetic views — currently the
   gateway's `staticcall_evm` view, declared as `view "staticcall_evm"
