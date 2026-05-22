@@ -146,15 +146,20 @@ let gen_keys_then_transfer_tez ?(giver = Constant.bootstrap1.alias)
   let* _ = Client.bake_for_and_wait client in
   return keys
 
+(* Declared at module level so the dependency is registered with the Tezt
+   [Uses] system when this module is loaded, not only when an outbox test that
+   actually consumes the kernel runs - which causes flakiness in the
+   runtime dependencies check. *)
+let riscv_echo_kernel = Uses.make ~tag:"riscv" ~path:"riscv-echo" ()
+
+let riscv_echo_kernel_checksum =
+  Uses.make ~tag:"riscv" ~path:"riscv-echo.checksum" ()
+
 let make_read_outbox_echo_kernel kind () =
   match kind with
   | "wasm_2_0_0" -> read_kernel "echo"
   | "riscv" -> (
-      let kernel = "riscv-echo" in
-      try
-        read_riscv_kernel
-          (Uses.make ~tag:"riscv" ~path:kernel ())
-          (Uses.make ~tag:"riscv" ~path:(kernel ^ ".checksum") ())
+      try read_riscv_kernel riscv_echo_kernel riscv_echo_kernel_checksum
       with Sys_error e ->
         Test.fail
           ~__LOC__
