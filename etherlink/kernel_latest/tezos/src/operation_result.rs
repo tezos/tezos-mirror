@@ -1413,7 +1413,8 @@ mod tests {
             &mut gas,
         )
         .unwrap()
-        .encode()
+        .encode(&mut Gas::default())
+        .unwrap()
         .unwrap();
 
         let add_amount_annots: Annotations =
@@ -1429,7 +1430,8 @@ mod tests {
             ]),
             NO_ANNS,
         )
-        .encode()
+        .encode(&mut Gas::default())
+        .unwrap()
         .unwrap();
 
         let operation = InternalOperationSum::Event(InternalContentWithMetadata {

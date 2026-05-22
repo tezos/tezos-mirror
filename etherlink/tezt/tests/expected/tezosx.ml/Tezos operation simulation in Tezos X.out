@@ -1,7 +1,7 @@
 
 ./octez-client --log-requests --wait none transfer 1 from '[PUBLIC_KEY_HASH]' to '[PUBLIC_KEY_HASH]'
 Node is bootstrapped.
-Estimated gas: 2168.781 units (will add 0 for safety)
+Estimated gas: 2168.821 units (will add 0 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -24,7 +24,7 @@ This sequence of operations was run:
       From: [PUBLIC_KEY_HASH]
       To: [PUBLIC_KEY_HASH]
       This transaction was successfully applied
-      Consumed gas: 2168.648
+      Consumed gas: 2168.688
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ1
         [PUBLIC_KEY_HASH] ... +ꜩ1
@@ -158,7 +158,7 @@ This sequence of operations was run:
                       { "kind": "contract",
                         "contract": "[PUBLIC_KEY_HASH]",
                         "change": "1000000", "origin": "block" } ],
-                  "consumed_milligas": "2168781" } } } ] }
+                  "consumed_milligas": "2168821" } } } ] }
 >>>>11: http://[HOST]:[PORT]/tezlink/chains/main/blocks/head~2/hash
 <<<<11: 200 OK
   "[BLOCK_HASH]"
@@ -194,7 +194,7 @@ This sequence of operations was run:
                         { "kind": "contract",
                           "contract": "[PUBLIC_KEY_HASH]",
                           "change": "1000000", "origin": "block" } ],
-                    "consumed_milligas": "2168648" } } } ],
+                    "consumed_milligas": "2168688" } } } ],
       "signature":
         "[SIGNATURE]" } ]
 >>>>14: http://[HOST]:[PORT]/tezlink/injection/operation?chain=main

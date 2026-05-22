@@ -127,6 +127,16 @@
   decoded-code corruption, balance overflow) via the typed
   `LookupViewError` enum, instead of silently masquerading as "view
   not found". (!21474)
+- Account for gas during Micheline encode and decode in the Tezos X
+  runtime: `Micheline::encode`, `decode_raw`, `decode_packed`, and
+  `decode_raw_prefix` now charge `cost_ENCODING_MICHELINE` /
+  `cost_DECODING_MICHELINE_bytes` (mirroring L1) and propagate
+  `OutOfGas` through the application error chain. Wired against the
+  real operation gas at transfer, origination, `mir_ctx` (big_map,
+  view lookup, hash), view handler, and MIR interpreter PACK / UNPACK
+  / VIEW sites; kernel-synthesised paths (CRAC receipts, canonical
+  Unit body) use `Gas::default()` as an OOG safety cap. (L2-437,
+  !21889)
 
 ## Version 0.3 (d2a6743ebef523c88c986c21311307a4251e67e4)
 

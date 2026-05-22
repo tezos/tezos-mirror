@@ -412,12 +412,17 @@ fn build_deposit_event(
     use mir::ast::annotations::{Annotation, Annotations, NO_ANNS};
     use mir::ast::micheline::Micheline;
     use mir::ast::Entrypoint;
+    use mir::gas::{Gas, OutOfGas};
     use mir::lexer::Prim;
     use std::borrow::Cow;
     use typed_arena::Arena;
 
     let arena = Arena::new();
 
+    // L1→L2 deposits are inbox-triggered: no Tezos op-gas to thread,
+    // and the event itself reports `consumed_milligas: 0` in the
+    // receipt. `Gas::default()` acts as an OOG safety cap on the two
+    // small bounded encodes below (pair of two nats).
     let payload = Micheline::App(
         Prim::Pair,
         arena.alloc_extend([
@@ -426,7 +431,10 @@ fn build_deposit_event(
         ]),
         NO_ANNS,
     )
-    .encode()
+    .encode(&mut Gas::default())
+    .map_err(|OutOfGas| {
+        crate::Error::BridgeError("Out of gas encoding deposit event payload".into())
+    })?
     .map_err(|e| {
         crate::Error::BridgeError(format!("Failed to encode deposit event payload: {e}"))
     })?;
@@ -444,7 +452,10 @@ fn build_deposit_event(
         ]),
         NO_ANNS,
     )
-    .encode()
+    .encode(&mut Gas::default())
+    .map_err(|OutOfGas| {
+        crate::Error::BridgeError("Out of gas encoding deposit event type".into())
+    })?
     .map_err(|e| {
         crate::Error::BridgeError(format!("Failed to encode deposit event type: {e}"))
     })?;

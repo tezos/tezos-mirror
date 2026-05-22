@@ -161,16 +161,24 @@ impl<'a, Host: StorageV1, C: Context> TypecheckingCtx<'a> for TcCtx<'a, Host, C>
             Err(err) => Err(err),
         }?;
 
-        let key_type =
-            Micheline::decode_raw(&arena, &encoded_key_type)?.parse_ty(self.gas())?;
+        let key_type = Micheline::decode_raw(
+            &arena,
+            &encoded_key_type,
+            &mut self.operation_gas.remaining,
+        )??
+        .parse_ty(self.gas())?;
 
         let encoded_value_type = match self.host.store_read_all(&value_type_path) {
             Ok(key_type) => Ok(key_type),
             Err(RuntimeError::PathNotFound) => return Ok(None),
             Err(err) => Err(err),
         }?;
-        let value_type =
-            Micheline::decode_raw(&arena, &encoded_value_type)?.parse_ty(self.gas())?;
+        let value_type = Micheline::decode_raw(
+            &arena,
+            &encoded_value_type,
+            &mut self.operation_gas.remaining,
+        )??
+        .parse_ty(self.gas())?;
 
         Ok(Some((key_type, value_type)))
     }
@@ -313,7 +321,11 @@ impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> CtxTrait<'
             .map_err(|e| LookupViewError::HostError(e.to_string()))?;
         match serialized_script {
             Code::Code(serialized_script) => {
-                let decoded = Micheline::decode_raw(arena, &serialized_script)?;
+                let decoded = Micheline::decode_raw(
+                    arena,
+                    &serialized_script,
+                    &mut self.tc_ctx.operation_gas.remaining,
+                )??;
                 let MichelineContractScript {
                     code: _,
                     parameter_ty: _,
@@ -729,8 +741,10 @@ pub fn clear_temporary_big_maps<Host: StorageV1, C: Context>(
 /// See: https://gitlab.com/tezos/tezos/-/blob/master/src/proto_023_PtSeouLo/lib_protocol/script_ir_translator.ml#L159
 fn hash_micheline_expr(
     expr: &Micheline<'_>,
-) -> Result<ScriptExprHash, tezos_data_encoding::enc::BinError> {
-    Ok(digest_256(&expr.encode_for_pack()?).into())
+    gas: &mut Gas,
+) -> Result<ScriptExprHash, LazyStorageError> {
+    let bytes = expr.encode_for_pack(gas)??;
+    Ok(digest_256(&bytes).into())
 }
 
 /// Adapter for the legacy `tezos_storage::Error → LazyStorageError`
@@ -753,7 +767,7 @@ fn hash_key(
 ) -> Result<ScriptExprHash, LazyStorageError> {
     let parser = Parser::new();
     let key_micheline = key.into_micheline_optimized_legacy(&parser.arena, gas)?;
-    Ok(hash_micheline_expr(&key_micheline)?)
+    hash_micheline_expr(&key_micheline, gas)
 }
 
 /// Function to convert a BtreeMap that represent the lazy_storage_diff
@@ -947,10 +961,18 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
 
         let value_type_path = value_type_path(self.context, id)?;
         let encoded_value_type = self.host.store_read_all(&value_type_path)?;
-        let value_type = Micheline::decode_raw(arena, &encoded_value_type)?;
+        let value_type = Micheline::decode_raw(
+            arena,
+            &encoded_value_type,
+            &mut self.operation_gas.remaining,
+        )??;
 
         let encoded_value = self.host.store_read_all(&value_path)?;
-        let value = Micheline::decode_raw(arena, &encoded_value)?;
+        let value = Micheline::decode_raw(
+            arena,
+            &encoded_value,
+            &mut self.operation_gas.remaining,
+        )??;
         Ok(Some(value.typecheck_value(self, &value_type)?))
     }
 
@@ -973,10 +995,11 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         let micheline_expr =
             key.into_micheline_optimized_legacy(&parser.arena, self.gas())?;
         // key_encoded: raw Micheline encoding (no 0x05 prefix), used in big_map_diff receipts
-        let key_encoded = micheline_expr.encode()?;
+        let key_encoded = micheline_expr.encode(&mut self.operation_gas.remaining)??;
         // key_hashed: hash of packed encoding (with 0x05 prefix), used for storage path
         // See: https://gitlab.com/tezos/tezos/-/blob/master/src/proto_023_PtSeouLo/lib_protocol/script_ir_translator.ml#L5563
-        let key_hashed = hash_micheline_expr(&micheline_expr)?;
+        let key_hashed =
+            hash_micheline_expr(&micheline_expr, &mut self.operation_gas.remaining)?;
         let value_path = value_path(self.context, id, &key_hashed)?;
         match value {
             None => {
@@ -1001,7 +1024,7 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
                 let arena = Arena::new();
                 let encoded = v
                     .into_micheline_optimized_legacy(&arena, self.gas())?
-                    .encode()?;
+                    .encode(&mut self.operation_gas.remaining)??;
                 let new_value_size = encoded.len() as u64;
                 let current = total_bytes(self.host, self.context, id)?;
                 let new_total_bytes = match self.host.store_value_size(&value_path) {
@@ -1044,10 +1067,10 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         let value_type_path = value_type_path(self.context, &id)?;
         let key_type_encoded = key_type
             .into_micheline_optimized_legacy(&arena, self.gas())?
-            .encode()?;
+            .encode(&mut self.operation_gas.remaining)??;
         let value_type_encoded = value_type
             .into_micheline_optimized_legacy(&arena, self.gas())?
-            .encode()?;
+            .encode(&mut self.operation_gas.remaining)??;
         self.host
             .store_write_all(&value_type_path, &value_type_encoded)?;
         self.host
@@ -1428,11 +1451,13 @@ pub mod tests {
         let mut gas = Gas::default();
         let key_type = mir::ast::Micheline::prim0(mir::lexer::Prim::nat, &mut gas)
             .unwrap()
-            .encode()
+            .encode(&mut Gas::default())
+            .unwrap()
             .unwrap();
         let value_type = mir::ast::Micheline::prim0(mir::lexer::Prim::unit, &mut gas)
             .unwrap()
-            .encode()
+            .encode(&mut Gas::default())
+            .unwrap()
             .unwrap();
         let alloc_0 = StorageDiff::Alloc(Alloc {
             updates: vec![],
@@ -1606,7 +1631,8 @@ pub mod tests {
         v.clone()
             .into_micheline_optimized_legacy(&arena, &mut gas)
             .unwrap()
-            .encode()
+            .encode(&mut gas)
+            .unwrap()
             .unwrap()
             .len() as u64
     }

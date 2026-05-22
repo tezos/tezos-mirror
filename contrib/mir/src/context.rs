@@ -465,7 +465,7 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
             .clone()
             .into_micheline_optimized_legacy(arena, &mut self.gas)?;
         let view_balance = self.balances.get(contract).cloned().unwrap_or(0);
-        let encoded = mich_storage.encode()?;
+        let encoded = mich_storage.encode(&mut self.gas)??;
         Ok(Some((view, mich_storage_ty, encoded, view_balance)))
     }
 

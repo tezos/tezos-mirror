@@ -1501,9 +1501,13 @@ mod tests {
         };
 
         let ty = Micheline::App(lexer::Prim::string, &[], NO_ANNS)
-            .encode()
+            .encode(&mut Gas::default())
+            .unwrap()
             .unwrap();
-        let payload = Micheline::from(crac_id.to_string()).encode().unwrap();
+        let payload = Micheline::from(crac_id.to_string())
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
 
         InternalOperationSum::Event(InternalContentWithMetadata {
             content: EventContent {
@@ -3158,7 +3162,10 @@ mod tests {
         // The payload is Micheline-encoded. Decode it to verify the string.
         let payload_bytes = e.content.payload.as_ref().unwrap();
         let parser = mir::parser::Parser::new();
-        let decoded = Micheline::decode_raw(&parser.arena, &payload_bytes.0).unwrap();
+        let decoded =
+            Micheline::decode_raw(&parser.arena, &payload_bytes.0, &mut Gas::default())
+                .unwrap()
+                .unwrap();
 
         match decoded {
             Micheline::String(s) => {

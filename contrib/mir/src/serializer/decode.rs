@@ -17,6 +17,7 @@ use crate::{
         annotations::{Annotations, NO_ANNS},
         Annotation, Micheline,
     },
+    gas::{interpret_cost, Gas, OutOfGas},
     lexer::{ann_from_str, Prim},
 };
 
@@ -61,10 +62,26 @@ const EXPECTED_MAX_SEQ_ELTS: usize = 3;
 
 impl<'a> Micheline<'a> {
     /// Decode raw binary data. Same as `decode_packed`, but doesn't expect the
-    /// first byte to be `0x05` tag.
+    /// first byte to be `0x05` tag. Charges
+    /// `interpret_cost::micheline_decoding_bytes` (mirrors L1's
+    /// `cost_DECODING_MICHELINE_bytes`) against `gas` before parsing.
+    /// The outer `Result` reports gas exhaustion; the inner `Result`
+    /// reports deserialization failures.
     pub fn decode_raw(
         arena: &'a Arena<Micheline<'a>>,
         bytes: &[u8],
+        gas: &mut Gas,
+    ) -> Result<Result<Micheline<'a>, DecodeError>, OutOfGas> {
+        gas.consume(interpret_cost::micheline_decoding_bytes(bytes.len()).map_err(|_| OutOfGas)?)?;
+        Ok(Self::decode_raw_unmetered(bytes, arena))
+    }
+
+    /// Inner decoder shared by [`Self::decode_raw`] and [`Self::decode_packed`].
+    /// Performs no gas accounting; the caller is responsible for charging
+    /// the bytes-based cost before calling.
+    fn decode_raw_unmetered(
+        bytes: &[u8],
+        arena: &'a Arena<Micheline<'a>>,
     ) -> Result<Micheline<'a>, DecodeError> {
         let mut it = bytes.into();
         let res = decode_micheline(arena, &mut it)?;
@@ -78,28 +95,35 @@ impl<'a> Micheline<'a> {
     /// Decode exactly one Micheline expression from the start of `bytes`,
     /// returning it together with the number of bytes consumed.
     ///
-    /// Unlike [`decode_raw`], this does NOT error on trailing bytes.
+    /// Unlike [`Self::decode_raw`], this does NOT error on trailing bytes.
+    /// Charges `interpret_cost::micheline_decoding_bytes` on the **full**
+    /// input length (a crafted long tail is paid for, even when only a
+    /// short prefix is consumed).
     pub fn decode_raw_prefix(
         arena: &'a Arena<Micheline<'a>>,
         bytes: &[u8],
-    ) -> Result<(Micheline<'a>, usize), DecodeError> {
+        gas: &mut Gas,
+    ) -> Result<Result<(Micheline<'a>, usize), DecodeError>, OutOfGas> {
+        gas.consume(interpret_cost::micheline_decoding_bytes(bytes.len()).map_err(|_| OutOfGas)?)?;
         let mut it: BytesIt = bytes.into();
-        let res = decode_micheline(arena, &mut it)?;
-        let consumed = bytes.len() - it.0.len();
-        Ok((res, consumed))
+        Ok(decode_micheline(arena, &mut it).map(|res| (res, bytes.len() - it.0.len())))
     }
 
     /// Decode data that was previously `PACK`ed. Checks for `0x05` tag as the
-    /// first byte and strips it.
+    /// first byte and strips it. Charges
+    /// `interpret_cost::micheline_decoding_bytes` on the **full** input
+    /// length (including the `0x05` PACK marker), matching L1's
+    /// `cost_DECODING_MICHELINE_bytes` applied to the UNPACK input.
     pub fn decode_packed(
         arena: &'a Arena<Micheline<'a>>,
         bytes: &[u8],
-    ) -> Result<Micheline<'a>, DecodeError> {
-        // PACK marker
+        gas: &mut Gas,
+    ) -> Result<Result<Micheline<'a>, DecodeError>, OutOfGas> {
+        gas.consume(interpret_cost::micheline_decoding_bytes(bytes.len()).map_err(|_| OutOfGas)?)?;
         if bytes.first() != Some(&0x05) {
-            return Err(DecodeError::NoPackTag);
+            return Ok(Err(DecodeError::NoPackTag));
         }
-        Micheline::decode_raw(arena, &bytes[1..])
+        Ok(Self::decode_raw_unmetered(&bytes[1..], arena))
     }
 }
 
@@ -332,9 +356,10 @@ mod test {
         assert_eq!(
             Micheline::decode_raw(
                 &arena,
-                &hex::decode(hex_bytes).expect("Bad hex string in `expected` argument")
+                &hex::decode(hex_bytes).expect("Bad hex string in `expected` argument"),
+                &mut Gas::default(),
             ),
-            Ok(v.into())
+            Ok(Ok(v.into()))
         );
     }
 
@@ -346,9 +371,10 @@ mod test {
         assert_eq!(
             Micheline::decode_raw(
                 &arena,
-                &hex::decode(hex_bytes).expect("Bad hex string in `expected` argument")
+                &hex::decode(hex_bytes).expect("Bad hex string in `expected` argument"),
+                &mut Gas::default(),
             ),
-            Err(err)
+            Ok(Err(err))
         );
     }
     // To figure out the expected bytes, use
