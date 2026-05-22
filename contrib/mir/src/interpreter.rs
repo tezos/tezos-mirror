@@ -25,7 +25,7 @@ use crate::ast::*;
 #[cfg(feature = "bls")]
 use crate::bls;
 use crate::context::{CtxTrait, TypecheckingCtx};
-use crate::gas::{interpret_cost, CompareError, CostOverflow, Gas, OutOfGas};
+use crate::gas::{interpret_cost, CompareError, CostOverflow, OutOfGas};
 use crate::interpreter::interpret_cost::SigCostError;
 use crate::irrefutable_match::irrefutable_match;
 use crate::lexer::Prim;
