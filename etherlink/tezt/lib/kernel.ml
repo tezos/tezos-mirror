@@ -33,7 +33,7 @@ let commit_of = function
 
 let name_of = function
   | Latest -> None
-  | Previewnet -> Some "previewnet-0.3"
+  | Previewnet -> Some "previewnet-0.5"
   | Mainnet -> Some "farfadet-r3"
 
 let upgrade_to = function
@@ -52,7 +52,7 @@ let supports_dal = function
    value for a network when that network's kernel is rebaked; treat this as
    the single source of truth when picking storage-version-gated paths in
    tezt. *)
-let storage_version = function Latest -> 58 | Previewnet -> 56 | Mainnet -> 46
+let storage_version = function Latest -> 58 | Previewnet -> 57 | Mainnet -> 46
 
 let of_tag tag =
   let contain_exp ~exp =
@@ -73,6 +73,6 @@ let of_tag tag =
 let select_evm_version ?evm_version kernel =
   match (evm_version, kernel) with
   | _, Mainnet -> Evm_version.Osaka
-  | _, Previewnet -> Evm_version.Prague
+  | _, Previewnet -> Evm_version.Osaka
   | None, Latest -> Evm_version.Osaka
   | Some v, Latest -> v
