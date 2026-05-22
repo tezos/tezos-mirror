@@ -12,7 +12,7 @@ module Files = struct
     [
       "images/rust-sdk-bindings/**/*";
       "images/create_image.sh";
-      "images/scripts/install_datadog_static.sh";
+      "images/scripts/install_sccache_static.sh";
       "scripts/version.sh";
     ]
 

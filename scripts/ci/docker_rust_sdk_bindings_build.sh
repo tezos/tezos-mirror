@@ -12,6 +12,7 @@
 #  - 'CI_JOB_ID': set by GitLab CI
 #  - 'CI_JOB_URL': set by GitLab CI
 #  - 'CI_COMMIT_SHA': set by GitLab CI
+#  - 'IMAGE': base image to derive from (e.g. debian:trixie or a CI-built base image)
 #
 # The image is tagged with $rust_sdk_bindings_image_name:REF_TAG and
 # $rust_sdk_bindings_image_name:TAG. REF_TAG is a sanitized version of $CI_COMMIT_REF_NAME.
@@ -93,6 +94,7 @@ echo "Build ${image_name}"
   "${image_tag}" \
   --push \
   --build-arg=BUILDKIT_INLINE_CACHE=1 \
+  --build-arg IMAGE="${IMAGE:-}" \
   --cache-from="${image_base}:${docker_image_ref_tag}" \
   --cache-from="${image_base_protected}:${CI_DEFAULT_BRANCH}" \
   --label "com.tezos.build-pipeline-id"="${CI_PIPELINE_ID}" \

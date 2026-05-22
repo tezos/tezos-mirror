@@ -44,8 +44,8 @@ pub enum ForgingError {
 /// This method will fail if `msg.len() > u32::MAX`. For all reasonable use-cases, this method should
 /// always succeed.
 #[uniffi::export]
-pub fn forge_message(msg: &str) -> Vec<u8> {
-    mir::ast::Micheline::String(msg.to_owned()).encode_for_pack()
+pub fn forge_message(msg: &str) -> Result<Vec<u8>, ForgingError> {
+    Ok(mir::ast::Micheline::String(msg.to_owned()).encode_for_pack()?)
 }
 
 #[uniffi::export]
@@ -222,7 +222,7 @@ mod tests {
     #[test]
     fn empty_message_forging() {
         let msg = "";
-        let raw_msg = forge_message(msg);
+        let raw_msg = forge_message(msg).expect("Forging empty message should succeed");
         let expected_bytes: Vec<u8> = vec![0x05, 0x01, 0x00, 0x00, 0x00, 0x00];
         assert_eq!(
             raw_msg, expected_bytes,
@@ -233,7 +233,7 @@ mod tests {
     #[test]
     fn message_forging() {
         let msg = "message";
-        let raw_msg = forge_message(msg);
+        let raw_msg = forge_message(msg).expect("Forging message should succeed");
         let expected_bytes: Vec<u8> = vec![
             0x05, 0x01, 0x00, 0x00, 0x00, 0x07, b'm', b'e', b's', b's', b'a', b'g', b'e',
         ];
@@ -246,7 +246,7 @@ mod tests {
     #[test]
     fn large_message_forging() {
         let msg = "a".repeat(256);
-        let raw_msg = forge_message(&msg);
+        let raw_msg = forge_message(&msg).expect("Forging large message should succeed");
         let expected_bytes: Vec<u8> =
             [vec![0x05, 0x01, 0x00, 0x00, 0x01, 0x00], [b'a'].repeat(256)].concat();
         assert_eq!(
