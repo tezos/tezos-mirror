@@ -7,7 +7,7 @@
 use num_bigint::{BigInt, Sign};
 use num_traits::{One, Zero};
 use std::{
-    collections::{btree_map::Entry, BTreeMap},
+    collections::{BTreeMap, BTreeSet},
     fmt::Display,
     mem,
     rc::Rc,
@@ -431,7 +431,7 @@ impl<'a> InMemoryLazyStorage<'a> {
 
     fn get_next_temp_id(&mut self) -> BigMapId {
         let id = self.next_temp_id.clone();
-        self.next_id = self.next_temp_id.succ();
+        self.next_temp_id = self.next_temp_id.succ();
         id
     }
 
@@ -754,59 +754,85 @@ pub fn dump_big_map_updates<'a>(
     finished_with_maps: &mut [&mut BigMap<'a>],
     temporary: bool,
 ) -> Result<(), LazyStorageError> {
-    // Note: this function is similar to `extract_lazy_storage_diff` from the
-    // Tezos protocol implementation. The difference is that we don't have
-    // their's `to_duplicate` argument.
+    // Note: structurally similar to `extract_lazy_storage_diff` /
+    // `extract_lazy_storage_updates` in the L1 protocol implementation
+    // (`script_ir_translator.ml`). Like L1, we allocate fresh ids as we
+    // walk the storage in source order — `finished_with_maps` is
+    // already in AST order, courtesy of [TypedValue::view_big_maps_mut]
+    // — so the assigned ids respect that order.
     //
-    // Temporarily we go with a simpler solution where each ID in
-    // `started_with_map_ids` is guaranteed to be used by only one big map, a
-    // big map that comes from parameter or storage value; these IDs are
-    // expected to be not used by big maps in other contracts. Consequences of
-    // this:
-    // * If a contract produces an operation with a big map, we immediately
-    // deduplicate big map ID there too (the Tezos protocol implementation does
-    // not).
-
-    // The `finished_with_maps` vector above is supposed to contain all big maps
-    // remaining on stack at the end of contract execution. After this function
-    // call, we want the provided big maps to satisfy the following invariants:
-    // * No `BigMapId` appears twice. This ensures that a big map in the storage
-    //   cannot be updated in-parallel via different `Value::BigMap` values.
-    // * Big maps, whose IDs are gone, are removed from the lazy storage.
-    // * Best effort is made to avoid copying big maps in the lazy storage, big
-    //   maps are updated in-place when possible.
-
-    // First, we find big maps that are related to same big map IDs in the
-    // storage. This is necessary to understand which maps will be updated in
-    // lazy storage in-place and which have to be copied.
+    // After this call, the provided big maps satisfy:
+    // * Every [BigMap]'s content is `FromId` with an empty overlay.
+    // * No `BigMapId` appears twice across the slice. This guarantees
+    //   that a big map in the storage cannot be updated in parallel via
+    //   different `Value::BigMap` values.
+    // * Big maps whose ids were in `started_with_map_ids` but are no
+    //   longer referenced have been removed from the lazy storage.
+    // * Best effort is made to avoid copies: when a big map can keep
+    //   its existing id, its overlay is applied in place.
     //
-    // With big map IDs we associate a non-empty list of big maps.
-    // Where "non-empty" is kept `(T, Vec<T>)` for convenience. Note
-    // that in the vast majority of the real-life cases big maps are not
-    // de-facto copied, so the vector will usually stay empty and produce no
-    // allocations.
+    // The `temporary` flag indicates whether the result should live in
+    // the temporary id range (e.g. the dump used at the end of contract
+    // execution for big maps reachable from the produced operation
+    // list, before the internal operations are interpreted).
     //
-    // The temporary boolean means that the result computed by the function should be
-    // considered as a temporary big_map
-    type NonEmpty<T> = (T, Vec<T>);
-    let mut grouped_maps: BTreeMap<BigMapId, NonEmpty<&mut BigMapFromId>> = BTreeMap::new();
-    for map in finished_with_maps {
-        // the "map" variable has type (&mut &mut BigMap<'_>), the
-        // following assignment casts it to as single &mut
+    // The general policy when visiting a big map in AST order:
+    //   * `InMemory`                           -> allocate a fresh id.
+    //   * `FromId(id)` with `id` temporary
+    //     OR result must be temporary         -> allocate a fresh id
+    //                                            via `big_map_copy`,
+    //                                            so the value escapes
+    //                                            the (soon-to-be
+    //                                            cleared) temporary
+    //                                            range.
+    //   * `FromId(id)` already seen earlier
+    //     in the walk                          -> dedup: copy from `id`.
+    //   * `FromId(id)`, first occurrence,
+    //     not temporary                        -> keep `id`, update in
+    //                                            place.
+    //
+    // First-occurrence in-place updates are deferred to a final pass so
+    // that, when a later occurrence of the same source id triggers a
+    // copy, the copy reads the pre-update state of the source (matching
+    // L1, which adds the in-place diff first to the accumulator so it
+    // is applied last).
+    //
+    // `seen_source_ids` records, for every encountered `FromId` map,
+    // the source id at the moment we visited it. This drives both the
+    // dedup detection and the "remove gone ids" pass: a started id that
+    // never appears in `seen_source_ids` is dropped storage that we
+    // must clean up.
+    let mut seen_source_ids: BTreeSet<BigMapId> = BTreeSet::new();
+    let mut deferred_in_place_updates: Vec<(
+        BigMapId,
+        BTreeMap<TypedValue<'a>, Option<TypedValue<'a>>>,
+    )> = Vec::new();
+    for map in finished_with_maps.iter_mut() {
+        // the "map" variable has type `&mut &mut BigMap<'_>`, the
+        // following assignment casts it to a single `&mut`.
         let map: &mut BigMap<'_> = map;
         match map.content {
             BigMapContent::FromId(ref mut m) => {
-                // Insert to grouped_maps
-                match grouped_maps.entry(m.id.clone()) {
-                    Entry::Vacant(e) => {
-                        e.insert((m, Vec::new()));
-                    }
-                    Entry::Occupied(e) => e.into_mut().1.push(m),
+                let source_id = m.id.clone();
+                let already_seen = !seen_source_ids.insert(source_id);
+                let must_copy = temporary || m.id.is_temporary() || already_seen;
+                if must_copy {
+                    let new_id = storage.big_map_copy(&m.id, temporary)?;
+                    storage.big_map_bulk_update(&new_id, mem::take(&mut m.overlay))?;
+                    m.id = new_id;
+                } else {
+                    // First occurrence of a permanent id with a
+                    // permanent result: keep the id and defer the
+                    // overlay write until later occurrences (if any)
+                    // have completed their copies.
+                    deferred_in_place_updates.push((m.id.clone(), mem::take(&mut m.overlay)));
                 }
             }
             BigMapContent::InMemory(ref mut m) => {
-                // The entire big map is still in memory. We have to
-                // create a new map in the storage.
+                // The entire big map is still in memory. Allocate a
+                // fresh id and write the data straight away — there is
+                // no source for any later occurrence to read from, so
+                // no need to defer.
                 let id = storage.big_map_new(&map.key_type, &map.value_type, temporary)?;
                 storage.big_map_bulk_update(
                     &id,
@@ -817,36 +843,24 @@ pub fn dump_big_map_updates<'a>(
                 map.content = BigMapContent::FromId(BigMapFromId {
                     id,
                     overlay: BTreeMap::new(),
-                })
+                });
             }
         }
     }
 
-    // Remove big maps that were gone.
+    // Remove big maps that started in storage but are no longer
+    // referenced by any finished map (neither kept in place nor used
+    // as a copy source).
     for map_id in started_with_map_ids {
-        // If not found in `finished_with_maps`...
-        if !grouped_maps.contains_key(map_id) {
+        if !seen_source_ids.contains(map_id) {
             storage.big_map_remove(map_id)?
         }
     }
 
-    // Update lazy storage with data from overlay.
-    for (id, (main_map, other_maps)) in grouped_maps {
-        // If there are any big maps with duplicate ID, we first copy them in
-        // the storage.
-        for map in other_maps {
-            let new_id = storage.big_map_copy(&id, temporary)?;
-            storage.big_map_bulk_update(&new_id, mem::take(&mut map.overlay))?;
-            map.id = new_id
-        }
-        if temporary || id.is_temporary() {
-            // The only remaining big map should also be copied if the result is expected to be temporary
-            // The big_map should also be copied if it's a temporary one
-            let new_id = storage.big_map_copy(&id, temporary)?;
-            main_map.id = new_id;
-        }
-        // The only remaining big map we update in the lazy storage in-place.
-        storage.big_map_bulk_update(&main_map.id, mem::take(&mut main_map.overlay))?
+    // Apply deferred in-place updates last so that any earlier copies
+    // captured the pre-update state of their source.
+    for (id, overlay) in deferred_in_place_updates {
+        storage.big_map_bulk_update(&id, overlay)?;
     }
 
     Ok(())
@@ -1053,5 +1067,54 @@ mod test_big_map_to_storage_update {
                 }
             )])
         );
+    }
+
+    /// Regression for the "internal origination assigns bigmap ids in
+    /// reverse AST order" bug. When the slice contains `FromId` maps
+    /// with temporary ids that were allocated in AST order
+    /// (`-1, -2, -3`) — as happens when a parent contract dumps the
+    /// storage of a `CREATE_CONTRACT` operation with `temporary=true`
+    /// — the subsequent permanent dump must reassign ids in the same
+    /// AST order: leftmost map gets the lowest fresh permanent id.
+    #[test]
+    fn test_temporary_from_id_ast_order() {
+        let storage = &mut InMemoryLazyStorage::new();
+        // Seed three empty temporary maps through the real allocator,
+        // mirroring the state left behind by a prior
+        // `dump_big_map_updates(..., temporary=true)` (e.g. the
+        // temporary dump applied to a `CREATE_CONTRACT` operation's
+        // storage at the end of the parent's execution).
+        let temp_ids: Vec<BigMapId> = (0..3)
+            .map(|_| storage.big_map_new(&Type::Int, &Type::Int, true).unwrap())
+            .collect();
+        assert_eq!(
+            temp_ids,
+            vec![(-1).into(), (-2).into(), (-3).into()],
+            "sanity: temp ids allocated in AST order"
+        );
+        let make_map = |id: BigMapId| BigMap {
+            content: BigMapContent::FromId(BigMapFromId {
+                id,
+                overlay: BTreeMap::new(),
+            }),
+            key_type: Type::Int,
+            value_type: Type::Int,
+        };
+        let mut map_ast_first = make_map(temp_ids[0].clone());
+        let mut map_ast_second = make_map(temp_ids[1].clone());
+        let mut map_ast_third = make_map(temp_ids[2].clone());
+        dump_big_map_updates(
+            storage,
+            &[],
+            &mut [&mut map_ast_first, &mut map_ast_second, &mut map_ast_third],
+            false,
+        )
+        .unwrap();
+        // Fresh permanent ids start at 0 (no prior permanent
+        // allocations on this storage). The leftmost AST occurrence
+        // must get the lowest fresh id.
+        check_is_dumped_map(map_ast_first, 0.into());
+        check_is_dumped_map(map_ast_second, 1.into());
+        check_is_dumped_map(map_ast_third, 2.into());
     }
 }

@@ -23,6 +23,15 @@
   `/script`, so wallets, indexers, and block explorers discover
   synthetic views through standard Tezos contract introspection.
   (!21936)
+- Big map ids freshly allocated when a contract is originated via
+  `CREATE_CONTRACT` are now assigned in source order, matching the
+  convention used for externally originated contracts: among the big
+  maps that receive a fresh id during the dump, the leftmost in the
+  storage AST gets the lowest, the next the next, and so on. (Big
+  maps that keep an existing storage id — e.g. a parent's big map
+  threaded into the child's storage — are unaffected.) Indexers and
+  tooling that map big map ids to positions in the storage type can
+  rely on this for both origination paths. (!21953)
 
 ### Native Atomic Composability
 
