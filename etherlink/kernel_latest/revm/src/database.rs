@@ -125,21 +125,11 @@ where
                             "DatabaseCommit `CodeStorage::add`"
                         );
                     }
-                    // Mark Native if the account signed (nonce bump)
-                    // or was just deployed (empty to non-empty code).
+                    // Mark Native if the account has code.
                     // Only writes when the path is empty, so existing
                     // classifications survive.
-                    let original_info = self.original_account_infos.get(&address);
-                    let nonce_increased = match original_info {
-                        Some(prev) => info.nonce > prev.nonce,
-                        None => info.nonce > 0,
-                    };
-                    let original_code_hash = original_info
-                        .map(|prev| prev.code_hash)
-                        .unwrap_or(KECCAK_EMPTY);
-                    let code_was_set = original_code_hash == KECCAK_EMPTY
-                        && info.code_hash != KECCAK_EMPTY;
-                    if nonce_increased || code_was_set {
+                    let has_code = info.code_hash != KECCAK_EMPTY;
+                    if has_code {
                         match storage_account.get_origin(self.host) {
                             Ok(None) => {
                                 abort_on_error!(

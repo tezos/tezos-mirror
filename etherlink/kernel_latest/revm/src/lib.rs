@@ -405,6 +405,23 @@ where
         &mut origin,
     )?;
 
+    match origin {
+        TransactionOrigin::UserInput { .. } => {
+            let mut storage_account =
+                StorageAccount::from_address(&caller).map_err(EvmDbError::from)?;
+            match storage_account.get_origin(host) {
+                Ok(Some(_)) => {}
+                Ok(None) => {
+                    storage_account
+                        .set_origin(host, &tezosx_interfaces::Origin::Native)
+                        .map_err(EvmDbError::from)?;
+                }
+                Err(e) => return Err(EvmDbError::from(e).into()),
+            }
+        }
+        TransactionOrigin::CrossRuntime { .. }
+        | TransactionOrigin::CrossRuntimeStatic => (),
+    };
     let db = EtherlinkVMDB::new(host, registry, block_constants)?;
 
     if let Some(tracer_input) = tracer_input {
