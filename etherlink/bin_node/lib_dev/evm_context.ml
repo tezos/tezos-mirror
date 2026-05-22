@@ -1392,6 +1392,8 @@ module State = struct
             Block.number ctxt.session.next_blueprint_number;
             Block.transaction_count (List.length receipts);
             Block.execution_gas execution_gas;
+            Block.evm_execution_gas evm_execution_gas;
+            Block.michelson_execution_gas michelson_execution_gas;
           ]) ;
 
     (* Look for potential kernel upgrades *)

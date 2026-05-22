@@ -54,8 +54,16 @@ module Attributes : sig
     val number : Ethereum_types.quantity -> Opentelemetry.key_value
 
     (** Integer representation of the amount of gas units necessary to process
-        the block *)
+        the block, in EVM-equivalent units (raw EVM gas plus Michelson gas
+        weighted by [michelson_to_evm_gas_multiplier]). *)
     val execution_gas : Z.t -> Opentelemetry.key_value
+
+    (** Raw EVM execution gas consumed by EVM transactions of the block. *)
+    val evm_execution_gas : Z.t -> Opentelemetry.key_value
+
+    (** Raw Michelson execution gas consumed by Michelson operations of the
+        block (in gas units, not milligas). *)
+    val michelson_execution_gas : Z.t -> Opentelemetry.key_value
 
     (** Integer representation of the number of transactions included in the
         block being processed *)
