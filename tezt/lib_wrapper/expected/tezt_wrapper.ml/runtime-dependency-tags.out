@@ -39,6 +39,8 @@ snoop: octez-snoop
 teztale_archiver: octez-teztale-archiver
 teztale_server: octez-teztale-server
 teztale_snitch: octez-teztale-snitch
+riscv: riscv-echo
+riscv: riscv-echo.checksum
 smart_rollup_installer: smart-rollup-installer
 echo: src/proto_alpha/lib_protocol/test/integration/wasm_kernel/echo.wasm
 riscv: src/riscv/assets/etherlink
