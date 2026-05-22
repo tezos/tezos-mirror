@@ -13,6 +13,8 @@
 
 ### Native Atomic Composability
 
+- Error that can be user triggered now maps now doesn't block abort. (!21918)
+
 ### Storage versions
 
 - `chain_id`, `evm_version`, `maximum_gas_per_transaction`,
