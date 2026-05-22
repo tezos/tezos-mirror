@@ -10,8 +10,8 @@ use revm::{
 use tezosx_interfaces::headers::format_tez_from_wei;
 use tezosx_interfaces::{
     gas, RuntimeId, ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER,
-    X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER,
-    X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
+    X_TEZOS_CRAC_DEPTH, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT,
+    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
 };
 
 use crate::{
@@ -350,6 +350,7 @@ fn inject_tezos_headers(
     timestamp: U256,
     block_number: U256,
     crac_id: &str,
+    crac_depth: u32,
     gas: Gas,
 ) -> Result<(), CustomPrecompileError> {
     let parse_value = |v: &str| -> Result<http::HeaderValue, CustomPrecompileError> {
@@ -372,7 +373,46 @@ fn inject_tezos_headers(
         parse_value(&format!("{block_number}"))?,
     );
     headers.insert(X_TEZOS_CRAC_ID, parse_value(crac_id)?);
+    headers.insert(X_TEZOS_CRAC_DEPTH, parse_value(&format!("{crac_depth}"))?);
     Ok(())
+}
+
+/// Read the context-driven `X-Tezos-*` values (timestamp, block number,
+/// CRAC-ID, outgoing chain depth) from `context` and write them — plus
+/// the per-call `sender_alias`/`source_alias`/`amount`/`gas_limit` — onto
+/// `headers`. `crac_depth` is `inbound + 1`: counts CRAC hops only, never
+/// REVM CALL frames.
+#[allow(clippy::too_many_arguments)]
+fn inject_tezos_headers_from_context<'j, CTX, Host, R>(
+    context: &CTX,
+    headers: &mut HeaderMap,
+    sender_alias: &str,
+    source_alias: &str,
+    amount: U256,
+    gas_limit: u64,
+    gas: Gas,
+) -> Result<(), CustomPrecompileError>
+where
+    Host: StorageV1 + 'j,
+    R: Registry + 'j,
+    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
+{
+    let timestamp = context.block().timestamp();
+    let block_number = context.block().number();
+    let crac_id = context.journal().crac_id();
+    let crac_depth = context.journal().crac_chain_depth().saturating_add(1);
+    inject_tezos_headers(
+        headers,
+        sender_alias,
+        source_alias,
+        amount,
+        gas_limit,
+        timestamp,
+        block_number,
+        &crac_id,
+        crac_depth,
+        gas,
+    )
 }
 
 pub(crate) fn runtime_gateway_precompile<'j, CTX, Host, R>(
@@ -477,19 +517,14 @@ where
                             gas,
                         )
                     })?;
-            let timestamp = context.block().timestamp();
-            let block_number = context.block().number();
             let crac_id = context.journal().crac_id();
-
-            inject_tezos_headers(
+            inject_tezos_headers_from_context(
+                context,
                 request.headers_mut(),
                 &sender_alias,
                 &source_alias,
                 amount,
                 gas_limit,
-                timestamp,
-                block_number,
-                &crac_id,
                 gas,
             )?;
 
@@ -562,19 +597,14 @@ where
                             gas,
                         )
                     })?;
-            let timestamp = context.block().timestamp();
-            let block_number = context.block().number();
             let crac_id = context.journal().crac_id();
-
-            inject_tezos_headers(
+            inject_tezos_headers_from_context(
+                context,
                 request.headers_mut(),
                 &sender_alias,
                 &source_alias,
                 amount,
                 gas_limit,
-                timestamp,
-                block_number,
-                &crac_id,
                 gas,
             )?;
 
@@ -658,21 +688,15 @@ where
                             .into(),
                         gas,
                     ))?;
-            let timestamp = context.block().timestamp();
-            let block_number = context.block().number();
-            let crac_id = context.journal().crac_id();
-
             // Amount is always zero (checked above), reuse the header
             // injector for uniform context propagation.
-            inject_tezos_headers(
+            inject_tezos_headers_from_context(
+                context,
                 request.headers_mut(),
                 &sender_alias,
                 &source_alias,
                 U256::ZERO,
                 gas_limit,
-                timestamp,
-                block_number,
-                &crac_id,
                 gas,
             )?;
 
@@ -782,22 +806,17 @@ where
                             gas,
                         )
                     })?;
-            let timestamp = context.block().timestamp();
-            let block_number = context.block().number();
             let crac_id = context.journal().crac_id();
-
             // Inject X-Tezos-* headers with trusted execution context.
             // These carry the call context that the target runtime's `serve`
             // implementation needs (sender, source, amount, gas, block info).
-            inject_tezos_headers(
+            inject_tezos_headers_from_context(
+                context,
                 request.headers_mut(),
                 &sender_alias,
                 &source_alias,
                 amount,
                 gas_limit,
-                timestamp,
-                block_number,
-                &crac_id,
                 gas,
             )?;
 
@@ -1013,6 +1032,7 @@ mod tests {
             timestamp,
             block_number,
             "test-crac-id",
+            0,
             Gas::new(u64::MAX),
         )
         .unwrap();
@@ -1091,6 +1111,46 @@ mod tests {
         );
     }
 
+    /// Non-zero `crac_depth` materialises on the outgoing header.
+    /// Exercises the gateway's contribution to the `X-Tezos-CRAC-Depth`
+    /// propagation chain: the receiving runtime parses this back into
+    /// `TransactionOrigin::call_depth` and seeds REVM's first frame
+    /// from it.
+    #[test]
+    fn test_inject_tezos_headers_writes_nonzero_crac_depth() {
+        let mut request = build_http_request(
+            "http://tezos/KT1abc/transfer",
+            &[],
+            &[],
+            1,
+            &mut Gas::new(u64::MAX),
+        )
+        .unwrap();
+        let alias = "KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2";
+        inject_tezos_headers(
+            request.headers_mut(),
+            alias,
+            alias,
+            U256::ZERO,
+            0,
+            U256::ZERO,
+            U256::ZERO,
+            "test-crac-id",
+            42,
+            Gas::new(u64::MAX),
+        )
+        .unwrap();
+        assert_eq!(
+            request
+                .headers()
+                .get(X_TEZOS_CRAC_DEPTH)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "42",
+        );
+    }
+
     #[test]
     fn test_build_http_request_rejects_user_supplied_x_tezos_headers() {
         // User-supplied X-Tezos-* headers are forbidden to prevent
@@ -1150,6 +1210,7 @@ mod tests {
             U256::from(1_700_000_000u64),
             U256::from(1u64),
             "test-crac-id",
+            0,
             Gas::new(u64::MAX),
         )
         .unwrap();
@@ -1192,6 +1253,7 @@ mod tests {
             U256::from(1_700_000_000u64),
             U256::from(1u64),
             "test-crac-id",
+            0,
             Gas::new(u64::MAX),
         )
         .unwrap();
@@ -1232,6 +1294,7 @@ mod tests {
             U256::ZERO,
             U256::ZERO,
             "test-crac-id",
+            0,
             Gas::new(u64::MAX),
         )
         .unwrap();
@@ -1428,6 +1491,7 @@ mod tests {
             U256::from(100u64),
             U256::from(42u64),
             "test-crac-id",
+            0,
             Gas::new(u64::MAX),
         )
         .unwrap();

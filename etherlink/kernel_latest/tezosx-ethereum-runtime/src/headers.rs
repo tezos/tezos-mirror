@@ -11,14 +11,14 @@
 //! headers produce a `HeaderError`.
 
 pub use tezosx_interfaces::{
-    X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_ID, X_TEZOS_GAS_LIMIT,
-    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
+    X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_DEPTH, X_TEZOS_CRAC_ID,
+    X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
 };
 
 use alloy_primitives::{hex::FromHex, Address, U256 as AlloyU256};
 use primitive_types::U256;
 use tezosx_interfaces::headers::{
-    parse_str, parse_tez_to_wei, require_str, require_u32, require_u64,
+    parse_str, parse_tez_to_wei, parse_u32_default, require_str, require_u32, require_u64,
 };
 use tezosx_interfaces::TezosXRuntimeError;
 
@@ -40,6 +40,9 @@ pub struct EthereumHeaders {
     pub crac_id: Option<String>,
     /// Source address from `X-Tezos-Source` (present for incoming CRACs).
     pub source: Option<Address>,
+    /// Cross-runtime chain depth from `X-Tezos-CRAC-Depth`. Counts
+    /// CRAC hops (not REVM CALL frames); absent header → `0`.
+    pub crac_depth: u32,
 }
 
 /// Parse `X-Tezos-*` headers from `headers`.
@@ -59,6 +62,7 @@ pub fn parse_request_headers(
         })?),
         None => None,
     };
+    let crac_depth = parse_u32_default(headers, X_TEZOS_CRAC_DEPTH, 0)?;
     Ok(EthereumHeaders {
         sender: require_address(headers, X_TEZOS_SENDER)?,
         amount: amount_wei,
@@ -67,6 +71,7 @@ pub fn parse_request_headers(
         block_number: U256::from(require_u32(headers, X_TEZOS_BLOCK_NUMBER)?),
         crac_id,
         source,
+        crac_depth,
     })
 }
 

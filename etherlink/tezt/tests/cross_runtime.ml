@@ -3931,6 +3931,91 @@ let test_http_trace_mixed_block =
     (List.length crac_traces) ;
   unit
 
+(** Extract the [X-Tezos-CRAC-Depth] request header value from an
+    [http_trace] JSON entry. Fails the test if absent — every CRAC
+    must carry the depth header on its outgoing request. *)
+let read_crac_depth_header trace =
+  let headers = JSON.(trace |-> "requestHeaders" |> as_list) in
+  let pair =
+    List.find_opt
+      (fun pair ->
+        let key = JSON.(pair |=> 0 |> as_string) in
+        String.equal (String.lowercase_ascii key) "x-tezos-crac-depth")
+      headers
+  in
+  match pair with
+  | Some pair -> JSON.(pair |=> 1 |> as_string) |> int_of_string
+  | None ->
+      Test.fail
+        "X-Tezos-CRAC-Depth header missing on CRAC trace: %s"
+        (JSON.encode trace)
+
+(** [http_traceTransaction] surfaces [X-Tezos-CRAC-Depth] on every
+    outgoing CRAC request: outer hop reads [1], the inner hop
+    (TEZ -> EVM nested inside the outer EVM -> TEZ) reads [2], and
+    a further nested EVM -> TEZ reads [3]. Validates that both the
+    EVM precompile gateway and the Michelson [dispatch_crac_call]
+    producer agree on the [inbound + 1] semantics end-to-end. *)
+let test_http_trace_crac_depth_propagation =
+  register_crac_runner_test
+    ~title:"CRAC: X-Tezos-CRAC-Depth increments across nested hops"
+    ~tags:["http_trace"; "crac_trace"; "crac_depth"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "HTTP-TRACE-DEPTH" in
+  Log.debug ~prefix "Deploy EVM inner leaf" ;
+  let* tez_leaf = TezMultiRunCaller.originate () in
+  Log.debug ~prefix "Deploy inner EVM bridge to TEZ leaf" ;
+  let* evm_bridge_inner = EvmCrossRuntimeRunnerTez.deploy_and_init tez_leaf in
+  Log.debug ~prefix "Originate TEZ bridge to inner EVM bridge" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_bridge_inner in
+  Log.debug ~prefix "Deploy outer EVM bridge to TEZ bridge" ;
+  let* evm_outer = EvmCrossRuntimeRunnerTez.deploy_and_init tez_bridge in
+  Log.debug ~prefix "Call outer EVM (triggers nested EVM->TEZ->EVM->TEZ CRAC)" ;
+  let* _ = EvmRunner.call_run evm_outer in
+  let*@ block = Rpc.get_block_by_number ~block:"latest" sequencer in
+  let tx_hash =
+    match block.transactions with
+    | Block.Hash (h :: _) -> h
+    | _ -> Test.fail "Expected a tx hash in the latest EVM block"
+  in
+  let*@ trace_json = Rpc.Tezosx.http_traceTransaction ~tx_hash sequencer in
+  let traces = JSON.(trace_json |-> "traces" |> as_list) in
+  let outer =
+    match traces with
+    | t :: _ -> t
+    | [] -> Test.fail "Expected at least one top-level HTTP trace, got none"
+  in
+  check_http_trace_shape outer ;
+  let outer_depth = read_crac_depth_header outer in
+  Check.(
+    (outer_depth = 1) int ~error_msg:"Expected outer CRAC depth = %R, got %L") ;
+  let inner_traces = JSON.(outer |-> "innerTraces" |> as_list) in
+  let inner =
+    match inner_traces with
+    | t :: _ -> t
+    | [] -> Test.fail "Expected at least one nested HTTP trace at depth 1"
+  in
+  check_http_trace_shape inner ;
+  let inner_depth = read_crac_depth_header inner in
+  Check.(
+    (inner_depth = 2) int ~error_msg:"Expected inner CRAC depth = %R, got %L") ;
+  let deeper_traces = JSON.(inner |-> "innerTraces" |> as_list) in
+  (match deeper_traces with
+  | t :: _ ->
+      let deeper_depth = read_crac_depth_header t in
+      Check.(
+        (deeper_depth = 3)
+          int
+          ~error_msg:"Expected deeper CRAC depth = %R, got %L")
+  | [] -> ()) ;
+  Log.info
+    "CRAC-Depth propagation: outer=%d, inner=%d (chain length captured by \
+     trace headers)"
+    outer_depth
+    inner_depth ;
+  unit
+
 (** EVM journal is preserved across CrossRuntime boundaries: TEZ revert must
  *  roll back inner EVM storage changes made via a TEZ->EVM CRAC.
  *
@@ -10973,6 +11058,7 @@ let () =
   test_http_trace_nested_crac [Alpha] ;
   test_http_trace_multiple_independent_cracs [Alpha] ;
   test_http_trace_mixed_block [Alpha] ;
+  test_http_trace_crac_depth_propagation [Alpha] ;
   test_l1_vs_tezosx_nested_failwith_receipt [Alpha] ;
   test_crac_callback_fire_and_forget [Alpha] ;
   test_crac_callback_receives_result_bytes [Alpha] ;

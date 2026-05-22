@@ -239,6 +239,7 @@ where
         now: &hdrs.timestamp,
         chain_id,
         source_public_key: &[],
+        crac_chain_depth: hdrs.crac_depth,
     };
 
     // Arena holding all Micheline allocations for typechecking and

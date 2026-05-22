@@ -34,8 +34,8 @@ use tezosx_journal::TezosXJournal;
 
 use crate::account_storage::TezlinkAccount;
 use crate::mir_ctx::{
-    HasContractAccount, HasCrossRuntime, HasHost, HasOperationGas, HasOriginLookup,
-    HasSourcePublicKey,
+    HasContractAccount, HasCracChainDepth, HasCrossRuntime, HasHost, HasOperationGas,
+    HasOriginLookup, HasSourcePublicKey,
 };
 
 /// Errors from CRAC-capable operations. The two variants have fundamentally
@@ -203,7 +203,8 @@ pub(crate) fn execute_enshrined_contract<'a, Host>(
               + HasOperationGas
               + HasSourcePublicKey
               + HasOriginLookup
-              + HasCrossRuntime<Host>),
+              + HasCrossRuntime<Host>
+              + HasCracChainDepth),
 ) -> Result<Vec<OperationInfo<'a>>, CracError>
 where
     Host: StorageV1,
@@ -738,6 +739,7 @@ fn inject_context_headers_raw(
     timestamp: u64,
     block_number: u32,
     crac_id: &str,
+    crac_depth: u32,
 ) -> Result<(), TransferError> {
     let parse_value = |v: &str| -> Result<http::HeaderValue, TransferError> {
         v.parse().map_err(|e| {
@@ -757,6 +759,10 @@ fn inject_context_headers_raw(
         parse_value(&format!("{block_number}"))?,
     );
     headers.insert(X_TEZOS_CRAC_ID, parse_value(crac_id)?);
+    headers.insert(
+        tezosx_interfaces::X_TEZOS_CRAC_DEPTH,
+        parse_value(&format!("{crac_depth}"))?,
+    );
     Ok(())
 }
 
@@ -772,7 +778,8 @@ fn inject_context_headers<'a, Host>(
               + HasOperationGas
               + HasSourcePublicKey
               + HasOriginLookup
-              + HasCrossRuntime<Host>),
+              + HasCrossRuntime<Host>
+              + HasCracChainDepth),
 ) -> Result<http::Request<Vec<u8>>, TransferError>
 where
     Host: StorageV1,
@@ -928,6 +935,7 @@ where
                     "http_call: Tezos gas limit overflows target runtime units".into(),
                 )
             })?;
+    let crac_depth = ctx.crac_chain_depth().saturating_add(1);
     let crac_id_str = ctx.journal().crac_id().to_string();
     inject_context_headers_raw(
         request.headers_mut(),
@@ -938,6 +946,7 @@ where
         timestamp_u64,
         block_number_u32,
         &crac_id_str,
+        crac_depth,
     )?;
     Ok(request)
 }
@@ -1107,7 +1116,8 @@ fn dispatch_crac_call<'a, Host>(
               + HasOperationGas
               + HasSourcePublicKey
               + HasOriginLookup
-              + HasCrossRuntime<Host>),
+              + HasCrossRuntime<Host>
+              + HasCracChainDepth),
     request: http::Request<Vec<u8>>,
 ) -> Result<Vec<u8>, CracError>
 where
@@ -1190,6 +1200,7 @@ pub fn dispatch_staticcall_evm_get<'a, Host, R, C>(
     crac_id: &str,
     timestamp: &str,
     block_number: &str,
+    crac_chain_depth: u32,
     destination: &str,
     calldata: &[u8],
 ) -> Result<Option<Vec<u8>>, mir::interpreter::InterpretError<'a>>
@@ -1260,6 +1271,7 @@ where
             destination: destination.to_string(),
         }
     })?;
+    let crac_depth = crac_chain_depth.saturating_add(1);
     let request = http::Request::builder()
         .method(http::Method::GET)
         .uri(uri)
@@ -1277,6 +1289,10 @@ where
         .header(tezosx_interfaces::X_TEZOS_TIMESTAMP, timestamp)
         .header(tezosx_interfaces::X_TEZOS_BLOCK_NUMBER, block_number)
         .header(tezosx_interfaces::X_TEZOS_CRAC_ID, crac_id)
+        .header(
+            tezosx_interfaces::X_TEZOS_CRAC_DEPTH,
+            crac_depth.to_string(),
+        )
         .body(calldata.to_vec())
         .map_err(|_| mir::interpreter::EnshrinedViewDispatchError::DispatchSetup)?;
 
@@ -1905,6 +1921,7 @@ mod tests {
             1700000000u64,
             5,
             &crac_id,
+            0,
         )
         .unwrap();
         assert_eq!(headers.get("X-Tezos-Sender").unwrap(), "sender_alias");
@@ -1914,6 +1931,30 @@ mod tests {
         assert_eq!(headers.get("X-Tezos-Timestamp").unwrap(), "1700000000");
         assert_eq!(headers.get("X-Tezos-Block-Number").unwrap(), "5");
         assert_eq!(headers.get("X-Tezos-Crac-Id").unwrap(), "0-5");
+    }
+
+    /// Non-zero `crac_depth` materialises on the outgoing header.
+    /// Receiving runtimes parse it into `TransactionOrigin::call_depth`
+    /// (EVM) or `OperationCtx::crac_chain_depth` (Michelson); seeing
+    /// the value round-trip through the header is the wire-level
+    /// guarantee.
+    #[test]
+    fn test_inject_context_headers_raw_writes_nonzero_crac_depth() {
+        let mut headers = http::HeaderMap::new();
+        let crac_id = CracId::new(0, 0).to_string();
+        inject_context_headers_raw(
+            &mut headers,
+            "sender_alias",
+            "source_alias",
+            0u64,
+            0,
+            0,
+            0,
+            &crac_id,
+            7,
+        )
+        .unwrap();
+        assert_eq!(headers.get("X-Tezos-Crac-Depth").unwrap(), "7");
     }
 
     #[test]
@@ -1933,6 +1974,7 @@ mod tests {
             0u64,
             0,
             &crac_id,
+            0,
         )
         .unwrap();
         assert_eq!(headers.get("X-Tezos-Sender").unwrap(), "new_alias");
@@ -2276,6 +2318,7 @@ mod tests {
             0u64,
             0,
             &crac_id,
+            0,
         )
         .unwrap();
         assert_eq!(headers.get("X-Tezos-Amount").unwrap(), "0");
@@ -2297,6 +2340,7 @@ mod tests {
             u64::MAX,
             u32::MAX,
             &crac_id,
+            0,
         )
         .unwrap();
         // u64::MAX mutez is a very large TEZ amount
