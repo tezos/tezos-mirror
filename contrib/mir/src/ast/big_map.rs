@@ -1079,27 +1079,30 @@ mod test_big_map_to_storage_update {
     #[test]
     fn test_temporary_from_id_ast_order() {
         let storage = &mut InMemoryLazyStorage::new();
-        // Pre-seed empty temporary maps at ids -1, -2, -3 so that the
-        // `big_map_copy` calls have something to read from. This
-        // mirrors the state left behind by a prior
-        // `dump_big_map_updates(..., temporary=true)`.
-        for temp_id in [-1_i64, -2, -3] {
-            storage.big_maps.insert(
-                temp_id.into(),
-                MapInfo::new(BTreeMap::new(), Type::Int, Type::Int),
-            );
-        }
-        let make_map = |id: i64| BigMap {
+        // Seed three empty temporary maps through the real allocator,
+        // mirroring the state left behind by a prior
+        // `dump_big_map_updates(..., temporary=true)` (e.g. the
+        // temporary dump applied to a `CREATE_CONTRACT` operation's
+        // storage at the end of the parent's execution).
+        let temp_ids: Vec<BigMapId> = (0..3)
+            .map(|_| storage.big_map_new(&Type::Int, &Type::Int, true).unwrap())
+            .collect();
+        assert_eq!(
+            temp_ids,
+            vec![(-1).into(), (-2).into(), (-3).into()],
+            "sanity: temp ids allocated in AST order"
+        );
+        let make_map = |id: BigMapId| BigMap {
             content: BigMapContent::FromId(BigMapFromId {
-                id: id.into(),
+                id,
                 overlay: BTreeMap::new(),
             }),
             key_type: Type::Int,
             value_type: Type::Int,
         };
-        let mut map_ast_first = make_map(-1);
-        let mut map_ast_second = make_map(-2);
-        let mut map_ast_third = make_map(-3);
+        let mut map_ast_first = make_map(temp_ids[0].clone());
+        let mut map_ast_second = make_map(temp_ids[1].clone());
+        let mut map_ast_third = make_map(temp_ids[2].clone());
         dump_big_map_updates(
             storage,
             &[],
