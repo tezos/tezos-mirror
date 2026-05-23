@@ -26,7 +26,7 @@ use crate::{
 
 /// Path where EVM codes' are stored.
 pub(crate) const EVM_CODES_PATH: RefPath =
-    RefPath::assert_from(b"/evm/world_state/eth_codes");
+    RefPath::assert_from(b"/evm/eth_accounts/eth_codes");
 
 /// Path to the EVM bytecode.
 const CODE_PATH: RefPath = RefPath::assert_from(b"/code");

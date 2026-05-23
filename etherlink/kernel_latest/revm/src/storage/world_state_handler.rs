@@ -29,8 +29,7 @@ use crate::{
 };
 
 /// Path where EVM accounts are stored.
-pub const EVM_ACCOUNTS_PATH: RefPath =
-    RefPath::assert_from(b"/evm/world_state/eth_accounts");
+pub const EVM_ACCOUNTS_PATH: RefPath = RefPath::assert_from(b"/evm/eth_accounts");
 
 /// Path where the L1 address of our withdrawals ticketer is stored.
 pub const NATIVE_TOKEN_TICKETER_PATH: RefPath =

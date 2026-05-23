@@ -189,18 +189,25 @@ let check_status_n_logs ~endpoint ~status ~logs ~tx =
           ~error_msg:"Unexpected transaction logs, expected:\n%R but got:\n%L") ;
       unit
 
-(** [get_value_in_storage client addr nth] fetch the [nth] value in the storage
-    of account [addr]  *)
-let get_value_in_storage sc_rollup_node address nth =
-  Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks:Tezos_regression.rpc_hooks
+(** [get_value_in_storage evm_setup addr nth] fetch the [nth] value in the
+    storage of account [addr]  *)
+let get_value_in_storage ~evm_setup address nth =
+  Sc_rollup_node.RPC.call
+    evm_setup.sc_rollup_node
+    ~rpc_hooks:Tezos_regression.rpc_hooks
   @@ Sc_rollup_rpc.get_global_block_durable_state_value
        ~pvm_kind
        ~operation:Sc_rollup_rpc.Value
-       ~key:(Durable_storage_path.storage address ~key:(hex_256_of_int nth) ())
+       ~key:
+         (Durable_storage_path.storage
+            evm_setup.kernel
+            address
+            ~key:(hex_256_of_int nth)
+            ())
        ()
 
 let check_str_in_storage ~evm_setup ~address ~nth ~expected =
-  let* value = get_value_in_storage evm_setup.sc_rollup_node address nth in
+  let* value = get_value_in_storage ~evm_setup address nth in
   Check.((value = Some expected) (option string))
     ~error_msg:"Unexpected value in storage, should be %R, but got %L" ;
   unit
@@ -212,20 +219,21 @@ let check_nb_in_storage ~evm_setup ~address ~nth ~expected =
     ~nth
     ~expected:(hex_256_of_int expected)
 
-let get_storage_size sc_rollup_node ~address =
+let get_storage_size ~evm_setup ~address =
   let* storage =
-    Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks:Tezos_regression.rpc_hooks
+    Sc_rollup_node.RPC.call
+      evm_setup.sc_rollup_node
+      ~rpc_hooks:Tezos_regression.rpc_hooks
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
          ~pvm_kind
          ~operation:Sc_rollup_rpc.Subkeys
-         ~key:(Durable_storage_path.storage address ())
+         ~key:(Durable_storage_path.storage evm_setup.kernel address ())
          ()
   in
   return (List.length storage)
 
-let check_storage_size sc_rollup_node ~address size =
-  (* check storage size *)
-  let* storage_size = get_storage_size sc_rollup_node ~address in
+let check_storage_size ~evm_setup ~address size =
+  let* storage_size = get_storage_size ~evm_setup ~address in
   Check.((storage_size = size) int)
     ~error_msg:"Unexpected storage size, should be %R, but is %L" ;
   unit
@@ -902,7 +910,7 @@ let deploy_with_base_checks {contract; expected_address} full_evm_setup =
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
          ~pvm_kind
          ~operation:Sc_rollup_rpc.Subkeys
-         ~key:Durable_storage_path.eth_accounts
+         ~key:(Durable_storage_path.eth_accounts full_evm_setup.kernel)
          ()
   in
   (* check tx status*)
@@ -1436,7 +1444,7 @@ let test_l2_call_simple_storage =
       ()
   in
   let* () = check_tx_succeeded ~endpoint ~tx in
-  let* () = check_storage_size sc_rollup_node ~address 1 in
+  let* () = check_storage_size ~evm_setup ~address 1 in
   let* () = check_nb_in_storage ~evm_setup ~address ~nth:0 ~expected:42 in
 
   (* set 24 by another user *)
@@ -1457,7 +1465,7 @@ let test_l2_call_simple_storage =
       ()
   in
   let* () = check_tx_succeeded ~endpoint ~tx in
-  let* () = check_storage_size sc_rollup_node ~address 1 in
+  let* () = check_storage_size ~evm_setup ~address 1 in
   (* value stored has changed *)
   let* () = check_nb_in_storage ~evm_setup ~address ~nth:0 ~expected:24 in
 
@@ -1481,7 +1489,7 @@ let test_l2_call_simple_storage =
       ()
   in
   let* () = check_tx_succeeded ~endpoint ~tx in
-  let* () = check_storage_size sc_rollup_node ~address 1 in
+  let* () = check_storage_size ~evm_setup ~address 1 in
   (* value stored has changed *)
   let* () =
     check_str_in_storage
@@ -1530,7 +1538,7 @@ let test_l2_deploy_erc20 =
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
          ~pvm_kind
          ~operation:Sc_rollup_rpc.Subkeys
-         ~key:Durable_storage_path.eth_accounts
+         ~key:(Durable_storage_path.eth_accounts evm_setup.kernel)
          ()
   in
   Check.(
@@ -4571,6 +4579,7 @@ let gen_kernel_migration_test ~from ~to_ ?eth_bootstrap_accounts ?chain_id
   (* Upgrade the kernel. *)
   let* () =
     bake_until_sync
+      ~timeout:90.
       ~sc_rollup_node:evm_setup.sc_rollup_node
       ~client:evm_setup.client
       ~sequencer:evm_setup.evm_node
@@ -4594,6 +4603,7 @@ let gen_kernel_migration_test ~from ~to_ ?eth_bootstrap_accounts ?chain_id
   (* Upgrade the kernel. *)
   let* () =
     bake_until_sync
+      ~timeout:90.
       ~sc_rollup_node:evm_setup.sc_rollup_node
       ~client:evm_setup.client
       ~sequencer:evm_setup.evm_node
@@ -5392,10 +5402,240 @@ let test_v58_migration_evm_config_world_state =
     ~scenario_after
     protocol
 
+let test_v59_migration_eth_accounts =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "migration"; "upgrade"; "mainnet"; "v59"; "eth_accounts"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.mainnet_kernel;
+        Constant.WASM.evm_kernel;
+      ])
+    ~title:
+      "V59 migration moves /evm/world_state/eth_accounts and eth_codes to \
+       /evm/eth_accounts (mainnet -> latest)"
+  @@ fun protocol ->
+  let account = Eth_account.bootstrap_accounts.(0) in
+  let addr = account.address in
+  let deployer = account in
+  let* simple_storage =
+    simple_storage @@ Kernel.select_evm_version @@ Kernel.Mainnet
+  in
+  let scenario_prior ~evm_setup =
+    let* _ = evm_setup.produce_block () in
+    let read path =
+      let*@ v = Rpc.state_value evm_setup.evm_node path in
+      return v
+    in
+    let* pre_balance =
+      read (Durable_storage_path.balance Kernel.Mainnet addr)
+    in
+    Check.(
+      (pre_balance <> None)
+        (option string)
+        ~error_msg:
+          (sf
+             "Pre-upgrade: bootstrap account balance must be present at legacy \
+              /evm/world_state/eth_accounts/%s/balance before V59"
+             addr)) ;
+    let*@ pre_eth_accounts_subkeys =
+      Rpc.state_subkeys evm_setup.evm_node "/evm/world_state"
+    in
+    Check.(
+      (List.mem
+         "eth_accounts"
+         (Option.value ~default:[] pre_eth_accounts_subkeys)
+      = true)
+        bool
+        ~error_msg:
+          "Pre-upgrade: /evm/world_state must contain eth_accounts before V59") ;
+    let* simple_storage_address, _ =
+      deploy ~contract:simple_storage ~sender:deployer evm_setup
+    in
+    let* () =
+      set_and_get_simple_storage_check
+        simple_storage
+        ~sender:deployer
+        ~number:42
+        ~address:simple_storage_address
+        ~error_prefix:"Pre-V59 migration"
+        evm_setup
+    in
+    let*@ pre_balance_eth = Rpc.get_balance ~address:addr evm_setup.evm_node in
+    return (pre_balance_eth, simple_storage_address)
+  in
+  let scenario_after ~evm_setup
+      ~sanity_check:(pre_balance_eth, simple_storage_address) =
+    let*@ legacy_eth_accounts =
+      Rpc.state_value
+        evm_setup.evm_node
+        (Durable_storage_path.balance Kernel.Mainnet addr)
+    in
+    Check.(
+      (legacy_eth_accounts = None)
+        (option string)
+        ~error_msg:
+          "Post-upgrade: /evm/world_state/eth_accounts must be absent after V59") ;
+    let*@ legacy_eth_accounts_subkeys =
+      Rpc.state_subkeys evm_setup.evm_node "/evm/world_state/eth_accounts"
+    in
+    Check.(
+      (legacy_eth_accounts_subkeys = Some [])
+        (option (list string))
+        ~error_msg:
+          "Post-upgrade: /evm/world_state/eth_accounts must have no subkeys \
+           after V59, got %L") ;
+    let*@ post_balance_eth = Rpc.get_balance ~address:addr evm_setup.evm_node in
+    Check.(
+      (post_balance_eth = pre_balance_eth)
+        Wei.typ
+        ~error_msg:
+          "Post-upgrade: account balance must be preserved after V59, got %L") ;
+    let*@ eth_codes_under_world_state =
+      Rpc.state_value evm_setup.evm_node "/evm/world_state/eth_codes"
+    in
+    Check.(
+      (eth_codes_under_world_state = None)
+        (option string)
+        ~error_msg:
+          "Post-upgrade: /evm/world_state/eth_codes must be absent after V59") ;
+    let*@ eth_codes_under_world_state_subkeys =
+      Rpc.state_subkeys evm_setup.evm_node "/evm/world_state/eth_codes"
+    in
+    Check.(
+      (eth_codes_under_world_state_subkeys = Some [])
+        (option (list string))
+        ~error_msg:
+          "Post-upgrade: /evm/world_state/eth_codes must have no subkeys after \
+           V59, got %L") ;
+    let*@ eth_codes_new =
+      Rpc.state_subkeys evm_setup.evm_node "/evm/eth_accounts"
+    in
+    Check.(
+      (List.mem "eth_codes" (Option.value ~default:[] eth_codes_new) = true)
+        bool
+        ~error_msg:
+          "Post-upgrade: /evm/eth_accounts must contain eth_codes after V59") ;
+    (* Direct bytecode lookup through the new [/evm/eth_accounts/eth_codes/<hash>/code]
+       path: SSTORE-via-simple_storage exercises the code lookup implicitly,
+       but an explicit [eth_getCode] catches a regression where the eth_codes
+       move silently dropped an entry while SSTORE still succeeded via a
+       different cache path. *)
+    let*@ code =
+      Rpc.get_code ~address:simple_storage_address evm_setup.evm_node
+    in
+    let expected_code = "0x" ^ read_file simple_storage.deployed_bin in
+    Check.((code = expected_code) string)
+      ~error_msg:
+        "Post-V59: eth_getCode on pre-V59-deployed contract must return the \
+         original bytecode, got %L" ;
+    let* () =
+      set_and_get_simple_storage_check
+        simple_storage
+        ~sender:deployer
+        ~number:24
+        ~address:simple_storage_address
+        ~error_prefix:"Post-V59 migration"
+        evm_setup
+    in
+    let*@ _ = evm_setup.produce_block () in
+    let*@ block = Rpc.get_block_by_number ~block:"latest" evm_setup.evm_node in
+    Check.(
+      (block.number > 0l)
+        int32
+        ~error_msg:
+          "eth_getBlockByNumber must return a positive block number after V59 \
+           account migration, got %L") ;
+    unit
+  in
+  gen_kernel_migration_test
+    ~from:Mainnet
+    ~to_:Latest
+    ~eth_bootstrap_accounts:[account.Eth_account.address]
+    ~scenario_prior
+    ~scenario_after
+    protocol
+
+let test_v59_migration_state_override =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:
+      [
+        "evm";
+        "migration";
+        "upgrade";
+        "mainnet";
+        "v59";
+        "state_override";
+        "eth_call";
+      ]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.mainnet_kernel;
+        Constant.WASM.evm_kernel;
+      ])
+    ~title:
+      "V59 migration: eth_call with state override uses post-V59 account paths \
+       (mainnet -> latest)"
+  @@ fun protocol ->
+  let account = Eth_account.bootstrap_accounts.(0) in
+  let* tester =
+    state_override_tester @@ Kernel.select_evm_version @@ Kernel.Mainnet
+  in
+  let caller_address = "0x0123456789012345678901234567890123456789" in
+  let scenario_prior ~evm_setup:_ = return () in
+  let scenario_after ~evm_setup ~sanity_check:() =
+    let* contract, _ = deploy ~contract:tester ~sender:account evm_setup in
+    let* calldata = Cast.calldata "getBalance()" in
+    let call =
+      `O
+        [
+          ("from", `String caller_address);
+          ("to", `String contract);
+          ("data", `String calldata);
+        ]
+    in
+    let override_balance =
+      `O [(caller_address, `O [("balance", `String "0xffff")])]
+    in
+    let* response =
+      Evm_node.(
+        call_evm_rpc
+          evm_setup.evm_node
+          {
+            method_ = "eth_call";
+            parameters = `A [call; `String "latest"; override_balance];
+          })
+    in
+    Check.(
+      (JSON.(response |-> "result" |> as_string)
+      = "0x000000000000000000000000000000000000000000000000000000000000ffff")
+        string)
+      ~error_msg:
+        "Post-V59: eth_call with balance override must return overridden \
+         balance 0xffff, got %L" ;
+    unit
+  in
+  gen_kernel_migration_test
+    ~from:Mainnet
+    ~to_:Latest
+    ~eth_bootstrap_accounts:[account.Eth_account.address]
+    ~scenario_prior
+    ~scenario_after
+    protocol
+
 let register_evm_migration ~protocols =
   test_latest_kernel_migration protocols ;
   test_mainnet_latest_kernel_migration protocols ;
   test_v58_migration_evm_config_world_state protocols ;
+  test_v59_migration_eth_accounts protocols ;
+  test_v59_migration_state_override protocols ;
   test_v50_migration_without_sequencer_key protocols ;
   test_latest_fa_bridge_non_regression_migration protocols ;
   test_deposit_before_and_after_migration protocols
@@ -5779,7 +6019,7 @@ let test_l2_call_inter_contract =
   in
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node () in
   let* () = check_tx_succeeded ~endpoint ~tx in
-  let* () = check_storage_size sc_rollup_node ~address:callee_address 1 in
+  let* () = check_storage_size ~evm_setup ~address:callee_address 1 in
   let* () =
     check_nb_in_storage ~evm_setup ~address:callee_address ~nth:0 ~expected:20
   in
@@ -5804,7 +6044,7 @@ let test_l2_call_inter_contract =
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node () in
 
   let* () = check_tx_succeeded ~endpoint ~tx in
-  let* () = check_storage_size sc_rollup_node ~address:callee_address 1 in
+  let* () = check_storage_size ~evm_setup ~address:callee_address 1 in
   let* () =
     check_nb_in_storage ~evm_setup ~address:callee_address ~nth:0 ~expected:10
   in
@@ -6839,7 +7079,7 @@ let test_reveal_storage =
       @@ Sc_rollup_rpc.get_global_block_durable_state_value
            ~pvm_kind
            ~operation:Sc_rollup_rpc.Value
-           ~key:(Durable_storage_path.account_info address)
+           ~key:(Durable_storage_path.account_info evm_setup.kernel address)
            ()
     in
     match info_opt with
@@ -7492,12 +7732,12 @@ let test_rpc_state_value_and_subkeys =
            [maximum_gas_per_transaction] under [/evm/world_state/], and
            reorganized the block index from [/evm/world_state/indexes/blocks/]
            to [/evm/world_state/blocks/indexes/], so [indexes] is no longer a
-           direct child of [/evm/world_state/]. *)
+           direct child of [/evm/world_state/]. Phase 7 (V59) moved
+           [eth_accounts] and [eth_codes] out of [/evm/world_state/] entirely
+           into [/evm/eth_accounts/]. *)
         [
           "blocks";
           "chain_id";
-          "eth_accounts";
-          "eth_codes";
           "evm_version";
           "fees";
           "maximum_gas_per_transaction";

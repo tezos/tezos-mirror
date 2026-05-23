@@ -89,6 +89,11 @@ pub const TEZ_BLOCKS_PATH: RefPath = RefPath::assert_from(b"/tez/world_state/tez
 pub const TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH: RefPath =
     RefPath::assert_from(b"/tez/tez_accounts");
 
+/// SafeStorage root for all EVM account state (balances, nonces, code, storage)
+/// and deduplicated bytecode.
+pub const EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH: RefPath =
+    RefPath::assert_from(b"/evm/eth_accounts");
+
 #[derive(Clone, Copy, Debug)]
 pub enum ChainFamily {
     Evm,
@@ -856,11 +861,15 @@ impl ChainConfigTrait for EvmChainConfig {
         if self.is_tezos_runtime_enabled(block_number) {
             vec![
                 ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+                EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
                 TEZ_SAFE_STORAGE_ROOT_PATH,
                 TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
             ]
         } else {
-            vec![ETHERLINK_SAFE_STORAGE_ROOT_PATH]
+            vec![
+                ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+                EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
+            ]
         }
     }
 }
@@ -1639,6 +1648,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
     fn storage_root_paths(&self, _block_number: U256) -> Vec<RefPath> {
         vec![
             ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+            EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
             TEZ_SAFE_STORAGE_ROOT_PATH,
             TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
         ]

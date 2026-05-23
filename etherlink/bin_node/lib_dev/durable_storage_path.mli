@@ -28,10 +28,6 @@ val michelson_ledger_root : path
 (** Root of the Michelson world-state keyspace ([/tez/world_state]). *)
 val tez_world_state_root : path
 
-(** Shadow root of the Michelson world-state keyspace
-    ([/tmp/tez/world_state]). *)
-val tez_world_state_safe_root : path
-
 (** TezosX: root for Tezos blocks stored under the Michelson world state
     ([/tez/world_state/tez_blocks]). *)
 val tezosx_tezos_blocks_root : path
@@ -118,20 +114,23 @@ end
 
 (** Paths related to accounts. *)
 module Accounts : sig
+  (** Root of the accounts subtree, version-aware. *)
+  val accounts_root : storage_version:int -> path
+
   (** Path to the account's info. Should be used in place of `balance`, `nonce` and `code` *)
-  val info : address -> path
+  val info : storage_version:int -> address -> path
 
   (** Path to the account's balance. DEPRECATED use `info` *)
-  val balance : address -> path
+  val balance : storage_version:int -> address -> path
 
   (** Path to the account's nonce. DEPRECATED use `info` *)
-  val nonce : address -> path
+  val nonce : storage_version:int -> address -> path
 
   (** Path to the account's code. *)
-  val code : address -> path
+  val code : storage_version:int -> address -> path
 
   (** Path to the account's code hash. DEPRECATED use `info` *)
-  val code_hash : address -> path
+  val code_hash : storage_version:int -> address -> path
 
   type error += Invalid_address of string | Invalid_key of string
 
@@ -147,9 +146,10 @@ module Accounts : sig
       can observe the underlying string without re-validating. *)
   type fixed_index = private path
 
-  (** [fixed_address a] returns [a] tagged as validated, or fails with
-      [Invalid_address] if the underlying hex string is not 40 characters. *)
-  val fixed_address : address -> fixed_address tzresult
+  (** [fixed_address ~storage_version a] returns [a] tagged as validated, or
+      fails with [Invalid_address] if the underlying hex string is not 40
+      characters. *)
+  val fixed_address : storage_version:int -> address -> fixed_address tzresult
 
   (** [fixed_index s] returns [s] tagged as validated, or fails with
       [Invalid_key] if [s] is not 64 hex characters. *)
@@ -163,7 +163,14 @@ module Accounts : sig
 end
 
 module Code : sig
-  val code : hash -> path
+  (** Root of the codes subtree, version-aware. *)
+  val codes : storage_version:int -> path
+
+  (** Path to the code storage for a given hash. *)
+  val code_storage : storage_version:int -> hash -> path
+
+  (** Path to the bytecode bytes for a given hash. *)
+  val code : storage_version:int -> hash -> path
 end
 
 module Blueprint : sig

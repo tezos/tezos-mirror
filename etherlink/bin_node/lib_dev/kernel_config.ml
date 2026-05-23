@@ -346,6 +346,11 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
     ?set_account_code ?max_delayed_inbox_blueprint_length ?evm_version
     ?(with_runtimes = []) ?tez_bootstrap_accounts ~tez_bootstrap_balance
     ?tez_bootstrap_contracts ~output () =
+  let eth_bootstrap_path address =
+    if Constants.(kernel_is_newer ~than:Previewnet05 kernel_compat) then
+      ["evm"; "eth_accounts"; address]
+    else ["evm"; "world_state"; "eth_accounts"; address]
+  in
   let eth_bootstrap_accounts =
     let open Ethereum_types in
     match eth_bootstrap_accounts with
@@ -355,7 +360,7 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
         List.map
           (fun (Address (Hex address)) ->
             make_instr
-              ~path_prefix:["evm"; "world_state"; "eth_accounts"; address]
+              ~path_prefix:(eth_bootstrap_path address)
               (Some ("balance", balance)))
           eth_bootstrap_accounts
         |> List.flatten
@@ -383,7 +388,7 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
           (fun (address, code) ->
             make_instr
               ~convert:encode_hexa
-              ~path_prefix:["evm"; "world_state"; "eth_accounts"; address]
+              ~path_prefix:(eth_bootstrap_path address)
               (Some ("code", code)))
           set_account_codes
         |> List.flatten

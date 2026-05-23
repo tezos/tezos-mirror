@@ -3227,7 +3227,7 @@ let patch_kernel ?block_number kernel =
   in
   return_unit
 
-let provision_balance ?block_number address value =
+let provision_balance ?block_number ~storage_version address value =
   let new_info u =
     String.of_bytes
       (Tezosx.Tezos_runtime.encode_account_info
@@ -3246,7 +3246,8 @@ let provision_balance ?block_number address value =
           Patch_state
             {
               commit = false;
-              key = Durable_storage_path.Accounts.balance address;
+              key =
+                Durable_storage_path.Accounts.balance ~storage_version address;
               patch =
                 (let open Ethereum_types in
                  function

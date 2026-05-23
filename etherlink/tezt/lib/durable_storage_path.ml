@@ -55,22 +55,24 @@ let kernel_version = function
 
 let indexes = world_state "/indexes"
 
-let eth_accounts = world_state "/eth_accounts"
+let eth_accounts = function
+  | Kernel.Latest -> evm "/eth_accounts"
+  | Kernel.Previewnet | Kernel.Mainnet -> world_state "/eth_accounts"
 
-let eth_account addr = sf "%s/%s" eth_accounts (normalize addr)
+let eth_account kernel addr = sf "%s/%s" (eth_accounts kernel) (normalize addr)
 
-let account_info addr = sf "%s/info" (eth_account addr)
+let account_info kernel addr = sf "%s/info" (eth_account kernel addr)
 
-let balance addr = sf "%s/balance" (eth_account addr)
+let balance kernel addr = sf "%s/balance" (eth_account kernel addr)
 
-let nonce addr = sf "%s/nonce" (eth_account addr)
+let nonce kernel addr = sf "%s/nonce" (eth_account kernel addr)
 
-let code addr = sf "%s/code" (eth_account addr)
+let code kernel addr = sf "%s/code" (eth_account kernel addr)
 
-let storage addr ?key () =
+let storage kernel addr ?key () =
   sf
     "%s/storage%s"
-    (eth_account addr)
+    (eth_account kernel addr)
     (match key with None -> "" | Some key -> "/" ^ key)
 
 let admin = function
@@ -139,13 +141,13 @@ let evm_node_flag = function
   | Kernel.Mainnet -> "/__evm_node"
 
 module Ticket_table = struct
-  let ticket_table =
+  let ticket_table kernel =
     sf
       "%s/ticket_table"
-      (eth_account "0x0000000000000000000000000000000000000000")
+      (eth_account kernel "0x0000000000000000000000000000000000000000")
 
-  let balance ~ticket_hash ~account =
-    String.concat "/" [ticket_table; ticket_hash; account]
+  let balance kernel ~ticket_hash ~account =
+    String.concat "/" [ticket_table kernel; ticket_hash; account]
 end
 
 module Ghostnet = struct

@@ -480,45 +480,48 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
             decode = infallible_decode Ethereum_types.decode_address;
           })
   | Evm_legacy_account_balance address ->
-      static_rw
-        {
-          path = Durable_storage_path.Accounts.balance address;
-          decode = infallible_decode Ethereum_types.decode_number_le;
-          encode = (fun q -> Bytes.to_string (Ethereum_types.encode_u256_le q));
-        }
+      versioned_rw (fun ~storage_version ->
+          {
+            path = Durable_storage_path.Accounts.balance ~storage_version address;
+            decode = infallible_decode Ethereum_types.decode_number_le;
+            encode =
+              (fun q -> Bytes.to_string (Ethereum_types.encode_u256_le q));
+          })
   | Evm_legacy_account_nonce address ->
-      static_rw
-        {
-          path = Durable_storage_path.Accounts.nonce address;
-          decode = infallible_decode Ethereum_types.decode_number_le;
-          encode = (fun q -> Bytes.to_string (Ethereum_types.encode_u64_le q));
-        }
+      versioned_rw (fun ~storage_version ->
+          {
+            path = Durable_storage_path.Accounts.nonce ~storage_version address;
+            decode = infallible_decode Ethereum_types.decode_number_le;
+            encode = (fun q -> Bytes.to_string (Ethereum_types.encode_u64_le q));
+          })
   | Evm_legacy_account_code address ->
-      static_rw
-        {
-          path = Durable_storage_path.Accounts.code address;
-          decode =
-            infallible_decode (fun bytes ->
-                Hex.of_bytes bytes |> Hex.show |> Ethereum_types.hex_of_string);
-          encode = Ethereum_types.hex_to_bytes;
-        }
+      versioned_rw (fun ~storage_version ->
+          {
+            path = Durable_storage_path.Accounts.code ~storage_version address;
+            decode =
+              infallible_decode (fun bytes ->
+                  Hex.of_bytes bytes |> Hex.show |> Ethereum_types.hex_of_string);
+            encode = Ethereum_types.hex_to_bytes;
+          })
   | Evm_legacy_account_code_hash address ->
-      static_ro
-        {
-          path = Durable_storage_path.Accounts.code_hash address;
-          decode =
-            infallible_decode (fun bytes ->
-                Hex.of_bytes bytes |> Hex.show |> Ethereum_types.hash_of_string);
-        }
+      versioned_ro (fun ~storage_version ->
+          {
+            path =
+              Durable_storage_path.Accounts.code_hash ~storage_version address;
+            decode =
+              infallible_decode (fun bytes ->
+                  Hex.of_bytes bytes |> Hex.show
+                  |> Ethereum_types.hash_of_string);
+          })
   | Evm_code_by_hash hash ->
-      static_rw
-        {
-          path = Durable_storage_path.Code.code hash;
-          decode =
-            infallible_decode (fun bytes ->
-                Hex.of_bytes bytes |> Hex.show |> Ethereum_types.hex_of_string);
-          encode = Ethereum_types.hex_to_bytes;
-        }
+      versioned_rw (fun ~storage_version ->
+          {
+            path = Durable_storage_path.Code.code ~storage_version hash;
+            decode =
+              infallible_decode (fun bytes ->
+                  Hex.of_bytes bytes |> Hex.show |> Ethereum_types.hex_of_string);
+            encode = Ethereum_types.hex_to_bytes;
+          })
   | Evm_account_storage (addr, idx) ->
       static_rw
         {
@@ -530,12 +533,13 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
           encode = Ethereum_types.hex_to_bytes;
         }
   | Evm_account_info address ->
-      static_rw
-        {
-          path = Durable_storage_path.Accounts.info address;
-          decode = infallible_decode EVM_account_info.decode_exn;
-          encode = (fun info -> Bytes.to_string (EVM_account_info.encode info));
-        }
+      versioned_rw (fun ~storage_version ->
+          {
+            path = Durable_storage_path.Accounts.info ~storage_version address;
+            decode = infallible_decode EVM_account_info.decode_exn;
+            encode =
+              (fun info -> Bytes.to_string (EVM_account_info.encode info));
+          })
   | Tezos_account_info pkh ->
       static_ro
         {
