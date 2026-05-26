@@ -256,12 +256,7 @@ let make (ctxt : Evm_ro_context.t) =
       let `Main = chain in
       let* block = shell_block_param_to_eth_block_param block in
       let* state = Evm_ro_context.get_state ctxt ~block () in
-      Lwt_result.map (Option.value ~default:None)
-      @@ Durable_storage.inspect_durable_and_decode_opt
-           state
-           (contract_path c "/data/storage")
-           (Data_encoding.Binary.of_bytes_opt
-              Tezlink_imports.Imported_context.Script.expr_encoding)
+      Durable_storage.read_opt (Tezos_contract_storage c) state
 
     let get_code chain block c =
       let open Lwt_result_syntax in
@@ -270,12 +265,7 @@ let make (ctxt : Evm_ro_context.t) =
       let `Main = chain in
       let* block = shell_block_param_to_eth_block_param block in
       let* state = Evm_ro_context.get_state ctxt ~block () in
-      Lwt_result.map (Option.value ~default:None)
-      @@ Durable_storage.inspect_durable_and_decode_opt
-           state
-           (contract_path c "/data/code")
-           (Data_encoding.Binary.of_bytes_opt
-              Tezlink_imports.Imported_context.Script.expr_encoding)
+      Durable_storage.read_opt (Tezos_contract_code c) state
 
     let get_script chain block c =
       let open Lwt_result_syntax in
@@ -351,39 +341,13 @@ let make (ctxt : Evm_ro_context.t) =
       let `Main = chain in
       let* block = shell_block_param_to_eth_block_param block in
       let* state = Evm_ro_context.get_state ctxt ~block () in
-      let path = Tezlink_durable_storage.Path.big_map_value id key_hash in
-      let decode =
-        Data_encoding.Binary.of_bytes_opt
-          Tezlink_imports.Imported_context.Script.expr_encoding
-      in
-      let+ result =
-        Durable_storage.inspect_durable_and_decode_opt state path decode
-      in
-      Option.join result
+      Durable_storage.read_opt (Tezos_big_map_value (id, key_hash)) state
 
     let big_map_key_type state id =
-      let open Lwt_result_syntax in
-      let path = Tezlink_durable_storage.Path.big_map_key_type id in
-      let decode =
-        Data_encoding.Binary.of_bytes_opt
-          Tezlink_imports.Imported_context.Script.expr_encoding
-      in
-      let+ result =
-        Durable_storage.inspect_durable_and_decode_opt state path decode
-      in
-      Option.join result
+      Durable_storage.read_opt (Tezos_big_map_key_type id) state
 
     let big_map_value_type state id =
-      let open Lwt_result_syntax in
-      let path = Tezlink_durable_storage.Path.big_map_value_type id in
-      let decode =
-        Data_encoding.Binary.of_bytes_opt
-          Tezlink_imports.Imported_context.Script.expr_encoding
-      in
-      let+ result =
-        Durable_storage.inspect_durable_and_decode_opt state path decode
-      in
-      Option.join result
+      Durable_storage.read_opt (Tezos_big_map_value_type id) state
 
     let big_map_raw_info chain block id =
       let open Lwt_result_syntax in

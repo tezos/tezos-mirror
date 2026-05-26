@@ -78,14 +78,15 @@ module EVM_account_info = struct
         Some {balance; nonce; code_hash}
     | _ -> None
 
-  let decode_exn b =
+  let decode b =
     match decode_opt b with
-    | Some x -> x
+    | Some x -> Ok x
     | None ->
-        Format.ksprintf
-          Stdlib.failwith
-          "Invalid account info format: %s"
-          Hex.(show @@ of_bytes b)
+        Result_syntax.tzfail
+          (Rlp.Rlp_decoding_error
+             (Format.asprintf
+                "Invalid account info format: %s"
+                Hex.(show @@ of_bytes b)))
 end
 
 (* Typed path GADT — see [.mli] for the capability semantics. *)
@@ -183,6 +184,22 @@ type ('a, 'cap) path =
   | Evm_current_block_transactions_objects :
       Ethereum_types.block_hash
       -> (Ethereum_types.legacy_transaction_object list, ro) path
+  | Tezos_contract_storage :
+      Tezos_types.Contract.t
+      -> (Tezlink_imports.Imported_context.Script.expr, ro) path
+  | Tezos_contract_code :
+      Tezos_types.Contract.t
+      -> (Tezlink_imports.Imported_context.Script.expr, ro) path
+  | Tezos_big_map_value :
+      Tezlink_imports.Imported_context.Big_map.Id.t
+      * Tezlink_imports.Imported_protocol.Script_expr_hash.t
+      -> (Tezlink_imports.Imported_context.Script.expr, ro) path
+  | Tezos_big_map_key_type :
+      Tezlink_imports.Imported_context.Big_map.Id.t
+      -> (Tezlink_imports.Imported_context.Script.expr, ro) path
+  | Tezos_big_map_value_type :
+      Tezlink_imports.Imported_context.Big_map.Id.t
+      -> (Tezlink_imports.Imported_context.Script.expr, ro) path
 
 type 'a ro_resolved = {path : string; decode : bytes -> 'a tzresult}
 
@@ -218,6 +235,17 @@ type ('a, 'cap) resolution =
   | Versioned of (storage_version:int -> ('a, 'cap) resolved)
 
 let infallible_decode decode bytes = Ok (decode bytes)
+
+(** Decode [bytes] using a data-encoding and surface decoding failures as a
+    [tzresult]. Use this instead of [infallible_decode (Binary.of_bytes_exn _)]:
+    the latter only wraps the result in [Ok] without catching the exception
+    that [of_bytes_exn] raises on malformed payloads, so the exception escapes
+    [read_opt]'s [let*?] into the surrounding Lwt task. *)
+let safe_binary_decode enc bytes =
+  match Data_encoding.Binary.of_bytes enc bytes with
+  | Ok v -> Ok v
+  | Error e ->
+      Result_syntax.tzfail (Tezos_base.Data_encoding_wrapper.Decoding_error e)
 
 (** Empty-body presence flags: the value on disk is an (empty) marker; we only
     care about existence. *)
@@ -536,7 +564,7 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
       versioned_rw (fun ~storage_version ->
           {
             path = Durable_storage_path.Accounts.info ~storage_version address;
-            decode = infallible_decode EVM_account_info.decode_exn;
+            decode = EVM_account_info.decode;
             encode =
               (fun info -> Bytes.to_string (EVM_account_info.encode info));
           })
@@ -608,6 +636,62 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
                 | _ ->
                     raise
                       (Invalid_argument "Transaction objects should be a list"));
+        }
+  | Tezos_contract_storage contract ->
+      static_ro
+        {
+          path = Durable_storage_path.michelson_contract_storage contract;
+          decode =
+            safe_binary_decode
+              Tezlink_imports.Imported_context.Script.expr_encoding;
+        }
+  | Tezos_contract_code contract ->
+      static_ro
+        {
+          path = Durable_storage_path.michelson_contract_code contract;
+          decode =
+            safe_binary_decode
+              Tezlink_imports.Imported_context.Script.expr_encoding;
+        }
+  | Tezos_big_map_value (id, key_hash) ->
+      let raw_hash =
+        Tezlink_imports.Imported_protocol.Script_expr_hash.to_bytes key_hash
+      in
+      let (`Hex key_hex) = Hex.of_bytes raw_hash in
+      static_ro
+        {
+          path =
+            Durable_storage_path.tezos_big_map_root ^ "/"
+            ^ Z.to_string
+                (Tezlink_imports.Imported_context.Big_map.Id.unparse_to_z id)
+            ^ "/" ^ key_hex;
+          decode =
+            safe_binary_decode
+              Tezlink_imports.Imported_context.Script.expr_encoding;
+        }
+  | Tezos_big_map_key_type id ->
+      static_ro
+        {
+          path =
+            Durable_storage_path.tezos_big_map_root ^ "/"
+            ^ Z.to_string
+                (Tezlink_imports.Imported_context.Big_map.Id.unparse_to_z id)
+            ^ "/key_type";
+          decode =
+            safe_binary_decode
+              Tezlink_imports.Imported_context.Script.expr_encoding;
+        }
+  | Tezos_big_map_value_type id ->
+      static_ro
+        {
+          path =
+            Durable_storage_path.tezos_big_map_root ^ "/"
+            ^ Z.to_string
+                (Tezlink_imports.Imported_context.Big_map.Id.unparse_to_z id)
+            ^ "/value_type";
+          decode =
+            safe_binary_decode
+              Tezlink_imports.Imported_context.Script.expr_encoding;
         }
 
 let storage_version state =
