@@ -410,6 +410,7 @@ where
     }
     safe_host.promote()?;
     safe_host.promote_trace()?;
+    safe_host.promote_http_trace()?;
     drop_blueprint(safe_host.host, block_header.blueprint_header.number)?;
     store_current_block_header(safe_host.host, &block_header)?;
 

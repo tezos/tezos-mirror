@@ -203,9 +203,10 @@ const EVM_BURNED_FEES: RefPath = RefPath::assert_from(b"/evm/world_state/fees/bu
 const EVM_INFO_PER_LEVEL_TIMESTAMP: RefPath =
     RefPath::assert_from(b"/base/info_per_level/timestamp");
 
-pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/evm/simulation_result");
+pub const SIMULATION_RESULT: RefPath =
+    RefPath::assert_from(b"/base/evm_simulation_result");
 pub const SIMULATION_HTTP_TRACES: RefPath =
-    RefPath::assert_from(b"/evm/simulation_http_traces");
+    RefPath::assert_from(b"/base/simulation_http_traces");
 
 /// Flag path enabling per-transaction HTTP trace capture during block
 /// replay. The `__` prefix follows the existing convention for node-driven
@@ -222,14 +223,16 @@ pub const HTTP_TRACE_ENABLED: RefPath =
 
 /// Storage root under which traces are persisted per transaction.
 ///
-/// This subtree *does* need to live under `/evm/world_state/` because the
-/// writes happen through the `SafeStorage`-wrapped host (the apply sites
-/// have no direct access to the underlying host): a path outside
-/// `storage_root_paths` would land in `/tmp/` and be discarded at promote
-/// instead of moved back to the real subtree. See
-/// `tezos_evm_runtime::safe_storage` for the mirror/promote mechanism.
-const HTTP_TRACES_ROOT: RefPath =
-    RefPath::assert_from(b"/evm/world_state/__http_trace/traces");
+/// The writes happen through the `SafeStorage`-wrapped host (the apply
+/// sites have no direct access to the underlying host), so they land in
+/// `/tmp/base/__http_trace/traces`. The block-finalization path calls
+/// [`SafeStorage::promote_http_trace`] to move that subtree out of
+/// `/tmp/` to the real `/base/__http_trace/traces` location. We do *not*
+/// add `/base/__http_trace` to the SafeStorage roots — it would force a
+/// `store_copy` of the subtree on every block, while HTTP traces only
+/// exist during the dedicated per-tx replay driven by
+/// [`HTTP_TRACE_ENABLED`].
+const HTTP_TRACES_ROOT: RefPath = RefPath::assert_from(b"/base/__http_trace/traces");
 
 // Path to the number of seconds until delayed txs are timed out.
 const EVM_DELAYED_INBOX_TIMEOUT: RefPath =
@@ -267,7 +270,7 @@ pub const DAL_PUBLISHERS_WHITELIST: RefPath =
     RefPath::assert_from(b"/base/dal_publishers_whitelist");
 
 // Path where the input for the tracer is stored by the sequencer.
-const TRACER_INPUT: RefPath = RefPath::assert_from(b"/evm/trace/input");
+const TRACER_INPUT: RefPath = RefPath::assert_from(b"/base/trace/input");
 
 // If this path contains a value, the fa bridge is enabled in the kernel.
 pub const ENABLE_FA_BRIDGE: RefPath =

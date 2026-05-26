@@ -1340,6 +1340,7 @@ where
 
     safe_host.promote()?;
     safe_host.promote_trace()?;
+    safe_host.promote_http_trace()?;
     safe_host.start()?;
 
     // Each operation uses 0-based nonces; block-sequential nonces are
@@ -1367,6 +1368,7 @@ where
         );
         safe_host.promote()?;
         safe_host.promote_trace()?;
+        safe_host.promote_http_trace()?;
     } else {
         log!(
             Debug,

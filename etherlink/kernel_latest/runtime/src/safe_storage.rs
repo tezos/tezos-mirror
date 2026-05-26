@@ -14,7 +14,7 @@ use tezos_smart_rollup_host::{
 };
 
 pub const TMP_PATH: RefPath = RefPath::assert_from(b"/tmp");
-pub const TRACE_PATH: RefPath = RefPath::assert_from(b"/evm/trace");
+pub const TRACE_PATH: RefPath = RefPath::assert_from(b"/base/trace");
 pub const HTTP_TRACE_PATH: RefPath = RefPath::assert_from(b"/base/__http_trace");
 pub const ETHERLINK_SAFE_STORAGE_ROOT_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state");
