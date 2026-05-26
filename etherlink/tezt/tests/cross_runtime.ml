@@ -1132,6 +1132,40 @@ module EvmStoreAndReturn = struct
     unit
 end
 
+(** Records [msg.sender] and [tx.origin] of the last incoming [run()]
+ *  call so a test can assert that a cross-runtime round-trip preserved
+ *  the native caller's identity. *)
+module EvmIdentityRecorder = struct
+  open EvmContract
+  include EvmRunner
+
+  let deploy =
+    deploy_solidity_contract ~contract:Solidity_contracts.crac_identity_recorder
+
+  (** Asserts that [lastSender] (slot 0) equals [expected_sender]
+   *  (lowercase hex, no [0x] prefix on either side). *)
+  let check_last_sender ~sequencer ~expected_sender contract =
+    let*@ raw = Rpc.get_storage_at ~address:contract ~pos:"0x0" sequencer in
+    let strip_0x = Test_helpers.remove_0x in
+    let parse_address slot =
+      let s = strip_0x slot in
+      (* Storage slot is 32 bytes (64 hex chars); address is the last 20
+         bytes (40 hex chars). *)
+      let len = String.length s in
+      let lo =
+        if len >= 40 then String.sub s (len - 40) 40 else String.make 40 '0'
+      in
+      String.lowercase_ascii lo
+    in
+    let actual = parse_address raw in
+    let expected = String.lowercase_ascii (strip_0x expected_sender) in
+    Check.(
+      (actual = expected)
+        string
+        ~error_msg:"Expected IdentityRecorder.lastSender %R but got %L") ;
+    unit
+end
+
 (** EVM contract that emits two indexed events ([EventA], [EventB]) on
  *  every [emitBoth(uint256)] call.  Used to verify that LOG opcodes
  *  emitted by an EVM contract reached through a Michelson-initiated
@@ -1805,6 +1839,12 @@ module CracRunnerWrapper = struct
       val deploy : unit -> evm_runner Lwt.t
 
       val check_storage : expected_value:int -> evm_runner -> unit Lwt.t
+    end
+
+    module EvmIdentityRecorder : sig
+      val deploy : unit -> evm_runner Lwt.t
+
+      val check_last_sender : expected_sender:string -> evm_runner -> unit Lwt.t
     end
 
     module EvmEvents : sig
@@ -2634,6 +2674,25 @@ module CracRunnerWrapper = struct
 
         let check_storage ~expected_value (`Evm_runner runner) =
           EvmStoreAndReturn.check_storage ~sequencer ~expected_value runner
+      end
+
+      module EvmIdentityRecorder = struct
+        let deploy () =
+          let* addr =
+            EvmIdentityRecorder.deploy
+              ~evm_version
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ()
+          in
+          return (`Evm_runner addr)
+
+        let check_last_sender ~expected_sender (`Evm_runner runner) =
+          EvmIdentityRecorder.check_last_sender
+            ~sequencer
+            ~expected_sender
+            runner
       end
 
       module EvmEvents = struct
@@ -9123,6 +9182,59 @@ let test_crac_http_call_evm_to_evm =
   Log.debug ~prefix "Verify EVM target was reached (counter=1)" ;
   EvmMultiRunCaller.check_storage ~expected_counter:1 evm_target
 
+(** Regression: an EVM contract that calls another EVM contract
+ *  through the runtime gateway must see [msg.sender] preserved on the
+ *  callee side.  Before the fix, the gateway re-derived an alias
+ *  ([keccak256("0x" ++ lowercase_hex(addr))[..20]]) for any native EVM
+ *  caller targeting the EVM runtime, silently rewriting [msg.sender] to
+ *  a deterministic-but-unrelated address.  This test deploys an
+ *  IdentityRecorder, calls it via the gateway from [CracHttpCallEvm],
+ *  and asserts that the recorder observed the calling contract's real
+ *  address rather than the laundered alias. *)
+let test_crac_http_call_evm_to_evm_preserves_msg_sender =
+  register_crac_runner_test
+    ~title:"CRAC: same-runtime EVM→EVM round-trip preserves msg.sender"
+    ~tags:["http_call"; "same_runtime"; "msg_sender"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-HTTP-EVM2EVM-SENDER" in
+  Log.debug ~prefix "Deploy EVM target (IdentityRecorder)" ;
+  let* evm_target = EvmIdentityRecorder.deploy () in
+  let (`Evm_runner target_address) = evm_target in
+  Log.debug ~prefix "Deploy EVM caller pointing at IdentityRecorder" ;
+  let* evm_caller = EvmCracHttpCallEvm.deploy_and_init evm_target in
+  let (`Evm_runner caller_address) = evm_caller in
+  Log.debug ~prefix "Trigger EVM→gateway→EVM round-trip" ;
+  let* _ = EvmCracHttpCallEvm.call_run_catch evm_caller in
+  Log.debug
+    ~prefix
+    "Verify caller counters: catches=0, count=3 (pre + ok + post)" ;
+  let* () =
+    EvmCracHttpCallEvm.check_storage
+      ~expected_catches:0
+      ~expected_counter:3
+      evm_caller
+  in
+  Log.debug
+    ~prefix
+    "Verify IdentityRecorder saw the real caller %s (NOT alias(caller))"
+    caller_address ;
+  let* () =
+    EvmIdentityRecorder.check_last_sender
+      ~expected_sender:caller_address
+      evm_target
+  in
+  (* Sanity: caller and target are distinct addresses (the assertion
+     above is only meaningful if they are). *)
+  Check.(
+    (String.lowercase_ascii caller_address
+    <> String.lowercase_ascii target_address)
+      string
+      ~error_msg:
+        "EVM caller and target addresses collided (%L == %R); the assertion is \
+         degenerate") ;
+  unit
+
 (** Generic call() precompile: TEZ calls TEZ via HTTP (same-runtime CRAC).
  *
  *    TEZ[tez_caller] --%call(http://tezos/.../run)--> TEZ[tez_target]
@@ -11047,6 +11159,7 @@ let () =
   test_crac_http_call_catch_revert [Alpha] ;
   test_crac_http_call_catch_oog [Alpha] ;
   test_crac_http_call_evm_to_evm [Alpha] ;
+  test_crac_http_call_evm_to_evm_preserves_msg_sender [Alpha] ;
   test_crac_http_call_tez_to_tez [Alpha] ;
   test_crac_http_call_evm_to_evm_revert [Alpha] ;
   test_crac_http_call_tez_to_tez_revert [Alpha] ;

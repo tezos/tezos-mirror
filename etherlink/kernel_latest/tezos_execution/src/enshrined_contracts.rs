@@ -833,6 +833,12 @@ where
     // the credential attached.
     let sender_is_source = sender == source;
     let sender_alias = 'sender: {
+        if target_runtime == RuntimeId::Tezos {
+            // Short-circuit for Tezos target: the alias is the sender's
+            // base58-encoded address. This covers both implicit and
+            // originated accounts since both fit the same pattern.
+            break 'sender sender.to_base58_check();
+        }
         let alias_info = match read_and_resolve_routing(ctx, &sender, target_runtime)? {
             RoutingDecision::RoundTrip(target) => break 'sender target,
             RoutingDecision::Transitive(info) => info,
@@ -887,6 +893,12 @@ where
             .cast_and_consume_milligas(ALIAS_LOOKUP_MILLIGAS)
             .map_err(TransferError::OutOfGas)?;
         'source: {
+            if target_runtime == RuntimeId::Tezos {
+                // Short-circuit for Tezos target: the alias is the source's
+                // base58-encoded address.
+                break 'source source.to_base58_check();
+            }
+
             let alias_info = match read_and_resolve_routing(ctx, &source, target_runtime)?
             {
                 RoutingDecision::RoundTrip(target) => break 'source target,
@@ -957,6 +969,14 @@ fn tezosx_resolve_source_alias_readonly(
     source: &AddressHash,
     target_runtime: RuntimeId,
 ) -> Result<String, TransferError> {
+    if target_runtime == RuntimeId::Tezos {
+        // Short-circuit for Tezos target: the alias is the source's
+        // base58check address. This avoids the durable read and alias
+        // computation for the common case of a Tezos contract calling
+        // the Tezos gateway.
+        return Ok(source.to_base58_check());
+    }
+
     let native_bytes = match read_and_resolve_routing(ctx, source, target_runtime)? {
         RoutingDecision::RoundTrip(target) => return Ok(target),
         RoutingDecision::Transitive(info) => info.native_address,

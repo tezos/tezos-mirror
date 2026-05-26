@@ -53,6 +53,11 @@
   namespace, colliding with real durable big-maps. The id is now seeded
   to `-1` (temporary) and the temporaries are cleared after the call,
   matching the native batch path. (!21991)
+- Same-runtime gateway round-trips no longer launder the caller's
+  identity: when the gateway's source and target runtimes are the
+  same and the source is a native account, the gateway now delivers
+  the real native `msg.sender` (EVM) / `SENDER` (Michelson) to the
+  callee instead of re-deriving an alias from the caller's address. (!21963)
 
 ### Storage versions
 

@@ -668,6 +668,11 @@ where
         target_runtime: RuntimeId,
         remaining_evm_gas: u64,
     ) -> Result<(String, u64), CustomPrecompileError> {
+        if target_runtime == RuntimeId::Ethereum {
+            // Short-circuit for Ethereum: the alias is the EVM address itself,
+            // and no generation cost is incurred even on cache miss.
+            return Ok((source.to_string(), 0));
+        }
         let context = CrossRuntimeContext {
             gas_limit: self.database.block.gas_limit,
             timestamp: self.database.block.timestamp,
@@ -729,6 +734,11 @@ where
         target_runtime: RuntimeId,
         remaining_evm_gas: u64,
     ) -> Result<String, CustomPrecompileError> {
+        if target_runtime == RuntimeId::Ethereum {
+            // Short-circuit for Ethereum: the alias is the EVM address itself,
+            // and no generation cost is incurred even on cache miss.
+            return Ok(source.to_string());
+        }
         let remaining = Gas::new(remaining_evm_gas);
         let origin = StorageAccount::from_address(&source)
             .map_err(OriginStorageError::from)
