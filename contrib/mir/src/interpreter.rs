@@ -1352,8 +1352,7 @@ fn interpret_one<'a>(
                 stack.push(V::Bytes(bs1))
             }
             overloads::Concat::ListOfStrings => {
-                let list_rc = pop_rc!();
-                let list = irrefutable_match!(&*list_rc; V::List);
+                pop_ref!(list, List);
                 ctx.gas()
                     .consume(interpret_cost::concat_list_precheck(list.len())?)?;
 
@@ -1379,8 +1378,7 @@ fn interpret_one<'a>(
                 stack.push(V::String(result))
             }
             overloads::Concat::ListOfBytes => {
-                let list_rc = pop_rc!();
-                let list = irrefutable_match!(&*list_rc; V::List);
+                pop_ref!(list, List);
                 ctx.gas()
                     .consume(interpret_cost::concat_list_precheck(list.len())?)?;
 
@@ -1423,8 +1421,7 @@ fn interpret_one<'a>(
         I::Mem(overload) => match overload {
             overloads::Mem::Set => {
                 let key_rc = pop_rc!();
-                let set_rc = pop_rc!();
-                let set = irrefutable_match!(&*set_rc; V::Set);
+                pop_ref!(set, Set);
                 ctx.gas()
                     .consume(interpret_cost::set_mem(&key_rc, set.len())?)?;
                 let result = set.contains(&*key_rc);
@@ -1432,8 +1429,7 @@ fn interpret_one<'a>(
             }
             overloads::Mem::Map => {
                 let key_rc = pop_rc!();
-                let map_rc = pop_rc!();
-                let map = irrefutable_match!(&*map_rc; V::Map);
+                pop_ref!(map, Map);
                 ctx.gas()
                     .consume(interpret_cost::map_mem(&key_rc, map.len())?)?;
                 let result = map.contains_key(&*key_rc);
@@ -1441,8 +1437,7 @@ fn interpret_one<'a>(
             }
             overloads::Mem::BigMap => {
                 let key_rc = pop_rc!();
-                let map_rc = pop_rc!();
-                let map = irrefutable_match!(&*map_rc; V::BigMap);
+                pop_ref!(map, BigMap);
                 let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
                 ctx.gas().consume(interpret_cost::map_mem(&key_rc, len)?)?;
@@ -1453,8 +1448,7 @@ fn interpret_one<'a>(
         I::Get(overload) => match overload {
             overloads::Get::Map => {
                 let key_rc = pop_rc!();
-                let map_rc = pop_rc!();
-                let map = irrefutable_match!(&*map_rc; V::Map);
+                pop_ref!(map, Map);
                 ctx.gas()
                     .consume(interpret_cost::map_get(&key_rc, map.len())?)?;
                 let result = map.get(&*key_rc);
@@ -1462,8 +1456,7 @@ fn interpret_one<'a>(
             }
             overloads::Get::BigMap => {
                 let key_rc = pop_rc!();
-                let map_rc = pop_rc!();
-                let map = irrefutable_match!(&*map_rc; V::BigMap);
+                pop_ref!(map, BigMap);
                 let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
                 ctx.gas().consume(interpret_cost::map_get(&key_rc, len)?)?;
@@ -1915,8 +1908,7 @@ fn interpret_one<'a>(
         }
         #[cfg(feature = "bls")]
         I::PairingCheck => {
-            let list_rc = pop_rc!();
-            let list = irrefutable_match!(&*list_rc; V::List);
+            pop_ref!(list, List);
             ctx.gas()
                 .consume(interpret_cost::pairing_check(list.len())?)?;
             let it = list.iter().map(|elt| {
