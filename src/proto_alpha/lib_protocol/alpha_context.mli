@@ -267,6 +267,8 @@ module Raw_level : sig
 
   val add : raw_level -> int -> raw_level
 
+  val add_opt : raw_level -> int -> raw_level option
+
   val sub : raw_level -> int -> raw_level option
 
   module Set : Set.S with type elt = raw_level

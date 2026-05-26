@@ -55,6 +55,11 @@ let add l i =
   assert (Compare.Int32.(x >= 0l)) ;
   x
 
+let add_opt l i =
+  assert (Compare.Int.(i >= 0)) ;
+  let res = Int32.add l (Int32.of_int i) in
+  if Compare.Int32.(res >= 0l) then Some res else None
+
 let sub l i =
   assert (Compare.Int.(i >= 0)) ;
   let res = Int32.sub l (Int32.of_int i) in
