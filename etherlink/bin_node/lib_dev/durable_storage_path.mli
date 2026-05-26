@@ -35,6 +35,21 @@ val michelson_contract_storage : Tezos_types.Contract.t -> path
     ([/tez/tez_accounts/contracts/index/<hex>/data/code]). *)
 val michelson_contract_code : Tezos_types.Contract.t -> path
 
+(** [michelson_contract_balance contract] is the durable storage path of
+    [contract]'s balance under the Tezlink Path data model
+    ([/tez/tez_accounts/contracts/index/<hex>/balance]). *)
+val michelson_contract_balance : Tezos_types.Contract.t -> path
+
+(** [michelson_contract_manager contract] is the durable storage path of
+    [contract]'s revealed-public-key manager under the Tezlink Path data
+    model ([/tez/tez_accounts/contracts/index/<hex>/manager]). *)
+val michelson_contract_manager : Tezos_types.Contract.t -> path
+
+(** [michelson_contract_counter contract] is the durable storage path of
+    [contract]'s nonce under the Tezlink Path data model
+    ([/tez/tez_accounts/contracts/index/<hex>/counter]). *)
+val michelson_contract_counter : Tezos_types.Contract.t -> path
+
 (** [/tez/tez_accounts/tezosx] — root of the TezosX projected accounts
     and cross-runtime alias subtree. *)
 val michelson_ledger_root : path
