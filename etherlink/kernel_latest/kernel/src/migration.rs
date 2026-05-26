@@ -753,6 +753,27 @@ where
             Ok(MigrationStatus::Done)
         }
         StorageVersion::V46 => {
+            if is_etherlink_network(host, MAINNET_CHAIN_ID)? {
+                const REGULAR_GOVERNANCE_KT: &[u8] =
+                    b"KT1AXRU3wLc87WNhLhVGrgqDGubLACUMUgPb";
+                const SECURITY_GOVERNANCE_KT: &[u8] =
+                    b"KT19oUVQPnVLuUBYXrBVd46WJnNAMpqkKSwo";
+                const SEQUENCER_GOVERNANCE_KT: &[u8] =
+                    b"KT1VGyd2cRSHoDnxDnSuqGJD3mL8DzcVqX98";
+
+                host.store_write_all(&legacy::KERNEL_GOVERNANCE, REGULAR_GOVERNANCE_KT)?;
+                host.store_write_all(
+                    &legacy::KERNEL_SECURITY_GOVERNANCE,
+                    SECURITY_GOVERNANCE_KT,
+                )?;
+                host.store_write_all(&SEQUENCER_GOVERNANCE, SEQUENCER_GOVERNANCE_KT)?;
+
+                Ok(MigrationStatus::Done)
+            } else {
+                Ok(MigrationStatus::None)
+            }
+        }
+        StorageVersion::V47 => {
             // Clean remaining leftover block indexes from V41.
             if let Ok(current_number) =
                 read_current_number(host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH)
@@ -788,27 +809,6 @@ where
                 }
             }
             Ok(MigrationStatus::Done)
-        }
-        StorageVersion::V47 => {
-            if is_etherlink_network(host, MAINNET_CHAIN_ID)? {
-                const REGULAR_GOVERNANCE_KT: &[u8] =
-                    b"KT1NM6cpM5BPTmYPszjv6LRDAMRZXPET9DmH";
-                const SECURITY_GOVERNANCE_KT: &[u8] =
-                    b"KT1JGCdHEyvE3RkmzR7hRYK7vC42QF6zK34H";
-                const SEQUENCER_GOVERNANCE_KT: &[u8] =
-                    b"KT1CSqkafD5ZCHFvmsozrCBeSy2XJQzutJRn";
-
-                host.store_write_all(&legacy::KERNEL_GOVERNANCE, REGULAR_GOVERNANCE_KT)?;
-                host.store_write_all(
-                    &legacy::KERNEL_SECURITY_GOVERNANCE,
-                    SECURITY_GOVERNANCE_KT,
-                )?;
-                host.store_write_all(&SEQUENCER_GOVERNANCE, SEQUENCER_GOVERNANCE_KT)?;
-
-                Ok(MigrationStatus::Done)
-            } else {
-                Ok(MigrationStatus::None)
-            }
         }
         StorageVersion::V48 => {
             // Starting version 48, blueprints from the sequencer can
