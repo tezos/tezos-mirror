@@ -1194,6 +1194,17 @@ where
             }
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V60 => {
+            // Phase 7.5: simulation & trace IPC moved under /base/.
+            // No store_move needed — every affected path
+            // (`/evm/simulation_result`, `/evm/simulation_http_traces`,
+            // `/evm/trace/input`, `/evm/world_state/__http_trace/traces`,
+            // `/tez/world_state/simulation_result`) is ephemeral IPC,
+            // populated only inside `simulate_and_read*` host calls and
+            // never persisted across rollup blocks. The version bump is
+            // sufficient.
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 
