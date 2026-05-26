@@ -351,6 +351,17 @@ fn interpret_one<'a>(
         };
     }
 
+    // `pop_ref!(x, Foo)` pops the stack and binds `x` as a borrow into
+    // `V::Foo`'s payload, without cloning. Expands to two `let`s so the
+    // intermediate `Rc<TypedValue>` lives in the caller's scope and `x`
+    // stays a valid reference.
+    macro_rules! pop_ref {
+        ($var:ident, $ctor:tt) => {
+            let __pop_ref_rc = pop_rc!();
+            let $var = irrefutable_match!(&*__pop_ref_rc; V::$ctor);
+        };
+    }
+
     match i {
         I::Add(overload) => match overload {
             overloads::Add::IntInt => {
@@ -1091,25 +1102,25 @@ fn interpret_one<'a>(
             }
             #[cfg(feature = "bls")]
             overloads::Int::Bls12381Fr => {
-                let i = pop!(V::Bls12381Fr);
+                pop_ref!(i, Bls12381Fr);
                 ctx.gas().consume(interpret_cost::INT_BLS_FR)?;
                 stack.push(V::Int(i.to_big_int()))
             }
             overloads::Int::Bytes => {
-                let i = pop!(V::Bytes);
+                pop_ref!(i, Bytes);
                 ctx.gas().consume(interpret_cost::int_bytes(i.len())?)?;
-                stack.push(V::Int(BigInt::from_signed_bytes_be(&i)))
+                stack.push(V::Int(BigInt::from_signed_bytes_be(i)))
             }
         },
         I::Nat => {
-            let i = pop!(V::Bytes);
+            pop_ref!(i, Bytes);
             ctx.gas().consume(interpret_cost::int_bytes(i.len())?)?;
-            stack.push(V::Nat(BigUint::from_bytes_be(&i)))
+            stack.push(V::Nat(BigUint::from_bytes_be(i)))
         }
         I::Bytes(overload) => match overload {
             overloads::Bytes::Nat => {
-                let i = pop!(V::Nat);
-                ctx.gas().consume(interpret_cost::bytes_nat(&i)?)?;
+                pop_ref!(i, Nat);
+                ctx.gas().consume(interpret_cost::bytes_nat(i)?)?;
                 stack.push(V::Bytes(if i.is_zero() {
                     Vec::new() // empty
                 } else {
@@ -1117,8 +1128,8 @@ fn interpret_one<'a>(
                 }));
             }
             overloads::Bytes::Int => {
-                let i = pop!(V::Int);
-                ctx.gas().consume(interpret_cost::bytes_int(&i)?)?;
+                pop_ref!(i, Int);
+                ctx.gas().consume(interpret_cost::bytes_int(i)?)?;
                 stack.push(V::Bytes(if i.is_zero() {
                     Vec::new() // empty
                 } else {
@@ -1341,8 +1352,7 @@ fn interpret_one<'a>(
                 stack.push(V::Bytes(bs1))
             }
             overloads::Concat::ListOfStrings => {
-                let list_rc = pop_rc!();
-                let list = irrefutable_match!(&*list_rc; V::List);
+                pop_ref!(list, List);
                 ctx.gas()
                     .consume(interpret_cost::concat_list_precheck(list.len())?)?;
 
@@ -1368,8 +1378,7 @@ fn interpret_one<'a>(
                 stack.push(V::String(result))
             }
             overloads::Concat::ListOfBytes => {
-                let list_rc = pop_rc!();
-                let list = irrefutable_match!(&*list_rc; V::List);
+                pop_ref!(list, List);
                 ctx.gas()
                     .consume(interpret_cost::concat_list_precheck(list.len())?)?;
 
@@ -1412,8 +1421,7 @@ fn interpret_one<'a>(
         I::Mem(overload) => match overload {
             overloads::Mem::Set => {
                 let key_rc = pop_rc!();
-                let set_rc = pop_rc!();
-                let set = irrefutable_match!(&*set_rc; V::Set);
+                pop_ref!(set, Set);
                 ctx.gas()
                     .consume(interpret_cost::set_mem(&key_rc, set.len())?)?;
                 let result = set.contains(&*key_rc);
@@ -1421,8 +1429,7 @@ fn interpret_one<'a>(
             }
             overloads::Mem::Map => {
                 let key_rc = pop_rc!();
-                let map_rc = pop_rc!();
-                let map = irrefutable_match!(&*map_rc; V::Map);
+                pop_ref!(map, Map);
                 ctx.gas()
                     .consume(interpret_cost::map_mem(&key_rc, map.len())?)?;
                 let result = map.contains_key(&*key_rc);
@@ -1430,8 +1437,7 @@ fn interpret_one<'a>(
             }
             overloads::Mem::BigMap => {
                 let key_rc = pop_rc!();
-                let map_rc = pop_rc!();
-                let map = irrefutable_match!(&*map_rc; V::BigMap);
+                pop_ref!(map, BigMap);
                 let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
                 ctx.gas().consume(interpret_cost::map_mem(&key_rc, len)?)?;
@@ -1442,8 +1448,7 @@ fn interpret_one<'a>(
         I::Get(overload) => match overload {
             overloads::Get::Map => {
                 let key_rc = pop_rc!();
-                let map_rc = pop_rc!();
-                let map = irrefutable_match!(&*map_rc; V::Map);
+                pop_ref!(map, Map);
                 ctx.gas()
                     .consume(interpret_cost::map_get(&key_rc, map.len())?)?;
                 let result = map.get(&*key_rc);
@@ -1451,8 +1456,7 @@ fn interpret_one<'a>(
             }
             overloads::Get::BigMap => {
                 let key_rc = pop_rc!();
-                let map_rc = pop_rc!();
-                let map = irrefutable_match!(&*map_rc; V::BigMap);
+                pop_ref!(map, BigMap);
                 let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
                 ctx.gas().consume(interpret_cost::map_get(&key_rc, len)?)?;
@@ -1529,7 +1533,7 @@ fn interpret_one<'a>(
         I::Size(overload) => {
             macro_rules! run_size {
                 ($ctor:tt, $gas:ident) => {{
-                    let e = pop!(V::$ctor);
+                    pop_ref!(e, $ctor);
                     ctx.gas().consume(interpret_cost::$gas)?;
                     let res = e.len();
                     stack.push(V::Nat(res.into()));
@@ -1647,16 +1651,14 @@ fn interpret_one<'a>(
             let length = pop!(V::Nat);
             let result = match overload {
                 overloads::Slice::String => {
-                    let str = pop!(V::String);
-
+                    pop_ref!(str, String);
                     ctx.gas().consume(interpret_cost::slice(str.len())?)?;
                     validate_bounds(offset, length, str.len())
                         .and_then(|range| str.get(range))
                         .map(|str| V::String(str.to_string()))
                 }
                 overloads::Slice::Bytes => {
-                    let bytes = pop!(V::Bytes);
-
+                    pop_ref!(bytes, Bytes);
                     ctx.gas().consume(interpret_cost::slice(bytes.len())?)?;
                     validate_bounds(offset, length, bytes.len())
                         .and_then(|range| bytes.get(range))
@@ -1906,8 +1908,7 @@ fn interpret_one<'a>(
         }
         #[cfg(feature = "bls")]
         I::PairingCheck => {
-            let list_rc = pop_rc!();
-            let list = irrefutable_match!(&*list_rc; V::List);
+            pop_ref!(list, List);
             ctx.gas()
                 .consume(interpret_cost::pairing_check(list.len())?)?;
             let it = list.iter().map(|elt| {
