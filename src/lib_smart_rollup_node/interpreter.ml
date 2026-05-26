@@ -547,7 +547,33 @@ let from_cached_eval_state ctx_index cached =
       | Some state -> return {state; info = cached.cached_info}
       | None -> failwith "Failed to checkout cached PVM state from disk")
 
-(* Global cache to share states between different parallel refutation games. *)
+(* Global cache to share states between different parallel refutation games.
+
+   INVARIANT (reorg safety). This cache is keyed by absolute tick only and is
+   never invalidated on L1 reorg. The reason this is safe in honest live
+   operation is the following chain:
+
+   1. The cache is only written from [state_of_tick] (below), which is reached
+      exclusively from refutation game code paths
+      ([Refutation_game.next_dissection] / [Refutation_game_helpers]).
+   2. The refutation coordinator only spawns a player for an L1 conflict in
+      which [self] is a party — i.e. [self]'s commitment is already published
+      on L1.
+   3. The publisher only emits a commitment to L1 once its inbox level is at
+      or below the locally observed finalized level (see
+      [Publisher.missing_commitments]).
+   4. The finalized level is set to a Tenderbake-finalized level (head − 2,
+      or the directly-fed finalized head when [l1_monitor_finalized] is on);
+      Tenderbake finality is not reorgable.
+
+   Therefore every tick the cache could see during a game belongs to an inbox
+   level that L1 cannot reorg away from, and the (tick) key cannot resolve to
+   two different canonical states across a reorg.
+
+   This invariant is load-bearing: populating the cache for non-finalized
+   ticks — e.g. caching during regular block processing, or entering a
+   refutation game without an L1-published own-commitment — would re-expose
+   the staleness scenario described in L2-1358. *)
 let global_tick_state_cache =
   Pvm_plugin_sig.make_state_cache 64 (* size of 2 dissections *)
 

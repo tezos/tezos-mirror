@@ -88,6 +88,11 @@ module Handlers = struct
         node_ctxt
         conflict.our_commitment
     in
+    (* Per-player tick state cache. The reorg-safety invariant documented on
+       [Interpreter.global_tick_state_cache] also covers this cache: a player
+       exists only because the coordinator observed an L1 conflict in which
+       [self] is a party, so [self]'s commitment is already on L1 and only
+       covers finalized inbox levels. *)
     let state_cache = Pvm_plugin_sig.make_state_cache 64 in
     return
       Types.

@@ -176,9 +176,6 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
   let* () =
     Plugin.L1_processing.process_l1_block_operations ~catching_up node_ctxt head
   in
-  (* Avoid storing and publishing commitments if the head is not final. *)
-  (* Avoid triggering the pvm execution if this has been done before for
-     this head. *)
   let* {num_ticks; initial_tick; state_hash; _} =
     Interpreter.process_head
       (module Plugin)
@@ -438,9 +435,19 @@ let on_layer_1_head ({node_ctxt; _} as state) ~finalized (head : Layer1.header)
     in
     let*? reorg = report_missing_data reorg in
     let*! () = Daemon_event.reorg reorg.old_chain in
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3348
-       Rollback state information on reorganization, i.e. for
-       reorg.old_chain. *)
+    (* NOTE (reorg rollback): no state is rolled back here for [reorg.old_chain].
+       This is currently safe because all observable side effects of head
+       processing — published commitments, cementations, refutation moves,
+       and the tick state caches consulted during dissection — are gated on
+       Tenderbake-finalized levels (see [Publisher.missing_commitments] and
+       the invariant on [Interpreter.global_tick_state_cache]). Tenderbake
+       finality cannot be reorged, so processed state covering finalized
+       levels is never stale after a reorg.
+
+       If you add state that depends on a *non-finalized* head being on the
+       canonical chain (anything not finality-gated), this is the place to
+       revert it for the blocks in [reorg.old_chain]. See
+       https://gitlab.com/tezos/tezos/-/issues/3348. *)
     let*! () = Daemon_event.processing_heads_iteration reorg.new_chain in
     let get_header Layer1.{hash; level} =
       if Block_hash.equal hash head.hash then return head
