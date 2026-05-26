@@ -312,37 +312,57 @@ module Http_trace : sig
       for the transaction [transaction_hash] (a hex string, without [0x]
       prefix). A missing key means the transaction performed no cross-runtime
       HTTP call. *)
-  val for_tx : transaction_hash:path -> path
+  val for_tx : storage_version:int -> transaction_hash:path -> path
 end
 
 module Trace : sig
   (** Path under which all traces are stored when the
       given [hash] parameter is provided, otherwise it
       will just provide the path to the root. *)
-  val root_indexed_by_hash : transaction_hash:path option -> path
+  val root_indexed_by_hash :
+    storage_version:int -> transaction_hash:path option -> path
 
   (** Path where is stored the input of the tracer. *)
-  val input : path
+  val input : storage_version:int -> path
 
   (** Path where is stored the gas consumed by the call. *)
-  val output_gas : transaction_hash:path option -> path
+  val output_gas : storage_version:int -> transaction_hash:path option -> path
 
   (** Path where the result of the traced transaction is stored. *)
-  val output_failed : transaction_hash:path option -> path
+  val output_failed :
+    storage_version:int -> transaction_hash:path option -> path
 
   (** Path where is stored the value returned by the transaction's execution. *)
-  val output_return_value : transaction_hash:path option -> path
+  val output_return_value :
+    storage_version:int -> transaction_hash:path option -> path
 
-  val logs_length : transaction_hash:path option -> path
+  val logs_length : storage_version:int -> transaction_hash:path option -> path
 
-  val opcode : transaction_hash:path option -> int -> path
+  val opcode :
+    storage_version:int -> transaction_hash:path option -> int -> path
 
   (** Path where is stored the number of call trace items *)
-  val call_trace_length : transaction_hash:path option -> path
+  val call_trace_length :
+    storage_version:int -> transaction_hash:path option -> path
 
   (** Path where is stored the [i]eth trace *)
-  val call_trace : transaction_hash:path option -> int -> path
+  val call_trace :
+    storage_version:int -> transaction_hash:path option -> int -> path
 end
+
+(** Path at which the EVM call simulation result is exposed. Used as an
+    insight key — caller splits it into path components via [to_components]. *)
+val evm_simulation_result : storage_version:int -> path
+
+(** Path at which the EVM call simulation HTTP traces are exposed. *)
+val evm_simulation_http_traces : storage_version:int -> path
+
+(** Path at which the Tezlink simulation result is exposed. *)
+val tez_simulation_result : storage_version:int -> path
+
+(** Split a path like [/foo/bar/baz] into [["foo"; "bar"; "baz"]] — the
+    component list expected by [Simulation.Encodings.Durable_storage_key]. *)
+val to_components : path -> string list
 
 module Chain_configuration : sig
   val minimum_base_fee_per_gas :

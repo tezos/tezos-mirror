@@ -45,3 +45,5 @@ let michelson_runtime_paths_moved_to_world_state ~storage_version =
 let evm_config_moved_to_world_state ~storage_version = storage_version >= 58
 
 let evm_accounts_isolated ~storage_version = storage_version >= 59
+
+let simulation_trace_ipc_moved_to_base ~storage_version = storage_version >= 60

@@ -465,53 +465,88 @@ module Http_trace = struct
      [SafeStorage] wrapping, so nothing inside the apply chain has to
      round-trip through [SafeStorage] to see it.
 
-     [root] is where the kernel persists the per-transaction traces: it
-     *does* sit under [/evm/world_state/] because those writes happen
-     through the [SafeStorage]-wrapped host, so they need to live under a
+     [root ~storage_version] is where the kernel persists the per-tx
+     traces. On V60+ kernels the subtree is dedicated under [/base/]
+     and the kernel promotes [/tmp/base/__http_trace] through
+     [SafeStorage::promote_http_trace] at block finalisation; on older
+     kernels it lived under [/evm/world_state/] because all writes went
+     through the [SafeStorage]-wrapped host, requiring it to sit under a
      promoted subtree to be readable from the post-replay state. *)
-  let root = World_state.make "/__http_trace/traces"
+  let root ~storage_version =
+    if Storage_version.simulation_trace_ipc_moved_to_base ~storage_version then
+      BASE.make "/__http_trace/traces"
+    else World_state.make "/__http_trace/traces"
 
   let enabled_flag = BASE.make "/__http_trace_enabled"
 
-  let for_tx ~transaction_hash = root ^ "/" ^ transaction_hash
+  let for_tx ~storage_version ~transaction_hash =
+    root ~storage_version ^ "/" ^ transaction_hash
 end
 
 module Trace = struct
-  let root = EVM.make "/trace"
+  let root ~storage_version =
+    if Storage_version.simulation_trace_ipc_moved_to_base ~storage_version then
+      BASE.make "/trace"
+    else EVM.make "/trace"
 
-  let root_indexed_by_hash ~transaction_hash =
+  let root_indexed_by_hash ~storage_version ~transaction_hash =
     match transaction_hash with
-    | Some transaction_hash -> root ^ "/" ^ transaction_hash
-    | None -> root
+    | Some transaction_hash -> root ~storage_version ^ "/" ^ transaction_hash
+    | None -> root ~storage_version
 
-  let input = root ^ "/input"
+  let input ~storage_version = root ~storage_version ^ "/input"
 
-  let output_gas ~transaction_hash =
-    root_indexed_by_hash ~transaction_hash ^ "/gas"
+  let output_gas ~storage_version ~transaction_hash =
+    root_indexed_by_hash ~storage_version ~transaction_hash ^ "/gas"
 
-  let output_failed ~transaction_hash =
-    root_indexed_by_hash ~transaction_hash ^ "/failed"
+  let output_failed ~storage_version ~transaction_hash =
+    root_indexed_by_hash ~storage_version ~transaction_hash ^ "/failed"
 
-  let output_return_value ~transaction_hash =
-    root_indexed_by_hash ~transaction_hash ^ "/return_value"
+  let output_return_value ~storage_version ~transaction_hash =
+    root_indexed_by_hash ~storage_version ~transaction_hash ^ "/return_value"
 
-  let opcodes_root ~transaction_hash =
-    root_indexed_by_hash ~transaction_hash ^ "/struct_logs"
+  let opcodes_root ~storage_version ~transaction_hash =
+    root_indexed_by_hash ~storage_version ~transaction_hash ^ "/struct_logs"
 
-  let logs_length ~transaction_hash = opcodes_root ~transaction_hash ^ "/length"
+  let logs_length ~storage_version ~transaction_hash =
+    opcodes_root ~storage_version ~transaction_hash ^ "/length"
 
-  let opcode ~transaction_hash i =
-    opcodes_root ~transaction_hash ^ "/" ^ string_of_int i
+  let opcode ~storage_version ~transaction_hash i =
+    opcodes_root ~storage_version ~transaction_hash ^ "/" ^ string_of_int i
 
-  let call_trace_root ~transaction_hash =
-    root_indexed_by_hash ~transaction_hash ^ "/call_trace"
+  let call_trace_root ~storage_version ~transaction_hash =
+    root_indexed_by_hash ~storage_version ~transaction_hash ^ "/call_trace"
 
-  let call_trace_length ~transaction_hash =
-    call_trace_root ~transaction_hash ^ "/length"
+  let call_trace_length ~storage_version ~transaction_hash =
+    call_trace_root ~storage_version ~transaction_hash ^ "/length"
 
-  let call_trace ~transaction_hash i =
-    call_trace_root ~transaction_hash ^ "/" ^ string_of_int i
+  let call_trace ~storage_version ~transaction_hash i =
+    call_trace_root ~storage_version ~transaction_hash ^ "/" ^ string_of_int i
 end
+
+(* Simulation insight paths. Each is the path the kernel writes during a
+   [simulate_and_read*] host call; the EVM node requests it back through
+   [Durable_storage_key], so simulator.ml needs the path components, not
+   the path string. *)
+let evm_simulation_result ~storage_version =
+  if Storage_version.simulation_trace_ipc_moved_to_base ~storage_version then
+    BASE.make "/evm_simulation_result"
+  else EVM.make "/simulation_result"
+
+let evm_simulation_http_traces ~storage_version =
+  if Storage_version.simulation_trace_ipc_moved_to_base ~storage_version then
+    BASE.make "/simulation_http_traces"
+  else EVM.make "/simulation_http_traces"
+
+let tez_simulation_result ~storage_version =
+  if Storage_version.simulation_trace_ipc_moved_to_base ~storage_version then
+    BASE.make "/tez_simulation_result"
+  else TEZ.World_state.make "/simulation_result"
+
+(* Split a [/foo/bar/baz] path into the [["foo"; "bar"; "baz"]] component
+   list expected by [Simulation.Encodings.Durable_storage_key]. *)
+let to_components path =
+  String.split_on_char '/' path |> List.filter (fun s -> s <> "")
 
 module Chain_configuration = struct
   open L2_types

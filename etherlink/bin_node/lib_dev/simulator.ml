@@ -47,8 +47,13 @@ module Etherlink = struct
       ~input_encoder ~input simulation_state =
     let open Lwt_result_syntax in
     let*? messages = input_encoder input in
+    let* storage_version = Durable_storage.storage_version simulation_state in
     let insight_requests =
-      [Simulation.Encodings.Durable_storage_key ["evm"; "simulation_result"]]
+      [
+        Simulation.Encodings.Durable_storage_key
+          (Durable_storage_path.to_components
+             (Durable_storage_path.evm_simulation_result ~storage_version));
+      ]
     in
     simulate_and_read
       ctxt
@@ -365,10 +370,12 @@ module Tezlink = struct
     in
     let*? messages = String.chunk_bytes 4096 (Bytes.of_string input) in
     let nb_messages = Ethereum_types.u16_to_bytes (List.length messages) in
+    let* storage_version = Durable_storage.storage_version simulation_state in
     let insight_requests =
       [
         Simulation.Encodings.Durable_storage_key
-          ["tez"; "world_state"; "simulation_result"];
+          (Durable_storage_path.to_components
+             (Durable_storage_path.tez_simulation_result ~storage_version));
       ]
     in
     simulate_and_read
@@ -519,11 +526,15 @@ module Http_trace = struct
            ~with_da_fees:false
            call)
     in
+    let* storage_version = Durable_storage.storage_version simulation_state in
     let insight_requests =
       [
-        Simulation.Encodings.Durable_storage_key ["evm"; "simulation_result"];
         Simulation.Encodings.Durable_storage_key
-          ["evm"; "simulation_http_traces"];
+          (Durable_storage_path.to_components
+             (Durable_storage_path.evm_simulation_result ~storage_version));
+        Simulation.Encodings.Durable_storage_key
+          (Durable_storage_path.to_components
+             (Durable_storage_path.evm_simulation_http_traces ~storage_version));
       ]
     in
     let* raw_insights =
@@ -572,10 +583,12 @@ module Http_trace = struct
     let encoded_input =
       Rlp.encode (Rlp.List [Rlp.Value skip_sig_bytes; Rlp.Value tx_bytes])
     in
+    let* storage_version = Durable_storage.storage_version state in
     let insight_requests =
       [
         Simulation.Encodings.Durable_storage_key
-          ["evm"; "simulation_http_traces"];
+          (Durable_storage_path.to_components
+             (Durable_storage_path.evm_simulation_http_traces ~storage_version));
       ]
     in
     let* raw_insights =
