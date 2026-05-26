@@ -52,7 +52,7 @@
 ### Internals
 
 - MIR: harden the Michelson runtime — internal aborts now surface as
-  structured errors. (!21869, !21870, !21872)
+  structured errors. (!21869, !21870, !21871, !21872)
 
 ## Version 0.5 (3038e37e7cfca6f6930dce8375fc97d3917e0518)
 

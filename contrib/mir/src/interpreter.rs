@@ -987,7 +987,7 @@ fn interpret_one<'a>(
         I::Drop(opt_height) => {
             ctx.gas().consume(interpret_cost::drop(*opt_height)?)?;
             let drop_height: usize = opt_height.unwrap_or(1) as usize;
-            stack.drop_top(drop_height);
+            stack.drop_top(drop_height)?;
         }
         I::Dup(opt_height) => {
             ctx.gas().consume(interpret_cost::dup(*opt_height)?)?;
@@ -1273,7 +1273,7 @@ fn interpret_one<'a>(
         I::PairN(n) => {
             ctx.gas().consume(interpret_cost::pair_n(*n as usize)?)?;
             let res = stack
-                .drain_top(*n as usize)
+                .drain_top(*n as usize)?
                 .rev()
                 .reduce(|acc, e| V::new_pair_rc(e, acc).into())
                 .unwrap();

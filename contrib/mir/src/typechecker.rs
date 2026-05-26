@@ -1044,24 +1044,24 @@ pub(crate) fn typecheck_instruction<'a>(
             I::Mul(overloads::Mul::NatMutez)
         }
         (App(MUL, [], _), [.., T::Nat, T::Int]) => {
-            stack.drop_top(2);
+            stack.drop_top(2)?;
             stack.push(T::Int);
             I::Mul(overloads::Mul::IntNat)
         }
         (App(MUL, [], _), [.., T::Nat, T::Mutez]) => {
-            stack.drop_top(2);
+            stack.drop_top(2)?;
             stack.push(T::Mutez);
             I::Mul(overloads::Mul::MutezNat)
         }
         #[cfg(feature = "bls")]
         (App(MUL, [], _), [.., T::Bls12381Fr, T::Bls12381G1]) => {
-            stack.drop_top(2);
+            stack.drop_top(2)?;
             stack.push(T::Bls12381G1);
             I::Mul(overloads::Mul::Bls12381G1Bls12381Fr)
         }
         #[cfg(feature = "bls")]
         (App(MUL, [], _), [.., T::Bls12381Fr, T::Bls12381G2]) => {
-            stack.drop_top(2);
+            stack.drop_top(2)?;
             stack.push(T::Bls12381G2);
             I::Mul(overloads::Mul::Bls12381G2Bls12381Fr)
         }
@@ -1082,13 +1082,13 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         #[cfg(feature = "bls")]
         (App(MUL, [], _), [.., T::Nat, T::Bls12381Fr]) => {
-            stack.drop_top(2);
+            stack.drop_top(2)?;
             stack.push(T::Bls12381Fr);
             I::Mul(overloads::Mul::Bls12381FrNat)
         }
         #[cfg(feature = "bls")]
         (App(MUL, [], _), [.., T::Int, T::Bls12381Fr]) => {
-            stack.drop_top(2);
+            stack.drop_top(2)?;
             stack.push(T::Bls12381Fr);
             I::Mul(overloads::Mul::Bls12381FrInt)
         }
@@ -1298,7 +1298,7 @@ pub(crate) fn typecheck_instruction<'a>(
             let drop_height: usize = opt_height.unwrap_or(1) as usize;
             gas.consume(gas::tc_cost::drop_n(&opt_height)?)?;
             ensure_stack_len(Prim::DROP, stack, drop_height)?;
-            stack.drop_top(drop_height);
+            stack.drop_top(drop_height)?;
             I::Drop(opt_height)
         }
 
@@ -1747,7 +1747,7 @@ pub(crate) fn typecheck_instruction<'a>(
             }
             gas.consume(tc_cost::pair_n(n as usize)?)?;
             let res = stack
-                .drain_top(n as usize)
+                .drain_top(n as usize)?
                 .rev()
                 .reduce(|acc, e| Type::new_pair(e, acc))
                 .ok_or(TcError::InternalError(TcInvariant::EmptyPairN { n }))?;
@@ -1959,21 +1959,21 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(UPDATE, [], _), [.., T::Set(ty), T::Bool, ty_]) => {
             ensure_ty_eq(gas, ty, ty_)?;
-            stack.drop_top(2);
+            stack.drop_top(2)?;
             I::Update(overloads::Update::Set)
         }
         (App(UPDATE, [], _), [.., T::Map(m), T::Option(vty_new), kty_]) => {
             let (kty, vty) = m.as_ref();
             ensure_ty_eq(gas, kty, kty_)?;
             ensure_ty_eq(gas, vty, vty_new)?;
-            stack.drop_top(2);
+            stack.drop_top(2)?;
             I::Update(overloads::Update::Map)
         }
         (App(UPDATE, [], _), [.., T::BigMap(m), T::Option(vty_new), kty_]) => {
             let (kty, vty) = m.as_ref();
             ensure_ty_eq(gas, kty, kty_)?;
             ensure_ty_eq(gas, vty, vty_new)?;
-            stack.drop_top(2);
+            stack.drop_top(2)?;
             I::Update(overloads::Update::BigMap)
         }
         (App(UPDATE, [], _), [.., _, _, _]) => no_overload!(UPDATE),
@@ -2102,7 +2102,7 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(TRANSFER_TOKENS, [], _), [.., T::Contract(ct), T::Mutez, arg_t]) => {
             ensure_ty_eq(gas, ct, arg_t)?;
-            stack.drop_top(3);
+            stack.drop_top(3)?;
             stack.push(T::Operation);
             I::TransferTokens
         }
@@ -2123,7 +2123,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(SET_DELEGATE, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(CHECK_SIGNATURE, [], _), [.., T::Bytes, T::Signature, T::Key]) => {
-            stack.drop_top(2);
+            stack.drop_top(2)?;
             *stack_top_mut(stack)? = T::Bool;
             I::CheckSignature
         }
@@ -2132,12 +2132,12 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(CHECK_SIGNATURE, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(SLICE, [], _), [.., T::String, T::Nat, T::Nat]) => {
-            stack.drop_top(2);
+            stack.drop_top(2)?;
             *stack_top_mut(stack)? = T::new_option(T::String);
             I::Slice(overloads::Slice::String)
         }
         (App(SLICE, [], _), [.., T::Bytes, T::Nat, T::Nat]) => {
-            stack.drop_top(2);
+            stack.drop_top(2)?;
             *stack_top_mut(stack)? = T::new_option(T::Bytes);
             I::Slice(overloads::Slice::Bytes)
         }
@@ -2456,7 +2456,7 @@ pub(crate) fn typecheck_instruction<'a>(
                 cs.split_script()?
                     .typecheck_script(gas, allow_lazy_storage_in_storage, false)?;
             ensure_ty_eq(gas, &contract_script.storage, new_storage)?;
-            stack.drop_top(3);
+            stack.drop_top(3)?;
             stack.push(Type::Address);
             stack.push(Type::Operation);
             I::CreateContract(Rc::new(contract_script), cs)
