@@ -232,6 +232,15 @@ pub(crate) const VALUE_TRANSFER_SURCHARGE: u64 = 5_000;
 // rehash).
 pub(crate) const HEADER_VALIDATION_PER_HEADER: u64 = 100;
 
+// EVM code-presence back-stop info read — same shape as
+// ALIAS_LOOKUP_COST (cold SLOAD equivalent). `pub` because
+// EthereumRuntime in a separate crate charges it inside `read_origin`
+// on the back-stop fire path: when no `/origin` record exists, a
+// single account-info read decides whether the account exposes
+// bytecode (CREATE contract or EIP-7702 SET_CODE delegation, in
+// either case native to this runtime).
+pub const CODE_BACKSTOP_COST: u64 = 2_100;
+
 // Rationale regarding the cost:
 // Consumed gas is ~81000 for both queue execute_without_proxy entrypoints
 pub const FA_DEPOSIT_EXECUTION_COST: u64 = 100_000;

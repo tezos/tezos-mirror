@@ -9,10 +9,11 @@
 
 pub use tezosx_types::headers;
 pub use tezosx_types::{
-    gas, resolve_routing, AliasInfo, CrossRuntimeContext, Origin, RoutingDecision,
-    RuntimeId, TezosXRuntimeError, ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT,
-    X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_DEPTH, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED,
-    X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
+    gas, resolve_routing, AliasInfo, Classification, CrossRuntimeContext,
+    KernelStorageError, Origin, RoutingDecision, RuntimeId, TezosXRuntimeError,
+    ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_DEPTH,
+    X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER,
+    X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
 };
 
 #[cfg(feature = "testing")]
@@ -62,6 +63,26 @@ pub trait Registry {
         address_str: &str,
         runtime_id: RuntimeId,
     ) -> Result<Vec<u8>, TezosXRuntimeError>;
+
+    /// Read the classification of `addr` in `addr_runtime`.
+    ///
+    /// `addr_runtime` is the dispatch key: the request is forwarded to the
+    /// per-runtime impl that owns `addr`'s address format and storage layout.
+    ///
+    /// `gas` is in `addr_runtime`'s native unit (EVM gas or milligas). The
+    /// remaining budget after the read is returned alongside the classification.
+    ///
+    /// Callers that cross gas-unit boundaries must convert before calling and
+    /// convert back after — the pattern used by `ensure_alias`.
+    fn read_origin<Host>(
+        &self,
+        host: &Host,
+        addr_runtime: RuntimeId,
+        addr: &str,
+        gas: u64,
+    ) -> Result<(Classification, u64), TezosXRuntimeError>
+    where
+        Host: StorageV1;
 
     /// Route an HTTP request to the appropriate runtime based on the URL host.
     fn serve<Host>(
@@ -139,6 +160,29 @@ pub trait RuntimeInterface {
         address_str: &str,
     ) -> Result<Vec<u8>, TezosXRuntimeError>;
 
+    /// Read the classification of `addr` in this runtime.
+    ///
+    /// `gas` is in this runtime's native unit. Returns
+    /// `(Classification, gas_remaining_after)`. Malformed addresses
+    /// short-circuit to `(Unknown, gas)` — no storage read, no charge.
+    ///
+    /// For the EVM runtime, when the storage record is absent **and** the
+    /// account exposes non-empty bytecode (CREATE contract or EIP-7702
+    /// SET_CODE delegation), the back-stop fires: returns `Native` and
+    /// deducts `CODE_BACKSTOP_COST` from `gas` (returns `OutOfGas` when
+    /// the budget is insufficient for that extra read).
+    ///
+    /// For the Tezos runtime, no back-stop is applied — a storage miss
+    /// returns `Unknown` without any extra charge.
+    fn read_origin<Host>(
+        &self,
+        host: &Host,
+        addr: &str,
+        gas: u64,
+    ) -> Result<(Classification, u64), TezosXRuntimeError>
+    where
+        Host: StorageV1;
+
     #[cfg(feature = "testing")]
     fn string_from_address(&self, address: &[u8]) -> Result<String, TezosXRuntimeError>;
 
@@ -149,3 +193,6 @@ pub trait RuntimeInterface {
         address: &[u8],
     ) -> Result<U256, TezosXRuntimeError>;
 }
+
+#[cfg(feature = "testing")]
+pub mod testing;

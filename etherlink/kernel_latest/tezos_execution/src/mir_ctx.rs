@@ -1629,51 +1629,9 @@ pub mod tests {
         // The test exercises `lookup_view_storage_balance` directly,
         // not the enshrined-view hook, so journal and registry are
         // just placeholders that satisfy the type system.
-        struct StubRegistry;
-        impl tezosx_interfaces::Registry for StubRegistry {
-            fn ensure_alias<Host>(
-                &self,
-                _host: &mut Host,
-                _journal: &mut tezosx_journal::TezosXJournal,
-                _alias_info: tezosx_interfaces::AliasInfo,
-                _native_public_key: Option<&[u8]>,
-                _target_runtime: tezosx_interfaces::RuntimeId,
-                _context: tezosx_interfaces::CrossRuntimeContext,
-                _gas_remaining: u64,
-            ) -> Result<(String, u64), tezosx_interfaces::TezosXRuntimeError>
-            where
-                Host: StorageV1,
-            {
-                Ok((String::new(), 0))
-            }
-            fn compute_alias(
-                &self,
-                _alias_info: tezosx_interfaces::AliasInfo,
-            ) -> Result<String, tezosx_interfaces::TezosXRuntimeError> {
-                Ok(String::new())
-            }
-            fn address_from_string(
-                &self,
-                _address_str: &str,
-                _runtime_id: tezosx_interfaces::RuntimeId,
-            ) -> Result<Vec<u8>, tezosx_interfaces::TezosXRuntimeError> {
-                Ok(Vec::new())
-            }
-            fn serve<Host>(
-                &self,
-                _host: &mut Host,
-                _journal: &mut tezosx_journal::TezosXJournal,
-                _request: http::Request<Vec<u8>>,
-            ) -> http::Response<Vec<u8>>
-            where
-                Host: StorageV1,
-            {
-                http::Response::new(Vec::new())
-            }
-        }
         let mut journal =
             tezosx_journal::TezosXJournal::new(tezosx_journal::CracId::new(1, 0));
-        let registry = StubRegistry;
+        let registry = tezosx_interfaces::testing::UnimplementedRegistry;
         let mut ctx = Ctx {
             tc_ctx: &mut tc_ctx,
             exec_ctx,
@@ -2204,51 +2162,13 @@ pub mod tests {
             },
         };
 
-        struct StubRegistry;
-        impl tezosx_interfaces::Registry for StubRegistry {
-            fn ensure_alias<Host>(
-                &self,
-                _host: &mut Host,
-                _journal: &mut tezosx_journal::TezosXJournal,
-                _alias_info: tezosx_interfaces::AliasInfo,
-                _native_public_key: Option<&[u8]>,
-                _target_runtime: tezosx_interfaces::RuntimeId,
-                _context: tezosx_interfaces::CrossRuntimeContext,
-                _gas_remaining: u64,
-            ) -> Result<(String, u64), tezosx_interfaces::TezosXRuntimeError>
-            where
-                Host: StorageV1,
-            {
-                Ok((String::new(), 0))
-            }
-            fn compute_alias(
-                &self,
-                _alias_info: tezosx_interfaces::AliasInfo,
-            ) -> Result<String, tezosx_interfaces::TezosXRuntimeError> {
-                Ok(String::new())
-            }
-            fn address_from_string(
-                &self,
-                _address_str: &str,
-                _runtime_id: tezosx_interfaces::RuntimeId,
-            ) -> Result<Vec<u8>, tezosx_interfaces::TezosXRuntimeError> {
-                Ok(Vec::new())
-            }
-            fn serve<Host>(
-                &self,
-                _host: &mut Host,
-                _journal: &mut tezosx_journal::TezosXJournal,
-                _request: http::Request<Vec<u8>>,
-            ) -> http::Response<Vec<u8>>
-            where
-                Host: StorageV1,
-            {
-                http::Response::new(Vec::new())
-            }
-        }
         let mut journal =
             tezosx_journal::TezosXJournal::new(tezosx_journal::CracId::new(1, 0));
-        let registry = StubRegistry;
+        // The synthetic-view dispatcher under test short-circuits on
+        // `Type::Unit` before any registry call, so unwiring all
+        // registry methods catches any future regression where a code
+        // path accidentally starts calling into them.
+        let registry = tezosx_interfaces::testing::UnimplementedRegistry;
         let mut ctx = Ctx {
             tc_ctx: &mut tc_ctx,
             exec_ctx,

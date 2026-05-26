@@ -36,6 +36,22 @@ pub struct CrossRuntimeContext {
     pub block_number: U256,
 }
 
+/// A runtime-agnostic wrapper for durable-storage failures.
+///
+/// Wraps a `String` rather than a concrete error type so that
+/// `tezosx-types` stays free of `revm-etherlink` (which would close a
+/// dependency cycle). The variant name remains structured so call sites
+/// can match on it; the message is for human readers only.
+#[derive(Eq, PartialEq, Debug, Error)]
+#[error("{0}")]
+pub struct KernelStorageError(pub String);
+
+impl From<tezos_storage::error::Error> for KernelStorageError {
+    fn from(e: tezos_storage::error::Error) -> Self {
+        KernelStorageError(e.to_string())
+    }
+}
+
 // TODO: L2-971
 // cleanup this, and remove use of Custom for more specific errors
 #[derive(Eq, PartialEq, Debug, Error)]
@@ -47,7 +63,7 @@ pub enum TezosXRuntimeError {
     #[error("Runtime error: {0}")]
     Runtime(#[from] RuntimeError),
     #[error("Storage error: {0}")]
-    Storage(#[from] tezos_storage::error::Error),
+    Storage(KernelStorageError),
     #[error("Path error: {0}")]
     Path(#[from] tezos_smart_rollup_host::path::PathError),
     #[error("Custom error: {0}")]
@@ -69,6 +85,23 @@ pub enum TezosXRuntimeError {
     /// The callee ran out of gas. Maps to HTTP 429.
     #[error("Gas exhaustion")]
     OutOfGas,
+}
+
+impl From<KernelStorageError> for TezosXRuntimeError {
+    fn from(e: KernelStorageError) -> Self {
+        TezosXRuntimeError::Storage(e)
+    }
+}
+
+/// Preserve existing `?`-ergonomics on the Tezos side: the many call
+/// sites that propagate `tezos_storage::error::Error` with `?` do not
+/// need to be touched.  `?` performs exactly one `From` hop, so without
+/// this direct impl every Tezos-side `?` would need an explicit
+/// `.map_err(Into::into)`.
+impl From<tezos_storage::error::Error> for TezosXRuntimeError {
+    fn from(e: tezos_storage::error::Error) -> Self {
+        TezosXRuntimeError::Storage(KernelStorageError(e.to_string()))
+    }
 }
 
 #[derive(Eq, PartialEq, Hash, Debug, Clone, Copy, BinWriter, NomReader, HasEncoding)]
@@ -102,6 +135,43 @@ pub enum Origin {
     Native,
     #[encoding(tag = 1)]
     Alias(AliasInfo),
+}
+
+/// Query-result type for origin lookups across runtimes.
+///
+/// An address is either absent from the registry (`Unknown`), native to
+/// its runtime (`Native`), or an alias whose underlying account lives
+/// in another runtime (`Alias`). Never stored on-disk — use [`Origin`]
+/// for the stored form.
+///
+/// `Unknown` means no classification record exists *and* no back-stop
+/// evidence (e.g. positive EVM nonce) promoted the address to `Native`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Classification {
+    /// No classification record found and no back-stop evidence.
+    Unknown,
+    /// Address is recorded (or inferred) as native to its runtime.
+    Native,
+    /// Address is an alias whose native account lives in another runtime.
+    Alias(AliasInfo),
+}
+
+impl From<Origin> for Classification {
+    fn from(o: Origin) -> Self {
+        match o {
+            Origin::Native => Classification::Native,
+            Origin::Alias(info) => Classification::Alias(info),
+        }
+    }
+}
+
+impl From<Option<Origin>> for Classification {
+    fn from(o: Option<Origin>) -> Self {
+        match o {
+            Some(origin) => Classification::from(origin),
+            None => Classification::Unknown,
+        }
+    }
 }
 
 /// How a source's translation toward a chosen target runtime should be routed.

@@ -1691,159 +1691,8 @@ where
 
 /// Shared test utilities for gateway testing
 #[cfg(test)]
-#[allow(clippy::type_complexity)]
 pub(crate) mod test_utils {
-    use std::cell::RefCell;
-    use tezos_smart_rollup_host::storage::StorageV1;
-    use tezosx_interfaces::{
-        AliasInfo, CrossRuntimeContext, Registry, RuntimeId, TezosXRuntimeError,
-    };
-    use tezosx_journal::TezosXJournal;
-
-    /// Mock Registry for testing gateway operations.
-    /// Tracks all calls to serve and ensure_alias for verification.
-    pub struct MockRegistry {
-        pub ensure_alias_calls: RefCell<Vec<(AliasInfo, RuntimeId)>>,
-        pub serve_calls: RefCell<Vec<http::Request<Vec<u8>>>>,
-        generated_alias: String,
-    }
-
-    impl MockRegistry {
-        pub fn new(generated_alias: String) -> Self {
-            Self {
-                ensure_alias_calls: RefCell::new(Vec::new()),
-                serve_calls: RefCell::new(Vec::new()),
-                generated_alias,
-            }
-        }
-    }
-
-    impl Registry for MockRegistry {
-        fn ensure_alias<Host>(
-            &self,
-            _host: &mut Host,
-            _journal: &mut TezosXJournal,
-            alias_info: AliasInfo,
-            _native_public_key: Option<&[u8]>,
-            target_runtime: RuntimeId,
-            _context: CrossRuntimeContext,
-            gas_remaining: u64,
-        ) -> Result<(String, u64), TezosXRuntimeError>
-        where
-            Host: StorageV1,
-        {
-            self.ensure_alias_calls
-                .borrow_mut()
-                .push((alias_info, target_runtime));
-            Ok((self.generated_alias.clone(), gas_remaining))
-        }
-
-        fn compute_alias(
-            &self,
-            _alias_info: AliasInfo,
-        ) -> Result<String, TezosXRuntimeError> {
-            Ok(self.generated_alias.clone())
-        }
-
-        fn address_from_string(
-            &self,
-            address_str: &str,
-            _runtime_id: RuntimeId,
-        ) -> Result<Vec<u8>, TezosXRuntimeError> {
-            Ok(address_str.as_bytes().to_vec())
-        }
-
-        fn serve<Host>(
-            &self,
-            _host: &mut Host,
-            _journal: &mut TezosXJournal,
-            request: http::Request<Vec<u8>>,
-        ) -> http::Response<Vec<u8>>
-        where
-            Host: StorageV1,
-        {
-            self.serve_calls.borrow_mut().push(request);
-            http::Response::builder()
-                .status(200)
-                .header(tezosx_interfaces::X_TEZOS_GAS_CONSUMED, "0")
-                .body(vec![])
-                .unwrap()
-        }
-    }
-
-    /// Mock Registry that returns a configurable HTTP status code from serve().
-    /// Used to test error handling when the target runtime returns non-success
-    /// responses.
-    pub struct MockRegistryWithStatus {
-        pub serve_calls: RefCell<Vec<http::Request<Vec<u8>>>>,
-        generated_alias: String,
-        status_code: u16,
-        response_body: Vec<u8>,
-    }
-
-    impl MockRegistryWithStatus {
-        pub fn new(
-            generated_alias: String,
-            status_code: u16,
-            response_body: Vec<u8>,
-        ) -> Self {
-            Self {
-                serve_calls: RefCell::new(Vec::new()),
-                generated_alias,
-                status_code,
-                response_body,
-            }
-        }
-    }
-
-    impl Registry for MockRegistryWithStatus {
-        fn ensure_alias<Host>(
-            &self,
-            _host: &mut Host,
-            _journal: &mut TezosXJournal,
-            _alias_info: AliasInfo,
-            _native_public_key: Option<&[u8]>,
-            _target_runtime: RuntimeId,
-            _context: CrossRuntimeContext,
-            gas_remaining: u64,
-        ) -> Result<(String, u64), TezosXRuntimeError>
-        where
-            Host: StorageV1,
-        {
-            Ok((self.generated_alias.clone(), gas_remaining))
-        }
-
-        fn compute_alias(
-            &self,
-            _alias_info: AliasInfo,
-        ) -> Result<String, TezosXRuntimeError> {
-            Ok(self.generated_alias.clone())
-        }
-
-        fn address_from_string(
-            &self,
-            address_str: &str,
-            _runtime_id: RuntimeId,
-        ) -> Result<Vec<u8>, TezosXRuntimeError> {
-            Ok(address_str.as_bytes().to_vec())
-        }
-
-        fn serve<Host>(
-            &self,
-            _host: &mut Host,
-            _journal: &mut TezosXJournal,
-            request: http::Request<Vec<u8>>,
-        ) -> http::Response<Vec<u8>>
-        where
-            Host: StorageV1,
-        {
-            self.serve_calls.borrow_mut().push(request);
-            http::Response::builder()
-                .status(self.status_code)
-                .body(self.response_body.clone())
-                .unwrap()
-        }
-    }
+    pub use tezosx_interfaces::testing::MockRegistry;
 }
 
 #[cfg(test)]
@@ -1913,57 +1762,7 @@ mod tests {
     }
     use crate::{get_required_da_fees, TcCtx};
     use primitive_types::U256;
-    use tezosx_interfaces::{
-        AliasInfo, CrossRuntimeContext, Registry, RuntimeId, TezosXRuntimeError,
-    };
-
-    // Mock Registry for tests that don't need cross-runtime functionality
-    struct MockRegistry;
-
-    impl Registry for MockRegistry {
-        fn ensure_alias<Host>(
-            &self,
-            _host: &mut Host,
-            _journal: &mut TezosXJournal,
-            _alias_info: AliasInfo,
-            _native_public_key: Option<&[u8]>,
-            target_runtime: RuntimeId,
-            _context: CrossRuntimeContext,
-            _gas_remaining: u64,
-        ) -> Result<(String, u64), TezosXRuntimeError>
-        where
-            Host: StorageV1,
-        {
-            Err(TezosXRuntimeError::RuntimeNotFound(target_runtime))
-        }
-
-        fn compute_alias(
-            &self,
-            alias_info: AliasInfo,
-        ) -> Result<String, TezosXRuntimeError> {
-            Err(TezosXRuntimeError::RuntimeNotFound(alias_info.runtime))
-        }
-
-        fn address_from_string(
-            &self,
-            _address_str: &str,
-            runtime_id: RuntimeId,
-        ) -> Result<Vec<u8>, TezosXRuntimeError> {
-            Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
-        }
-
-        fn serve<Host>(
-            &self,
-            _host: &mut Host,
-            _journal: &mut TezosXJournal,
-            _request: http::Request<Vec<u8>>,
-        ) -> http::Response<Vec<u8>>
-        where
-            Host: StorageV1,
-        {
-            unimplemented!("not needed for this test")
-        }
-    }
+    use tezosx_interfaces::testing::NotWiredRegistry;
 
     macro_rules! block_ctx {
         () => {
@@ -2342,7 +2141,7 @@ mod tests {
 
         let result = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
@@ -2380,7 +2179,7 @@ mod tests {
 
         let result = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
@@ -2418,7 +2217,7 @@ mod tests {
 
         let result = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
@@ -2470,7 +2269,7 @@ mod tests {
         let operation = make_reveal_operation(15, 1, 1000, 5, source.clone());
         let processed = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
@@ -2541,7 +2340,7 @@ mod tests {
 
         let processed = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
@@ -2607,7 +2406,7 @@ mod tests {
 
         let result = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
@@ -2654,7 +2453,7 @@ mod tests {
 
         let processed = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
@@ -2735,7 +2534,7 @@ mod tests {
 
         let processed = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
@@ -2820,7 +2619,7 @@ mod tests {
 
         let processed = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
@@ -2919,7 +2718,7 @@ mod tests {
 
         let processed = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
@@ -3046,7 +2845,7 @@ mod tests {
         );
         let res = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context,
             OperationHash::default(),
@@ -3199,7 +2998,7 @@ mod tests {
 
         let processed = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
@@ -3295,7 +3094,7 @@ mod tests {
 
         let processed = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
@@ -3435,7 +3234,7 @@ mod tests {
 
         let _ = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
@@ -3502,7 +3301,7 @@ mod tests {
 
         let processed = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
@@ -3613,7 +3412,7 @@ mod tests {
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
-                &MockRegistry,
+                &NotWiredRegistry,
                 &mut TezosXJournal::default(),
                 &context::TezlinkContext::init_context(),
                 OperationHash::default(),
@@ -3724,7 +3523,7 @@ mod tests {
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
-                &MockRegistry,
+                &NotWiredRegistry,
                 &mut TezosXJournal::default(),
                 &context::TezlinkContext::init_context(),
                 OperationHash::default(),
@@ -3854,7 +3653,7 @@ mod tests {
 
         let processed = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
@@ -3947,7 +3746,7 @@ mod tests {
 
         let processed = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
@@ -4022,7 +3821,7 @@ mod tests {
 
         let processed = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
@@ -4112,7 +3911,7 @@ mod tests {
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
-                &MockRegistry,
+                &NotWiredRegistry,
                 &mut TezosXJournal::default(),
                 &ctx,
                 OperationHash::default(),
@@ -4302,7 +4101,7 @@ mod tests {
 
         let receipts = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &ctx,
             OperationHash::default(),
@@ -4412,7 +4211,7 @@ mod tests {
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
-                &MockRegistry,
+                &NotWiredRegistry,
                 &mut TezosXJournal::default(),
                 &context::TezlinkContext::init_context(),
                 OperationHash::default(),
@@ -4537,7 +4336,7 @@ mod tests {
 
         let processed = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context,
             OperationHash::default(),
@@ -4768,7 +4567,7 @@ mod tests {
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
-                &MockRegistry,
+                &NotWiredRegistry,
                 &mut TezosXJournal::default(),
                 &context,
                 OperationHash::default(),
@@ -4940,7 +4739,7 @@ mod tests {
 
         let _processed = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             operation.hash().unwrap(),
@@ -5016,7 +4815,7 @@ mod tests {
 
         let _processed = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             operation.hash().unwrap(),
@@ -5094,7 +4893,7 @@ mod tests {
 
         let _processed = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             operation.hash().unwrap(),
@@ -5171,7 +4970,7 @@ mod tests {
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
-                &MockRegistry,
+                &NotWiredRegistry,
                 &mut TezosXJournal::default(),
                 &context::TezlinkContext::init_context(),
                 OperationHash::default(),
@@ -5330,7 +5129,7 @@ mod tests {
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
-                &MockRegistry,
+                &NotWiredRegistry,
                 &mut TezosXJournal::default(),
                 &context,
                 OperationHash::default(),
@@ -5545,7 +5344,7 @@ mod tests {
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
-                &MockRegistry,
+                &NotWiredRegistry,
                 &mut TezosXJournal::default(),
                 &context,
                 OperationHash::default(),
@@ -5813,7 +5612,7 @@ mod tests {
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
-                &MockRegistry,
+                &NotWiredRegistry,
                 &mut TezosXJournal::default(),
                 &ctx,
                 OperationHash::default(),
@@ -6101,7 +5900,7 @@ mod tests {
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
-                &MockRegistry,
+                &NotWiredRegistry,
                 &mut TezosXJournal::default(),
                 &context,
                 OperationHash::default(),
@@ -6183,7 +5982,7 @@ mod tests {
         let receipts1 = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
-                &MockRegistry,
+                &NotWiredRegistry,
                 &mut TezosXJournal::default(),
                 &context,
                 OperationHash::default(),
@@ -6234,7 +6033,7 @@ mod tests {
         let receipts2 = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
-                &MockRegistry,
+                &NotWiredRegistry,
                 &mut TezosXJournal::default(),
                 &context,
                 OperationHash::default(),
@@ -6286,7 +6085,7 @@ mod tests {
         let receipts3 = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
-                &MockRegistry,
+                &NotWiredRegistry,
                 &mut TezosXJournal::default(),
                 &context,
                 OperationHash::default(),
@@ -6346,7 +6145,7 @@ mod tests {
         let receipts4 = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
-                &MockRegistry,
+                &NotWiredRegistry,
                 &mut TezosXJournal::default(),
                 &context,
                 OperationHash::default(),
@@ -6448,7 +6247,7 @@ mod tests {
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
-                &MockRegistry,
+                &NotWiredRegistry,
                 &mut TezosXJournal::default(),
                 &context,
                 OperationHash::default(),
@@ -6549,7 +6348,7 @@ mod tests {
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
-                &MockRegistry,
+                &NotWiredRegistry,
                 &mut TezosXJournal::default(),
                 &context,
                 OperationHash::default(),
@@ -6664,7 +6463,7 @@ mod tests {
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 ctx.host,
-                &MockRegistry,
+                &NotWiredRegistry,
                 &mut TezosXJournal::default(),
                 ctx.context,
                 OperationHash::default(),
@@ -6972,7 +6771,7 @@ mod tests {
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 ctx.host,
-                &MockRegistry,
+                &NotWiredRegistry,
                 &mut TezosXJournal::default(),
                 &context,
                 OperationHash::default(),
@@ -7238,7 +7037,7 @@ mod tests {
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 ctx.host,
-                &MockRegistry,
+                &NotWiredRegistry,
                 &mut TezosXJournal::default(),
                 ctx.context,
                 OperationHash::default(),
@@ -7393,7 +7192,7 @@ mod tests {
         // None = delayed inbox: DA fee check is skipped.
         let result = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
@@ -7447,7 +7246,7 @@ mod tests {
             get_required_da_fees(&batch, da_fee_per_byte_mutez).unwrap();
         let result = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
@@ -7502,7 +7301,7 @@ mod tests {
             get_required_da_fees(&operation, da_fee_per_byte_mutez).unwrap();
         let result = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
@@ -7558,7 +7357,7 @@ mod tests {
             get_required_da_fees(&operation, da_fee_per_byte_mutez).unwrap();
         let result = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
@@ -7737,56 +7536,6 @@ mod tests {
     /// produce an Applied result with a spurious storage field.
     #[test]
     fn gateway_evm_revert_yields_failed_receipt() {
-        struct RevertRegistry;
-
-        impl Registry for RevertRegistry {
-            fn ensure_alias<Host>(
-                &self,
-                _host: &mut Host,
-                _journal: &mut TezosXJournal,
-                _alias_info: AliasInfo,
-                _native_public_key: Option<&[u8]>,
-                _target_runtime: RuntimeId,
-                _context: CrossRuntimeContext,
-                gas_remaining: u64,
-            ) -> Result<(String, u64), TezosXRuntimeError>
-            where
-                Host: StorageV1,
-            {
-                Ok(("KT1_mock_revert".to_string(), gas_remaining))
-            }
-
-            fn compute_alias(
-                &self,
-                _alias_info: AliasInfo,
-            ) -> Result<String, TezosXRuntimeError> {
-                Ok("KT1_mock_revert".to_string())
-            }
-
-            fn address_from_string(
-                &self,
-                address_str: &str,
-                _runtime_id: RuntimeId,
-            ) -> Result<Vec<u8>, TezosXRuntimeError> {
-                Ok(address_str.as_bytes().to_vec())
-            }
-
-            fn serve<Host>(
-                &self,
-                _host: &mut Host,
-                _journal: &mut TezosXJournal,
-                _request: http::Request<Vec<u8>>,
-            ) -> http::Response<Vec<u8>>
-            where
-                Host: StorageV1,
-            {
-                http::Response::builder()
-                    .status(http::StatusCode::BAD_REQUEST)
-                    .body(b"reverted".to_vec())
-                    .unwrap()
-            }
-        }
-
         let mut host = MockKernelHost::default();
         let src = bootstrap1();
         let gateway_kt1 =
@@ -7794,6 +7543,9 @@ mod tests {
                 .expect("Gateway KT1 address should be valid");
         init_account(&mut host, &src.pkh, 100);
         reveal_account(&mut host, &src);
+
+        let registry = crate::test_utils::MockRegistry::new("KT1_mock_revert")
+            .with_serve_response(400, b"reverted".to_vec());
 
         let operation = make_transfer_operation(
             15,
@@ -7818,7 +7570,7 @@ mod tests {
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
-                &RevertRegistry,
+                &registry,
                 &mut journal,
                 &context::TezlinkContext::init_context(),
                 OperationHash::default(),
@@ -8060,7 +7812,7 @@ mod tests {
             let op = make_operation(5, counter, gas_limit, 0, src.clone(), content);
             validate_and_apply_operation(
                 host,
-                &MockRegistry,
+                &NotWiredRegistry,
                 &mut TezosXJournal::default(),
                 &ctx,
                 OperationHash::default(),
@@ -8369,7 +8121,7 @@ mod tests {
 
         let processed = validate_and_apply_operation(
             &mut host,
-            &MockRegistry,
+            &NotWiredRegistry,
             &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
