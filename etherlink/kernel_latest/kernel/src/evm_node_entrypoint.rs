@@ -898,13 +898,42 @@ mod tests {
         assert!(entries.contains_key("call"));
         assert!(entries.contains_key("call_evm"));
         assert!(entries.contains_key("collect_result"));
+        assert_eq!(views.len(), 3);
+
         // Synthetic view `staticcall_evm`: (pair string bytes) -> bytes.
-        assert_eq!(views.len(), 1);
         let (param_ty, return_ty) = views
             .get("staticcall_evm")
             .expect("staticcall_evm view must be exposed");
         assert_eq!(*param_ty, Type::new_pair(Type::String, Type::Bytes));
         assert_eq!(*return_ty, Type::Bytes);
+
+        // Synthetic view `originOf`:
+        //   (pair string nat) -> (or unit (or nat (pair nat string))).
+        let (param_ty, return_ty) = views
+            .get("originOf")
+            .expect("originOf view must be exposed");
+        assert_eq!(*param_ty, Type::new_pair(Type::String, Type::Nat));
+        assert_eq!(
+            *return_ty,
+            Type::new_or(
+                Type::Unit,
+                Type::new_or(Type::Nat, Type::new_pair(Type::Nat, Type::String)),
+            )
+        );
+
+        // Synthetic view `resolveAddress`:
+        //   (pair string (pair nat nat)) -> (option (pair nat string)).
+        let (param_ty, return_ty) = views
+            .get("resolveAddress")
+            .expect("resolveAddress view must be exposed");
+        assert_eq!(
+            *param_ty,
+            Type::new_pair(Type::String, Type::new_pair(Type::Nat, Type::Nat))
+        );
+        assert_eq!(
+            *return_ty,
+            Type::new_option(Type::new_pair(Type::Nat, Type::String))
+        );
     }
 
     #[test]

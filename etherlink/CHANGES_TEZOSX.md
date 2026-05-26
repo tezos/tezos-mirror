@@ -200,21 +200,37 @@
 - Reject `STATICCALL` on the runtime gateway precompile's
   state-mutating selectors. (!21905)
 
-- Add a `originOf` synthetic read-only view on the TezosXGateway
-  enshrined contract, callable via the Michelson `VIEW` opcode:
-  `originOf :: (pair string nat) -> (or unit (or nat (pair nat string)))`
-  — Given `(address, source_runtime)`, returns `Left Unit` for an
-  unknown address, `Right (Left nat)` with the source runtime id for a
-  native address, or `Right (Right (Pair nat string))` with the alias's
-  home runtime and native address string for an aliased address. For
-  EVM sources with no `/origin` record, a code-presence back-stop is
-  applied: non-empty bytecode (`code_hash != KECCAK_EMPTY`) is treated
-  as `Native`. Invalid runtime ids FAILWITH
-  `(Pair "INVALID_RUNTIME_ID" received_nat)`. The view is read-only and
-  `STATICCALL`-compatible: no journal writes, no log emission. Gas
-  model: `ALIAS_LOOKUP_MILLIGAS = 210 000` (origin read) plus the
-  milligas equivalent of `CODE_BACKSTOP_COST` (conditional, charged
-  only when the EVM code-presence back-stop path executes).
+- Add two synthetic read-only views on the TezosXGateway enshrined
+  contract, callable via the Michelson `VIEW` opcode:
+  - `originOf :: (pair string nat) -> (or unit (or nat (pair nat string)))`
+    — Given `(address, source_runtime)`, returns `Left Unit` for an
+    unknown address, `Right (Left nat)` with the source runtime id for a
+    native address, or `Right (Right (Pair nat string))` with the alias's
+    home runtime and native address string for an aliased address. For
+    EVM sources with no `/origin` record, a code-presence back-stop is
+    applied: non-empty bytecode (`code_hash != KECCAK_EMPTY`) is treated
+    as `Native`. Invalid runtime ids FAILWITH
+    `(Pair "INVALID_RUNTIME_ID" received_nat)`.
+  - `resolveAddress :: (pair string (pair nat nat)) -> (option (pair nat string))`
+    — Given `(address, source_runtime, target_runtime)`, returns `None`
+    when the address is unknown, and `Some (Pair resolution_nat translated_str)`
+    otherwise. `resolution_nat` is `0` (recorded — the inverse alias is
+    already materialized in storage) or `1` (derived — the alias address
+    was computed but not yet written). A same-source short-circuit skips
+    all storage reads when `source_runtime == target_runtime`, returning
+    the input address directly. Both views FAILWITH
+    `(Pair "INVALID_RUNTIME_ID" received_nat)` when `source_runtime` or
+    `target_runtime` does not map to a known runtime id. Both views are
+    read-only and `STATICCALL`-compatible: no journal writes, no log
+    emission. Gas model: a `resolveAddress` call with an `Origin::Native`
+    (or transitive `Alias`) source pays `ALIAS_LOOKUP_MILLIGAS` (source
+    origin read) + `DERIVE_ALIAS_MILLIGAS` (alias derivation) +
+    `ALIAS_LOOKUP_MILLIGAS` (destination origin read); the same-source
+    short-circuit pays only `ALIAS_LOOKUP_MILLIGAS`. The milligas
+    equivalent of `CODE_BACKSTOP_COST` is charged additionally when the
+    EVM code-presence back-stop fires. Constants:
+    `ALIAS_LOOKUP_MILLIGAS = 210 000`,
+    `DERIVE_ALIAS_MILLIGAS = 150 000` (placeholder, to be calibrated).
 
 ### Storage versions
 

@@ -144,6 +144,128 @@
       "prim": "view",
       "args": [
         {
+          "string": "originOf"
+        },
+        {
+          "prim": "pair",
+          "args": [
+            {
+              "prim": "string"
+            },
+            {
+              "prim": "nat"
+            }
+          ]
+        },
+        {
+          "prim": "or",
+          "args": [
+            {
+              "prim": "unit"
+            },
+            {
+              "prim": "or",
+              "args": [
+                {
+                  "prim": "nat"
+                },
+                {
+                  "prim": "pair",
+                  "args": [
+                    {
+                      "prim": "nat"
+                    },
+                    {
+                      "prim": "string"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        [
+          {
+            "prim": "DROP"
+          },
+          {
+            "prim": "PUSH",
+            "args": [
+              {
+                "prim": "string"
+              },
+              {
+                "string": "Enshrined contract"
+              }
+            ]
+          },
+          {
+            "prim": "FAILWITH"
+          }
+        ]
+      ]
+    },
+    {
+      "prim": "view",
+      "args": [
+        {
+          "string": "resolveAddress"
+        },
+        {
+          "prim": "pair",
+          "args": [
+            {
+              "prim": "string"
+            },
+            {
+              "prim": "nat"
+            },
+            {
+              "prim": "nat"
+            }
+          ]
+        },
+        {
+          "prim": "option",
+          "args": [
+            {
+              "prim": "pair",
+              "args": [
+                {
+                  "prim": "nat"
+                },
+                {
+                  "prim": "string"
+                }
+              ]
+            }
+          ]
+        },
+        [
+          {
+            "prim": "DROP"
+          },
+          {
+            "prim": "PUSH",
+            "args": [
+              {
+                "prim": "string"
+              },
+              {
+                "string": "Enshrined contract"
+              }
+            ]
+          },
+          {
+            "prim": "FAILWITH"
+          }
+        ]
+      ]
+    },
+    {
+      "prim": "view",
+      "args": [
+        {
           "string": "staticcall_evm"
         },
         {

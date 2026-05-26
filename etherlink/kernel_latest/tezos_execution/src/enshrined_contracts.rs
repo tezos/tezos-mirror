@@ -1207,6 +1207,27 @@ where
 
 // ── originOf / resolveAddress gas constants (milligas) ───────────────────
 
+/// Per-hop cost for the alias-derivation path in `resolveAddress`
+/// (BLAKE2b-160 + base58check / hex encoding).
+///
+/// Tezos milligas mirror of the EVM-side `DERIVE_ALIAS_STRING_COST = 1_500`
+/// (× `EVM_GAS_TO_MILLIGAS = 100`). Same notional cost on both runtimes so a
+/// contract pays the same amount for the same derivation regardless of
+/// which side it calls from. Like its EVM peer, conservative against the
+/// actual hashing + encoding work — the value mirrors the EVM-side
+/// category pin rather than measured derivation cost.
+const DERIVE_ALIAS_MILLIGAS: u64 = 150_000;
+
+// ── Resolution constants (Michelson nat encoding) ────────────────────────
+
+/// The target alias is already materialized (its `/origin` record matches).
+/// Encodes as nat 0 on the `resolveAddress` return.
+const RESOLUTION_RECORDED_NAT: u64 = 0;
+
+/// The target alias was derived but not yet written to storage.
+/// Encodes as nat 1 on the `resolveAddress` return.
+const RESOLUTION_DERIVED_NAT: u64 = 1;
+
 /// Classify the origin of `addr_str` in `source_runtime` via
 /// [`Registry::read_origin`], charging the gas that `read_origin` consumed.
 ///
@@ -1253,6 +1274,60 @@ where
     Ok(classification)
 }
 
+/// Derive the target alias for a Native or foreign-target Alias source
+/// and encode the Michelson `option (pair nat string)` result.
+///
+/// Charges `DERIVE_ALIAS_MILLIGAS` for the derivation and (transparently
+/// via `classify_origin_for_view`) the inverse alias lookup on the
+/// destination side. The `Recorded` upgrade fires when the destination
+/// already has an Alias record pointing back to `source_runtime` with
+/// the same `basis`; otherwise the result is `Derived`.
+fn derive_alias_for_view<'a, Host, R>(
+    host: &Host,
+    registry: &R,
+    operation_gas: &mut crate::gas::TezlinkOperationGas,
+    source_runtime: RuntimeId,
+    target_runtime: RuntimeId,
+    basis: Vec<u8>,
+) -> Result<TypedValue<'a>, mir::interpreter::InterpretError<'a>>
+where
+    Host: StorageV1,
+    R: tezosx_interfaces::Registry,
+{
+    operation_gas
+        .cast_and_consume_milligas(DERIVE_ALIAS_MILLIGAS)
+        .map_err(|_| mir::interpreter::InterpretError::OutOfGas)?;
+    let derived = registry
+        .compute_alias(tezosx_interfaces::AliasInfo {
+            runtime: target_runtime,
+            native_address: basis.clone(),
+        })
+        .map_err(|_| mir::interpreter::EnshrinedViewDispatchError::AliasResolution)?;
+
+    let inverse_class = classify_origin_for_view(
+        host,
+        registry,
+        operation_gas,
+        target_runtime,
+        &derived,
+    )?;
+
+    let resolution_nat: u64 = match inverse_class {
+        Classification::Alias(info_back)
+            if info_back.runtime == source_runtime
+                && info_back.native_address == basis =>
+        {
+            RESOLUTION_RECORDED_NAT
+        }
+        _ => RESOLUTION_DERIVED_NAT,
+    };
+
+    Ok(TypedValue::new_option(Some(TypedValue::new_pair(
+        TypedValue::Nat(resolution_nat.into()),
+        TypedValue::String(derived),
+    ))))
+}
+
 /// Kernel-side logic for the `originOf` synthetic Michelson view on the
 /// TezosXGateway.
 ///
@@ -1291,7 +1366,124 @@ where
     )?;
 
     // ── Encode result as `or unit (or nat (pair nat string))` ────────────
-    Ok(encode_origin_of(classification, source_runtime))
+    encode_origin_of(classification, source_runtime)
+}
+
+/// Kernel-side logic for the `resolveAddress` synthetic Michelson view.
+///
+/// Input: `(addr_str, source_runtime_nat, target_runtime_nat)`.
+///
+/// Returns a [`TypedValue`] of type `option (pair nat string)`:
+/// - Unknown source  → `None`
+/// - Resolved target → `Some (Pair <resolution_nat> <translated_addr>)`
+///   where `resolution_nat` is 0 (Recorded) or 1 (Derived).
+pub fn dispatch_resolve_address_get<'a, Host, R>(
+    host: &Host,
+    operation_gas: &mut crate::gas::TezlinkOperationGas,
+    registry: &R,
+    addr_str: &str,
+    source_runtime_nat: &num_bigint::BigUint,
+    target_runtime_nat: &num_bigint::BigUint,
+) -> Result<TypedValue<'a>, mir::interpreter::InterpretError<'a>>
+where
+    Host: StorageV1,
+    R: tezosx_interfaces::Registry,
+{
+    // Reusing `EnshrinedViewDispatchError::AliasResolution` for all three
+    // registry call sites (source read, compute, destination read). A more
+    // granular variant would help traces, but each of these is a kernel-side
+    // infra error caused by the same class of problem (registry can't dispatch
+    // or storage layer failure), and the contract-facing semantics are
+    // identical (operation reverts with 400). Splitting can land later if
+    // observability needs it.
+
+    // ── Runtime ID validation ────────────────────────────────────────────
+    let source_runtime = runtime_id_from_nat(source_runtime_nat)?;
+    let target_runtime = runtime_id_from_nat(target_runtime_nat)?;
+
+    // ── Same-source short-circuit ────────────────────────────────────────
+    // No storage reads needed.  A malformed address still returns None.
+    if source_runtime == target_runtime {
+        let valid = registry
+            .address_from_string(addr_str, source_runtime)
+            .is_ok();
+        if !valid {
+            return Ok(TypedValue::new_option(None));
+        }
+        return Ok(TypedValue::new_option(Some(TypedValue::new_pair(
+            TypedValue::Nat(RESOLUTION_RECORDED_NAT.into()),
+            TypedValue::String(addr_str.to_owned()),
+        ))));
+    }
+
+    // ── Origin lookup (back-stop included inside classify_origin_for_view) ──
+    let classification = classify_origin_for_view(
+        host,
+        registry,
+        operation_gas,
+        source_runtime,
+        addr_str,
+    )?;
+
+    // ── Routing ─────────────────────────────────────────────────────────
+    // Exhaustive over all three `Classification` arms so the compiler
+    // enforces coverage rather than a catch-all + inner `unreachable!`.
+    let result = match classification {
+        Classification::Unknown => {
+            // Unknown — cannot translate.
+            TypedValue::new_option(None)
+        }
+        Classification::Alias(info) if info.runtime == target_runtime => {
+            // Direct recorded lookup — target address is already in the record.
+            // Strict UTF-8: `AliasInfo.native_address` is a kernel invariant
+            // (declared in tezosx-types) and a non-UTF-8 payload here is data
+            // corruption, not legitimate state. Mirrors the EVM twin in
+            // `revm/src/precompiles/runtime_gateway.rs` which reverts.
+            let native_str = String::from_utf8(info.native_address).map_err(|_| {
+                mir::interpreter::EnshrinedViewDispatchError::AliasResolution
+            })?;
+            TypedValue::new_option(Some(TypedValue::new_pair(
+                TypedValue::Nat(RESOLUTION_RECORDED_NAT.into()),
+                TypedValue::String(native_str),
+            )))
+        }
+        Classification::Native => {
+            let basis: Vec<u8> = if source_runtime == RuntimeId::Ethereum {
+                // Canonicalize EVM hex to lowercase so alias derivation is
+                // casing-insensitive; mirrors the EVM peer in
+                // `revm/src/precompiles/runtime_gateway.rs` and the
+                // journal's native-source path.
+                addr_str.to_lowercase().into_bytes()
+            } else {
+                addr_str.as_bytes().to_vec()
+            };
+            derive_alias_for_view(
+                host,
+                registry,
+                operation_gas,
+                source_runtime,
+                target_runtime,
+                basis,
+            )?
+        }
+        Classification::Alias(info) => {
+            // Foreign-target Alias: source's Alias points to a runtime that
+            // is not the requested target. Vacuous in the 2-runtime MVP —
+            // the only Alias the source can have points to `target_runtime`,
+            // which the direct-lookup arm above already handled. Kept so
+            // the derivation surface is correct in 3+ runtime futures.
+            derive_alias_for_view(
+                host,
+                registry,
+                operation_gas,
+                source_runtime,
+                target_runtime,
+                info.native_address,
+            )?
+        }
+    };
+
+    Ok(result)
 }
 
 /// Convert a Michelson nat to a [`RuntimeId`], returning
@@ -1330,12 +1522,18 @@ fn make_invalid_runtime_id_error<'a>(
 
 /// Encode an origin classification as the Michelson type
 /// `or unit (or nat (pair nat string))`.
+///
+/// Strict UTF-8 on the alias arm: `AliasInfo.native_address` is a kernel
+/// invariant (declared in tezosx-types) and a non-UTF-8 payload here is
+/// data corruption. Surfaces as
+/// [`EnshrinedViewDispatchError::AliasResolution`], mirroring the EVM
+/// twin in `revm/src/precompiles/runtime_gateway.rs` which reverts.
 fn encode_origin_of<'a>(
     classification: Classification,
     source_runtime: RuntimeId,
-) -> TypedValue<'a> {
+) -> Result<TypedValue<'a>, mir::interpreter::InterpretError<'a>> {
     use mir::ast::or::Or;
-    match classification {
+    Ok(match classification {
         Classification::Unknown => {
             // Unknown → Left Unit
             TypedValue::new_or(Or::Left(TypedValue::Unit))
@@ -1348,14 +1546,15 @@ fn encode_origin_of<'a>(
         Classification::Alias(info) => {
             // Alias → Right (Right (Pair (<home_runtime as nat>, <native_str>)))
             let home_nat = TypedValue::Nat((u8::from(info.runtime) as u64).into());
-            let native_str = TypedValue::String(
-                String::from_utf8_lossy(&info.native_address).into_owned(),
-            );
+            let native_str =
+                TypedValue::String(String::from_utf8(info.native_address).map_err(
+                    |_| mir::interpreter::EnshrinedViewDispatchError::AliasResolution,
+                )?);
             TypedValue::new_or(Or::Right(TypedValue::new_or(Or::Right(
                 TypedValue::new_pair(home_nat, native_str),
             ))))
         }
-    }
+    })
 }
 
 /// Read-only counterpart to [`dispatch_crac_call`], shaped for the
@@ -3776,6 +3975,26 @@ mod tests {
         }
     }
 
+    /// Decode a `resolveAddress` result (type `option (pair nat string)`)
+    /// into `None` or `Some((resolution_nat, translated_str))`.
+    fn decode_resolve_address(tv: &TypedValue<'_>) -> Option<(u64, String)> {
+        let TypedValue::Option(inner) = tv else {
+            panic!("expected Option, got: {tv:?}")
+        };
+        let pair_rc = inner.as_ref()?;
+        let TypedValue::Pair(nat_rc, str_rc) = pair_rc.as_ref() else {
+            panic!("expected Pair inside Option")
+        };
+        let TypedValue::Nat(n) = nat_rc.as_ref() else {
+            panic!("expected Nat")
+        };
+        let TypedValue::String(s) = str_rc.as_ref() else {
+            panic!("expected String")
+        };
+        let resolution = if n.is_zero() { 0 } else { n.to_u64_digits()[0] };
+        Some((resolution, s.clone()))
+    }
+
     // ── originOf tests ─────────────────────────────────────────────────────
 
     #[test]
@@ -3939,12 +4158,167 @@ mod tests {
         }
     }
 
+    // ── resolveAddress tests ───────────────────────────────────────────────
+
+    #[test]
+    fn resolve_address_same_source_valid() {
+        let host = MockKernelHost::default();
+        let registry = StubRegistry::with_classification(Classification::Unknown);
+        let mut gas = make_gas(10_000_000);
+        let addr = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
+        let result = dispatch_resolve_address_get(
+            &host,
+            &mut gas,
+            &registry,
+            addr,
+            &num_bigint::BigUint::from(0u64), // source = Tezos
+            &num_bigint::BigUint::from(0u64), // target = Tezos (same)
+        );
+        let tv = result.expect("should succeed");
+        // Expected: Some(Pair(Nat(0 = Recorded), String(addr)))
+        let resolved = decode_resolve_address(&tv);
+        assert!(resolved.is_some(), "expected Some");
+        let (res, translated) = resolved.unwrap();
+        assert_eq!(res, 0, "expected Recorded");
+        assert_eq!(translated, addr);
+    }
+
+    #[test]
+    fn resolve_address_same_source_malformed() {
+        let host = MockKernelHost::default();
+        let registry = StubRegistry::with_classification(Classification::Unknown);
+        let mut gas = make_gas(10_000_000);
+        let result = dispatch_resolve_address_get(
+            &host,
+            &mut gas,
+            &registry,
+            "not-an-address",
+            &num_bigint::BigUint::from(0u64),
+            &num_bigint::BigUint::from(0u64),
+        );
+        let tv = result.expect("should succeed");
+        // Expected: None (malformed)
+        assert!(
+            decode_resolve_address(&tv).is_none(),
+            "expected None for malformed address"
+        );
+    }
+
+    #[test]
+    fn resolve_address_alias_direct_to_target() {
+        let host = MockKernelHost::default();
+        let evm_addr = "0xcccccccccccccccccccccccccccccccccccccccc";
+        let alias_info = tezosx_interfaces::AliasInfo {
+            runtime: RuntimeId::Ethereum,
+            native_address: evm_addr.as_bytes().to_vec(),
+        };
+        let registry =
+            StubRegistry::with_classification(Classification::Alias(alias_info));
+        let mut gas = make_gas(10_000_000);
+        let result = dispatch_resolve_address_get(
+            &host,
+            &mut gas,
+            &registry,
+            "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+            &num_bigint::BigUint::from(0u64), // source = Tezos
+            &num_bigint::BigUint::from(1u64), // target = Ethereum
+        );
+        let tv = result.expect("should succeed");
+        let resolved = decode_resolve_address(&tv);
+        assert!(resolved.is_some(), "expected Some");
+        let (res, translated) = resolved.unwrap();
+        assert_eq!(res, 0, "expected Recorded");
+        assert_eq!(translated, evm_addr);
+    }
+
+    #[test]
+    fn resolve_address_native_derives_recorded() {
+        let host = MockKernelHost::default();
+        let derived = "0xdddddddddddddddddddddddddddddddddddddddd";
+        let tezos_addr = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
+        // Destination check returns an alias pointing back to source → Recorded.
+        let dest_class = Classification::Alias(tezosx_interfaces::AliasInfo {
+            runtime: RuntimeId::Tezos,
+            native_address: tezos_addr.as_bytes().to_vec(),
+        });
+        let registry = StubRegistry::with_alias_and_expected_runtime(
+            Classification::Native,
+            derived,
+            Some(dest_class),
+            RuntimeId::Ethereum,
+        );
+        let mut gas = make_gas(10_000_000);
+        let result = dispatch_resolve_address_get(
+            &host,
+            &mut gas,
+            &registry,
+            tezos_addr,
+            &num_bigint::BigUint::from(0u64), // source = Tezos
+            &num_bigint::BigUint::from(1u64), // target = Ethereum
+        );
+        let tv = result.expect("should succeed");
+        let resolved = decode_resolve_address(&tv);
+        assert!(resolved.is_some(), "expected Some");
+        let (res, translated) = resolved.unwrap();
+        assert_eq!(res, 0, "expected Recorded");
+        assert_eq!(translated, derived);
+    }
+
+    #[test]
+    fn resolve_address_native_derives_unrecorded() {
+        let host = MockKernelHost::default();
+        let derived = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+        let tezos_addr = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
+        // Destination check returns Unknown → Derived (1).
+        let registry = StubRegistry::with_alias_and_expected_runtime(
+            Classification::Native,
+            derived,
+            Some(Classification::Unknown),
+            RuntimeId::Ethereum,
+        );
+        let mut gas = make_gas(10_000_000);
+        let result = dispatch_resolve_address_get(
+            &host,
+            &mut gas,
+            &registry,
+            tezos_addr,
+            &num_bigint::BigUint::from(0u64), // source = Tezos
+            &num_bigint::BigUint::from(1u64), // target = Ethereum
+        );
+        let tv = result.expect("should succeed");
+        let resolved = decode_resolve_address(&tv);
+        assert!(resolved.is_some(), "expected Some");
+        let (res, translated) = resolved.unwrap();
+        assert_eq!(res, 1, "expected Derived");
+        assert_eq!(translated, derived);
+    }
+
+    #[test]
+    fn resolve_address_unknown_returns_none() {
+        let host = MockKernelHost::default();
+        let registry = StubRegistry::with_classification(Classification::Unknown);
+        let mut gas = make_gas(10_000_000);
+        let result = dispatch_resolve_address_get(
+            &host,
+            &mut gas,
+            &registry,
+            "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+            &num_bigint::BigUint::from(0u64),
+            &num_bigint::BigUint::from(1u64),
+        );
+        let tv = result.expect("should succeed");
+        assert!(
+            decode_resolve_address(&tv).is_none(),
+            "expected None for unknown address"
+        );
+    }
+
     // ── missing row tests ─────────────────────────────────────────────────
 
     #[test]
     fn origin_of_tezos_unknown_returns_unknown() {
         // Tezos source, no `/origin` record → Unknown (Left Unit).
-        // No nonce backstop for Tezos sources (backstop only applies to EVM).
+        // No code-presence back-stop for Tezos sources (back-stop only applies to EVM).
         let host = MockKernelHost::default();
         let registry = StubRegistry::with_classification(Classification::Unknown);
         let mut gas = make_gas(10_000_000);
@@ -4000,5 +4374,105 @@ mod tests {
             kind, 0,
             "expected Unknown for malformed address (EVM source)"
         );
+    }
+
+    #[test]
+    fn resolve_address_evm_unknown_with_bytecode_falls_into_derivation() {
+        // EVM source, no `/origin` record, but non-empty bytecode → back-stop fires,
+        // effective origin becomes Native, derivation runs.
+        // No inverse alias on the destination side → Derived (1).
+        // The actual gas accounting of the back-stop is tested in tezosx-ethereum-runtime.
+        let host = MockKernelHost::default();
+        let derived = "0xffffffffffffffffffffffffffffffffffffffff";
+        // source_classification = Native (back-stop result), destination_classification = Unknown.
+        let registry = StubRegistry::with_alias_and_expected_runtime(
+            Classification::Native,
+            derived,
+            Some(Classification::Unknown),
+            RuntimeId::Tezos,
+        );
+        let mut gas = make_gas(10_000_000);
+        let result = dispatch_resolve_address_get(
+            &host,
+            &mut gas,
+            &registry,
+            "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            &num_bigint::BigUint::from(1u64), // source = Ethereum
+            &num_bigint::BigUint::from(0u64), // target = Tezos
+        );
+        let tv = result.expect("should succeed");
+        let resolved = decode_resolve_address(&tv);
+        assert!(
+            resolved.is_some(),
+            "expected Some — backstop treats as Native"
+        );
+        let (res, translated) = resolved.unwrap();
+        assert_eq!(res, RESOLUTION_DERIVED_NAT, "expected Derived (1)");
+        assert_eq!(translated, derived);
+    }
+
+    #[test]
+    fn resolve_address_native_evm_lowercases_basis_for_derivation() {
+        // Mixed-case EVM hex input must be canonicalized to lowercase
+        // before being passed as the basis to `compute_alias`, otherwise
+        // a Michelson caller passing `0xDDdd...` and a Solidity caller
+        // passing the same address would derive different KT1 aliases.
+        // The StubRegistry asserts the basis passed to `compute_alias`.
+        let host = MockKernelHost::default();
+        let mixed_case = "0xDDddDDddDDddDDddDDddDDddDDddDDddDDddDDdd";
+        let lowercase = "0xdddddddddddddddddddddddddddddddddddddddd";
+        let derived = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
+        let registry = StubRegistry::with_alias_and_expected_runtime(
+            Classification::Native,
+            derived,
+            Some(Classification::Unknown),
+            RuntimeId::Tezos,
+        )
+        .expecting_native_address(lowercase.as_bytes().to_vec());
+        let mut gas = make_gas(10_000_000);
+        let result = dispatch_resolve_address_get(
+            &host,
+            &mut gas,
+            &registry,
+            mixed_case,
+            &num_bigint::BigUint::from(1u64), // source = Ethereum
+            &num_bigint::BigUint::from(0u64), // target = Tezos
+        );
+        let tv = result.expect("should succeed");
+        let resolved = decode_resolve_address(&tv);
+        let (res, translated) = resolved.expect("expected Some");
+        assert_eq!(res, RESOLUTION_DERIVED_NAT, "expected Derived (1)");
+        assert_eq!(translated, derived);
+    }
+
+    #[test]
+    fn resolve_address_invalid_runtime_id() {
+        let host = MockKernelHost::default();
+        let registry = StubRegistry::with_classification(Classification::Unknown);
+        let mut gas = make_gas(10_000_000);
+        let result = dispatch_resolve_address_get(
+            &host,
+            &mut gas,
+            &registry,
+            "tz1abc",
+            &num_bigint::BigUint::from(99u64), // invalid
+            &num_bigint::BigUint::from(1u64),
+        );
+        match result {
+            Err(mir::interpreter::InterpretError::FailedWith(_, ref tv)) => {
+                let TypedValue::Pair(msg, received) = tv else {
+                    panic!("expected Pair payload, got: {tv:?}")
+                };
+                assert!(
+                    matches!(msg.as_ref(), TypedValue::String(s) if s == "INVALID_RUNTIME_ID"),
+                    "expected INVALID_RUNTIME_ID message"
+                );
+                assert!(
+                    matches!(received.as_ref(), TypedValue::Nat(n) if *n == num_bigint::BigUint::from(99u64)),
+                    "expected received nat = 99"
+                );
+            }
+            other => panic!("expected FailedWith INVALID_RUNTIME_ID, got: {other:?}"),
+        }
     }
 }
