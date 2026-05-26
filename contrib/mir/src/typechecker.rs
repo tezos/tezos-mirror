@@ -191,23 +191,55 @@ pub enum TcError {
     /// rather than flattened into a stringly error.
     #[error(transparent)]
     StackOob(#[from] StackOob),
-    /// Internal invariant violation surfaced by the `pop!` / `stack_get!` /
-    /// `stack_top_mut!` macros (empty-stack pop, out-of-range access, or a
-    /// popped value of an unexpected type). Unreachable for valid Micheline
-    /// — the typechecker establishes the stack shape and element types
-    /// before these run. Carries a descriptive message until !21872 turns
-    /// it into a structured `InternalErrorKind`.
+    /// Internal invariant violation surfaced by the `pop!` macro and the
+    /// `stack_get` / `stack_top_mut` helpers (empty-stack pop, out-of-range
+    /// access, or a popped value of an unexpected type). Unreachable for
+    /// valid Micheline — the typechecker establishes the stack shape and
+    /// element types before these run. The variant tag identifies which
+    /// path fired; payloads carry forensic context where useful.
     #[error("internal typechecker error: {0}")]
-    InternalError(String),
+    InternalError(TcInvariant),
 }
 
-// Empty-stack message produced by the `pop!` macro. Lifted to a module-level
-// `const` so the macro and its contract test share the string and a wording
-// drift can't go unnoticed — `pop!` is a local macro whose empty-stack arm is
-// unreachable through the public API, so it can't be tested by calling it.
-// (The `stack_get` / `stack_top_mut` helpers are plain functions and are
-// exercised directly by their tests, so they need no such const.)
-pub(crate) const MSG_EMPTY_TYPE_STACK_POP: &str = "attempted to pop from an empty type stack";
+/// Categorises invariant violations reachable only on malformed input or a
+/// typechecker bug. Variants either have no payload (single-site invariants
+/// where the tag alone identifies the broken precondition) or carry typed,
+/// equality-stable fields (`usize`, `u16`, `&'static str`) that preserve
+/// forensic context without re-introducing the brittleness of formatted
+/// strings: `PartialEq` stays well-defined for tests, and the `Display` impl
+/// surfaces the runtime values when a path does fire.
+#[allow(missing_docs)]
+#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
+pub enum TcInvariant {
+    #[error("stack index out of bounds")]
+    StackIndexOob,
+    #[error("attempted to pop from an empty type stack")]
+    EmptyTypeStackPop,
+    #[error("type mismatch when popping the type stack: expected {expected}")]
+    TypeMismatchOnPop { expected: &'static str },
+    #[error("type stack too short for indexed access: index {index}, len {len}")]
+    TypeStackTooShort { index: usize, len: usize },
+    #[error("type stack unexpectedly empty")]
+    EmptyTypeStack,
+    #[error("comparison of incomparable values")]
+    ComparisonOfIncomparable,
+    #[error("expected Micheline::App")]
+    ExpectedMichelineApp,
+    #[error("PAIR {n} produced no elements during typechecking")]
+    EmptyPairN { n: u16 },
+    #[error("unexpected prim in Left/Right typed value")]
+    UnexpectedLeftRightPrim,
+    #[error("typecheck_value did not return the expected variant: expected {expected}")]
+    TypecheckValueWrongVariant { expected: &'static str },
+    #[error("expected ticket type on the left of JOIN_TICKETS pair")]
+    ExpectedTicketLeftJoin,
+    #[error("expected ticket type on the right of JOIN_TICKETS pair")]
+    ExpectedTicketRightJoin,
+    #[error("expected nested Pair(content, amount) in ticket value")]
+    ExpectedTicketNestedPair,
+    #[error("expected Nat for ticket amount")]
+    ExpectedTicketNatAmount,
+}
 
 impl From<TryFromBigIntError<()>> for TcError {
     fn from(error: TryFromBigIntError<()>) -> Self {
@@ -702,9 +734,9 @@ fn parse_ty_with_entrypoints<'a>(
     if let Option::Some(eps) = entrypoints {
         // We just ensured it's an application of some type primitive.
         let Micheline::App(_, _, anns) = ty else {
-            return Err(TcError::InternalError(format!(
-                "expected Micheline::App, got {ty:?}"
-            )));
+            return Err(TcError::InternalError(
+                TcInvariant::ExpectedMichelineApp,
+            ));
         };
         if let Option::Some(field_ann) = anns.get_single_field_ann()? {
             // NB: field annotations may be longer than entrypoints; however
@@ -799,10 +831,10 @@ macro_rules! nothing_to_none {
 /// Micheline, since the typechecker establishes the stack shape before access.
 fn stack_get(stack: &TypeStack, idx: usize) -> Result<&Type, TcError> {
     stack.get(idx).map_err(|_| {
-        TcError::InternalError(format!(
-            "type stack too short: attempted to access index {idx}, len {}",
-            stack.len()
-        ))
+        TcError::InternalError(TcInvariant::TypeStackTooShort {
+            index: idx,
+            len: stack.len(),
+        })
     })
 }
 
@@ -811,7 +843,7 @@ fn stack_get(stack: &TypeStack, idx: usize) -> Result<&Type, TcError> {
 fn stack_top_mut(stack: &mut TypeStack) -> Result<&mut Type, TcError> {
     stack
         .get_mut(0)
-        .map_err(|_| TcError::InternalError("type stack unexpectedly empty".to_owned()))
+        .map_err(|_| TcError::InternalError(TcInvariant::EmptyTypeStack))
 }
 
 pub(crate) fn typecheck_instruction<'a>(
@@ -836,18 +868,19 @@ pub(crate) fn typecheck_instruction<'a>(
         () => {{
             stack
                 .pop()
-                .ok_or_else(|| TcError::InternalError(MSG_EMPTY_TYPE_STACK_POP.to_owned()))?
+                .ok_or(TcError::InternalError(TcInvariant::EmptyTypeStackPop))?
         }};
         ($p:path) => {{
             let v = pop!();
             match v {
                 #[allow(unused_parens)]
                 $p(i) => i,
-                other => {
-                    return Err(TcError::InternalError(format!(
-                        "type mismatch: expected {}, got {other:?}",
-                        stringify!($p(_))
-                    )))
+                _ => {
+                    return Err(TcError::InternalError(
+                        TcInvariant::TypeMismatchOnPop {
+                            expected: stringify!($p),
+                        },
+                    ))
                 }
             }
         }};
@@ -1717,11 +1750,7 @@ pub(crate) fn typecheck_instruction<'a>(
                 .drain_top(n as usize)
                 .rev()
                 .reduce(|acc, e| Type::new_pair(e, acc))
-                .ok_or_else(|| {
-                    TcError::InternalError(format!(
-                        "PAIR {n} unexpectedly produced no elements during typechecking"
-                    ))
-                })?;
+                .ok_or(TcError::InternalError(TcInvariant::EmptyPairN { n }))?;
             stack.push(res);
             I::PairN(n)
         }
@@ -2220,16 +2249,14 @@ pub(crate) fn typecheck_instruction<'a>(
             if matches!(tickets.as_ref(), (Type::Ticket(_), Type::Ticket(_))) =>
         {
             let Type::Ticket(lt) = &tickets.0 else {
-                return Err(TcError::InternalError(format!(
-                    "expected ticket type on the left, got {:?}",
-                    tickets.0
-                )));
+                return Err(TcError::InternalError(
+                    TcInvariant::ExpectedTicketLeftJoin,
+                ));
             };
             let Type::Ticket(rt) = &tickets.1 else {
-                return Err(TcError::InternalError(format!(
-                    "expected ticket type on the right, got {:?}",
-                    tickets.1
-                )));
+                return Err(TcError::InternalError(
+                    TcInvariant::ExpectedTicketRightJoin,
+                ));
             };
 
             ensure_ty_eq(gas, lt, rt)?;
@@ -2605,10 +2632,10 @@ pub fn typecheck_value<'a>(
             let typed_val = match prim {
                 Prim::Left => crate::ast::Or::Left(typecheck_value(val, ctx, tl)?),
                 Prim::Right => crate::ast::Or::Right(typecheck_value(val, ctx, tr)?),
-                other => {
-                    return Err(TcError::InternalError(format!(
-                        "unexpected prim in Left/Right typed value: {other:?}"
-                    )))
+                _ => {
+                    return Err(TcError::InternalError(
+                        TcInvariant::UnexpectedLeftRightPrim,
+                    ))
                 }
             };
             TV::new_or(typed_val)
@@ -2691,10 +2718,12 @@ pub fn typecheck_value<'a>(
         (T::Contract(ty), addr) => {
             let t_addr = match typecheck_value(addr, ctx, &T::Address)? {
                 TV::Address(addr) => addr,
-                other => {
-                    return Err(TcError::InternalError(format!(
-                        "typecheck_value(Address) returned {other:?}"
-                    )))
+                _ => {
+                    return Err(TcError::InternalError(
+                        TcInvariant::TypecheckValueWrongVariant {
+                            expected: "TV::Address",
+                        },
+                    ))
                 }
             };
             typecheck_contract_address(ctx, t_addr, Entrypoint::default(), ty)
@@ -2797,20 +2826,24 @@ pub fn typecheck_value<'a>(
             let ticketer = typecheck_value(ticketer, ctx, &T::Address)?;
             let ticketer = match ticketer {
                 TV::Address(addr) => addr,
-                other => {
-                    return Err(TcError::InternalError(format!(
-                        "typecheck_value(Address) returned {other:?}"
-                    )))
+                _ => {
+                    return Err(TcError::InternalError(
+                        TcInvariant::TypecheckValueWrongVariant {
+                            expected: "TV::Address",
+                        },
+                    ))
                 }
             };
             let content = typecheck_value(content, ctx, content_type)?;
             let amount = typecheck_value(amount, ctx, &T::Nat)?;
             let amount = match amount {
                 TV::Nat(amount) => amount,
-                other => {
-                    return Err(TcError::InternalError(format!(
-                        "typecheck_value(Nat) returned {other:?}"
-                    )))
+                _ => {
+                    return Err(TcError::InternalError(
+                        TcInvariant::TypecheckValueWrongVariant {
+                            expected: "TV::Nat",
+                        },
+                    ))
                 }
             };
             TV::new_ticket(Ticket {
@@ -2833,19 +2866,20 @@ pub fn typecheck_value<'a>(
                 Ok(TV::Pair(left, right)) => {
                     let address = match TypedValue::unwrap_rc(left) {
                         TV::Address(addr) => addr,
-                        other => {
-                            return Err(TcError::InternalError(format!(
-                                "typecheck_value(Address, ...) returned {other:?}"
-                            )))
+                        _ => {
+                            return Err(TcError::InternalError(
+                                TcInvariant::TypecheckValueWrongVariant {
+                                    expected: "TV::Address",
+                                },
+                            ))
                         }
                     };
                     let (content, amount) = match TypedValue::unwrap_rc(right) {
                         TV::Pair(content, amount) => (content, amount),
-                        other => {
-                            return Err(TcError::InternalError(format!(
-                                "expected nested Pair(content, amount) in ticket value, \
-                                 got {other:?}"
-                            )))
+                        _ => {
+                            return Err(TcError::InternalError(
+                                TcInvariant::ExpectedTicketNestedPair,
+                            ))
                         }
                     };
                     TV::new_ticket(Ticket {
@@ -2854,10 +2888,10 @@ pub fn typecheck_value<'a>(
                         content: TypedValue::unwrap_rc(content),
                         amount: match TypedValue::unwrap_rc(amount) {
                             TV::Nat(amount) => amount,
-                            other => {
-                                return Err(TcError::InternalError(format!(
-                                    "expected Nat for ticket amount, got {other:?}"
-                                )))
+                            _ => {
+                                return Err(TcError::InternalError(
+                                    TcInvariant::ExpectedTicketNatAmount,
+                                ))
                             }
                         },
                     })
@@ -9421,7 +9455,7 @@ mod typecheck_tests {
     #[test]
     fn pop_empty_internal_error_message() {
         // pop!() on an empty type stack produces this exact error.
-        let err: TcError = TcError::InternalError(MSG_EMPTY_TYPE_STACK_POP.to_owned());
+        let err = TcError::InternalError(TcInvariant::EmptyTypeStackPop);
         assert_eq!(
             format!("{err}"),
             "internal typechecker error: attempted to pop from an empty type stack"
@@ -9441,32 +9475,28 @@ mod typecheck_tests {
     }
 
     #[test]
-    fn pop_type_mismatch_internal_error_format() {
-        // pop!(T::Foo) on a value that isn't T::Foo produces an InternalError
-        // shaped like "type mismatch: expected <Pattern>, got <Debug>". Lock
-        // the format so the macro's stringify!/Debug interpolation is
-        // observable and stable.
-        let err: TcError = TcError::InternalError(format!(
-            "type mismatch: expected {}, got {:?}",
-            stringify!(Type::Nat(_)),
-            Type::Bool,
-        ));
+    fn pop_type_mismatch_internal_error_message() {
+        // pop!(T::Foo) on a value that isn't T::Foo produces this exact error,
+        // with the expected variant name stringified at the macro call site.
+        let err = TcError::InternalError(TcInvariant::TypeMismatchOnPop {
+            expected: "Type::Nat",
+        });
         assert_eq!(
             format!("{err}"),
-            "internal typechecker error: type mismatch: expected Type::Nat(_), got Bool"
+            "internal typechecker error: type mismatch when popping the type stack: expected Type::Nat"
         );
     }
 
     #[test]
     fn stack_get_oob_internal_error_format() {
-        // stack_get(idx) out-of-bounds returns an InternalError shaped like
-        // "type stack too short: attempted to access index <idx>, len <len>".
+        // stack_get(idx) out-of-bounds returns this exact error, carrying
+        // the requested index and the actual stack length for forensics.
         // Unreachable for valid Micheline, so exercised directly here.
         let stack = crate::stack::TypeStack::new();
         let err = super::stack_get(&stack, 3).expect_err("out-of-range access must error");
         assert_eq!(
             format!("{err}"),
-            "internal typechecker error: type stack too short: attempted to access index 3, len 0"
+            "internal typechecker error: type stack too short for indexed access: index 3, len 0"
         );
     }
 }
