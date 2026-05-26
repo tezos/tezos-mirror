@@ -206,6 +206,9 @@ type ('a, 'cap) path =
   | Tezlink_block_by_hash :
       Ethereum_types.block_hash
       -> (L2_types.Tezos_block.t, ro) path
+  | Blueprint_current_generation : (Ethereum_types.quantity, ro) path
+  | Kernel_boot_wasm : (bytes, rw) path
+  | Kernel_verbosity : (string, rw) path
 
 type 'a ro_resolved = {path : string; decode : bytes -> 'a tzresult}
 
@@ -732,6 +735,27 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
               block_hash;
           decode = infallible_decode L2_types.Tezos_block.block_from_kernel;
         }
+  | Blueprint_current_generation ->
+      versioned_ro (fun ~storage_version ->
+          {
+            path =
+              Durable_storage_path.Blueprint.current_generation ~storage_version;
+            decode = infallible_decode Ethereum_types.decode_number_le;
+          })
+  | Kernel_boot_wasm ->
+      static_rw
+        {
+          path = Durable_storage_path.kernel_boot_wasm;
+          decode = infallible_decode Fun.id;
+          encode = Bytes.to_string;
+        }
+  | Kernel_verbosity ->
+      versioned_rw (fun ~storage_version ->
+          {
+            path = Durable_storage_path.kernel_verbosity ~storage_version;
+            decode = infallible_decode Bytes.to_string;
+            encode = Fun.id;
+          })
 
 let storage_version state =
   let open Lwt_result_syntax in

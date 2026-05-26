@@ -287,12 +287,10 @@ let store_blueprint_chunks ~blueprint_number evm_state
   in
   if version >= 39 then
     let* current_generation =
-      Durable_storage.inspect_durable_and_decode_default
+      Durable_storage.read_or_default
         ~default:Qty.zero
+        Blueprint_current_generation
         evm_state
-        (Durable_storage_path.Blueprint.current_generation
-           ~storage_version:version)
-        Ethereum_types.decode_number_le
     in
     let* evm_state =
       Durable_storage.write

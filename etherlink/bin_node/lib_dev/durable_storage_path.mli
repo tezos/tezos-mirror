@@ -50,6 +50,15 @@ val michelson_contract_manager : Tezos_types.Contract.t -> path
     ([/tez/tez_accounts/contracts/index/<hex>/counter]). *)
 val michelson_contract_counter : Tezos_types.Contract.t -> path
 
+(** [/kernel/boot.wasm] — path of the kernel's WASM blob, the entry
+    point [Pvm.Kernel] runs. Writable by the EVM node only for
+    debugger / replay overrides. *)
+val kernel_boot_wasm : path
+
+(** [contract_hex contract] is the hex-encoded binary form of [contract]
+    used as a directory name under {!michelson_contracts_index}. *)
+val contract_hex : Tezos_types.Contract.t -> string
+
 (** [/tez/tez_accounts/tezosx] — root of the TezosX projected accounts
     and cross-runtime alias subtree. *)
 val michelson_ledger_root : path

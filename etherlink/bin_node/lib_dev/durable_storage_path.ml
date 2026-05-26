@@ -108,6 +108,11 @@ let michelson_contracts_index = "/tez/tez_accounts/contracts/index"
     writes under the Tezlink context root. *)
 let tezos_big_map_root = "/tez/tez_accounts/big_map"
 
+(** [/kernel/boot.wasm] — path of the kernel's WASM blob, the entry
+    point [Pvm.Kernel] runs. Writable by the EVM node only for
+    debugger / replay overrides. *)
+let kernel_boot_wasm = "/kernel/boot.wasm"
+
 let contract_hex contract =
   let raw_key =
     Data_encoding.Binary.to_bytes_exn Tezos_types.Contract.encoding contract
