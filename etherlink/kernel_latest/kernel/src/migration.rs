@@ -755,11 +755,11 @@ where
         StorageVersion::V46 => {
             if is_etherlink_network(host, MAINNET_CHAIN_ID)? {
                 const REGULAR_GOVERNANCE_KT: &[u8] =
-                    b"KT1NM6cpM5BPTmYPszjv6LRDAMRZXPET9DmH";
+                    b"KT1AXRU3wLc87WNhLhVGrgqDGubLACUMUgPb";
                 const SECURITY_GOVERNANCE_KT: &[u8] =
-                    b"KT1JGCdHEyvE3RkmzR7hRYK7vC42QF6zK34H";
+                    b"KT19oUVQPnVLuUBYXrBVd46WJnNAMpqkKSwo";
                 const SEQUENCER_GOVERNANCE_KT: &[u8] =
-                    b"KT1CSqkafD5ZCHFvmsozrCBeSy2XJQzutJRn";
+                    b"KT1VGyd2cRSHoDnxDnSuqGJD3mL8DzcVqX98";
 
                 host.store_write_all(&legacy::KERNEL_GOVERNANCE, REGULAR_GOVERNANCE_KT)?;
                 host.store_write_all(
