@@ -1314,7 +1314,10 @@ fn interpret_one<'a>(
             let l = pop_rc!();
             let r = pop_rc!();
             ctx.gas().consume(interpret_cost::compare(&l, &r)?)?;
-            let cmp = l.partial_cmp(&r).expect("comparison failed") as i8;
+            let cmp = l
+                .partial_cmp(&r)
+                .ok_or(InterpretError::CompareError(CompareError::Incomparable))?
+                as i8;
             stack.push(V::Int(cmp.into()));
         }
         I::Amount => {
