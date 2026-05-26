@@ -250,13 +250,17 @@ module Dal_helpers = struct
        - [Exact_lag lag]: straightforward, both conditions use [lag].
        - [Lag_interval (min_lag, max_lag)]: we check whether there exists a lag
          in [[min_lag, max_lag]] satisfying both conditions. *)
+    (* We use [add_opt] to detect overflow rather than letting [add] raise. An
+       overflow makes the page id invalid by definition. *)
     let not_too_recent =
       let lag =
         match lag_check with
         | Exact_lag lag -> lag
         | Lag_interval (min_lag, _) -> min_lag
       in
-      add published_level lag <= import_inbox_level
+      match add_opt published_level lag with
+      | None -> false
+      | Some lvl -> lvl <= import_inbox_level
     in
     let ttl_not_expired =
       let lag =
@@ -264,9 +268,12 @@ module Dal_helpers = struct
         | Exact_lag lag -> lag
         | Lag_interval (_, max_lag) -> max_lag
       in
-      Raw_level_repr.(
-        add (add published_level lag) dal_attested_slots_validity_lag
-        >= import_inbox_level)
+      match add_opt published_level lag with
+      | None -> false
+      | Some lvl -> (
+          match add_opt lvl dal_attested_slots_validity_lag with
+          | None -> false
+          | Some lvl -> Raw_level_repr.(lvl >= import_inbox_level))
     in
     dal_was_activated && slot_published_after_origination && not_too_recent
     && ttl_not_expired
