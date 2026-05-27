@@ -284,6 +284,14 @@ where
             })
             .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
     }
+    // `crac_chain_depth` is per-call: save the outer frame's value, set
+    // this call's inbound depth for the duration of the inner EVM
+    // execution, and restore it on return (below). Otherwise a
+    // re-entrant outer frame (EVM → TEZ → EVM → …) would keep observing
+    // the inner depth and stamp an inflated `X-Tezos-CRAC-Depth` on its
+    // next outgoing CRAC. Mirrors the `revm_call_depth` save/restore in
+    // `Journal::tezosx_call_http` (revm/src/journal.rs).
+    let saved_crac_chain_depth = journal.evm.crac_chain_depth();
     journal.evm.set_crac_chain_depth(hdrs.crac_depth);
 
     let context = CrossRuntimeContext {
@@ -328,8 +336,13 @@ where
         TransactionOrigin::CrossRuntime {
             credit: Some((hdrs.sender, hdrs.amount)),
         },
-    )
-    .map_err(|e| TezosXRuntimeError::Custom(format!("EVM execution failed: {e:?}")))?;
+    );
+    // Restore the outer frame's per-call depth now that the inner
+    // execution is done (see the save above).
+    journal.evm.set_crac_chain_depth(saved_crac_chain_depth);
+    let outcome = outcome.map_err(|e| {
+        TezosXRuntimeError::Custom(format!("EVM execution failed: {e:?}"))
+    })?;
 
     Ok(outcome)
 }
@@ -385,6 +398,9 @@ where
             })
             .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
     }
+    // Per-call `crac_chain_depth`: save / set / restore around the inner
+    // execution, same as the POST path. See `execute_call`.
+    let saved_crac_chain_depth = journal.evm.crac_chain_depth();
     journal.evm.set_crac_chain_depth(hdrs.crac_depth);
 
     let context = CrossRuntimeContext {
@@ -420,8 +436,11 @@ where
         // validation time.
         true,
         TransactionOrigin::CrossRuntimeStatic,
-    )
-    .map_err(|e| {
+    );
+    // Restore the outer frame's per-call depth now that the inner
+    // execution is done (see the save above).
+    journal.evm.set_crac_chain_depth(saved_crac_chain_depth);
+    let outcome = outcome.map_err(|e| {
         TezosXRuntimeError::Custom(format!("EVM static execution failed: {e:?}"))
     })?;
 
@@ -921,6 +940,131 @@ mod tests {
             revm::primitives::U256::ZERO,
             "Sender balance should be 0 after transfer"
         );
+    }
+
+    /// Build a minimal cross-runtime `serve()` request carrying an
+    /// inbound `X-Tezos-CRAC-Depth`. Empty body + amount 0 so the call
+    /// is a no-op transfer to a codeless account on both the POST and
+    /// GET (static) paths.
+    fn serve_request_with_depth(
+        method: http::Method,
+        sender: &Address,
+        destination: &Address,
+        crac_depth: u32,
+    ) -> http::Request<Vec<u8>> {
+        let url = format!(
+            "http://ethereum/{}",
+            alloy_primitives::hex::encode(destination.0 .0)
+        );
+        http::Request::builder()
+            .method(method)
+            .uri(&url)
+            .header(
+                tezosx_interfaces::X_TEZOS_SENDER,
+                format!("0x{}", alloy_primitives::hex::encode(sender.0 .0)),
+            )
+            .header(tezosx_interfaces::X_TEZOS_AMOUNT, "0")
+            .header(tezosx_interfaces::X_TEZOS_GAS_LIMIT, u64::MAX.to_string())
+            .header(tezosx_interfaces::X_TEZOS_TIMESTAMP, "1")
+            .header(tezosx_interfaces::X_TEZOS_BLOCK_NUMBER, "1")
+            .header(
+                tezosx_interfaces::X_TEZOS_CRAC_DEPTH,
+                crac_depth.to_string(),
+            )
+            .body(vec![])
+            .unwrap()
+    }
+
+    // Outer EVM frame already inside a CRAC at this depth; the inbound
+    // serve carries a shallower depth. After the inbound execution
+    // returns, the outer frame's per-call depth must be the outer value
+    // again, not the inner one.
+    const OUTER_DEPTH: u32 = 5;
+    const INBOUND_DEPTH: u32 = 2;
+
+    #[test]
+    fn test_serve_post_restores_crac_chain_depth() {
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let registry = UnimplementedRegistry;
+        let sender = Address::from_slice(&[0x11; 20]);
+        let destination = Address::from_slice(&[0x22; 20]);
+
+        let mut journal = TezosXJournal::default();
+        journal.evm.set_crac_chain_depth(OUTER_DEPTH);
+
+        let request = serve_request_with_depth(
+            http::Method::POST,
+            &sender,
+            &destination,
+            INBOUND_DEPTH,
+        );
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        assert_eq!(resp.status(), http::StatusCode::OK);
+
+        // Without the save/restore the outer frame would keep the inner
+        // INBOUND_DEPTH and stamp an inflated header on its next CRAC.
+        assert_eq!(
+            journal.evm.crac_chain_depth(),
+            OUTER_DEPTH,
+            "POST serve() must restore the outer frame's crac_chain_depth on return"
+        );
+    }
+
+    #[test]
+    fn test_serve_get_restores_crac_chain_depth() {
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let registry = UnimplementedRegistry;
+        let sender = Address::from_slice(&[0x11; 20]);
+        let destination = Address::from_slice(&[0x22; 20]);
+
+        let mut journal = TezosXJournal::default();
+        journal.evm.set_crac_chain_depth(OUTER_DEPTH);
+
+        let request = serve_request_with_depth(
+            http::Method::GET,
+            &sender,
+            &destination,
+            INBOUND_DEPTH,
+        );
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        assert_eq!(resp.status(), http::StatusCode::OK);
+
+        assert_eq!(
+            journal.evm.crac_chain_depth(),
+            OUTER_DEPTH,
+            "GET serve() must restore the outer frame's crac_chain_depth on return"
+        );
+    }
+
+    #[test]
+    fn test_serve_preserves_revm_call_depth_control() {
+        // Control / sibling: `revm_call_depth` is written only by the
+        // OUTBOUND `tezosx_call_http` (revm/src/journal.rs), never by an
+        // inbound serve, so it is naturally preserved across an inbound
+        // CRAC. This is the bracketed counter `crac_chain_depth` is now
+        // aligned with; the assertion holds regardless of the
+        // crac_chain_depth fix.
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let registry = UnimplementedRegistry;
+        let sender = Address::from_slice(&[0x11; 20]);
+        let destination = Address::from_slice(&[0x22; 20]);
+
+        let mut journal = TezosXJournal::default();
+        journal.evm.set_revm_call_depth(Some(7));
+
+        let request = serve_request_with_depth(
+            http::Method::POST,
+            &sender,
+            &destination,
+            INBOUND_DEPTH,
+        );
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        assert_eq!(resp.status(), http::StatusCode::OK);
+
+        assert_eq!(journal.evm.revm_call_depth(), Some(7));
     }
 
     /// Test that alias addresses are computed deterministically from native addresses.
