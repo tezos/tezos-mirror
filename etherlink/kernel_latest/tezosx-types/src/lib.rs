@@ -25,6 +25,25 @@ pub const X_TEZOS_BLOCK_NUMBER: &str = "X-Tezos-Block-Number";
 pub const X_TEZOS_CRAC_ID: &str = "X-Tezos-CRAC-ID";
 pub const X_TEZOS_CRAC_DEPTH: &str = "X-Tezos-CRAC-Depth";
 
+/// Maximum permitted value of the `X-Tezos-CRAC-Depth` header, i.e. the
+/// maximum number of cross-runtime (CRAC) hops a single chain may take.
+///
+/// Each cross-runtime crossing stamps `inbound + 1` on the outgoing
+/// header, so the counter is a hop count. A self-recursive Michelson↔EVM
+/// gateway cycle drives it up one hop at a time; without a bound such a
+/// cycle never terminates and wedges sequencer block production. Every
+/// runtime rejects an inbound CRAC whose depth exceeds this cap,
+/// converting the would-be spin into a clean, catchable operation-level
+/// failure.
+///
+/// This is a network-performance bound for Tezos X — not derived from
+/// any protocol constant — chosen well above realistic legitimate
+/// cross-runtime composition depth (a handful of hops) while keeping the
+/// worst-case per-operation kernel work bounded. A gas-based termination
+/// (charged symmetrically across runtimes) is the longer-term fix and
+/// will subsume this cap.
+pub const MAX_CRAC_DEPTH: u32 = 128;
+
 pub const ERR_FORBIDDEN_TEZOS_HEADER: &str =
     "user-supplied X-Tezos-* headers are forbidden";
 

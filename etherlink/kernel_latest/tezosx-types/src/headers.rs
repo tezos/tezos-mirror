@@ -7,7 +7,7 @@
 //! Each runtime re-uses these low-level extractors when building its own
 //! typed `parse_request_headers` function.
 
-use crate::TezosXRuntimeError;
+use crate::{TezosXRuntimeError, MAX_CRAC_DEPTH};
 use primitive_types::U256;
 
 /// Returns `None` if the header is absent, `Some(str)` if present and valid
@@ -93,6 +93,25 @@ pub fn parse_u32_default(
         }),
         None => Ok(default),
     }
+}
+
+/// Reject an inbound cross-runtime call whose CRAC chain depth exceeds
+/// [`MAX_CRAC_DEPTH`].
+///
+/// The depth is attacker-controllable — a self-recursive Michelson↔EVM
+/// gateway cycle drives it up one hop at a time — so the
+/// rejection is a *catchable* [`TezosXRuntimeError::BadRequest`]
+/// (HTTP 400), never a `HeaderError`/`Custom` (HTTP 500). Both gateway
+/// producers classify a 4xx as an operation-level revert and a 5xx as a
+/// whole-block abort; a user-triggerable limit must only revert the
+/// offending operation.
+pub fn check_crac_depth(depth: u32) -> Result<(), TezosXRuntimeError> {
+    if depth > MAX_CRAC_DEPTH {
+        return Err(TezosXRuntimeError::BadRequest(format!(
+            "CRAC chain depth {depth} exceeds maximum {MAX_CRAC_DEPTH}"
+        )));
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -279,6 +298,28 @@ mod tests {
     fn require_u32_rejects_overflow() {
         let hdrs = headers_from(&[(X_TEZOS_BLOCK_NUMBER, "5000000000")]);
         assert!(require_u32(&hdrs, X_TEZOS_BLOCK_NUMBER).is_err());
+    }
+
+    // --- CRAC depth cap ---
+
+    #[test]
+    fn check_crac_depth_accepts_below_and_at_cap() {
+        assert!(check_crac_depth(0).is_ok());
+        assert!(check_crac_depth(MAX_CRAC_DEPTH - 1).is_ok());
+        // The cap itself is allowed; only strictly deeper chains are rejected.
+        assert!(check_crac_depth(MAX_CRAC_DEPTH).is_ok());
+    }
+
+    #[test]
+    fn check_crac_depth_rejects_above_cap_as_catchable_bad_request() {
+        let err = check_crac_depth(MAX_CRAC_DEPTH + 1).unwrap_err();
+        // Must be BadRequest (→ 400 → catchable operation-level revert),
+        // never HeaderError/Custom (→ 500 → whole-block abort): the depth
+        // is user-triggerable.
+        assert!(
+            matches!(err, TezosXRuntimeError::BadRequest(_)),
+            "expected BadRequest, got {err:?}"
+        );
     }
 
     // --- TEZ formatting tests ---

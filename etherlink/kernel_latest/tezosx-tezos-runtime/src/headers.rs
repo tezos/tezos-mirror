@@ -18,8 +18,8 @@ use tezos_data_encoding::types::Narith;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezosx_interfaces::headers::{
-    parse_str, parse_tez_to_mutez, parse_u32_default, require_i64, require_str,
-    require_u32, require_u64,
+    check_crac_depth, parse_str, parse_tez_to_mutez, parse_u32_default, require_i64,
+    require_str, require_u32, require_u64,
 };
 use tezosx_interfaces::TezosXRuntimeError;
 
@@ -50,7 +50,10 @@ pub struct MichelsonHeaders {
 /// Parse `X-Tezos-*` headers from `headers`.
 ///
 /// Returns `HeaderError` if a required header is absent or any header value
-/// cannot be parsed as its expected type.
+/// cannot be parsed as its expected type. A well-formed but over-deep
+/// `X-Tezos-CRAC-Depth` (above [`tezosx_interfaces::MAX_CRAC_DEPTH`]) is
+/// rejected as a catchable `BadRequest` — this is the cross-runtime
+/// chain-depth cap that stops a self-recursive gateway cycle.
 pub fn parse_request_headers(
     headers: &http::HeaderMap,
 ) -> Result<MichelsonHeaders, TezosXRuntimeError> {
@@ -65,6 +68,7 @@ pub fn parse_request_headers(
 
     let crac_id = parse_str(headers, X_TEZOS_CRAC_ID)?;
     let crac_depth = parse_u32_default(headers, X_TEZOS_CRAC_DEPTH, 0)?;
+    check_crac_depth(crac_depth)?;
 
     Ok(MichelsonHeaders {
         amount: Narith(
@@ -96,6 +100,7 @@ fn require_kt1(
 mod tests {
     use super::*;
     use tezosx_interfaces::headers::headers_from;
+    use tezosx_interfaces::MAX_CRAC_DEPTH;
 
     const KT1: &str = "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT";
     const TZ1: &str = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU";
@@ -376,5 +381,41 @@ mod tests {
             (X_TEZOS_SENDER, "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU");
         let err = parse_request_headers(&headers_from(&hdrs)).unwrap_err();
         assert!(matches!(err, TezosXRuntimeError::HeaderError(_)));
+    }
+
+    fn parse_with_crac_depth(depth: u32) -> Result<MichelsonHeaders, TezosXRuntimeError> {
+        let depth_str = depth.to_string();
+        let pairs: Vec<(&str, &str)> = vec![
+            (X_TEZOS_AMOUNT, "0"),
+            (X_TEZOS_GAS_LIMIT, "1000000"),
+            (X_TEZOS_TIMESTAMP, "1000000"),
+            (X_TEZOS_BLOCK_NUMBER, "1"),
+            (X_TEZOS_SENDER, KT1),
+            (X_TEZOS_CRAC_DEPTH, depth_str.as_str()),
+        ];
+        parse_request_headers(&headers_from(&pairs))
+    }
+
+    #[test]
+    fn crac_depth_absent_defaults_to_zero() {
+        let parsed = parse_request_headers(&headers_from(&required_headers())).unwrap();
+        assert_eq!(parsed.crac_depth, 0);
+    }
+
+    #[test]
+    fn crac_depth_at_cap_accepted() {
+        let parsed = parse_with_crac_depth(MAX_CRAC_DEPTH).unwrap();
+        assert_eq!(parsed.crac_depth, MAX_CRAC_DEPTH);
+    }
+
+    #[test]
+    fn crac_depth_above_cap_rejected_as_bad_request() {
+        // Over-deep chain must be a catchable 400, not a 500 — the depth
+        // is user-triggerable and may only revert the operation.
+        let err = parse_with_crac_depth(MAX_CRAC_DEPTH + 1).unwrap_err();
+        assert!(
+            matches!(err, TezosXRuntimeError::BadRequest(_)),
+            "expected BadRequest, got {err:?}"
+        );
     }
 }
