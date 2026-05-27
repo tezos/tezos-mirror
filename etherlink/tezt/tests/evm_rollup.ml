@@ -6109,6 +6109,22 @@ let test_rpc_getLogs =
   (* Check that there have been 3 logs in total *)
   let*@ all_logs = Rpc.get_logs ~from_block:(Number 0) evm_node in
   Check.((List.length all_logs = 3) int) ~error_msg:"Expected %R logs, got %L" ;
+  (* Regression for L2-1342: over a multi-block range, [eth_getLogs] used to
+     stamp [blockNumber == fromBlock] on every log instead of the block that
+     actually emitted it. The three logs above span three distinct blocks, so
+     cross-check each log's [blockNumber] against the block identified by its
+     (always-correct) [blockHash]. *)
+  let* () =
+    Lwt_list.iter_s
+      (fun (log : Transaction.tx_log) ->
+        let*@ block = Rpc.get_block_by_hash ~block:log.blockHash evm_node in
+        Check.((Int32.to_int log.blockNumber = Int32.to_int block.number) int)
+          ~error_msg:
+            "eth_getLogs returned a log with blockNumber %L, but its blockHash \
+             resolves to block %R" ;
+        unit)
+      all_logs
+  in
   (* Check that the [address] contract has produced 3 logs in total *)
   let*@ contract_logs =
     Rpc.get_logs ~from_block:(Number 0) ~address:(Single address) evm_node
