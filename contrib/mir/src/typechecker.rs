@@ -9928,12 +9928,111 @@ mod typecheck_tests {
         );
     }
 
-    // Regression for the ordering bug surfaced on !21983 (note 3376561578):
-    // for a map type with both a non-comparable key and a value that itself
-    // fails parsing, the recursive code reported the key's `Comparable`
-    // failure first; the iterative MR2 worklist (pre-fix) reported the value
-    // error first because the value Visit ran before the key check. Fix:
-    // EnsureProp frame slotted between Visit(k) and Visit(v).
+    /// Helper: builds a `[Micheline]` body of `DEPTH` nested
+    /// `PUSH (lambda unit unit) {<inner>} ; DROP` layers, leaving the
+    /// outer body's input stack at `[]`. Each layer keeps its body's
+    /// stack at `[unit]` so the lambda's `out_ty = unit` unifies. The
+    /// returned closure runs the typecheck on a thread with the given
+    /// stack size and either expects success or expects an overflow,
+    /// per the caller's intent.
+    #[cfg(test)]
+    fn run_nested_push_lambda<F>(depth: usize, stack_size: usize, body: F)
+    where
+        F: FnOnce(Result<Vec<Instruction<'static>>, TcError>) + Send + 'static,
+    {
+        use std::thread;
+        thread::Builder::new()
+            .stack_size(stack_size)
+            .spawn(move || {
+                // Build the Micheline directly via the arena (the source
+                // parser has its own recursion limit; the kernel uses
+                // `Micheline::decode_raw` byte-decoding which is iterative
+                // and has no parser-level depth bound — confirmed by the
+                // third-pass review).
+                let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+                let unit_ty = Micheline::App(Prim::unit, &[], NO_ANNS);
+                let lambda_ty = Micheline::App(
+                    Prim::lambda,
+                    arena.alloc_extend([unit_ty.clone(), unit_ty.clone()]),
+                    NO_ANNS,
+                );
+                let drop_instr = Micheline::App(Prim::DROP, &[], NO_ANNS);
+                let mut current_body: &[Micheline<'_>] = &[];
+                for _ in 0..depth {
+                    let lambda_value = Micheline::Seq(current_body);
+                    let push = Micheline::App(
+                        Prim::PUSH,
+                        arena.alloc_extend([lambda_ty.clone(), lambda_value]),
+                        NO_ANNS,
+                    );
+                    current_body = arena.alloc_extend([push, drop_instr.clone()]);
+                }
+                let mut gas = Gas::new(u32::MAX);
+                let stk = &mut tc_stk![];
+                // Safety transmute: extend the arena-borrowed lifetime to
+                // 'static so the closure signature is portable. The arena
+                // lives until thread exit; the closure runs to completion
+                // before the join.
+                let result: Result<Vec<Instruction<'_>>, TcError> =
+                    typecheck(current_body, &mut gas, None, stk, false);
+                let result: Result<Vec<Instruction<'static>>, TcError> =
+                    unsafe { std::mem::transmute(result) };
+                std::mem::forget(std::mem::replace(stk, tc_stk![]));
+                body(result);
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
+    }
+
+    /// **Forward budget-pin** for the value-level PUSH-lambda recursion.
+    /// Not a regression test — there is no fix yet that this would have
+    /// regressed against. The instruction-level LAMBDA path was
+    /// iteratised in commit 75172615a6b (OpenLambda/AfterLambda), but
+    /// the value-level `step_typecheck_value → typecheck_lambda →
+    /// typecheck` chain still adds Rust frames per nested literal.
+    ///
+    /// The third-pass Security review surfaced a kernel-budget BLOCKER
+    /// based on the gas-vs-stack mismatch: an attacker can fit
+    /// 500K–700K nested PUSH-lambda layers in a single L1 operation's
+    /// gas budget while the kernel's 1 MiB WASM stack admits only
+    /// 64–128. The matching kernel-budget overflow test below
+    /// (`#[ignore]`-gated) pins the BLOCKER until the follow-up MR
+    /// iteratises the value-level Lambda path.
+    ///
+    /// This test runs at a depth that fits a generous worker budget so
+    /// CI clears it; do not interpret the passing state as a proof of
+    /// kernel safety.
+    #[test]
+    fn push_lambda_literal_depth_budget_pin() {
+        run_nested_push_lambda(50, 16 * 1024 * 1024, |result| {
+            let body = result.expect("PUSH-lambda budget pin: depth 50 must typecheck");
+            std::mem::forget(body);
+        });
+    }
+
+    /// **Kernel-budget BLOCKER pin** (Security third-pass): demonstrates
+    /// that an adversarial nested-PUSH-lambda input overflows a worker
+    /// thread sized to the kernel's WASM stack (1 MiB). Ignored by
+    /// default so CI does not flake; run with `--ignored` to confirm
+    /// the BLOCKER. The follow-up MR that iteratises the value-level
+    /// PUSH-lambda path should turn this into a `#[should_panic]` and
+    /// then, post-fix, into a clean passing test.
+    #[test]
+    #[ignore = "BLOCKER pin: overflows the kernel's 1 MiB WASM stack; \
+                value-level PUSH-lambda recursion is the residual hazard \
+                tracked in the MR2 review synthesis"]
+    fn push_lambda_literal_overflows_kernel_budget() {
+        // Depth deliberately set above the kernel's release-build
+        // budget (Security third-pass estimated 64-128 layers per
+        // 1 MiB). The thread-builder propagates the resulting abort
+        // through `.join().expect()` as a panic, locking in the
+        // BLOCKER's presence until the follow-up MR.
+        run_nested_push_lambda(256, 1024 * 1024, |_result| {
+            unreachable!("value-level PUSH-lambda recursion must overflow this budget")
+        });
+    }
+
     // Regression: pre-fix, nested LAMBDAs grew the Rust call stack by one
     // frame per nesting level (`typecheck_instruction_step` → `typecheck_lambda`
     // → `typecheck` recursion). With the OpenLambda/AfterLambda worklist
