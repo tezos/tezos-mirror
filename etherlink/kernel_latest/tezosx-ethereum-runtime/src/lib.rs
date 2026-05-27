@@ -376,7 +376,15 @@ where
         hdrs.amount,
         None,
         None,
-        false,
+        // Disable EIP-3607 (via `is_simulation = true`): an inbound CRAC
+        // caller is not a user-signed EVM transaction but a trusted,
+        // gateway-supplied address. A same-runtime EVM-to-EVM round-trip
+        // forwards the real calling contract as `msg.sender`, whose
+        // bytecode is neither empty nor an EIP-7702 delegation; EIP-3607
+        // would otherwise reject it (RejectCallerWithCode), turning a
+        // catchable revert into a 500 that aborts the whole CRAC block.
+        // The static GET path disables it for the same reason.
+        true,
         TransactionOrigin::CrossRuntime {
             credit: Some((hdrs.sender, hdrs.amount)),
         },
@@ -1597,6 +1605,57 @@ mod tests {
     ) -> revm::primitives::U256 {
         let account = StorageAccount::from_address(address).unwrap();
         account.get_storage(host, &slot).unwrap_or_default()
+    }
+
+    /// Regression (L2-1370): an inbound CRAC whose caller is a real
+    /// code-bearing contract must not be rejected by EIP-3607. Since the
+    /// same-runtime EVM-to-EVM round-trip forwards the calling contract
+    /// verbatim as `msg.sender` (rather than a re-aliased,
+    /// EIP-3607-exempt address), the `execute_call` path must disable
+    /// EIP-3607; otherwise the caller's bytecode triggers
+    /// `RejectCallerWithCode`, surfaced as a 500 that aborts the whole
+    /// CRAC block. Reverting the fix (`is_simulation = false`) turns the
+    /// asserted 200 into a 500.
+    #[test]
+    fn test_serve_accepts_code_bearing_caller() {
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let block_constants = BlockConstants::test_block_with_no_fees();
+        let registry = UnimplementedRegistry;
+
+        let sender = Address::from_slice(&[0x11; 20]);
+        let contract = Address::from_slice(&[0x22; 20]);
+
+        // Give the caller non-empty, non-EIP-7702 bytecode: this is what
+        // EIP-3607 rejects, and what a same-runtime EVM-to-EVM caller now
+        // carries.
+        deploy_at(&mut host, &sender, Bytes::from_hex("6001").unwrap());
+
+        // Target stores 0x42 at slot 1 (PUSH1 0x42 PUSH1 0x01 SSTORE).
+        deploy_at(&mut host, &contract, Bytes::from_hex("6042600155").unwrap());
+
+        let mut journal = TezosXJournal::default();
+        let request = build_serve_request(&sender, &contract, "0", vec![]);
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        assert_eq!(
+            resp.status(),
+            http::StatusCode::OK,
+            "a code-bearing CRAC caller must not be rejected by EIP-3607"
+        );
+        commit_evm_journal_from_external(
+            &mut host,
+            &registry,
+            &block_constants,
+            &mut journal,
+        )
+        .unwrap();
+
+        // The target actually executed (proves the call was not rejected
+        // before reaching the EVM frame).
+        assert_eq!(
+            read_slot(&mut host, &contract, revm::primitives::U256::from(1)),
+            revm::primitives::U256::from(0x42)
+        );
     }
 
     #[test]

@@ -545,6 +545,12 @@ let store_and_return =
     ~label:"store_and_return"
     ~contract:"StoreAndReturn"
 
+let crac_identity_recorder =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/crac_identity_recorder.sol")
+    ~label:"crac_identity_recorder"
+    ~contract:"IdentityRecorder"
+
 let gas_burner =
   compile_contract
     ~source:(solidity_contracts_path ^ "/gas_burner.sol")
