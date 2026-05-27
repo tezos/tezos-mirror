@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2026 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,194 +25,194 @@
 (*****************************************************************************)
 
 open Tezos_scoru_wasm
-open Wasm_pvm_state.Internal_state
 
-module Wasm_vm = Wasm_vm.Make_vm (struct
-  let config = Wasm_pvm_config.empty
+module Make_vm (P : Wasm_vm.Params) = struct
+  open Wasm_pvm_state.Internal_state
+  module Wasm_vm = Wasm_vm.Make_vm (P)
 
-  let make_empty_nds = None
-end)
+  include (Wasm_vm : Wasm_vm_sig.S)
 
-include (Wasm_vm : Wasm_vm_sig.S)
-
-let compute_until_snapshot ~wasm_entrypoint ~max_steps ?write_debug pvm_state =
-  Wasm_vm.compute_step_many_until
-    ~wasm_entrypoint
-    ~max_steps
-    ?write_debug
-    (fun pvm_state ->
-      Lwt.return
-      @@
-      match pvm_state.tick_state with
-      | Snapshot -> false
-      | _ -> Wasm_vm.should_compute pvm_state)
-    pvm_state
-
-let compute_fast ~wasm_entrypoint ~hooks ~reveal_builtins ~write_debug pvm_state
-    =
-  let open Lwt.Syntax in
-  let* version = Wasm_vm.get_wasm_version pvm_state in
-  (* Execute! *)
-  let durable = Wasm_pvm_state.Internal_state.durable_of pvm_state.storage in
-  let* durable =
-    Exec.compute
-      ~hooks
+  let compute_until_snapshot ~wasm_entrypoint ~max_steps ?write_debug pvm_state
+      =
+    Wasm_vm.compute_step_many_until
       ~wasm_entrypoint
-      ~version
-      ~reveal_builtins
-      ~write_debug
-      durable
-      pvm_state.buffers
-  in
-  (* The WASM PVM does several maintenance operations at the end of
-     each [kernel_run] call, using the very last [Padding]
-     tick. Instead of replicating the same logic in the Fast VM, we
-     reuse it by crafting the PVM state just before that critical
-     tick. *)
-  let ticks = pvm_state.max_nb_ticks in
-  let current_tick = Z.(pred @@ add pvm_state.last_top_level_call ticks) in
-  let pvm_state =
-    {
-      pvm_state with
-      storage =
-        Wasm_pvm_state.Internal_state.update_durable pvm_state.storage durable;
-      current_tick;
-      tick_state = Padding;
-    }
-  in
-  (* Here, we don't reuse the [write_debug] argument, because we are
-     in the [Padding] stage of the WASM PVM execution, so there is no
-     WASM execution during this tick.
+      ~max_steps
+      ?write_debug
+      (fun pvm_state ->
+        Lwt.return
+        @@
+        match pvm_state.tick_state with
+        | Snapshot -> false
+        | _ -> Wasm_vm.should_compute pvm_state)
+      pvm_state
 
-     Calling [compute_step_with_debug ~write_debug] has a significant
-     performance cost, because the host functions registry is
-     reconstructed.
-
-     As a consequence of these two facts, we call [compute_step] to
-     avoid this penalty.*)
-  let* pvm_state = Wasm_vm.compute_step ~wasm_entrypoint pvm_state in
-
-  Lwt.return pvm_state
-
-let rec compute_step_many accum_ticks ~(hooks : Hooks.t) ?reveal_builtins
-    ?(write_debug = Builtins.Noop) ?(stop_at_snapshot = false) ~wasm_entrypoint
-    ~max_steps pvm_state =
-  let open Lwt.Syntax in
-  assert (max_steps > 0L) ;
-  let after_fast_exec =
-    match hooks.fast_exec.completed with
-    | Some hook -> hook
-    | None -> fun () -> Lwt_syntax.return_unit
-  in
-  let eligible_for_fast_exec =
-    Z.Compare.(pvm_state.max_nb_ticks <= Z.of_int64 max_steps)
-  in
-  let inbox_snapshot =
-    Tezos_webassembly_interpreter.Input_buffer.snapshot pvm_state.buffers.input
-  in
-  let* outbox_snapshot =
-    Tezos_webassembly_interpreter.Output_buffer.snapshot
-      pvm_state.buffers.output
-  in
-  let backup pvm_state =
-    let+ pvm_state, ticks =
-      Wasm_vm.compute_step_many
-        ~wasm_entrypoint
+  let compute_fast ~wasm_entrypoint ~hooks ~reveal_builtins ~write_debug
+      pvm_state =
+    let open Lwt.Syntax in
+    let* version = Wasm_vm.get_wasm_version pvm_state in
+    (* Execute! *)
+    let durable = Wasm_pvm_state.Internal_state.durable_of pvm_state.storage in
+    let* durable =
+      Exec.compute
         ~hooks
-        ?reveal_builtins
+        ~wasm_entrypoint
+        ~version
+        ~reveal_builtins
         ~write_debug
-        ~stop_at_snapshot
-        ~max_steps
-        {
-          pvm_state with
-          buffers = {input = inbox_snapshot; output = outbox_snapshot};
-        }
+        durable
+        pvm_state.buffers
     in
-    (pvm_state, Int64.add accum_ticks ticks)
-  in
-  match reveal_builtins with
-  | Some reveal_builtins when eligible_for_fast_exec -> (
-      let goto_snapshot_and_retry () =
-        let* pvm_state, ticks =
-          compute_until_snapshot
-            ~wasm_entrypoint
-            ~write_debug
-            ~max_steps
-            pvm_state
+    (* The WASM PVM does several maintenance operations at the end of
+       each [kernel_run] call, using the very last [Padding]
+       tick. Instead of replicating the same logic in the Fast VM, we
+       reuse it by crafting the PVM state just before that critical
+       tick. *)
+    let ticks = pvm_state.max_nb_ticks in
+    let current_tick = Z.(pred @@ add pvm_state.last_top_level_call ticks) in
+    let pvm_state =
+      {
+        pvm_state with
+        storage =
+          Wasm_pvm_state.Internal_state.update_durable pvm_state.storage durable;
+        current_tick;
+        tick_state = Padding;
+      }
+    in
+    (* Here, we don't reuse the [write_debug] argument, because we are
+       in the [Padding] stage of the WASM PVM execution, so there is no
+       WASM execution during this tick.
+
+       Calling [compute_step_with_debug ~write_debug] has a significant
+       performance cost, because the host functions registry is
+       reconstructed.
+
+       As a consequence of these two facts, we call [compute_step] to
+       avoid this penalty.*)
+    let* pvm_state = Wasm_vm.compute_step ~wasm_entrypoint pvm_state in
+
+    Lwt.return pvm_state
+
+  let rec compute_step_many accum_ticks ~(hooks : Hooks.t) ?reveal_builtins
+      ?(write_debug = Builtins.Noop) ?(stop_at_snapshot = false)
+      ~wasm_entrypoint ~max_steps pvm_state =
+    let open Lwt.Syntax in
+    assert (max_steps > 0L) ;
+    let after_fast_exec =
+      match hooks.fast_exec.completed with
+      | Some hook -> hook
+      | None -> fun () -> Lwt_syntax.return_unit
+    in
+    let eligible_for_fast_exec =
+      Z.Compare.(pvm_state.max_nb_ticks <= Z.of_int64 max_steps)
+    in
+    let inbox_snapshot =
+      Tezos_webassembly_interpreter.Input_buffer.snapshot
+        pvm_state.buffers.input
+    in
+    let* outbox_snapshot =
+      Tezos_webassembly_interpreter.Output_buffer.snapshot
+        pvm_state.buffers.output
+    in
+    let backup pvm_state =
+      let+ pvm_state, ticks =
+        Wasm_vm.compute_step_many
+          ~wasm_entrypoint
+          ~hooks
+          ?reveal_builtins
+          ~write_debug
+          ~stop_at_snapshot
+          ~max_steps
+          {
+            pvm_state with
+            buffers = {input = inbox_snapshot; output = outbox_snapshot};
+          }
+      in
+      (pvm_state, Int64.add accum_ticks ticks)
+    in
+    match reveal_builtins with
+    | Some reveal_builtins when eligible_for_fast_exec -> (
+        let goto_snapshot_and_retry () =
+          let* pvm_state, ticks =
+            compute_until_snapshot
+              ~wasm_entrypoint
+              ~write_debug
+              ~max_steps
+              pvm_state
+          in
+          match pvm_state.tick_state with
+          | Snapshot when not stop_at_snapshot ->
+              let max_steps = Int64.sub max_steps ticks in
+              let accum_ticks = Int64.add accum_ticks ticks in
+              let may_compute_more = Wasm_vm.should_compute pvm_state in
+              if may_compute_more && max_steps > 0L then
+                (compute_step_many [@tailcall])
+                  ~wasm_entrypoint
+                  ~hooks
+                  accum_ticks
+                  ~reveal_builtins
+                  ~write_debug
+                  ~stop_at_snapshot
+                  ~max_steps
+                  pvm_state
+              else Lwt.return (pvm_state, accum_ticks)
+          | _ -> Lwt.return (pvm_state, ticks)
+        in
+        let go_like_the_wind () =
+          let* pvm_state =
+            compute_fast
+              ~wasm_entrypoint
+              ~hooks
+              ~write_debug
+              ~reveal_builtins
+              pvm_state
+          in
+          let accum_ticks =
+            Int64.add accum_ticks (Z.to_int64 pvm_state.max_nb_ticks)
+          in
+          let* () = after_fast_exec () in
+          let max_steps =
+            Int64.sub max_steps (Z.to_int64 pvm_state.max_nb_ticks)
+          in
+          if
+            max_steps > 0L
+            && Wasm_vm.should_compute pvm_state
+            && not stop_at_snapshot
+          then
+            (compute_step_many [@tailcall])
+              ~wasm_entrypoint
+              ~hooks
+              accum_ticks
+              ~max_steps
+              ~reveal_builtins
+              ~write_debug
+              ~stop_at_snapshot
+              pvm_state
+          else Lwt.return (pvm_state, accum_ticks)
+        in
+        let go_like_the_wind () =
+          Lwt.catch go_like_the_wind (fun exn ->
+              let* () =
+                match hooks.fast_exec.panicked with
+                | Some hook -> hook exn
+                | None -> Lwt_syntax.return_unit
+              in
+              Lwt.reraise exn)
         in
         match pvm_state.tick_state with
-        | Snapshot when not stop_at_snapshot ->
-            let max_steps = Int64.sub max_steps ticks in
-            let accum_ticks = Int64.add accum_ticks ticks in
-            let may_compute_more = Wasm_vm.should_compute pvm_state in
-            if may_compute_more && max_steps > 0L then
-              (compute_step_many [@tailcall])
-                ~wasm_entrypoint
-                ~hooks
-                accum_ticks
-                ~reveal_builtins
-                ~write_debug
-                ~stop_at_snapshot
-                ~max_steps
-                pvm_state
-            else Lwt.return (pvm_state, accum_ticks)
-        | _ -> Lwt.return (pvm_state, ticks)
-      in
-      let go_like_the_wind () =
-        let* pvm_state =
-          compute_fast
-            ~wasm_entrypoint
-            ~hooks
-            ~write_debug
-            ~reveal_builtins
-            pvm_state
-        in
-        let accum_ticks =
-          Int64.add accum_ticks (Z.to_int64 pvm_state.max_nb_ticks)
-        in
-        let* () = after_fast_exec () in
-        let max_steps =
-          Int64.sub max_steps (Z.to_int64 pvm_state.max_nb_ticks)
-        in
-        if
-          max_steps > 0L
-          && Wasm_vm.should_compute pvm_state
-          && not stop_at_snapshot
-        then
-          (compute_step_many [@tailcall])
-            ~wasm_entrypoint
-            ~hooks
-            accum_ticks
-            ~max_steps
-            ~reveal_builtins
-            ~write_debug
-            ~stop_at_snapshot
-            pvm_state
-        else Lwt.return (pvm_state, accum_ticks)
-      in
-      let go_like_the_wind () =
-        Lwt.catch go_like_the_wind (fun exn ->
-            let* () =
-              match hooks.fast_exec.panicked with
-              | Some hook -> hook exn
-              | None -> Lwt_syntax.return_unit
-            in
-            Lwt.reraise exn)
-      in
-      match pvm_state.tick_state with
-      | Snapshot when hooks.fast_exec.fallback ->
-          Lwt.catch go_like_the_wind (fun _ -> backup pvm_state)
-      | Snapshot -> go_like_the_wind ()
-      | _ -> goto_snapshot_and_retry ())
-  | _ ->
-      (* The number of ticks we're asked to do is lower than the maximum number
-         of ticks for a top-level cycle or no builtins were supplied. Fast
-         Execution cannot be applied in this case. *)
-      backup pvm_state
+        | Snapshot when hooks.fast_exec.fallback ->
+            Lwt.catch go_like_the_wind (fun _ -> backup pvm_state)
+        | Snapshot -> go_like_the_wind ()
+        | _ -> goto_snapshot_and_retry ())
+    | _ ->
+        (* The number of ticks we're asked to do is lower than the maximum number
+           of ticks for a top-level cycle or no builtins were supplied. Fast
+           Execution cannot be applied in this case. *)
+        backup pvm_state
 
-let compute_step_many = compute_step_many 0L
+  let compute_step_many = compute_step_many 0L
 
-let get_wasm_version = Wasm_vm.get_wasm_version
+  let get_wasm_version = Wasm_vm.get_wasm_version
 
-let compute_step_many ?reveal_builtins ?(hooks = Hooks.no_hooks) =
-  compute_step_many ?reveal_builtins ~hooks
+  let compute_step_many ?reveal_builtins ?(hooks = Hooks.no_hooks) =
+    compute_step_many ?reveal_builtins ~hooks
+end

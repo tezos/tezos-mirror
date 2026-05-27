@@ -96,11 +96,10 @@ module type S = sig
   val save_fallback_kernel : Durable.t -> Durable.t Lwt.t
 end
 
-(** [Make_vm (Params)] is the WASM VM parameterised by a
-    {!Wasm_pvm_config.t} (feature flags consulted by the evaluator)
-    and an optional fresh-NDS factory invoked at the
-    [Padding -> Snapshot] reboot boundary when the kernel's
-    activation sentinel is observed.
+(** Per-instance VM parameters: the {!Wasm_pvm_config.t} feature flags
+    consulted by the evaluator, and an optional fresh-NDS factory
+    invoked at the [Padding -> Snapshot] reboot boundary when the
+    kernel's activation sentinel is observed.
 
     [make_empty_nds = None] is a promise from the caller that the
     [Nds_host_functions] gate never opens for this instantiation
@@ -108,8 +107,11 @@ end
     is broken — the kernel sets the sentinel and the gate is open
     at a reboot boundary — {!maybe_activate_nds} raises rather than
     silently dropping the activation request. *)
-module Make_vm (Params : sig
+module type Params = sig
   val config : Wasm_pvm_config.t
 
   val make_empty_nds : (unit -> Nds.t) option
-end) : S
+end
+
+(** [Make_vm (Params)] is the WASM VM parameterised by a {!Params}. *)
+module Make_vm (Params : Params) : S

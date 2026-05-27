@@ -53,11 +53,13 @@ module type S = sig
   val save_fallback_kernel : Durable.t -> Durable.t Lwt.t
 end
 
-module Make_vm (Params : sig
+module type Params = sig
   val config : Wasm_pvm_config.t
 
   val make_empty_nds : (unit -> Nds.t) option
-end) : S = struct
+end
+
+module Make_vm (Params : Params) : S = struct
   (** [current_level_of pvm_state] returns the inbox level of the
       most recent input, or [0l] before the first input. Used as the
       reference level for {!Wasm_pvm_config} feature gates. *)

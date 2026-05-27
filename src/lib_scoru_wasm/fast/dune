@@ -11,6 +11,7 @@
   octez-libs.webassembly-interpreter
   octez-libs.lazy-containers
   octez-libs.scoru-wasm
+  octez-libs.riscv-nds-common
   octez-l2-libs.wasmer)
  (flags
   (:standard)

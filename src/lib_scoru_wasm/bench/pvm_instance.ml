@@ -26,7 +26,8 @@
 open Tezos_scoru_wasm
 open Tezos_scoru_wasm_helpers
 module Wasm = Wasm_utils.Wasm
-module Wasm_fast_vm = Tezos_scoru_wasm_fast.Vm
+module Wasm_fast_vm =
+  Tezos_scoru_wasm_fast.Vm.Make_vm (Tezos_scoru_wasm_fast.Pvm.Default_params)
 module State = Wasm_utils.State
 
 let encode_pvm_state state tree = State.Encoding_runner.encode state tree
