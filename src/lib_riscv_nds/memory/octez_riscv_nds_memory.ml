@@ -112,6 +112,13 @@ module Normal = struct
   end
 end
 
+type _ Nds.tag += Normal_tag : Normal.Registry.t Nds.tag
+
+let unwrap_normal nds : Normal.Registry.t option =
+  match Nds.unpack nds with
+  | Nds.Packed {tag = Normal_tag; value; _} -> Some value
+  | _ -> None
+
 module Prove = struct
   module Registry = struct
     type t = Api.registry_prove
@@ -187,6 +194,13 @@ module Prove = struct
   let produce_proof registry_prove =
     Api.octez_riscv_durable_in_memory_produce_proof registry_prove
 end
+
+type _ Nds.tag += Prove_tag : Prove.Registry.t Nds.tag
+
+let unwrap_prove nds : Prove.Registry.t option =
+  match Nds.unpack nds with
+  | Nds.Packed {tag = Prove_tag; value; _} -> Some value
+  | _ -> None
 
 let convert_verification = function Api.Not_found -> Not_found
 
@@ -275,3 +289,10 @@ module Verify = struct
 
   let start_verify proof = Api.octez_riscv_durable_in_memory_start_verify proof
 end
+
+type _ Nds.tag += Verify_tag : Verify.Registry.t Nds.tag
+
+let unwrap_verify nds : Verify.Registry.t option =
+  match Nds.unpack nds with
+  | Nds.Packed {tag = Verify_tag; value; _} -> Some value
+  | _ -> None
