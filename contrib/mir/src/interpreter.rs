@@ -27,7 +27,6 @@ use crate::bls;
 use crate::context::{CtxTrait, TypecheckingCtx};
 use crate::gas::{interpret_cost, CompareError, CostOverflow, OutOfGas};
 use crate::interpreter::interpret_cost::SigCostError;
-use crate::irrefutable_match::irrefutable_match;
 use crate::lexer::Prim;
 use crate::serializer::DecodeError;
 use crate::stack::*;
@@ -97,6 +96,40 @@ pub enum InterpretError<'a> {
     #[allow(missing_docs)]
     #[error(transparent)]
     EnshrinedViewDispatch(#[from] EnshrinedViewDispatchError),
+    /// Internal invariant violation reachable only on a typechecker bug or
+    /// malformed input — analogous to [`TcError::InternalError`] but raised
+    /// from the interpreter side, so the value lands directly in
+    /// `InterpretError` without detouring through `TcError`.
+    #[error("internal interpreter error: {0}")]
+    InternalError(InterpretInvariant),
+}
+
+/// Categorises invariant violations reachable only on a typechecker bug or
+/// malformed Micheline that bypassed typechecking. Mirrors
+/// [`crate::typechecker::TcInvariant`] on the interpreter side: variants
+/// either have no payload (single-site invariants where the tag alone
+/// identifies the broken precondition) or carry typed, equality-stable
+/// fields (`&'static str`) that preserve forensic context without the
+/// brittleness of formatted strings.
+#[allow(missing_docs)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum InterpretInvariant {
+    #[error("attempted to pop from an empty value stack")]
+    EmptyValueStackPop,
+    #[error("type mismatch when popping the value stack: expected {expected}")]
+    TypeMismatchOnPop { expected: &'static str },
+    #[error("type mismatch on the top of the value stack: expected {expected}")]
+    TypeMismatchOnTop { expected: &'static str },
+    #[error("type mismatch on a typed value: expected {expected}")]
+    TypeMismatch { expected: &'static str },
+    #[error("unreachable interpreter state reached")]
+    UnreachableState,
+    #[error("script result was not a `pair operation_list storage`")]
+    ExpectedPairResult,
+    #[error("script result's operation field was not `list operation`")]
+    ExpectedListOperation,
+    #[error("script result's operation list contained a non-operation element")]
+    ExpectedOperationElement,
 }
 
 #[allow(missing_docs)]
@@ -184,41 +217,57 @@ impl<'a> ContractScript<'a> {
 
         use TypedValue as V;
 
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/8061
-        // Handle errors instead of panicking.
-        let result = TypedValue::unwrap_rc(stack.pop().expect("empty execution stack"));
-        match result {
-            V::Pair(operation_list, storage) => {
-                let mut operation_list = TypedValue::unwrap_rc(operation_list);
-                let mut storage = TypedValue::unwrap_rc(storage);
-                // Handle storage big_maps (those big_maps are definitive and will be stored in the durable_storage)
-                let mut storage_big_maps = vec![];
-                storage.view_big_maps_mut(&mut storage_big_maps);
-                let lazy_storage = *ctx.lazy_storage();
-                dump_big_map_updates(
-                    lazy_storage,
-                    &started_with_map_ids,
-                    &mut storage_big_maps,
-                    false,
-                )?;
-                // Handle big_maps that appears in the operation list, those big_maps are temporary and it depends to
-                // the internal operation to determine what to do with it
-                let mut operations_big_maps = vec![];
-                operation_list.view_big_maps_mut(&mut operations_big_maps);
-                dump_big_map_updates(lazy_storage, &[], &mut operations_big_maps, true)?;
+        let result = TypedValue::unwrap_rc(stack.pop().ok_or(InterpretError::InternalError(
+            InterpretInvariant::EmptyValueStackPop,
+        ))?);
+        let (operation_list, storage) = match result {
+            V::Pair(operation_list, storage) => (operation_list, storage),
+            _ => {
+                return Err(
+                    InterpretError::InternalError(InterpretInvariant::ExpectedPairResult).into(),
+                )
+            }
+        };
+        let mut operation_list = TypedValue::unwrap_rc(operation_list);
+        let mut storage = TypedValue::unwrap_rc(storage);
+        // Handle storage big_maps (those big_maps are definitive and will be stored in the durable_storage)
+        let mut storage_big_maps = vec![];
+        storage.view_big_maps_mut(&mut storage_big_maps);
+        let lazy_storage = *ctx.lazy_storage();
+        dump_big_map_updates(
+            lazy_storage,
+            &started_with_map_ids,
+            &mut storage_big_maps,
+            false,
+        )?;
+        // Handle big_maps that appears in the operation list, those big_maps are temporary and it depends to
+        // the internal operation to determine what to do with it
+        let mut operations_big_maps = vec![];
+        operation_list.view_big_maps_mut(&mut operations_big_maps);
+        dump_big_map_updates(lazy_storage, &[], &mut operations_big_maps, true)?;
 
-                match operation_list {
-                    V::List(vec) => Ok((
-                        vec.into_iter()
-                            .map(|x| *irrefutable_match!(TypedValue::unwrap_rc(x); V::Operation)),
-                        storage,
-                    )),
-                    v => panic!("expected `list operation`, got {v:?}"),
+        let vec = match operation_list {
+            V::List(vec) => vec,
+            _ => {
+                return Err(
+                    InterpretError::InternalError(InterpretInvariant::ExpectedListOperation).into(),
+                )
+            }
+        };
+
+        let mut ops = Vec::with_capacity(vec.len());
+        for op in vec {
+            match TypedValue::unwrap_rc(op) {
+                V::Operation(op) => ops.push(*op),
+                _ => {
+                    return Err(InterpretError::InternalError(
+                        InterpretInvariant::ExpectedOperationElement,
+                    )
+                    .into())
                 }
             }
-
-            v => panic!("expected `pair 'a 'b`, got {v:?}"),
         }
+        Ok((ops.into_iter(), storage))
     }
 
     /// Wrap the input in the entrypoint with the given name.
@@ -299,13 +348,6 @@ fn interpret<'a>(
     Ok(())
 }
 
-#[track_caller]
-fn unreachable_state() -> ! {
-    // If the typechecking of the program being interpreted was successful and if this is reached
-    // during interpreting, then the typechecking should be broken, and needs to be fixed.
-    panic!("Unreachable state reached during interpreting, possibly broken typechecking!")
-}
-
 fn interpret_one<'a>(
     i: &Instruction<'a>,
     ctx: &mut impl CtxTrait<'a>,
@@ -320,34 +362,58 @@ fn interpret_one<'a>(
     // access (no risk of deep-cloning a shared collection); use `pop!`
     // only when the value is consumed by value.
     //
-    // helper to reduce boilerplate. Usage:
-    // `pop!()` force-pops the top elements from the stack (panics if nothing to
-    // pop), returning it
-    // `let x = pop!()` is roughly equivalent to `let x = stack.pop().unwrap()`
-    // but with a clear error message
-    // `pop!(T::Foo)` force-pops the stack and unwraps `T::Foo(x)`, returning
-    // `x`
-    // `let x = pop!(T::Foo)` is roughly equivalent to `let T::Foo(x) = pop!()
-    // else {panic!()}` but with a clear error message
-    // `pop!(T::Bar, x, y, z)` force-pops the stack, unwraps `T::Bar(x, y, z)`
-    // and binds those to `x, y, z` in the surrounding scope
-    // `pop!(T::Bar, x, y, z)` is roughly equivalent to `let T::Bar(x, y, z) =
-    // pop!() else {panic!()}` but with a clear error message.
+    // Usage:
+    // `pop_rc!()` pops the top element from the stack, propagating
+    //   `InterpretError::InternalError(EmptyValueStackPop)` on `?` if empty.
+    // `pop!()` pops and `unwrap_rc`s the top element, propagating the same
+    //   error on `?`.
+    // `pop!(T::Foo)` pops, `unwrap_rc`s, then matches `T::Foo(x)` returning
+    //   `x`; on type mismatch propagates
+    //   `InterpretError::InternalError(TypeMismatchOnPop { expected })`.
+    // `pop!(T::Bar, x, y, z)` pops, `unwrap_rc`s, matches `T::Bar(x, y, z)`
+    //   and binds the fields in the surrounding scope (statement form).
+    //
+    // `top_mut!(T::Foo)` borrows the top of the stack as `&mut Foo`'s inner
+    //   payload, propagating `StackOob` on empty and
+    //   `InterpretError::InternalError(TypeMismatchOnTop { expected })` on
+    //   variant mismatch.
     macro_rules! pop_rc {
-        ($($args:tt)*) => {
-            crate::irrefutable_match::irrefutable_match!(
-                stack.pop().unwrap_or_else(|| unreachable_state());
-                $($args)*
-                )
-        };
+        () => {{
+            stack.pop().ok_or(InterpretError::InternalError(
+                InterpretInvariant::EmptyValueStackPop,
+            ))?
+        }};
     }
 
     macro_rules! pop {
-        ($($args:tt)*) => {
-            crate::irrefutable_match::irrefutable_match!(
-                TypedValue::unwrap_rc(stack.pop().unwrap_or_else(|| unreachable_state()));
-                $($args)*
-                )
+        () => {{
+            TypedValue::unwrap_rc(pop_rc!())
+        }};
+        ($p:path) => {{
+            match pop!() {
+                #[allow(unused_parens)]
+                $p(i) => i,
+                _ => {
+                    return Err(InterpretError::InternalError(
+                        InterpretInvariant::TypeMismatchOnPop {
+                            expected: stringify!($p),
+                        },
+                    ))
+                }
+            }
+        }};
+        ($p:path, $( $a:ident ),+) => {
+            #[allow(unused_parens)]
+            let ($($a),*) = match pop!() {
+                $p($($a),*) => ($($a),*),
+                _ => {
+                    return Err(InterpretError::InternalError(
+                        InterpretInvariant::TypeMismatchOnPop {
+                            expected: stringify!($p),
+                        },
+                    ))
+                }
+            };
         };
     }
 
@@ -358,8 +424,34 @@ fn interpret_one<'a>(
     macro_rules! pop_ref {
         ($var:ident, $ctor:tt) => {
             let __pop_ref_rc = pop_rc!();
-            let $var = irrefutable_match!(&*__pop_ref_rc; V::$ctor);
+            let $var = match &*__pop_ref_rc {
+                V::$ctor(x) => x,
+                _ => {
+                    return Err(InterpretError::InternalError(
+                        InterpretInvariant::TypeMismatchOnPop {
+                            expected: concat!("V::", stringify!($ctor)),
+                        },
+                    ))
+                }
+            };
         };
+    }
+
+    macro_rules! top_mut {
+        ($p:path) => {{
+            let top_rc = stack.get_mut(0)?;
+            match Rc::make_mut(top_rc) {
+                #[allow(unused_parens)]
+                $p(i) => i,
+                _ => {
+                    return Err(InterpretError::InternalError(
+                        InterpretInvariant::TypeMismatchOnTop {
+                            expected: stringify!($p),
+                        },
+                    ))
+                }
+            }
+        }};
     }
 
     match i {
@@ -742,19 +834,19 @@ fn interpret_one<'a>(
             #[cfg(feature = "bls")]
             overloads::Neg::Bls12381G1 => {
                 ctx.gas().consume(interpret_cost::NEG_G1)?;
-                let v = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bls12381G1).as_mut();
+                let v = top_mut!(V::Bls12381G1).as_mut();
                 *v = -(v as &bls::G1);
             }
             #[cfg(feature = "bls")]
             overloads::Neg::Bls12381G2 => {
                 ctx.gas().consume(interpret_cost::NEG_G2)?;
-                let v = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bls12381G2).as_mut();
+                let v = top_mut!(V::Bls12381G2).as_mut();
                 *v = -(v as &bls::G2);
             }
             #[cfg(feature = "bls")]
             overloads::Neg::Bls12381Fr => {
                 ctx.gas().consume(interpret_cost::NEG_FR)?;
-                let v = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bls12381Fr);
+                let v = top_mut!(V::Bls12381Fr);
                 *v = -(v as &bls::Fr);
             }
         },
@@ -767,7 +859,7 @@ fn interpret_one<'a>(
                     return Err(InterpretError::Overflow);
                 }
 
-                let o2_usize = o2.to_usize().unwrap();
+                let o2_usize = o2.to_usize().ok_or(InterpretError::Overflow)?;
                 ctx.gas().consume(interpret_cost::lsl_nat(&o1)?)?;
                 stack.push(V::Nat(o1.shl(o2_usize)));
             }
@@ -779,7 +871,7 @@ fn interpret_one<'a>(
                     return Err(InterpretError::Overflow);
                 }
 
-                let o2_usize = o2.to_usize().unwrap();
+                let o2_usize = o2.to_usize().ok_or(InterpretError::Overflow)?;
                 ctx.gas()
                     .consume(interpret_cost::lsl_bytes(&o1, &o2_usize)?)?;
 
@@ -814,7 +906,7 @@ fn interpret_one<'a>(
                     return Err(InterpretError::Overflow);
                 }
 
-                let o2_usize = o2.to_usize().unwrap();
+                let o2_usize = o2.to_usize().ok_or(InterpretError::Overflow)?;
                 ctx.gas().consume(interpret_cost::lsr_nat(&o1)?)?;
                 stack.push(V::Nat(o1.shr(o2_usize)));
             }
@@ -859,13 +951,13 @@ fn interpret_one<'a>(
         I::And(overload) => match overload {
             overloads::And::Bool => {
                 let o1 = pop!(V::Bool);
-                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bool);
+                let o2 = top_mut!(V::Bool);
                 ctx.gas().consume(interpret_cost::AND_BOOL)?;
                 *o2 &= o1;
             }
             overloads::And::NatNat => {
                 let o1 = pop!(V::Nat);
-                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Nat);
+                let o2 = top_mut!(V::Nat);
                 ctx.gas().consume(interpret_cost::and_num(&o1, o2)?)?;
                 *o2 &= o1;
             }
@@ -880,7 +972,7 @@ fn interpret_one<'a>(
             }
             overloads::And::Bytes => {
                 let mut o1 = pop!(V::Bytes);
-                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bytes);
+                let o2 = top_mut!(V::Bytes);
                 ctx.gas().consume(interpret_cost::and_bytes(&o1, o2)?)?;
 
                 // The resulting vector length is the smallest length among the
@@ -897,19 +989,19 @@ fn interpret_one<'a>(
         I::Or(overload) => match overload {
             overloads::Or::Bool => {
                 let o1 = pop!(V::Bool);
-                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bool);
+                let o2 = top_mut!(V::Bool);
                 ctx.gas().consume(interpret_cost::OR_BOOL)?;
                 *o2 |= o1;
             }
             overloads::Or::Nat => {
                 let o1 = pop!(V::Nat);
-                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Nat);
+                let o2 = top_mut!(V::Nat);
                 ctx.gas().consume(interpret_cost::or_num(&o1, o2)?)?;
                 *o2 |= o1;
             }
             overloads::Or::Bytes => {
                 let mut o1 = pop!(V::Bytes);
-                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bytes);
+                let o2 = top_mut!(V::Bytes);
                 ctx.gas().consume(interpret_cost::or_bytes(&o1, o2)?)?;
 
                 // The resulting vector length is the largest length among the
@@ -926,19 +1018,19 @@ fn interpret_one<'a>(
         I::Xor(overloads) => match overloads {
             overloads::Xor::Bool => {
                 let o1 = pop!(V::Bool);
-                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bool);
+                let o2 = top_mut!(V::Bool);
                 ctx.gas().consume(interpret_cost::XOR_BOOL)?;
                 *o2 ^= o1;
             }
             overloads::Xor::Nat => {
                 let o1 = pop!(V::Nat);
-                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Nat);
+                let o2 = top_mut!(V::Nat);
                 ctx.gas().consume(interpret_cost::xor_nat(&o1, o2)?)?;
                 *o2 ^= o1;
             }
             overloads::Xor::Bytes => {
                 let mut o1 = pop!(V::Bytes);
-                let o2 = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bytes);
+                let o2 = top_mut!(V::Bytes);
 
                 // The resulting vector length is the largest length among the
                 // operands, so to reuse memory we put the largest vector to
@@ -953,7 +1045,7 @@ fn interpret_one<'a>(
         },
         I::Not(overload) => match overload {
             overloads::Not::Bool => {
-                let o = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bool);
+                let o = top_mut!(V::Bool);
                 ctx.gas().consume(interpret_cost::NOT_BOOL)?;
                 *o = !*o;
             }
@@ -968,7 +1060,7 @@ fn interpret_one<'a>(
                 stack.push(V::Int(!BigInt::from(o)))
             }
             overloads::Not::Bytes => {
-                let o = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bytes);
+                let o = top_mut!(V::Bytes);
                 ctx.gas().consume(interpret_cost::not_bytes(o)?)?;
                 for b in o.iter_mut() {
                     *b = !*b
@@ -1058,7 +1150,7 @@ fn interpret_one<'a>(
         }
         I::IfCons(when_cons, when_nil) => {
             ctx.gas().consume(interpret_cost::IF_CONS)?;
-            let lst = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::List);
+            let lst = top_mut!(V::List);
             match lst.uncons() {
                 Some(x) => {
                     stack.push(x);
@@ -1249,7 +1341,11 @@ fn interpret_one<'a>(
             let x = pop!();
             return Err(InterpretError::FailedWith(ty.clone(), x));
         }
-        I::Never => unreachable_state(),
+        I::Never => {
+            return Err(InterpretError::InternalError(
+                InterpretInvariant::UnreachableState,
+            ))
+        }
         I::Unit => {
             ctx.gas().consume(interpret_cost::UNIT)?;
             stack.push(V::Unit);
@@ -1276,7 +1372,9 @@ fn interpret_one<'a>(
                 .drain_top(*n as usize)?
                 .rev()
                 .reduce(|acc, e| V::new_pair_rc(e, acc).into())
-                .unwrap();
+                .ok_or(InterpretError::InternalError(
+                    InterpretInvariant::UnreachableState,
+                ))?;
             stack.push(res);
         }
         I::Unpair => {
@@ -1287,19 +1385,29 @@ fn interpret_one<'a>(
         }
         I::UnpairN(n) => {
             ctx.gas().consume(interpret_cost::unpair_n(*n as usize)?)?;
-            fn fill<'a>(n: u16, stack: &mut IStack<'a>, p: Rc<TypedValue<'a>>) {
+            fn fill<'a>(
+                n: u16,
+                stack: &mut IStack<'a>,
+                p: Rc<TypedValue<'a>>,
+            ) -> Result<(), InterpretError<'a>> {
                 if n == 0 {
                     stack.push(p);
+                    Ok(())
                 } else if let V::Pair(l, r) = p.as_ref() {
-                    fill(n - 1, stack, r.clone());
+                    fill(n - 1, stack, r.clone())?;
                     stack.push(l.clone());
+                    Ok(())
                 } else {
-                    unreachable_state();
+                    Err(InterpretError::InternalError(
+                        InterpretInvariant::TypeMismatch {
+                            expected: "V::Pair",
+                        },
+                    ))
                 }
             }
             let p = pop_rc!();
             stack.reserve(*n as usize);
-            fill(n - 1, stack, p);
+            fill(n - 1, stack, p)?;
         }
         I::ISome => {
             ctx.gas().consume(interpret_cost::SOME)?;
@@ -1363,7 +1471,13 @@ fn interpret_one<'a>(
                 for val in list {
                     let s = match val.as_ref() {
                         V::String(s) => s,
-                        _ => unreachable_state(),
+                        _ => {
+                            return Err(InterpretError::InternalError(
+                                InterpretInvariant::TypeMismatch {
+                                    expected: "V::String",
+                                },
+                            ))
+                        }
                     };
                     total_len += s.len()
                 }
@@ -1374,7 +1488,13 @@ fn interpret_one<'a>(
                 for val in list {
                     let s = match val.as_ref() {
                         V::String(s) => s,
-                        _ => unreachable_state(),
+                        _ => {
+                            return Err(InterpretError::InternalError(
+                                InterpretInvariant::TypeMismatch {
+                                    expected: "V::String",
+                                },
+                            ))
+                        }
                     };
                     result.push_str(s);
                 }
@@ -1389,7 +1509,13 @@ fn interpret_one<'a>(
                 for val in list {
                     let bs = match val.as_ref() {
                         V::Bytes(bs) => bs,
-                        _ => unreachable_state(),
+                        _ => {
+                            return Err(InterpretError::InternalError(
+                                InterpretInvariant::TypeMismatch {
+                                    expected: "V::Bytes",
+                                },
+                            ))
+                        }
                     };
                     total_len += bs.len()
                 }
@@ -1400,7 +1526,13 @@ fn interpret_one<'a>(
                 for val in list {
                     let bs = match val.as_ref() {
                         V::Bytes(bs) => bs,
-                        _ => unreachable_state(),
+                        _ => {
+                            return Err(InterpretError::InternalError(
+                                InterpretInvariant::TypeMismatch {
+                                    expected: "V::Bytes",
+                                },
+                            ))
+                        }
                     };
                     result.extend_from_slice(bs);
                 }
@@ -1470,14 +1602,14 @@ fn interpret_one<'a>(
         I::GetN(n) => {
             ctx.gas().consume(interpret_cost::get_n(*n as usize)?)?;
             let comb_rc = pop_rc!();
-            let field = get_nth_field_rc(*n, &comb_rc);
+            let field = get_nth_field_rc(*n, &comb_rc)?;
             stack.push(field);
         }
         I::Update(overload) => match overload {
             overloads::Update::Set => {
                 let key_rc = pop_rc!();
                 let new_present = pop!(V::Bool);
-                let set = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Set);
+                let set = top_mut!(V::Set);
                 ctx.gas()
                     .consume(interpret_cost::set_update(&key_rc, set.len())?)?;
                 if new_present {
@@ -1489,7 +1621,7 @@ fn interpret_one<'a>(
             overloads::Update::Map => {
                 let key_rc = pop_rc!();
                 let opt_new_val = pop!(V::Option);
-                let map = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Map);
+                let map = top_mut!(V::Map);
                 ctx.gas()
                     .consume(interpret_cost::map_update(&key_rc, map.len())?)?;
                 match opt_new_val {
@@ -1500,7 +1632,7 @@ fn interpret_one<'a>(
             overloads::Update::BigMap => {
                 let key = pop!();
                 let opt_new_val = pop!(V::Option).map(TypedValue::unwrap_rc);
-                let map = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::BigMap);
+                let map = top_mut!(V::BigMap);
                 let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
                 ctx.gas().consume(interpret_cost::map_update(&key, len)?)?;
@@ -1511,7 +1643,7 @@ fn interpret_one<'a>(
             overloads::GetAndUpdate::Map => {
                 let key_rc = pop_rc!();
                 let opt_new_val = pop!(V::Option);
-                let map = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Map);
+                let map = top_mut!(V::Map);
                 ctx.gas()
                     .consume(interpret_cost::map_get_and_update(&key_rc, map.len())?)?;
                 let opt_old_val = match opt_new_val {
@@ -1523,7 +1655,7 @@ fn interpret_one<'a>(
             overloads::GetAndUpdate::BigMap => {
                 let key = pop!();
                 let opt_new_val = pop!(V::Option).map(TypedValue::unwrap_rc);
-                let map = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::BigMap);
+                let map = top_mut!(V::BigMap);
                 let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
                 ctx.gas()
@@ -1553,7 +1685,7 @@ fn interpret_one<'a>(
         I::UpdateN(n) => {
             ctx.gas().consume(interpret_cost::update_n(*n as usize)?)?;
             let new_val = pop!();
-            let field = get_nth_field_ref(*n, Rc::make_mut(stack.get_mut(0)?));
+            let field = get_nth_field_ref(*n, Rc::make_mut(stack.get_mut(0)?))?;
             *field = new_val;
         }
         I::ChainId => {
@@ -1613,8 +1745,16 @@ fn interpret_one<'a>(
             ));
         }
         I::SetDelegate => {
-            let opt_keyhash =
-                pop!(V::Option).map(|kh| irrefutable_match!(TypedValue::unwrap_rc(kh); V::KeyHash));
+            let opt_keyhash = pop!(V::Option)
+                .map(|kh| match TypedValue::unwrap_rc(kh) {
+                    V::KeyHash(k) => Ok(k),
+                    _ => Err(InterpretError::InternalError(
+                        InterpretInvariant::TypeMismatch {
+                            expected: "V::KeyHash",
+                        },
+                    )),
+                })
+                .transpose()?;
             let counter: u128 = ctx.operation_counter();
             ctx.gas().consume(interpret_cost::SET_DELEGATE)?;
             stack.push(V::new_operation(
@@ -1706,7 +1846,9 @@ fn interpret_one<'a>(
                                 stk
                             }
                         };
-                        stack.push(res_stk.pop().unwrap_or_else(|| unreachable_state()));
+                        stack.push(res_stk.pop().ok_or(InterpretError::InternalError(
+                            InterpretInvariant::EmptyValueStackPop,
+                        ))?);
                         break;
                     }
                     Closure::Apply {
@@ -1756,14 +1898,38 @@ fn interpret_one<'a>(
         }
         I::ReadTicket => {
             ctx.gas().consume(interpret_cost::READ_TICKET)?;
-            let ticket = irrefutable_match!(stack.get(0)?.as_ref(); V::Ticket);
+            let top = stack.get(0)?.as_ref();
+            let ticket = match top {
+                V::Ticket(t) => t,
+                _ => {
+                    return Err(InterpretError::InternalError(
+                        InterpretInvariant::TypeMismatchOnTop {
+                            expected: "V::Ticket",
+                        },
+                    ))
+                }
+            };
             stack.push(unwrap_ticket(ticket.as_ref().clone()));
         }
         I::SplitTicket => {
             let ticket = *pop!(V::Ticket);
             pop!(V::Pair, amount_left, amount_right);
-            let amount_left = irrefutable_match!(TypedValue::unwrap_rc(amount_left); V::Nat);
-            let amount_right = irrefutable_match!(TypedValue::unwrap_rc(amount_right); V::Nat);
+            let amount_left = match TypedValue::unwrap_rc(amount_left) {
+                V::Nat(n) => n,
+                _ => {
+                    return Err(InterpretError::InternalError(
+                        InterpretInvariant::TypeMismatch { expected: "V::Nat" },
+                    ))
+                }
+            };
+            let amount_right = match TypedValue::unwrap_rc(amount_right) {
+                V::Nat(n) => n,
+                _ => {
+                    return Err(InterpretError::InternalError(
+                        InterpretInvariant::TypeMismatch { expected: "V::Nat" },
+                    ))
+                }
+            };
 
             ctx.gas()
                 .consume(interpret_cost::split_ticket(&amount_left, &amount_right)?)?;
@@ -1787,8 +1953,26 @@ fn interpret_one<'a>(
         }
         I::JoinTickets => {
             pop!(V::Pair, ticket_left, ticket_right);
-            let mut ticket_left = irrefutable_match!(TypedValue::unwrap_rc(ticket_left); V::Ticket);
-            let ticket_right = irrefutable_match!(TypedValue::unwrap_rc(ticket_right); V::Ticket);
+            let mut ticket_left = match TypedValue::unwrap_rc(ticket_left) {
+                V::Ticket(t) => t,
+                _ => {
+                    return Err(InterpretError::InternalError(
+                        InterpretInvariant::TypeMismatch {
+                            expected: "V::Ticket",
+                        },
+                    ))
+                }
+            };
+            let ticket_right = match TypedValue::unwrap_rc(ticket_right) {
+                V::Ticket(t) => t,
+                _ => {
+                    return Err(InterpretError::InternalError(
+                        InterpretInvariant::TypeMismatch {
+                            expected: "V::Ticket",
+                        },
+                    ))
+                }
+            };
             ctx.gas()
                 .consume(interpret_cost::join_tickets(&ticket_left, &ticket_right)?)?;
             if ticket_left.content == ticket_right.content
@@ -1801,27 +1985,27 @@ fn interpret_one<'a>(
             }
         }
         I::Blake2b => {
-            let msg = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bytes);
+            let msg = top_mut!(V::Bytes);
             ctx.gas().consume(interpret_cost::blake2b(msg)?)?;
             *msg = blake2b_256(msg).to_vec();
         }
         I::Keccak => {
-            let msg = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bytes);
+            let msg = top_mut!(V::Bytes);
             ctx.gas().consume(interpret_cost::keccak(msg)?)?;
             *msg = keccak256(msg).to_vec();
         }
         I::Sha256 => {
-            let msg = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bytes);
+            let msg = top_mut!(V::Bytes);
             ctx.gas().consume(interpret_cost::sha256(msg)?)?;
             *msg = sha256(msg).to_vec();
         }
         I::Sha3 => {
-            let msg = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bytes);
+            let msg = top_mut!(V::Bytes);
             ctx.gas().consume(interpret_cost::sha3(msg)?)?;
             *msg = sha3_256(msg).to_vec();
         }
         I::Sha512 => {
-            let msg = irrefutable_match!(Rc::make_mut(stack.get_mut(0)?); V::Bytes);
+            let msg = top_mut!(V::Bytes);
             ctx.gas().consume(interpret_cost::sha512(msg)?)?;
             *msg = sha512(msg).to_vec();
         }
@@ -1914,21 +2098,58 @@ fn interpret_one<'a>(
             pop_ref!(list, List);
             ctx.gas()
                 .consume(interpret_cost::pairing_check(list.len())?)?;
-            let it = list.iter().map(|elt| {
-                irrefutable_match!(elt.as_ref(); V::Pair, g1, g2);
-                (
-                    irrefutable_match!(g1.as_ref(); V::Bls12381G1).as_ref(),
-                    irrefutable_match!(g2.as_ref(); V::Bls12381G2).as_ref(),
-                )
-            });
-            let res = bls::pairing::pairing_check(it);
+            let pairs: Vec<(&bls::G1, &bls::G2)> = list
+                .iter()
+                .map(|elt| -> Result<_, InterpretError<'a>> {
+                    let (g1, g2) = match elt.as_ref() {
+                        V::Pair(g1, g2) => (g1, g2),
+                        _ => {
+                            return Err(InterpretError::InternalError(
+                                InterpretInvariant::TypeMismatch {
+                                    expected: "V::Pair(V::Bls12381G1, V::Bls12381G2)",
+                                },
+                            ))
+                        }
+                    };
+                    let g1 = match g1.as_ref() {
+                        V::Bls12381G1(g) => g.as_ref(),
+                        _ => {
+                            return Err(InterpretError::InternalError(
+                                InterpretInvariant::TypeMismatch {
+                                    expected: "V::Bls12381G1",
+                                },
+                            ))
+                        }
+                    };
+                    let g2 = match g2.as_ref() {
+                        V::Bls12381G2(g) => g.as_ref(),
+                        _ => {
+                            return Err(InterpretError::InternalError(
+                                InterpretInvariant::TypeMismatch {
+                                    expected: "V::Bls12381G2",
+                                },
+                            ))
+                        }
+                    };
+                    Ok((g1, g2))
+                })
+                .collect::<Result<_, _>>()?;
+            let res = bls::pairing::pairing_check(pairs.into_iter());
             stack.push(V::Bool(res));
         }
         I::CreateContract(cs, micheline) => {
             ctx.gas().consume(interpret_cost::CREATE_CONTRACT)?;
             let counter: u128 = ctx.operation_counter();
             let opt_keyhash = pop!(V::Option)
-                .map(|keyhash| irrefutable_match!(TypedValue::unwrap_rc(keyhash); V::KeyHash));
+                .map(|keyhash| match TypedValue::unwrap_rc(keyhash) {
+                    V::KeyHash(k) => Ok(k),
+                    _ => Err(InterpretError::InternalError(
+                        InterpretInvariant::TypeMismatch {
+                            expected: "V::KeyHash",
+                        },
+                    )),
+                })
+                .transpose()?;
             let amount = pop!(V::Mutez);
             let storage = pop!();
             let origination_counter = ctx.origination_counter();
@@ -1951,7 +2172,9 @@ fn interpret_one<'a>(
         }
         I::Seq(nested) => interpret(nested, ctx, arena, stack)?,
         I::IView { name, return_type } => {
-            let input = TypedValue::unwrap_rc(stack.pop().unwrap_or_else(|| unreachable_state()));
+            let input = TypedValue::unwrap_rc(stack.pop().ok_or(InterpretError::InternalError(
+                InterpretInvariant::EmptyValueStackPop,
+            ))?);
             let Address {
                 hash,
                 entrypoint: _,
@@ -2009,8 +2232,9 @@ fn interpret_one<'a>(
                     let result = interpret(code.as_ref(), ctx, arena, &mut stk);
                     ctx.set_view_context(old.0, old.1, old.2, old.3);
                     result?;
-                    let result =
-                        TypedValue::unwrap_rc(stk.pop().unwrap_or_else(|| unreachable_state()));
+                    let result = TypedValue::unwrap_rc(stk.pop().ok_or(
+                        InterpretError::InternalError(InterpretInvariant::EmptyValueStackPop),
+                    )?);
                     stack.push(V::new_option(Some(result)));
                 } else {
                     stack.push(V::Option(None));
@@ -2047,20 +2271,26 @@ pub fn compute_contract_address(
 fn get_nth_field_ref<'a, 'b>(
     mut m: u16,
     mut val: &'a mut TypedValue<'b>,
-) -> &'a mut TypedValue<'b> {
+) -> Result<&'a mut TypedValue<'b>, InterpretError<'b>> {
     use TypedValue as V;
     loop {
         match (m, val) {
-            (0, val_) => break val_,
+            (0, val_) => break Ok(val_),
             (1, V::Pair(l, _)) => {
-                break Rc::make_mut(l);
+                break Ok(Rc::make_mut(l));
             }
 
             (_, V::Pair(_, r)) => {
                 val = Rc::make_mut(r);
                 m -= 2;
             }
-            _ => unreachable_state(),
+            _ => {
+                break Err(InterpretError::InternalError(
+                    InterpretInvariant::TypeMismatch {
+                        expected: "V::Pair",
+                    },
+                ))
+            }
         }
     }
 }
@@ -2078,17 +2308,26 @@ fn get_nth_field_ref<'a, 'b>(
 /// Descending into the right child consumes two indices at once: the
 /// "suffix at this level" (even) and the "field at this level" (odd),
 /// hence `m -= 2`.
-fn get_nth_field_rc<'b>(mut m: u16, mut val: &Rc<TypedValue<'b>>) -> Rc<TypedValue<'b>> {
+fn get_nth_field_rc<'b>(
+    mut m: u16,
+    mut val: &Rc<TypedValue<'b>>,
+) -> Result<Rc<TypedValue<'b>>, InterpretError<'b>> {
     use TypedValue as V;
     loop {
         match (m, &**val) {
-            (0, _) => return val.clone(),
-            (1, V::Pair(l, _)) => return l.clone(),
+            (0, _) => return Ok(val.clone()),
+            (1, V::Pair(l, _)) => return Ok(l.clone()),
             (_, V::Pair(_, r)) => {
                 val = r;
                 m -= 2;
             }
-            _ => unreachable_state(),
+            _ => {
+                return Err(InterpretError::InternalError(
+                    InterpretInvariant::TypeMismatch {
+                        expected: "V::Pair",
+                    },
+                ))
+            }
         }
     }
 }
@@ -4854,17 +5093,18 @@ mod interpreter_tests {
     }
 
     #[test]
-    #[should_panic(
-        expected = "Unreachable state reached during interpreting, possibly broken typechecking!"
-    )]
     fn trigger_unreachable_state() {
         let mut stack = Stack::new();
-        interpret(
-            &[Add(overloads::Add::NatInt)],
-            &mut Ctx::default(),
-            &mut stack,
-        )
-        .unwrap(); // panics
+        assert!(matches!(
+            interpret(
+                &[Add(overloads::Add::NatInt)],
+                &mut Ctx::default(),
+                &mut stack,
+            ),
+            Err(InterpretError::InternalError(
+                InterpretInvariant::EmptyValueStackPop
+            ))
+        ));
     }
 
     #[test]
@@ -5628,7 +5868,9 @@ mod interpreter_tests {
             let mut stack = stk![V::Bytes(input)];
             assert_eq!(interpret_one(&i, &mut Ctx::default(), &mut stack), Ok(()));
             assert_eq!(stack.len(), 1);
-            let out = irrefutable_match!(stack.get(0).unwrap().as_ref(); V::Bytes);
+            let V::Bytes(out) = stack.get(0).unwrap().as_ref() else {
+                panic!("expected V::Bytes on stack");
+            };
             assert_eq!(out, &hex::decode(expected_output).unwrap());
         }
         macro_rules! test {
