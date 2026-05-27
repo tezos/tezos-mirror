@@ -76,6 +76,130 @@ impl EthereumRuntime {
             prevrandao: None,
         }
     }
+
+    /// Branch 3 of [`RuntimeInterface::ensure_alias`]: store the
+    /// forwarder code, run `init_tezosx_alias`, and record the
+    /// `Origin::Alias` classification.
+    ///
+    /// The caller writes the delegation `code_hash` *before* invoking
+    /// this — the EVM call to the alias resolves the EIP-7702
+    /// delegation, so the code must already be present — and rolls that
+    /// write back if this returns `Err`. Keeping every fallible step of
+    /// the materialization inside one `Result` means a single rollback
+    /// at the call site covers all failure paths (store failure, init
+    /// revert, halt, or run error); there is no per-arm rollback to
+    /// forget when a new failure path is added.
+    #[allow(clippy::too_many_arguments)]
+    fn materialize_alias<Host>(
+        &self,
+        registry: &impl Registry,
+        host: &mut Host,
+        journal: &mut TezosXJournal,
+        alias: Address,
+        alias_info: &AliasInfo,
+        native_address: &str,
+        native_public_key: Option<&[u8]>,
+        context: &CrossRuntimeContext,
+        gas_remaining: u64,
+        code_bytes: &[u8],
+        delegation_code_hash: revm::primitives::B256,
+    ) -> Result<(String, u64), TezosXRuntimeError>
+    where
+        Host: StorageV1,
+    {
+        CodeStorage::add(host, code_bytes, Some(delegation_code_hash)).map_err(|e| {
+            TezosXRuntimeError::Custom(format!("Failed to store delegation code: {e}"))
+        })?;
+
+        // Ensure the AliasForwarder precompile code is available
+        // (it should be initialized at kernel startup, but verify it exists)
+        let precompile_account =
+            StorageAccount::from_address(&ALIAS_FORWARDER_PRECOMPILE_ADDRESS)?;
+        let precompile_info = precompile_account.info(host)?;
+        if precompile_info.code_hash != ALIAS_FORWARDER_SOL_CONTRACT.code_hash {
+            // Initialize the precompile if not already done
+            CodeStorage::add(
+                host,
+                ALIAS_FORWARDER_SOL_CONTRACT.code,
+                Some(ALIAS_FORWARDER_SOL_CONTRACT.code_hash),
+            )
+            .map_err(|e| {
+                TezosXRuntimeError::Custom(format!(
+                    "Failed to store AliasForwarder precompile code: {e}"
+                ))
+            })?;
+        }
+
+        // Call init_tezosx_alias on the alias address to set up storage.
+        // The native address is passed as a string (e.g., "tz1...").
+        let call_data = init_tezosx_aliasCall {
+            nativeAddress: native_address.to_string(),
+            nativePublicKey: native_public_key.unwrap_or_default().to_vec().into(),
+        }
+        .abi_encode();
+
+        // Set up block constants for EVM execution
+        let evm_version = read_evm_version(host);
+        let block_constants = self.create_block_constants(host, context);
+
+        // Use the caller's remaining gas so it controls the budget. The
+        // `effective_gas_price` is 0, so REVM's pre-flight balance check on the
+        // caller (`gas_limit * gas_price + value`) reduces to 0 and no funding
+        // is needed for `TEZOSX_CALLER_ADDRESS`. Earlier kernels wrote
+        // `U256::MAX` to durable storage here as a "safety" buffer, which
+        // leaked as a visible huge balance on Blockscout — kept in
+        // `TransactionOrigin::CrossRuntime { credit: ... }` for any non-zero
+        // future credit, but here we don't credit anything.
+        let gas_data = GasData::new(gas_remaining, 0, gas_remaining);
+
+        // Run the EVM transaction to call init_tezosx_alias
+        let outcome = run_transaction(
+            host,
+            registry,
+            journal,
+            evm_version.into(),
+            &block_constants,
+            None, // no transaction hash for internal transactions
+            TEZOSX_CALLER_ADDRESS,
+            Some(alias), // call to the alias address
+            Bytes::from(call_data),
+            gas_data,
+            AlloyU256::ZERO, // no value transfer
+            None,            // no authorization list
+            None,            // no tracer
+            false,           // not a simulation
+            TransactionOrigin::CrossRuntime { credit: None },
+        )
+        .map_err(|e| classify_evm_run_error("EVM execution failed", e))?;
+
+        // Check that the call succeeded; return remaining EVM gas.
+        let gas_used = outcome.result.gas_used();
+        let remaining_after = gas_remaining.saturating_sub(gas_used);
+        match outcome.result {
+            ExecutionResult::Success { .. } => {
+                // Record the classification only after init succeeded.
+                // The forwarder bytecode and the classification record
+                // share the same persistence model: both go to durable
+                // storage, both survive a revert in the surrounding
+                // frame, and the next call to ensure_alias finds the
+                // no-op branch.
+                let mut alias_account = StorageAccount::from_address(&alias)?;
+                let new_origin = Origin::Alias(alias_info.clone());
+                alias_account.set_origin(host, &new_origin).map_err(|e| {
+                    TezosXRuntimeError::Custom(format!(
+                        "Failed to write alias origin: {e}"
+                    ))
+                })?;
+                Ok((alias.to_string(), remaining_after))
+            }
+            ExecutionResult::Revert { output, .. } => Err(TezosXRuntimeError::Custom(
+                format!("init_tezosx_alias reverted: {output:?}"),
+            )),
+            ExecutionResult::Halt { reason, .. } => Err(TezosXRuntimeError::Custom(
+                format!("init_tezosx_alias halted: {reason:?}"),
+            )),
+        }
+    }
 }
 
 /// Read the sequencer pool address (coinbase) from storage.
@@ -570,109 +694,52 @@ impl RuntimeInterface for EthereumRuntime {
             return Ok((alias.to_string(), gas_remaining));
         }
 
-        // Branch 3: full materialization. Deploy the forwarder, run
-        // the existing init transaction, and record the classification
-        // at the end.
+        // Branch 3: full materialization. Deploy the forwarder, run the
+        // init transaction, and record the classification.
+        //
+        // Materialization must be atomic. The delegation `code_hash`
+        // written just below is a direct, un-journaled durable write,
+        // while `Origin::Alias` is only recorded once init succeeds. If
+        // init fails in between, a half-materialized account (delegation
+        // `code_hash` set, no `Origin`) would let the next `ensure_alias`
+        // take Branch 2 and bless the alias *without* re-running init —
+        // permanently bricking an uninitialized forwarder. So we snapshot
+        // the pre-init account info, hand the rest of the materialization
+        // to `materialize_alias`, and on *any* failure restore the
+        // snapshot (reverting `code_hash` while preserving any
+        // balance/nonce), leaving no half-state for the next attempt. The
+        // single rollback below covers every failure path inside
+        // `materialize_alias`.
+        let original_info = storage_info.clone();
 
         // Set up EIP-7702 delegation bytecode at the alias address.
         storage_info.code_hash = delegation_code_hash;
         alias_account.set_info(host, storage_info)?;
 
-        CodeStorage::add(host, code_bytes, Some(delegation_code_hash)).map_err(|e| {
-            TezosXRuntimeError::Custom(format!("Failed to store delegation code: {e}"))
-        })?;
-
-        // Ensure the AliasForwarder precompile code is available
-        // (it should be initialized at kernel startup, but verify it exists)
-        let precompile_account =
-            StorageAccount::from_address(&ALIAS_FORWARDER_PRECOMPILE_ADDRESS)?;
-        let precompile_info = precompile_account.info(host)?;
-        if precompile_info.code_hash != ALIAS_FORWARDER_SOL_CONTRACT.code_hash {
-            // Initialize the precompile if not already done
-            CodeStorage::add(
-                host,
-                ALIAS_FORWARDER_SOL_CONTRACT.code,
-                Some(ALIAS_FORWARDER_SOL_CONTRACT.code_hash),
-            )
-            .map_err(|e| {
-                TezosXRuntimeError::Custom(format!(
-                    "Failed to store AliasForwarder precompile code: {e}"
-                ))
-            })?;
-        }
-
-        // Step 3: Call init_tezosx_alias on the alias address to set up storage
-        // The native address is passed as a string (e.g., "tz1...")
-
-        // Encode the init_tezosx_alias call
-        let call_data = init_tezosx_aliasCall {
-            nativeAddress: native_address.to_string(),
-            nativePublicKey: native_public_key.unwrap_or_default().to_vec().into(),
-        }
-        .abi_encode();
-
-        // Set up block constants for EVM execution
-        let evm_version = read_evm_version(host);
-        let block_constants = self.create_block_constants(host, &context);
-
-        // Use the caller's remaining gas so it controls the budget. The
-        // `effective_gas_price` is 0, so REVM's pre-flight balance check on the
-        // caller (`gas_limit * gas_price + value`) reduces to 0 and no funding
-        // is needed for `TEZOSX_CALLER_ADDRESS`. Earlier kernels wrote
-        // `U256::MAX` to durable storage here as a "safety" buffer, which
-        // leaked as a visible huge balance on Blockscout — kept in
-        // `TransactionOrigin::CrossRuntime { credit: ... }` for any non-zero
-        // future credit, but here we don't credit anything.
-        let gas_data = GasData::new(gas_remaining, 0, gas_remaining);
-
-        // Run the EVM transaction to call init_tezosx_alias
-        let outcome = run_transaction(
-            host,
+        match self.materialize_alias(
             registry,
+            host,
             journal,
-            evm_version.into(),
-            &block_constants,
-            None, // no transaction hash for internal transactions
-            TEZOSX_CALLER_ADDRESS,
-            Some(alias), // call to the alias address
-            Bytes::from(call_data),
-            gas_data,
-            AlloyU256::ZERO, // no value transfer
-            None,            // no authorization list
-            None,            // no tracer
-            false,           // not a simulation
-            TransactionOrigin::CrossRuntime { credit: None },
-        )
-        .map_err(|e| {
-            TezosXRuntimeError::Custom(format!("EVM execution failed: {e:?}"))
-        })?;
-
-        // Check that the call succeeded; return remaining EVM gas.
-        let gas_used = outcome.result.gas_used();
-        let remaining_after = gas_remaining.saturating_sub(gas_used);
-        match outcome.result {
-            ExecutionResult::Success { .. } => {
-                // Record the classification only after init succeeded.
-                // The forwarder bytecode and the classification record
-                // share the same persistence model: both go to durable
-                // storage, both survive a revert in the surrounding
-                // frame, and the next call to ensure_alias finds the
-                // no-op branch.
-                let mut alias_account = StorageAccount::from_address(&alias)?;
-                let new_origin = Origin::Alias(alias_info);
-                alias_account.set_origin(host, &new_origin).map_err(|e| {
-                    TezosXRuntimeError::Custom(format!(
-                        "Failed to write alias origin: {e}"
-                    ))
-                })?;
-                Ok((alias.to_string(), remaining_after))
+            alias,
+            &alias_info,
+            native_address,
+            native_public_key,
+            &context,
+            gas_remaining,
+            code_bytes,
+            delegation_code_hash,
+        ) {
+            Ok(result) => Ok(result),
+            Err(e) => {
+                alias_account
+                    .set_info_without_code(host, original_info)
+                    .map_err(|err| {
+                        TezosXRuntimeError::Custom(format!(
+                            "Failed to roll back alias materialization: {err}"
+                        ))
+                    })?;
+                Err(e)
             }
-            ExecutionResult::Revert { output, .. } => Err(TezosXRuntimeError::Custom(
-                format!("init_tezosx_alias reverted: {output:?}"),
-            )),
-            ExecutionResult::Halt { reason, .. } => Err(TezosXRuntimeError::Custom(
-                format!("init_tezosx_alias halted: {reason:?}"),
-            )),
         }
     }
 
@@ -2036,6 +2103,117 @@ mod tests {
                 runtime.read_origin(&host, &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Unknown);
             assert_eq!(remaining, 0);
+        }
+    }
+
+    // ── EthereumRuntime::ensure_alias atomicity (L2-1369) ────────────────
+
+    mod ensure_alias_tests {
+        use super::*;
+        use primitive_types::U256;
+        use revm::state::Bytecode;
+        use revm_etherlink::precompiles::constants::ALIAS_FORWARDER_PRECOMPILE_ADDRESS;
+        use tezosx_interfaces::{AliasInfo, CrossRuntimeContext, RuntimeId};
+
+        // Native address whose alias we materialize. The bytes are the
+        // UTF-8 form of the address string, exactly as ensure_alias hashes.
+        fn alias_info() -> AliasInfo {
+            AliasInfo {
+                runtime: RuntimeId::Tezos,
+                native_address: b"tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w".to_vec(),
+            }
+        }
+
+        fn context() -> CrossRuntimeContext {
+            CrossRuntimeContext {
+                gas_limit: 30_000_000,
+                timestamp: U256::from(1u64),
+                block_number: U256::from(1u64),
+            }
+        }
+
+        // Alias address, computed the same way ensure_alias does.
+        fn alias_address(info: &AliasInfo) -> Address {
+            let mut hasher = Keccak256::new();
+            hasher.update(&info.native_address);
+            Address::from_slice(&hasher.finalize()[0..20])
+        }
+
+        // A failed init (here a budget below intrinsic gas, so the init
+        // transaction never executes) must leave NO half-materialized
+        // state and must not brick the alias: the next ensure_alias has
+        // to re-run full materialization (Branch 3), not bless an
+        // uninitialized forwarder via Branch 2. Regression test for
+        // L2-1369 — pre-fix the delegation code_hash survived the failed
+        // init, so the second call returned Ok with an empty forwarder.
+        #[test]
+        fn failed_init_rolls_back_and_does_not_brick_alias() {
+            let mut host = MockKernelHost::default();
+            let runtime = EthereumRuntime::default();
+            let registry = UnimplementedRegistry;
+            let mut journal = TezosXJournal::default();
+
+            let info = alias_info();
+            let alias = alias_address(&info);
+            let pubkey = [0xab; 32];
+
+            // The delegation code_hash ensure_alias writes during
+            // materialization — the very write that must be rolled back.
+            let delegation_code_hash = bytes_hash(
+                Bytecode::new_eip7702(ALIAS_FORWARDER_PRECOMPILE_ADDRESS)
+                    .original_byte_slice(),
+            );
+
+            // Budget 0 is below the EVM intrinsic gas, so init fails
+            // before it can run, exercising the failure arm that
+            // previously left the delegation code_hash behind.
+            let failed = runtime.ensure_alias(
+                &registry,
+                &mut host,
+                &mut journal,
+                info.clone(),
+                Some(pubkey.as_slice()),
+                context(),
+                0,
+            );
+            // A budget below intrinsic gas is a pre-execution validation
+            // failure: the user-shaped error must surface as a catchable
+            // `BadRequest` (400), never a block-aborting 500.
+            assert!(
+                matches!(failed, Err(TezosXRuntimeError::BadRequest(_))),
+                "init under a zero gas budget must be a catchable BadRequest, got {failed:?}"
+            );
+
+            // No half-state: the delegation code_hash was rolled back and
+            // no Origin record was written.
+            let alias_account = StorageAccount::from_address(&alias).unwrap();
+            assert_ne!(
+                alias_account.info(&mut host).unwrap().code_hash,
+                delegation_code_hash,
+                "delegation code_hash must be rolled back after a failed init"
+            );
+            assert!(
+                alias_account.get_origin(&host).unwrap().is_none(),
+                "no Origin record must be written when init fails"
+            );
+
+            // A second attempt must re-run full materialization (Branch
+            // 3) and fail the same way under the same budget — NOT
+            // short-circuit through Branch 2 and bless the still
+            // uninitialized forwarder. Pre-fix this returned Ok.
+            let retried = runtime.ensure_alias(
+                &registry,
+                &mut host,
+                &mut journal,
+                info,
+                Some(pubkey.as_slice()),
+                context(),
+                0,
+            );
+            assert!(
+                retried.is_err(),
+                "a half-init alias must remain re-materializable, not bricked"
+            );
         }
     }
 }
