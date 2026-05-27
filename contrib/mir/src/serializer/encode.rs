@@ -414,20 +414,29 @@ mod test_encoding {
         }
     }
 
-    /// A depth that would overflow the Rust call stack under the old
-    /// recursive encoder, so the test only completes with the worklist
-    /// driver.
+    /// Depth-stress tests for the iterative encoder. The depth here is
+    /// bounded by `gas::collect_micheline_size`, which still walks the
+    /// tree recursively and is charged via `interpret_cost::micheline_encoding`
+    /// inside the gas-threaded `encode_starting_with`. The fully unbounded
+    /// depth-100k variants will return alongside the iterative
+    /// `collect_micheline_size` (tracked separately). The symmetric decoder
+    /// regression already runs at depth 100k because the decoder's gas
+    /// charge is byte-based (`micheline_decoding_bytes`) and does not
+    /// traverse the tree.
     mod deep_recursion {
         use super::*;
         use crate::ast::annotations::NO_ANNS;
         use typed_arena::Arena;
 
+        /// Bounded by the still-recursive `gas::collect_micheline_size`.
+        /// On a 2 MiB test thread this comfortably fits; 100k would not.
+        const DEPTH: usize = 1_000;
+
         #[test]
-        #[ignore = "needs iterative collect_micheline_size (gas.rs); enable once MR5 lands"]
         fn deeply_nested_seq_encodes() {
             let arena: Arena<Micheline<'_>> = Arena::new();
             let mut current: Micheline<'_> = Micheline::Seq(&[]);
-            for _ in 0..100_000 {
+            for _ in 0..DEPTH {
                 let slot = arena.alloc_extend(std::iter::once(current));
                 current = Micheline::Seq(slot);
             }
@@ -439,12 +448,11 @@ mod test_encoding {
         }
 
         #[test]
-        #[ignore = "needs iterative collect_micheline_size (gas.rs); enable once MR5 lands"]
         fn deeply_nested_pair_encodes() {
             use crate::lexer::Prim;
             let arena: Arena<Micheline<'_>> = Arena::new();
             let mut current: Micheline<'_> = Micheline::Int(0.into());
-            for _ in 0..100_000 {
+            for _ in 0..DEPTH {
                 let pair_args = arena.alloc_extend([Micheline::Int(0.into()), current]);
                 current = Micheline::App(Prim::Pair, pair_args, NO_ANNS);
             }
