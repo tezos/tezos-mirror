@@ -23,7 +23,7 @@ use tezos_execution::{
     context::Context,
     cross_runtime_transfer,
     enshrined_contracts::CracError,
-    mir_ctx::{OperationCtx, TcCtx},
+    mir_ctx::{clear_temporary_big_maps, OperationCtx, TcCtx},
     originate_contract, typecheck_code_and_storage, CracTransferError, OriginationNonce,
     TezlinkOperationGas,
 };
@@ -672,11 +672,18 @@ where
                 ))
             })?;
 
+    // Seed the per-operation temporary big-map id to -1 (negative =
+    // temporary, per `BigMapId::is_temporary`), matching the native
+    // batch path (`tezos_execution::apply_operations`) and the
+    // alias-origination path below. A non-negative seed (e.g. 0) is
+    // NOT recognized as temporary, so transient big-maps would be
+    // written to — and leak into — the durable `/big_map/<id>`
+    // namespace.
     let mut next_temp_id = BigMapId {
-        value: Zarith(0.into()),
+        value: Zarith((-1).into()),
     };
     let mut tc_ctx = TcCtx {
-        host,
+        host: &mut *host,
         context: &context,
         operation_gas: &mut gas,
         big_map_diff: BTreeMap::new(),
@@ -819,6 +826,18 @@ where
             return Err(rt_err);
         }
     };
+
+    // Clear the temporary big-maps allocated during this CRAC's
+    // Michelson execution, mirroring the native batch path
+    // (`tezos_execution::apply_operations`). Without this, the
+    // transient big-maps persist in durable storage after the
+    // operation. Only the success path needs it: every failure path in
+    // `cross_runtime_transfer` reverts the world-state checkpoint,
+    // which already removes any temp big-maps written during the
+    // reverted execution.
+    if let Err(e) = clear_temporary_big_maps(host, &context, &mut next_temp_id) {
+        log!(Error, "Failed to clear temporary big-maps after CRAC: {e}");
+    }
 
     // For cross-runtime calls (CRAC), build the two-step receipt
     // structure per RFC: CRAC Derived Block Contents and store it
