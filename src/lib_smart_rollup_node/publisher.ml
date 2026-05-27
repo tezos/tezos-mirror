@@ -28,18 +28,25 @@
 (** The rollup node stores and publishes commitments for the PVM every
     [Constants.sc_rollup_commitment_period_in_blocks] levels.
 
-    Every time a finalized block is processed by the rollup node, the latter
-    determines whether the last commitment that the node has produced referred
-    to [sc_rollup.commitment_period_in_blocks] blocks earlier. For mainnet,
-    [sc_rollup.commitment_period_in_blocks = 30]. In this case, it computes and
-    stores a new commitment in a level-indexed map.
+    Every time a head is processed by the rollup node, the latter determines
+    whether the last commitment that the node has produced referred to
+    [sc_rollup.commitment_period_in_blocks] blocks earlier. In this case, it
+    computes and stores a new commitment in a level-indexed map. Local
+    storage happens for every processed head at a period boundary, regardless
+    of finality.
 
-    Stored commitments are signed by the rollup node operator
-    and published on the layer1 chain. To ensure that commitments
-    produced by the rollup node are eventually published,
-    storing and publishing commitments are decoupled. Every time
-    a new head is processed, the node tries to publish the oldest
-    commitment that was not published already.
+    Stored commitments are signed by the rollup node operator and published
+    on the layer 1 chain. To ensure that commitments produced by the rollup
+    node are eventually published, storing and publishing commitments are
+    decoupled. Every time a new head is processed, the node tries to publish
+    the oldest commitment that was not published already.
+
+    Crucially, only commitments whose inbox level is finalized on L1 (i.e. at
+    or below the locally observed finalized level) are published. See
+    [missing_commitments] below. This finality gate is what makes the
+    refutation-time tick caches (see [Interpreter.global_tick_state_cache])
+    reorg-safe: an honest node never becomes a party to a refutation game for
+    a tick range that an L1 reorg could invalidate.
 *)
 
 open Publisher_worker_types
@@ -285,7 +292,14 @@ let missing_commitments (node_ctxt : _ Node_context.t) =
               > sc_rollup_challenge_window_int32
         in
         let is_finalized = commitment.inbox_level <= finalized_level in
-        (* Only publish commitments that are finalized and not past the curfew *)
+        (* Only publish commitments whose inbox level is finalized on L1 and
+           that are not past the curfew.
+
+           The finality gate is load-bearing for refutation-time cache safety
+           (see [Interpreter.global_tick_state_cache]): by never publishing a
+           commitment for a non-final inbox level, an honest node guarantees
+           it can never become a party to a refutation game over a tick range
+           that an L1 reorg could invalidate. *)
         let acc =
           if is_finalized && not past_curfew then
             (commitment_hash, commitment) :: acc
