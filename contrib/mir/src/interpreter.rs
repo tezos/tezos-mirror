@@ -859,7 +859,7 @@ fn interpret_one<'a>(
                     return Err(InterpretError::Overflow);
                 }
 
-                let o2_usize = o2.to_usize().unwrap();
+                let o2_usize = o2.to_usize().ok_or(InterpretError::Overflow)?;
                 ctx.gas().consume(interpret_cost::lsl_nat(&o1)?)?;
                 stack.push(V::Nat(o1.shl(o2_usize)));
             }
@@ -871,7 +871,7 @@ fn interpret_one<'a>(
                     return Err(InterpretError::Overflow);
                 }
 
-                let o2_usize = o2.to_usize().unwrap();
+                let o2_usize = o2.to_usize().ok_or(InterpretError::Overflow)?;
                 ctx.gas()
                     .consume(interpret_cost::lsl_bytes(&o1, &o2_usize)?)?;
 
@@ -906,7 +906,7 @@ fn interpret_one<'a>(
                     return Err(InterpretError::Overflow);
                 }
 
-                let o2_usize = o2.to_usize().unwrap();
+                let o2_usize = o2.to_usize().ok_or(InterpretError::Overflow)?;
                 ctx.gas().consume(interpret_cost::lsr_nat(&o1)?)?;
                 stack.push(V::Nat(o1.shr(o2_usize)));
             }
@@ -1372,7 +1372,9 @@ fn interpret_one<'a>(
                 .drain_top(*n as usize)?
                 .rev()
                 .reduce(|acc, e| V::new_pair_rc(e, acc).into())
-                .unwrap();
+                .ok_or(InterpretError::InternalError(
+                    InterpretInvariant::UnreachableState,
+                ))?;
             stack.push(res);
         }
         I::Unpair => {
