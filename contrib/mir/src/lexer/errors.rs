@@ -38,4 +38,12 @@ pub enum LexerError {
     /// A token matched the annotation regex, but couldn't be converted to an [Annotation].
     #[error("invalid annotation: {0}")]
     InvalidAnnotation(String),
+    /// An annotation token exceeds L1's 255-byte limit.
+    #[error("annotation exceeds 255 bytes (was {length}): {annotation}")]
+    OversizedAnnotation {
+        /// The offending annotation token, including its leading sigil.
+        annotation: String,
+        /// The annotation's length in bytes.
+        length: usize,
+    },
 }
