@@ -20,7 +20,7 @@ use crate::{
     journal::{CrossRuntimeCall, Journal},
     precompiles::{
         constants::{
-            ALIAS_LOOKUP_COST, HEADER_VALIDATION_PER_HEADER, RUNTIME_GATEWAY_BASE_COST,
+            HEADER_VALIDATION_PER_HEADER, RUNTIME_GATEWAY_BASE_COST,
             RUNTIME_GATEWAY_PER_WORD_COST, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
             VALUE_TRANSFER_SURCHARGE,
         },
@@ -29,7 +29,7 @@ use crate::{
     },
 };
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezosx_interfaces::Registry;
+use tezosx_interfaces::{Registry, ALIAS_LOOKUP_COST};
 use tezosx_journal::OriginalSource;
 
 sol! {

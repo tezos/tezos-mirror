@@ -222,12 +222,12 @@ impl Registry for MockRegistry {
         _host: &Host,
         _addr_runtime: RuntimeId,
         _addr: &str,
-        gas: u64,
+        _budget: u64,
     ) -> Result<(crate::Classification, u64), TezosXRuntimeError>
     where
         Host: StorageV1,
     {
-        Ok((crate::Classification::Unknown, gas))
+        Ok((crate::Classification::Unknown, 0))
     }
 
     fn serve<Host>(

@@ -96,7 +96,7 @@ impl Registry for RegistryImpl {
         host: &Host,
         addr_runtime: tezosx_interfaces::RuntimeId,
         addr: &str,
-        gas: u64,
+        budget: u64,
     ) -> Result<
         (tezosx_interfaces::Classification, u64),
         tezosx_interfaces::TezosXRuntimeError,
@@ -106,10 +106,10 @@ impl Registry for RegistryImpl {
     {
         match addr_runtime {
             tezosx_interfaces::RuntimeId::Tezos => {
-                self.tezos.read_origin(host, addr, gas)
+                self.tezos.read_origin(host, addr, budget)
             }
             tezosx_interfaces::RuntimeId::Ethereum => {
-                self.ethereum.read_origin(host, addr, gas)
+                self.ethereum.read_origin(host, addr, budget)
             }
         }
     }
@@ -154,7 +154,9 @@ mod tests {
     use revm_etherlink::storage::world_state_handler::StorageAccount;
     use tezos_crypto_rs::public_key_hash::PublicKeyHash;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezosx_interfaces::{Classification, Origin, RuntimeId};
+    use tezosx_interfaces::{
+        Classification, Origin, RuntimeId, ALIAS_LOOKUP_COST, ALIAS_LOOKUP_MILLIGAS,
+    };
     use tezosx_journal::TezosXJournal;
     use tezosx_tezos_runtime::account::set_origin_for_implicit;
 
@@ -207,11 +209,11 @@ mod tests {
         account.set_origin(&mut host, &Origin::Native).unwrap();
 
         let budget = 100_000;
-        let (class, remaining) = registry
+        let (class, consumed) = registry
             .read_origin(&host, RuntimeId::Ethereum, &addr_str, budget)
             .unwrap();
         assert_eq!(class, Classification::Native);
-        assert_eq!(remaining, budget); // recorded origin → no back-stop charge
+        assert_eq!(consumed, ALIAS_LOOKUP_COST); // recorded origin → no back-stop charge
     }
 
     #[test]
@@ -223,8 +225,8 @@ mod tests {
             PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
         set_origin_for_implicit(&mut host, &pkh, &Origin::Native).unwrap();
 
-        let budget = 100_000;
-        let (class, remaining) = registry
+        let budget = 1_000_000;
+        let (class, consumed) = registry
             .read_origin(
                 &host,
                 RuntimeId::Tezos,
@@ -233,7 +235,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(class, Classification::Native);
-        assert_eq!(remaining, budget); // Tezos: no back-stop charge
+        assert_eq!(consumed, ALIAS_LOOKUP_MILLIGAS); // Tezos: charges milligas
     }
 
     #[test]
@@ -261,11 +263,11 @@ mod tests {
             .unwrap();
 
         let budget = 100_000;
-        let (class, remaining) = registry
+        let (class, consumed) = registry
             .read_origin(&host, RuntimeId::Ethereum, &addr_str, budget)
             .unwrap();
         assert_eq!(class, Classification::Native);
-        assert_eq!(remaining, budget - CODE_BACKSTOP_COST);
+        assert_eq!(consumed, ALIAS_LOOKUP_COST + CODE_BACKSTOP_COST);
     }
 
     #[test]
@@ -273,8 +275,8 @@ mod tests {
         let host = MockKernelHost::default();
         let registry = RegistryImpl::default();
 
-        let budget = 100_000;
-        let (class, remaining) = registry
+        let budget = 1_000_000;
+        let (class, consumed) = registry
             .read_origin(
                 &host,
                 RuntimeId::Tezos,
@@ -283,6 +285,6 @@ mod tests {
             )
             .unwrap();
         assert_eq!(class, Classification::Unknown);
-        assert_eq!(remaining, budget); // Tezos never charges a back-stop
+        assert_eq!(consumed, ALIAS_LOOKUP_MILLIGAS); // Tezos: charges milligas even on miss
     }
 }
