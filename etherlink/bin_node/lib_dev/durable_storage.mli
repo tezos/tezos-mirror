@@ -107,6 +107,13 @@ type ('a, 'cap) path =
   | Evm_legacy_account_code_hash :
       Ethereum_types.address
       -> (Ethereum_types.hash, ro) path
+  | Evm_legacy_block_by_hash :
+      Ethereum_types.block_hash
+      -> ( Ethereum_types.legacy_transaction_object Ethereum_types.block,
+           ro )
+         path
+  | Evm_legacy_current_block :
+      (Ethereum_types.legacy_transaction_object Ethereum_types.block, ro) path
   | Evm_code_by_hash : Ethereum_types.hash -> (Ethereum_types.hex, rw) path
   | Evm_account_storage :
       Durable_storage_path.Accounts.fixed_address

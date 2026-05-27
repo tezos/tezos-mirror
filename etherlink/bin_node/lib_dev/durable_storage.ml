@@ -160,6 +160,13 @@ type ('a, 'cap) path =
   | Evm_legacy_account_code_hash :
       Ethereum_types.address
       -> (Ethereum_types.hash, ro) path
+  | Evm_legacy_block_by_hash :
+      Ethereum_types.block_hash
+      -> ( Ethereum_types.legacy_transaction_object Ethereum_types.block,
+           ro )
+         path
+  | Evm_legacy_current_block :
+      (Ethereum_types.legacy_transaction_object Ethereum_types.block, ro) path
   | Evm_code_by_hash : Ethereum_types.hash -> (Ethereum_types.hex, rw) path
   | Evm_account_storage :
       Durable_storage_path.Accounts.fixed_address
@@ -480,6 +487,23 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
              (Durable_storage_path.Block.current_block
                 ~root:Durable_storage_path.tezosx_tezos_blocks_root)
            ~chain_family:Michelson)
+  | Evm_legacy_block_by_hash block_hash ->
+      static_ro
+        {
+          path =
+            Durable_storage_path.Block.by_hash
+              ~root:Durable_storage_path.etherlink_root
+              block_hash;
+          decode = infallible_decode Ethereum_types.block_from_rlp;
+        }
+  | Evm_legacy_current_block ->
+      static_ro
+        {
+          path =
+            Durable_storage_path.Block.current_block
+              ~root:Durable_storage_path.etherlink_root;
+          decode = infallible_decode Ethereum_types.block_from_rlp;
+        }
   | Current_receipts ->
       static_ro
         {
