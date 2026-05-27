@@ -9,13 +9,8 @@
     full staking balances that are maintained to be used at cycle end to compute
     staking rights.
 
-    The module provides two encodings:
-
-    - [encoding_up_to_t] reads the Q/Paris/Oxford formats (without [stez_frozen]).
-      It is used during protocol activation to migrate existing data.
-
-    - [encoding] reads and writes the Protocol U format (with [stez_frozen]).
-      It is used for all reads and writes after migration.
+    [encoding] reads and writes the Protocol U format (with [stez_frozen]); it
+    is used for all reads and writes.
 *)
 
 (** This type gathers the information we need to store so that we can
@@ -166,43 +161,6 @@ let min_delegated_to_raw {last_modified_level; previous_min} =
     | None -> (Tez_repr.zero, None)
   in
   (previous_min_value, previous_min_level, Some last_modified_level)
-
-(* This encoding reads and writes the Q format (without [stez_frozen]).
-   It is backward-compatible with both the encodings used in Oxford and
-   in Paris. It is used by {!Staking_balance_up_to_T} in [storage.ml]
-   to read existing data during migration at protocol activation. After
-   migration, all data is read/written using {!encoding} instead. *)
-let encoding_up_to_t =
-  let open Data_encoding in
-  conv
-    (fun {
-           own_frozen;
-           staked_frozen;
-           delegated;
-           min_delegated_in_cycle;
-           stez_frozen = _;
-         }
-       ->
-      ( own_frozen,
-        staked_frozen,
-        delegated,
-        Some (min_delegated_to_raw min_delegated_in_cycle) ))
-    (fun (own_frozen, staked_frozen, delegated, min_delegated_in_cycle_opt) ->
-      let min_delegated_in_cycle =
-        min_delegated_of_raw min_delegated_in_cycle_opt
-      in
-      {
-        own_frozen;
-        staked_frozen;
-        delegated;
-        min_delegated_in_cycle;
-        stez_frozen = Tez_repr.zero;
-      })
-    (obj4
-       (req "own_frozen" Tez_repr.encoding)
-       (req "staked_frozen" Tez_repr.encoding)
-       (req "delegated" Tez_repr.encoding)
-       (varopt "min_delegated_in_cycle" min_delegated_in_cycle_encoding))
 
 (* This encoding includes the [stez_frozen] field. It is NOT backward-
    compatible with data up to Tallinn. All existing staking balances must be

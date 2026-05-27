@@ -19,10 +19,6 @@ val init :
     this encoding can be used for reads. *)
 val encoding : t Data_encoding.t
 
-(** Encoding that reads the Q/Paris/Oxford formats (without [stez_frozen]).
-    Used by the legacy storage module to read existing data during migration. *)
-val encoding_up_to_t : t Data_encoding.t
-
 (** The weight of a delegate used for voting rights. *)
 val voting_weight : t -> Int64.t tzresult
 
