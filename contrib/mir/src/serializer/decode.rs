@@ -8,8 +8,22 @@
 use super::constants::*;
 use bitvec::{order::Lsb0, vec::BitVec, view::BitView};
 use num_bigint::{BigInt, Sign};
+use smallvec::SmallVec;
 use strum::EnumCount;
 use typed_arena::Arena;
+
+/// If the number of arguments is small, an allocation-avoiding optimization is
+/// used. This constant specifies the upper bound for the number of arguments
+/// where it triggers.
+/// At most we expect primitives with 3 arguments.
+const EXPECTED_MAX_APP_ARGS: usize = 3;
+
+/// If the number of arguments is small, an allocation-avoiding optimization is
+/// used. This constant specifies the upper bound for the number of sequence
+/// elements where it triggers.
+/// 3 elements doesn't waste too much stack space and seems like a reasonable
+/// optimization for small sequences.
+const EXPECTED_MAX_SEQ_ELTS: usize = 3;
 
 use crate::{
     ast::{
@@ -163,11 +177,11 @@ enum DecFrame<'a> {
         prim: Prim,
         remaining: usize,
         annots: bool,
-        acc: Vec<Micheline<'a>>,
+        acc: SmallVec<[Micheline<'a>; EXPECTED_MAX_APP_ARGS]>,
     },
     Container {
         kind: ContainerKind,
-        acc: Vec<Micheline<'a>>,
+        acc: SmallVec<[Micheline<'a>; EXPECTED_MAX_SEQ_ELTS]>,
     },
 }
 
@@ -302,7 +316,7 @@ fn decode_micheline<'a, 'b>(
                     iters.push(scoped);
                     frames.push(DecFrame::Container {
                         kind: ContainerKind::Seq,
-                        acc: Vec::new(),
+                        acc: SmallVec::new(),
                     });
                     None
                 }
@@ -324,7 +338,7 @@ fn decode_micheline<'a, 'b>(
                         prim,
                         remaining: 1,
                         annots,
-                        acc: Vec::new(),
+                        acc: SmallVec::new(),
                     });
                     None
                 }
@@ -335,7 +349,7 @@ fn decode_micheline<'a, 'b>(
                         prim,
                         remaining: 2,
                         annots,
-                        acc: Vec::new(),
+                        acc: SmallVec::new(),
                     });
                     None
                 }
@@ -345,7 +359,7 @@ fn decode_micheline<'a, 'b>(
                     iters.push(scoped);
                     frames.push(DecFrame::Container {
                         kind: ContainerKind::AppMany { prim, annots: true },
-                        acc: Vec::new(),
+                        acc: SmallVec::new(),
                     });
                     None
                 }
