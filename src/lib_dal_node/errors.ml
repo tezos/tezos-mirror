@@ -298,5 +298,14 @@ module Exit_codes = struct
   let invalid_configuration_file_code =
     Cmdliner.Cmd.Exit.info_code invalid_configuration_file
 
-  let all = defaults @ [invalid_configuration_file]
+  let trapped_attester =
+    Cmdliner.Cmd.Exit.info
+      2
+      ~doc:
+        "$(status): a registered attester attested a slot containing traps; \
+         the node halts to prevent further reward loss"
+
+  let trapped_attester_code = Cmdliner.Cmd.Exit.info_code trapped_attester
+
+  let all = defaults @ [invalid_configuration_file; trapped_attester]
 end

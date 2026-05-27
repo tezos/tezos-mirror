@@ -114,5 +114,7 @@ module Exit_codes : sig
 
   val invalid_configuration_file_code : code
 
+  val trapped_attester_code : code
+
   val all : info trace
 end
