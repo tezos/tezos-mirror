@@ -61,6 +61,11 @@ pub enum DecodeError {
     /// An annotation exceeds L1's 255-byte limit.
     #[error("annotation exceeds 255 bytes (was {0})")]
     OversizedAnnotation(usize),
+    /// Non-canonical zarith encoding: a multi-byte number whose final byte is
+    /// `0x00` carries an all-zero high-order group and could be shortened. L1
+    /// rejects this as `Trailing_zero`, so UNPACK must return `None`.
+    #[error("non-canonical zarith encoding: trailing zero byte")]
+    ZarithTrailingZero,
 }
 
 impl<'a> Micheline<'a> {
@@ -389,10 +394,9 @@ fn decode_int(bytes: &mut BytesIt) -> Result<Micheline<'static>, DecodeError> {
     let mut sign = Sign::Plus;
     let mut first = true;
     loop {
-        let bits = bytes
-            .next_ref()
-            .ok_or(DecodeError::UnexpectedEOF)?
-            .view_bits::<Lsb0>();
+        let byte = *bytes.next_ref().ok_or(DecodeError::UnexpectedEOF)?;
+        let bits = byte.view_bits::<Lsb0>();
+        let is_first = first;
         let data_len = if first {
             sign = if bits[6] { Sign::Minus } else { Sign::Plus };
             first = false;
@@ -401,7 +405,19 @@ fn decode_int(bytes: &mut BytesIt) -> Result<Micheline<'static>, DecodeError> {
             7
         };
         bitvec.extend_from_bitslice(&bits[..data_len]);
+        // bit 7 is the continuation flag; clear means this is the final byte.
         if !bits[7] {
+            // A continuation byte (i.e. not the first one) that terminates the
+            // number with value `0x00` contributes an all-zero high-order
+            // group, so the number is encodable in fewer bytes. L1's zarith
+            // reader rejects this as `Trailing_zero`; mirror that so UNPACK
+            // returns `None` instead of accepting the non-canonical input.
+            // The single-byte `0x00` (the canonical encoding of 0) and the
+            // first-byte `0x40` (negative zero, handled elsewhere) are
+            // unaffected because they keep `is_first` true.
+            if !is_first && byte == 0 {
+                return Err(DecodeError::ZarithTrailingZero);
+            }
             break;
         }
     }
@@ -590,6 +606,29 @@ mod test {
             #[test]
             fn negative_large() {
                 check(-987654321, "0x00f1a2f3ad07");
+            }
+
+            // Canonical encodings of 12345 and 1; control cases that must keep
+            // decoding successfully after the trailing-zero check below.
+            #[test]
+            fn canonical_multibyte() {
+                check(12345, "0x00b9c001");
+                check(1, "0x0001");
+            }
+
+            // Non-canonical zarith: a multi-byte number terminated by a `0x00`
+            // byte. L1 rejects these as `Trailing_zero`, so we must too,
+            // otherwise UNPACK would return `Some` where L1 returns `None`.
+            #[test]
+            fn trailing_zero_rejected() {
+                // 12345 with a spurious trailing 0x00 group.
+                check_err("0x00b9c08100", DecodeError::ZarithTrailingZero);
+                // 1 encoded in two bytes instead of one (non-minimal).
+                check_err("0x008100", DecodeError::ZarithTrailingZero);
+                // 0 encoded in two bytes instead of one.
+                check_err("0x008000", DecodeError::ZarithTrailingZero);
+                // Negative number with a trailing zero group is rejected too.
+                check_err("0x00c1c08100", DecodeError::ZarithTrailingZero);
             }
         }
 
