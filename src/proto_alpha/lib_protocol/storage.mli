@@ -693,20 +693,6 @@ module Clst : sig
        and type value = Clst_delegates_parameters_repr.update
 end
 
-type consensus_pk_in_R = {
-  delegate : Signature.Public_key_hash.t;
-  consensus_pk : Signature.Public_key.t;
-  consensus_pkh : Signature.Public_key_hash.t;
-}
-
-(** State of the sampler used to select delegates up to R.
-    Remove in S. *)
-module Delegate_sampler_state_up_to_R :
-  Indexed_data_storage
-    with type key = Cycle_repr.t
-     and type value = consensus_pk_in_R Sampler.t
-     and type t := Raw_context.t
-
 (** State of the sampler used to select delegates. Managed synchronously
     with [Stake.Selected_distribution_for_cycle]. *)
 module Delegate_sampler_state :

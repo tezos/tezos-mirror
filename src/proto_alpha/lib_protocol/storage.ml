@@ -1343,41 +1343,6 @@ module Cycle = struct
       end)
       (Stake_repr)
 
-  type consensus_pk_in_R = {
-    delegate : Signature.Public_key_hash.t;
-    consensus_pk : Signature.Public_key.t;
-    consensus_pkh : Signature.Public_key_hash.t;
-  }
-
-  let consensus_pk_encoding_in_R =
-    let open Data_encoding in
-    conv
-      (fun {delegate; consensus_pk; consensus_pkh} ->
-        if Signature.Public_key_hash.equal consensus_pkh delegate then
-          (consensus_pk, None)
-        else (consensus_pk, Some delegate))
-      (fun (consensus_pk, delegate) ->
-        let consensus_pkh = Signature.Public_key.hash consensus_pk in
-        let delegate =
-          match delegate with None -> consensus_pkh | Some del -> del
-        in
-        {delegate; consensus_pk; consensus_pkh})
-      (obj2
-         (req "consensus_pk" Signature.Public_key.encoding)
-         (opt "delegate" Signature.Public_key_hash.encoding))
-
-  module Delegate_sampler_state_up_to_R =
-    Indexed_context.Make_map
-      (Ghost)
-      (struct
-        let name = ["delegate_sampler_state"]
-      end)
-      (struct
-        type t = consensus_pk_in_R Sampler.t
-
-        let encoding = Sampler.encoding consensus_pk_encoding_in_R
-      end)
-
   module Delegate_sampler_state =
     Indexed_context.Make_map
       (Registered)
@@ -1602,13 +1567,6 @@ module Clst = struct
   module Pending_delegate_parameters = Cycle.Pending_CLST_delegate_parameters
 end
 
-type consensus_pk_in_R = Cycle.consensus_pk_in_R = {
-  delegate : Signature.Public_key_hash.t;
-  consensus_pk : Signature.Public_key.t;
-  consensus_pkh : Signature.Public_key_hash.t;
-}
-
-module Delegate_sampler_state_up_to_R = Cycle.Delegate_sampler_state_up_to_R
 module Delegate_sampler_state = Cycle.Delegate_sampler_state
 module Delegate_stake_info = Cycle.Delegate_stake_info
 module Issuance_bonus = Cycle.Issuance_bonus
