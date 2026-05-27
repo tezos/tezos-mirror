@@ -71,6 +71,10 @@
   `Some "...\\r..."`. The textual lexer no longer recognises `\r` as
   an escape for the same reason. Strings whose bytes are all in the
   permitted set are unaffected. (!22005)
+- MIR: `UNPACK` now rejects non-canonical zarith encodings — multi-byte
+  `int`/`nat`/`mutez`/`timestamp` values terminated by a `0x00` group
+  (e.g. `0x0500b9c08100`, `0x05008100`) — returning `None` to match
+  Tezos L1. Canonical encodings are unaffected. (!21992)
 
 ### Native Atomic Composability
 
