@@ -845,8 +845,9 @@ DO UPDATE SET value = excluded.value
 
     let select_receipts_from_block_range =
       (t3 level level (option octets)
-      ->* t6
+      ->* t7
             block_hash
+            level
             quantity
             root_hash
             address
@@ -855,7 +856,7 @@ DO UPDATE SET value = excluded.value
         ~name:__FUNCTION__
         ~table
       (* See {Note cast} *)
-      @@ {eos|SELECT block_hash, index_, hash, from_, to_, CAST(receipt_fields AS BLOB) FROM transactions
+      @@ {eos|SELECT block_hash, block_number, index_, hash, from_, to_, CAST(receipt_fields AS BLOB) FROM transactions
               WHERE $1 <= block_number AND block_number < $2
               AND ($3 IS NULL OR
                    receipt_contains_bloom_filter(receipt_fields, $3))
@@ -1620,6 +1621,7 @@ module Transactions = struct
         conn
         Q.Transactions.select_receipts_from_block_range
         (fun ( block_hash,
+               block_number,
                index,
                hash,
                from,
@@ -1642,7 +1644,7 @@ module Transactions = struct
               transactionHash = hash;
               transactionIndex = index;
               blockHash = block_hash;
-              blockNumber = Qty level;
+              blockNumber = block_number;
               from;
               to_;
               cumulativeGasUsed = cumulative_gas_used;
@@ -1653,7 +1655,7 @@ module Transactions = struct
                   (Compact_transactions_receipt.fill_log_context
                      ~hash
                      ~block_hash
-                     ~block_number:(Qty level)
+                     ~block_number
                      ~index)
                   logs;
               logsBloom = logs_bloom;

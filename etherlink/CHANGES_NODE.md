@@ -8,6 +8,11 @@
 
 ### RPCs changes
 
+- Fix `eth_getLogs`: each returned log now carries the `blockNumber` of the
+  block that actually emitted it. Over a range spanning more than one block,
+  every log was previously stamped with the request's `fromBlock` (the
+  `blockHash` was already correct). (!21995)
+
 ### Monitoring changes
 
 ### Command-line interface changes
