@@ -1109,6 +1109,12 @@ fn build_ethereum_request(
 
 /// Dispatch a CRAC call: inject context headers, serve the request,
 /// classify the response, and debit the gateway balance.
+///
+/// `serve` is invoked synchronously from inside the gateway entrypoint,
+/// which is what makes a CRAC sub-tree execute depth-first within the
+/// caller's frame — equivalent to a same-runtime synchronous call (EVM
+/// `CALL`) or a same-runtime DFS-expanded `TRANSFER_TOKENS` (Michelson
+/// since Florence).
 fn dispatch_crac_call<'a, Host>(
     ctx: &mut (impl CtxTrait<'a>
               + HasHost<Host>

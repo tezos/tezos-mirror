@@ -626,6 +626,14 @@ pub trait CrossRuntimeCall {
         remaining_evm_gas: u64,
     ) -> Result<String, CustomPrecompileError>;
 
+    /// Dispatch a cross-runtime HTTP call by invoking the runtime
+    /// registry's `serve` synchronously.
+    ///
+    /// `serve` is invoked synchronously from inside the gateway
+    /// precompile, which is what makes a CRAC sub-tree execute
+    /// depth-first within the caller's frame — equivalent to a
+    /// same-runtime synchronous call (EVM `CALL`) or a same-runtime
+    /// DFS-expanded `TRANSFER_TOKENS` (Michelson since Florence).
     fn tezosx_call_http(
         &mut self,
         http_request: http::Request<Vec<u8>>,
