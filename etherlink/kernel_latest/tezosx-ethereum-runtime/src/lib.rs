@@ -10,7 +10,7 @@ use alloy_primitives::{IntoLogData, Log};
 use alloy_sol_types::{sol, SolCall};
 use http::StatusCode;
 use primitive_types::U256;
-use revm::context::result::{ExecutionResult, HaltReason, Output};
+use revm::context::result::{EVMError, ExecutionResult, HaltReason, Output};
 use revm::primitives::KECCAK_EMPTY;
 use revm::state::Bytecode;
 use revm_etherlink::precompiles::constants::{
@@ -25,7 +25,7 @@ use revm_etherlink::{
     storage::{
         code::CodeStorage, version::read_evm_version, world_state_handler::StorageAccount,
     },
-    ExecutionOutcome, GasData, TransactionOrigin,
+    EvmRunError, ExecutionOutcome, GasData, TransactionOrigin,
 };
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -244,6 +244,50 @@ where
     }
 }
 
+/// Map an [`EvmRunError`] returned by [`run_transaction`] onto a
+/// [`TezosXRuntimeError`], separating user-triggerable pre-execution
+/// validation failures from genuine infrastructure errors.
+///
+/// revm's `validate()` runs *before any frame executes* and returns
+/// `EVMError::Transaction(_)` when the (attacker-shaped) transaction
+/// inputs are themselves invalid — e.g. a forwarded `gas_limit` below the
+/// intrinsic cost (`CallGasCostMoreThanGasLimit` /
+/// `GasFloorMoreThanGasLimit`), a bad nonce, or insufficient balance.
+/// *Every* `InvalidTransaction` variant is a deterministic property of
+/// those inputs — never an infrastructure fault — so the whole
+/// `Transaction(_)` arm maps to `BadRequest` → `400` →
+/// `CracError::Operation`, a catchable op-level failure, exactly like a
+/// `HaltReason` (see `build_response` and L2-1341). A `500` here would be
+/// reclassified by the gateway as `CracError::BlockAbort` — a
+/// user-triggerable block-production DoS (L2-1380).
+///
+/// Every other `EvmRunError` is infrastructure the user cannot shape and
+/// keeps propagating as a `5xx`. Rather than flattening it all into
+/// `Custom`, the storage/runtime variants reuse the typed `EvmDbError` /
+/// `EvmKernelError` → `TezosXRuntimeError` translations (c840d70cfcc4) so a
+/// storage fault stays tagged `Storage`/`Runtime`; only the genuinely
+/// opaque `EVMError::Header`/`Custom` fall back to `Custom`. The match is
+/// intentionally exhaustive (no `_`): a new `EvmRunError`/`EVMError`
+/// variant must fail to compile so a human classifies it instead of
+/// silently defaulting to a block-aborting `500` — mirroring the
+/// `build_response` halt branch.
+fn classify_evm_run_error(context: &str, e: EvmRunError) -> TezosXRuntimeError {
+    let message = format!("{context}: {e:?}");
+    match e {
+        // User-shaped pre-execution validation failure → catchable `400`.
+        EvmRunError::RevmDB(EVMError::Transaction(_)) => {
+            TezosXRuntimeError::BadRequest(message)
+        }
+        // Storage / runtime faults: reuse the typed translations so they
+        // keep their `Storage` / `Runtime` tag instead of becoming `Custom`.
+        EvmRunError::DB(db) | EvmRunError::RevmDB(EVMError::Database(db)) => db.into(),
+        EvmRunError::Kernel(kernel) => kernel.into(),
+        // No richer typing available for these → keep them opaque.
+        EvmRunError::RevmDB(EVMError::Header(_))
+        | EvmRunError::RevmDB(EVMError::Custom(_)) => TezosXRuntimeError::Custom(message),
+    }
+}
+
 /// Execute a state-mutating cross-runtime entrypoint call (POST).
 ///
 /// Unchanged behavior from pre-L2-1259: emits `CracReceived`, credits the
@@ -340,9 +384,8 @@ where
     // Restore the outer frame's per-call depth now that the inner
     // execution is done (see the save above).
     journal.evm.set_crac_chain_depth(saved_crac_chain_depth);
-    let outcome = outcome.map_err(|e| {
-        TezosXRuntimeError::Custom(format!("EVM execution failed: {e:?}"))
-    })?;
+    let outcome =
+        outcome.map_err(|e| classify_evm_run_error("EVM execution failed", e))?;
 
     Ok(outcome)
 }
@@ -440,9 +483,8 @@ where
     // Restore the outer frame's per-call depth now that the inner
     // execution is done (see the save above).
     journal.evm.set_crac_chain_depth(saved_crac_chain_depth);
-    let outcome = outcome.map_err(|e| {
-        TezosXRuntimeError::Custom(format!("EVM static execution failed: {e:?}"))
-    })?;
+    let outcome =
+        outcome.map_err(|e| classify_evm_run_error("EVM static execution failed", e))?;
 
     Ok(outcome)
 }
@@ -1299,6 +1341,77 @@ mod tests {
         fn error_response_has_zero_gas_consumed() {
             let resp = build_response(Err(TezosXRuntimeError::BadRequest("err".into())));
             assert_eq!(resp.headers().get(X_TEZOS_GAS_CONSUMED).unwrap(), "0");
+        }
+
+        /// Regression: a revm *pre-execution validation* failure
+        /// (`EVMError::Transaction`) is a deterministic property of the
+        /// attacker-shaped tx inputs — here a forwarded gas limit below the
+        /// intrinsic cost. It must classify as a catchable 400, not a 500
+        /// that the gateway reclassifies as `CracError::BlockAbort` (a
+        /// user-triggerable block-production DoS).
+        #[test]
+        fn evm_transaction_validation_error_maps_to_400() {
+            use crate::classify_evm_run_error;
+            use revm::context::result::{EVMError, InvalidTransaction};
+            use revm_etherlink::EvmRunError;
+
+            let err = EvmRunError::RevmDB(EVMError::Transaction(
+                InvalidTransaction::CallGasCostMoreThanGasLimit {
+                    initial_gas: 21064,
+                    gas_limit: 20452,
+                },
+            ));
+            let mapped = classify_evm_run_error("EVM execution failed", err);
+            assert!(
+                matches!(mapped, TezosXRuntimeError::BadRequest(_)),
+                "validation Err must be a catchable BadRequest, got {mapped:?}"
+            );
+            assert_eq!(
+                build_response(Err(mapped)).status(),
+                StatusCode::BAD_REQUEST
+            );
+        }
+
+        /// The dual of the above: genuine infrastructure errors the user
+        /// cannot shape (DB / header / custom) must still surface as a 500
+        /// so the gateway aborts the block rather than swallowing a real
+        /// failure as a catchable op-level revert.
+        #[test]
+        fn evm_infrastructure_error_maps_to_500() {
+            use crate::classify_evm_run_error;
+            use revm::context::result::EVMError;
+            use revm_etherlink::EvmRunError;
+
+            let err = EvmRunError::RevmDB(EVMError::Custom("storage unavailable".into()));
+            let mapped = classify_evm_run_error("EVM execution failed", err);
+            assert!(
+                matches!(mapped, TezosXRuntimeError::Custom(_)),
+                "infra Err must remain a 500-mapped Custom, got {mapped:?}"
+            );
+            assert_eq!(
+                build_response(Err(mapped)).status(),
+                StatusCode::INTERNAL_SERVER_ERROR
+            );
+        }
+
+        /// A storage fault keeps its typed `Storage` tag (reusing the
+        /// `EvmDbError` → `TezosXRuntimeError` translation) instead of being
+        /// flattened into `Custom`, while still mapping to a 500.
+        #[test]
+        fn evm_storage_error_is_tagged_storage_not_custom() {
+            use crate::classify_evm_run_error;
+            use revm_etherlink::{EvmDbError, EvmRunError};
+
+            let err = EvmRunError::DB(EvmDbError::CommitMismatch);
+            let mapped = classify_evm_run_error("EVM execution failed", err);
+            assert!(
+                matches!(mapped, TezosXRuntimeError::Storage(_)),
+                "DB fault must be tagged Storage, not Custom, got {mapped:?}"
+            );
+            assert_eq!(
+                build_response(Err(mapped)).status(),
+                StatusCode::INTERNAL_SERVER_ERROR
+            );
         }
     }
 
