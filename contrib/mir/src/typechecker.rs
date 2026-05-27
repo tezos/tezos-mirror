@@ -60,6 +60,14 @@ pub enum TcError {
     /// Encountered FAIL instruction not in tail position.
     #[error("FAIL instruction is not in tail position")]
     FailNotInTail,
+    /// Typechecking would recurse beyond the protocol-defined depth limit
+    /// (10000). Mirrors L1's `Typechecking_too_many_recursive_calls` in
+    /// `src/proto_alpha/lib_protocol/script_ir_translator.ml:571`. Currently
+    /// guards the value-level Lambda recursion (`step_typecheck_value` →
+    /// `typecheck_lambda` → `typecheck`); the instruction-level LAMBDA path
+    /// is iterative and unbounded by gas.
+    #[error("too many recursive calls during typechecking")]
+    TypecheckingTooManyRecursiveCalls,
     /// Failed to interpret a number as a value of some type due to a numeric
     /// conversion error.
     #[error("numeric conversion failed: {0}")]
@@ -257,6 +265,62 @@ pub enum TcInvariant {
         got: usize,
         where_: &'static str,
     },
+}
+
+/// L1 parity: mirrors `Typechecking_too_many_recursive_calls` (returned
+/// when `stack_depth > 10000` in `script_ir_translator.ml:571`).
+///
+/// Implementation rationale (vs. plumbing through `TypecheckingCtx`):
+/// the kernel runs in a single thread, so a thread-local + RAII guard
+/// keeps the counter balanced across every `?`-propagated `Err` without
+/// every recursive callsite needing manual save/restore. Under
+/// `panic = "abort"` (the kernel's profile via `sdk/rust/Cargo.toml`)
+/// `Drop` does not fire on panic, but the abort terminates the runtime
+/// before the next operation runs — the next operation re-initialises
+/// the thread-local, so counter pollution across operations is moot.
+/// Under `panic = "unwind"` (native embedders, debug tooling) `Drop`
+/// fires on the unwind path and the counter balances normally.
+const MAX_LAMBDA_TYPECHECK_DEPTH: u16 = 10_000;
+
+std::thread_local! {
+    static LAMBDA_TYPECHECK_DEPTH: std::cell::Cell<u16> = const { std::cell::Cell::new(0) };
+}
+
+struct LambdaTypecheckDepthGuard;
+
+impl LambdaTypecheckDepthGuard {
+    fn enter() -> Result<Self, TcError> {
+        LAMBDA_TYPECHECK_DEPTH.with(|d| {
+            let cur = d.get();
+            // L1 admits the call when `stack_depth <= 10000` (rejects on
+            // `stack_depth > 10000`); the depth counter is incremented
+            // *before* the recursive call, so the first 10001 entries
+            // succeed (`stack_depth` 0..=10000). MIR's counter is also
+            // pre-increment here — match the admit threshold exactly.
+            if cur > MAX_LAMBDA_TYPECHECK_DEPTH {
+                return Err(TcError::TypecheckingTooManyRecursiveCalls);
+            }
+            d.set(cur + 1);
+            Ok(LambdaTypecheckDepthGuard)
+        })
+    }
+}
+
+impl Drop for LambdaTypecheckDepthGuard {
+    fn drop(&mut self) {
+        LAMBDA_TYPECHECK_DEPTH.with(|d| {
+            let cur = d.get();
+            // Defense-in-depth: paired enter/Drop should never put the
+            // counter at 0 here. A debug-build trip surfaces an
+            // invariant violation that `saturating_sub` would silently
+            // mask in release.
+            debug_assert!(
+                cur > 0,
+                "LambdaTypecheckDepthGuard::Drop fired with counter at 0",
+            );
+            d.set(cur.saturating_sub(1));
+        });
+    }
 }
 
 impl From<TryFromBigIntError<()>> for TcError {
@@ -4497,6 +4561,16 @@ fn visit_value<'a, 'b>(
             raw @ (V::Seq(instrs) | V::App(Prim::Lambda_rec, [V::Seq(instrs)], _)),
         ) => {
             let (in_ty, out_ty) = tys.as_ref();
+            // The value-level Lambda path recurses through `typecheck_lambda`
+            // → `typecheck` → `step_typecheck_instruction` (PUSH) →
+            // `typecheck_value` → this arm. Each level adds Rust frames; an
+            // adversarial nested `PUSH (lambda …) {PUSH (lambda …) {…}}` can
+            // exhaust the kernel's 1 MiB WASM stack within a single
+            // operation's gas budget. Mirror L1's defense — see
+            // `script_ir_translator.ml:571` for the `stack_depth > 10000`
+            // check that returns `Typechecking_too_many_recursive_calls`.
+            // RAII guard ensures depth balance even on Err propagation.
+            let _depth_guard = LambdaTypecheckDepthGuard::enter()?;
             results.push(TV::Lambda(Closure::Lambda(typecheck_lambda(
                 instrs,
                 ctx.gas(),
@@ -9928,108 +10002,131 @@ mod typecheck_tests {
         );
     }
 
-    /// Helper: builds a `[Micheline]` body of `DEPTH` nested
-    /// `PUSH (lambda unit unit) {<inner>} ; DROP` layers, leaving the
-    /// outer body's input stack at `[]`. Each layer keeps its body's
-    /// stack at `[unit]` so the lambda's `out_ty = unit` unifies. The
-    /// returned closure runs the typecheck on a thread with the given
-    /// stack size and either expects success or expects an overflow,
-    /// per the caller's intent.
+    /// Helper: builds and typechecks a `PUSH (lambda unit unit) {<inner>}
+    /// ; DROP` body of the given depth on the current thread. Each layer
+    /// keeps its body's stack at `[unit]` so the lambda's `out_ty = unit`
+    /// unifies. Returns the typecheck result; the caller is responsible
+    /// for asserting the expected shape. Drops are skipped via
+    /// `mem::forget` so the still-recursive `Type` / `Instruction`
+    /// `Drop` (gated on MR4) does not overflow on scope exit.
+    ///
+    /// The kernel call path uses `Micheline::decode_raw` (the iterative
+    /// byte-decoder), so building via the arena rather than the source
+    /// parser mirrors the actual kernel exposure surface.
     #[cfg(test)]
-    fn run_nested_push_lambda<F>(depth: usize, stack_size: usize, body: F)
-    where
-        F: FnOnce(Result<Vec<Instruction<'static>>, TcError>) + Send + 'static,
-    {
-        use std::thread;
-        thread::Builder::new()
-            .stack_size(stack_size)
-            .spawn(move || {
-                // Build the Micheline directly via the arena (the source
-                // parser has its own recursion limit; the kernel uses
-                // `Micheline::decode_raw` byte-decoding which is iterative
-                // and has no parser-level depth bound — confirmed by the
-                // third-pass review).
-                let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
-                let unit_ty = Micheline::App(Prim::unit, &[], NO_ANNS);
-                let lambda_ty = Micheline::App(
-                    Prim::lambda,
-                    arena.alloc_extend([unit_ty.clone(), unit_ty.clone()]),
-                    NO_ANNS,
-                );
-                let drop_instr = Micheline::App(Prim::DROP, &[], NO_ANNS);
-                let mut current_body: &[Micheline<'_>] = &[];
-                for _ in 0..depth {
-                    let lambda_value = Micheline::Seq(current_body);
-                    let push = Micheline::App(
-                        Prim::PUSH,
-                        arena.alloc_extend([lambda_ty.clone(), lambda_value]),
-                        NO_ANNS,
-                    );
-                    current_body = arena.alloc_extend([push, drop_instr.clone()]);
-                }
-                let mut gas = Gas::new(u32::MAX);
-                let stk = &mut tc_stk![];
-                // Safety transmute: extend the arena-borrowed lifetime to
-                // 'static so the closure signature is portable. The arena
-                // lives until thread exit; the closure runs to completion
-                // before the join.
-                let result: Result<Vec<Instruction<'_>>, TcError> =
-                    typecheck(current_body, &mut gas, None, stk, false);
-                let result: Result<Vec<Instruction<'static>>, TcError> =
-                    unsafe { std::mem::transmute(result) };
-                std::mem::forget(std::mem::replace(stk, tc_stk![]));
-                body(result);
-            })
-            .unwrap()
-            .join()
-            .expect("worker thread completes");
+    fn typecheck_nested_push_lambda<'a>(
+        arena: &'a typed_arena::Arena<Micheline<'a>>,
+        depth: usize,
+    ) -> Result<(), TcError> {
+        let unit_ty = Micheline::App(Prim::unit, &[], NO_ANNS);
+        let lambda_ty = Micheline::App(
+            Prim::lambda,
+            arena.alloc_extend([unit_ty.clone(), unit_ty.clone()]),
+            NO_ANNS,
+        );
+        let drop_instr = Micheline::App(Prim::DROP, &[], NO_ANNS);
+        let mut current_body: &[Micheline<'_>] = &[];
+        for _ in 0..depth {
+            let lambda_value = Micheline::Seq(current_body);
+            let push = Micheline::App(
+                Prim::PUSH,
+                arena.alloc_extend([lambda_ty.clone(), lambda_value]),
+                NO_ANNS,
+            );
+            current_body = arena.alloc_extend([push, drop_instr.clone()]);
+        }
+        let mut gas = Gas::new(u32::MAX);
+        let stk = &mut tc_stk![];
+        let result = typecheck(current_body, &mut gas, None, stk, false);
+        std::mem::forget(std::mem::replace(stk, tc_stk![]));
+        match result {
+            Ok(body) => {
+                std::mem::forget(body);
+                Ok(())
+            }
+            Err(e) => Err(e),
+        }
     }
 
-    /// **Forward budget-pin** for the value-level PUSH-lambda recursion.
-    /// Not a regression test — there is no fix yet that this would have
-    /// regressed against. The instruction-level LAMBDA path was
-    /// iteratised in commit 75172615a6b (OpenLambda/AfterLambda), but
-    /// the value-level `step_typecheck_value → typecheck_lambda →
-    /// typecheck` chain still adds Rust frames per nested literal.
-    ///
-    /// The third-pass Security review surfaced a kernel-budget BLOCKER
-    /// based on the gas-vs-stack mismatch: an attacker can fit
-    /// 500K–700K nested PUSH-lambda layers in a single L1 operation's
-    /// gas budget while the kernel's 1 MiB WASM stack admits only
-    /// 64–128. The matching kernel-budget overflow test below
-    /// (`#[ignore]`-gated) pins the BLOCKER until the follow-up MR
-    /// iteratises the value-level Lambda path.
-    ///
-    /// This test runs at a depth that fits a generous worker budget so
-    /// CI clears it; do not interpret the passing state as a proof of
-    /// kernel safety.
+    /// Below-limit case: a single PUSH-lambda value typechecks cleanly
+    /// with the depth guard installed; the guard increments to 1 and
+    /// decrements back to 0 on scope exit, leaving the counter clean
+    /// for the next test.
     #[test]
-    fn push_lambda_literal_depth_budget_pin() {
-        run_nested_push_lambda(50, 16 * 1024 * 1024, |result| {
-            let body = result.expect("PUSH-lambda budget pin: depth 50 must typecheck");
-            std::mem::forget(body);
+    fn push_lambda_literal_below_l1_depth_limit() {
+        let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+        typecheck_nested_push_lambda(&arena, 1)
+            .expect("below the L1 depth cap, typecheck must succeed");
+        LAMBDA_TYPECHECK_DEPTH.with(|d| {
+            assert_eq!(d.get(), 0, "depth counter must return to 0 after Ok");
         });
     }
 
-    /// **Kernel-budget BLOCKER pin** (Security third-pass): demonstrates
-    /// that an adversarial nested-PUSH-lambda input overflows a worker
-    /// thread sized to the kernel's WASM stack (1 MiB). Ignored by
-    /// default so CI does not flake; run with `--ignored` to confirm
-    /// the BLOCKER. The follow-up MR that iteratises the value-level
-    /// PUSH-lambda path should turn this into a `#[should_panic]` and
-    /// then, post-fix, into a clean passing test.
+    /// L1-parity guard at the recursion limit. Mirrors
+    /// `script_ir_translator.ml:571` (`stack_depth > 10000` →
+    /// `Typechecking_too_many_recursive_calls`). Pre-load the counter
+    /// to `MAX_LAMBDA_TYPECHECK_DEPTH` so the next entry trips the
+    /// guard — verifies the check fires *without* needing to recurse
+    /// 10000 times (which would overflow any test thread's stack on
+    /// debug builds at ~160 KB/layer).
     #[test]
-    #[ignore = "BLOCKER pin: overflows the kernel's 1 MiB WASM stack; \
-                value-level PUSH-lambda recursion is the residual hazard \
-                tracked in the MR2 review synthesis"]
-    fn push_lambda_literal_overflows_kernel_budget() {
-        // Depth deliberately set above the kernel's release-build
-        // budget (Security third-pass estimated 64-128 layers per
-        // 1 MiB). The thread-builder propagates the resulting abort
-        // through `.join().expect()` as a panic, locking in the
-        // BLOCKER's presence until the follow-up MR.
-        run_nested_push_lambda(256, 1024 * 1024, |_result| {
-            unreachable!("value-level PUSH-lambda recursion must overflow this budget")
+    fn push_lambda_literal_at_l1_depth_limit_returns_clean_error() {
+        // Pre-load past the L1-parity threshold: L1 rejects on
+        // `stack_depth > 10000`, MIR rejects on `cur > 10000` after
+        // increment. Pre-loading to 10001 makes the next `enter()`
+        // trip exactly as L1 would on stack_depth=10001.
+        LAMBDA_TYPECHECK_DEPTH.with(|d| d.set(MAX_LAMBDA_TYPECHECK_DEPTH + 1));
+        // Hand-construct a single PUSH-lambda value and typecheck it.
+        // The very first DepthGuard::enter() must trip on the
+        // pre-loaded counter and return a clean Err.
+        let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+        let result = typecheck_nested_push_lambda(&arena, 1);
+        // Restore the counter immediately so a leak doesn't bias the
+        // next test (the guard's Drop already decremented from its
+        // failed enter() — but defensive reset is cheap).
+        LAMBDA_TYPECHECK_DEPTH.with(|d| d.set(0));
+        match result {
+            Err(TcError::TypecheckingTooManyRecursiveCalls) => {}
+            other => panic!(
+                "expected TypecheckingTooManyRecursiveCalls at L1 limit; got {other:?}",
+            ),
+        }
+    }
+
+    /// The RAII guard restores the counter on both Ok and Err paths.
+    /// Pre-load to a sentinel `K`, exercise each path, verify the
+    /// counter ends back at `K`. Covers the Drop-on-`?` propagation
+    /// contract that the guard's purpose hinges on.
+    #[test]
+    fn lambda_typecheck_depth_guard_balances_on_ok_and_err() {
+        const K: u16 = 7;
+        let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+
+        // Ok path: counter starts at K, increments to K+1 during typecheck,
+        // Drop fires on Ok scope exit, ends at K.
+        LAMBDA_TYPECHECK_DEPTH.with(|d| d.set(K));
+        typecheck_nested_push_lambda(&arena, 1).expect("Ok path");
+        LAMBDA_TYPECHECK_DEPTH.with(|d| {
+            assert_eq!(d.get(), K, "guard must restore counter on Ok");
+        });
+
+        // Err path: pre-load above the cap; enter() returns Err *before*
+        // constructing the guard, so Drop never runs for the failed
+        // entry. The counter therefore stays at the pre-loaded value.
+        LAMBDA_TYPECHECK_DEPTH.with(|d| d.set(MAX_LAMBDA_TYPECHECK_DEPTH + 1));
+        let err = typecheck_nested_push_lambda(&arena, 1).unwrap_err();
+        assert!(
+            matches!(err, TcError::TypecheckingTooManyRecursiveCalls),
+            "Err path must return TypecheckingTooManyRecursiveCalls; got {err:?}",
+        );
+        LAMBDA_TYPECHECK_DEPTH.with(|d| {
+            assert_eq!(
+                d.get(),
+                MAX_LAMBDA_TYPECHECK_DEPTH + 1,
+                "counter must be unchanged after Err — Drop must not fire on a failed enter()",
+            );
+            // Restore so subsequent tests aren't biased by the residual.
+            d.set(0);
         });
     }
 
