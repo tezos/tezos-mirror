@@ -239,6 +239,24 @@ pub enum TcInvariant {
     ExpectedTicketNestedPair,
     #[error("expected Nat for ticket amount")]
     ExpectedTicketNatAmount,
+    #[error("worklist result stack unexpectedly empty: expected {expected}")]
+    EmptyResultStack { expected: &'static str },
+    /// The outer `FailingTypeStack` became `Failed` at a worklist site
+    /// that the driver invariant expected to be `Ok`. Distinct from
+    /// `EmptyResultStack` (about result-stack emptiness) — this one is
+    /// about the *type* stack having lost its `Ok` shape.
+    #[error("outer type stack unexpectedly Failed: {where_}")]
+    OuterStackUnexpectedlyFailed { where_: &'static str },
+    /// Worklist result-stack accumulator left with a non-singleton
+    /// cardinality where the driver invariant expects exactly one root
+    /// entry. Distinct from `EmptyResultStack` (about emptiness) — this
+    /// one is about the wrong *count*.
+    #[error("worklist accumulator wrong cardinality at {where_}: expected {expected}, got {got}")]
+    ResultStackLen {
+        expected: usize,
+        got: usize,
+        where_: &'static str,
+    },
 }
 
 impl From<TryFromBigIntError<()>> for TcError {
@@ -1010,57 +1028,57 @@ fn parse_ty_with_entrypoints<'a, 'b>(
             } => {
                 let parsed = match kind {
                     BuildKind::Pair => {
-                        let r = results.pop().expect("pair r");
-                        let l = results.pop().expect("pair l");
+                        let r = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "pair r" }))?;
+                        let l = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "pair l" }))?;
                         Type::new_pair(l, r)
                     }
                     BuildKind::Or => {
-                        let r = results.pop().expect("or r");
-                        let l = results.pop().expect("or l");
+                        let r = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "or r" }))?;
+                        let l = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "or l" }))?;
                         Type::new_or(l, r)
                     }
                     BuildKind::Lambda => {
-                        let ret = results.pop().expect("lambda ret");
-                        let arg = results.pop().expect("lambda arg");
+                        let ret = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "lambda ret" }))?;
+                        let arg = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "lambda arg" }))?;
                         Type::new_lambda(arg, ret)
                     }
                     BuildKind::Map => {
                         // ensure_prop(k, Comparable) already ran via the
                         // EnsureProp frame between Visit(k) and Visit(v),
                         // preserving recursive-order failure semantics.
-                        let v = results.pop().expect("map v");
-                        let k = results.pop().expect("map k");
+                        let v = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "map v" }))?;
+                        let k = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "map k" }))?;
                         Type::new_map(k, v)
                     }
                     BuildKind::BigMap => {
                         // ensure_prop(k, Comparable) and ensure_prop(v,
                         // BigMapValue) ran via EnsureProp frames between
                         // the Visits.
-                        let v = results.pop().expect("big_map v");
-                        let k = results.pop().expect("big_map k");
+                        let v = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "big_map v" }))?;
+                        let k = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "big_map k" }))?;
                         Type::new_big_map(k, v)
                     }
                     BuildKind::Option => {
-                        let t = results.pop().expect("option t");
+                        let t = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "option t" }))?;
                         Type::new_option(t)
                     }
                     BuildKind::List => {
-                        let t = results.pop().expect("list t");
+                        let t = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "list t" }))?;
                         Type::new_list(t)
                     }
                     BuildKind::Set => {
-                        let t = results.pop().expect("set t");
+                        let t = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "set t" }))?;
                         t.ensure_prop(gas, TypeProperty::Comparable)?;
                         Type::new_set(t)
                     }
                     BuildKind::Ticket => {
-                        let t = results.pop().expect("ticket t");
+                        let t = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "ticket t" }))?;
                         // The inner type of ticket only needs to be comparable.
                         t.ensure_prop(gas, TypeProperty::Comparable)?;
                         Type::new_ticket(t)
                     }
                     BuildKind::Contract => {
-                        let t = results.pop().expect("contract t");
+                        let t = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "contract t" }))?;
                         // The argument of contract only needs to be passable;
                         // contract itself is duplicable and packable.
                         t.ensure_prop(gas, TypeProperty::Passable)?;
@@ -1082,12 +1100,12 @@ fn parse_ty_with_entrypoints<'a, 'b>(
                 // without consuming it; the result remains available for the
                 // surrounding Build frame to pop. Borrowing avoids a clone
                 // of the (possibly deep) Type.
-                let t = results.last().expect("ensure_prop target");
+                let t = results.last().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "ensure_prop target" }))?;
                 t.ensure_prop(gas, prop)?;
             }
         }
     }
-    Ok(results.pop().expect("root type"))
+    Ok(results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "root type" }))?)
 }
 
 #[allow(clippy::type_complexity)]
@@ -1130,10 +1148,11 @@ fn parse_parameter_ty_with_entrypoints<'a>(
 /// has to be locally overridden during typechecking.
 /// What a per instruction step yields. Non recursive arms produce a
 /// finished instruction; control flow arms with unbounded depth (IF
-/// family, LOOP family, ITER, DIP, SEQ) produce an Open variant that the
-/// driver expands into nested block frames. LAMBDA and MAP keep using
-/// their helper functions (typecheck_lambda, typecheck_map_block) whose
-/// own internal typecheck calls go through the same iterative driver.
+/// family, LOOP family, ITER, DIP, SEQ, LAMBDA / LAMBDA_REC, MAP)
+/// produce an Open variant that the driver expands into nested block
+/// frames. The LAMBDA / MAP arms switch the driver into a fresh
+/// (LAMBDA) or cloned-and-extended (MAP) type-stack context for the
+/// body, then restore the outer context on the matching After frame.
 enum StepResult<'a, 'b> {
     Done(Instruction<'a>),
     OpenIf {
@@ -1337,7 +1356,7 @@ fn typecheck<'a, 'b>(
                 )?;
                 match step {
                     StepResult::Done(typed) => {
-                        block_results.last_mut().expect("block result").push(typed);
+                        block_results.last_mut().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "block result" }))?.push(typed);
                         frames.push(parent);
                     }
                     StepResult::OpenIf {
@@ -1576,15 +1595,15 @@ fn typecheck<'a, 'b>(
                 });
             }
             TcIFrame::AfterIfFalse { saved_t_stack } => {
-                let f_instructions = block_results.pop().expect("if false block");
-                let t_instructions = block_results.pop().expect("if true block");
+                let f_instructions = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "if false block" }))?;
+                let t_instructions = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "if true block" }))?;
                 // Match the recursive code's unify_stacks(post_true, post_false)
                 // so error messages name the same stacks in the same order.
                 let post_false = std::mem::replace(opt_stack, saved_t_stack);
                 unify_stacks(gas, opt_stack, post_false)?;
                 block_results
                     .last_mut()
-                    .expect("if parent")
+                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "if parent" }))?
                     .push(Instruction::If(t_instructions, f_instructions));
             }
             TcIFrame::AfterIfNoneNone {
@@ -1600,13 +1619,13 @@ fn typecheck<'a, 'b>(
                 });
             }
             TcIFrame::AfterIfNoneSome { saved_none_stack } => {
-                let some_instructions = block_results.pop().expect("if_none some");
-                let none_instructions = block_results.pop().expect("if_none none");
+                let some_instructions = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "if_none some" }))?;
+                let none_instructions = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "if_none none" }))?;
                 let post_some = std::mem::replace(opt_stack, saved_none_stack);
                 unify_stacks(gas, opt_stack, post_some)?;
                 block_results
                     .last_mut()
-                    .expect("if_none parent")
+                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "if_none parent" }))?
                     .push(Instruction::IfNone(none_instructions, some_instructions));
             }
             TcIFrame::AfterIfConsCons {
@@ -1623,14 +1642,14 @@ fn typecheck<'a, 'b>(
                 });
             }
             TcIFrame::AfterIfConsNil { saved_cons_stack } => {
-                let nil_instructions = block_results.pop().expect("if_cons nil");
-                let cons_instructions = block_results.pop().expect("if_cons cons");
+                let nil_instructions = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "if_cons nil" }))?;
+                let cons_instructions = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "if_cons cons" }))?;
                 // Recursive code orders unify(opt_stack=post_nil, cons=post_cons)
                 // since the nil arm runs second; mirror that here.
                 unify_stacks(gas, opt_stack, saved_cons_stack)?;
                 block_results
                     .last_mut()
-                    .expect("if_cons parent")
+                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "if_cons parent" }))?
                     .push(Instruction::IfCons(cons_instructions, nil_instructions));
             }
             TcIFrame::AfterIfLeftLeft {
@@ -1646,68 +1665,68 @@ fn typecheck<'a, 'b>(
                 });
             }
             TcIFrame::AfterIfLeftRight { saved_left_stack } => {
-                let right_instructions = block_results.pop().expect("if_left right");
-                let left_instructions = block_results.pop().expect("if_left left");
+                let right_instructions = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "if_left right" }))?;
+                let left_instructions = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "if_left left" }))?;
                 let post_right = std::mem::replace(opt_stack, saved_left_stack);
                 unify_stacks(gas, opt_stack, post_right)?;
                 block_results
                     .last_mut()
-                    .expect("if_left parent")
+                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "if_left parent" }))?
                     .push(Instruction::IfLeft(left_instructions, right_instructions));
             }
             TcIFrame::AfterLoop { initial_copy } => {
-                let body = block_results.pop().expect("loop body");
+                let body = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "loop body" }))?;
                 unify_stacks(gas, opt_stack, initial_copy)?;
                 // Pop the remaining bool (if not failed) and emit I::Loop.
                 opt_stack.access_mut(()).ok().map(Stack::pop);
                 block_results
                     .last_mut()
-                    .expect("loop parent")
+                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "loop parent" }))?
                     .push(Instruction::Loop(body));
             }
             TcIFrame::AfterLoopLeft { initial_copy, r_ty } => {
-                let body = block_results.pop().expect("loop_left body");
+                let body = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "loop_left body" }))?;
                 unify_stacks(gas, opt_stack, initial_copy)?;
                 *opt_stack
                     .access_mut(TcError::FailNotInTail)?
                     .get_mut(0)? = r_ty;
                 block_results
                     .last_mut()
-                    .expect("loop_left parent")
+                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "loop_left parent" }))?
                     .push(Instruction::LoopLeft(body));
             }
             TcIFrame::AfterIter {
                 variant,
                 outer_opt_stack,
             } => {
-                let body = block_results.pop().expect("iter body");
+                let body = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "iter body" }))?;
                 // The live opt_stack is post-body inner stack; outer was
                 // saved separately. Unify them, then restore outer.
                 let post_body = std::mem::replace(opt_stack, outer_opt_stack);
                 unify_stacks(gas, opt_stack, post_body)?;
                 block_results
                     .last_mut()
-                    .expect("iter parent")
+                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "iter parent" }))?
                     .push(Instruction::Iter(variant, body));
             }
             TcIFrame::AfterDip {
                 opt_height,
                 protected,
             } => {
-                let body = block_results.pop().expect("dip body");
+                let body = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "dip body" }))?;
                 opt_stack
                     .access_mut(TcError::FailNotInTail)?
                     .append(&mut { protected });
                 block_results
                     .last_mut()
-                    .expect("dip parent")
+                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "dip parent" }))?
                     .push(Instruction::Dip(opt_height, body));
             }
             TcIFrame::AfterSeq => {
-                let body = block_results.pop().expect("seq body");
+                let body = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "seq body" }))?;
                 block_results
                     .last_mut()
-                    .expect("seq parent")
+                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "seq parent" }))?
                     .push(Instruction::Seq(body));
             }
             TcIFrame::AfterLambda {
@@ -1769,17 +1788,22 @@ fn typecheck<'a, 'b>(
                     FailingTypeStack::Failed => return Err(TcError::MapBlockFail),
                 };
                 let ty2 = body_stack.pop().ok_or(TcError::MapBlockEmptyStack)?;
-                match opt_stack {
-                    FailingTypeStack::Ok(outer) => {
-                        ensure_stacks_eq(gas, outer, &body_stack)?;
-                    }
+                // The outer stack cannot be `Failed` here: the MAP arm
+                // only fires after a successful `pop!` from an `Ok`
+                // outer matching `[.., T::List(..) | T::Option(..) |
+                // T::Map(..)]`. Surface a structured `TcInvariant`
+                // rather than a panic if the invariant ever breaks.
+                let outer = match opt_stack {
+                    FailingTypeStack::Ok(s) => s,
                     FailingTypeStack::Failed => {
-                        // Outer was already failing pre-MAP; preserve the
-                        // failing state and skip the rewrap (no Ok stack
-                        // to push onto).
-                        return Err(TcError::FailNotInTail);
+                        return Err(TcError::InternalError(
+                            TcInvariant::OuterStackUnexpectedlyFailed {
+                                where_: "AfterMapBlock: outer stack after MAP body",
+                            },
+                        ))
                     }
-                }
+                };
+                ensure_stacks_eq(gas, outer, &body_stack)?;
                 let (instr, wrapped) = match kind {
                     MapKind::List => (
                         Instruction::Map(overloads::Map::List, body_instrs),
@@ -1794,9 +1818,9 @@ fn typecheck<'a, 'b>(
                         Type::new_map(kty, ty2),
                     ),
                 };
-                if let FailingTypeStack::Ok(s) = opt_stack {
-                    s.push(wrapped);
-                }
+                // `outer` is reborrowed from `opt_stack` for the rewrap;
+                // its `Ok` shape was already proven above.
+                outer.push(wrapped);
                 block_results
                     .last_mut()
                     .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack {
@@ -1807,8 +1831,34 @@ fn typecheck<'a, 'b>(
         }
     }
 
-    assert_eq!(block_results.len(), 1, "block_results stack not drained");
-    Ok(block_results.pop().unwrap())
+    // Driver invariant: when the worklist is exhausted, exactly one
+    // (root) accumulator remains. A mismatch is a programmer-invariant
+    // violation, surfaced as a structured `TcInvariant` rather than a
+    // raw panic — same contract as the per-frame pops cleaned up by the
+    // earlier panic-removal pass.
+    // Defense-in-depth: keep a debug_assert! so a misimplementation that
+    // leaves a non-singleton accumulator trips a clear stack trace in
+    // debug builds, on top of the structured Err return for release.
+    debug_assert_eq!(
+        block_results.len(),
+        1,
+        "block_results stack not drained: {} entries left",
+        block_results.len(),
+    );
+    if block_results.len() != 1 {
+        return Err(TcError::InternalError(TcInvariant::ResultStackLen {
+            expected: 1,
+            got: block_results.len(),
+            where_: "typecheck driver tail",
+        }));
+    }
+    block_results
+        .pop()
+        .ok_or(TcError::InternalError(TcInvariant::ResultStackLen {
+            expected: 1,
+            got: 0,
+            where_: "typecheck driver tail (after len check)",
+        }))
 }
 
 
@@ -1863,7 +1913,7 @@ pub(crate) fn typecheck_instruction<'a, 'b>(
         opt_stack,
         in_view,
     )?;
-    Ok(results.pop().expect("typecheck_instruction produced one"))
+    Ok(results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "typecheck_instruction produced one" }))?)
 }
 
 /// Per instruction step used by the iterative driver. For non recursive
@@ -3713,7 +3763,7 @@ pub fn typecheck_value<'a, 'b>(
     while let Some(frame) = frames.pop() {
         step_typecheck_value(frame, ctx, &mut frames, &mut results)?;
     }
-    Ok(results.pop().expect("typecheck_value root"))
+    Ok(results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "typecheck_value root" }))?)
 }
 
 fn step_typecheck_value<'a, 'b>(
@@ -3766,28 +3816,28 @@ fn step_typecheck_value<'a, 'b>(
             }
         }
         TvFrame::BuildPair => {
-            let r = results.pop().expect("pair r");
-            let l = results.pop().expect("pair l");
+            let r = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "pair r" }))?;
+            let l = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "pair l" }))?;
             results.push(TV::new_pair(l, r));
             Ok(())
         }
         TvFrame::BuildLeft => {
-            let v = results.pop().expect("left");
+            let v = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "left" }))?;
             results.push(TV::new_or(crate::ast::Or::Left(v)));
             Ok(())
         }
         TvFrame::BuildRight => {
-            let v = results.pop().expect("right");
+            let v = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "right" }))?;
             results.push(TV::new_or(crate::ast::Or::Right(v)));
             Ok(())
         }
         TvFrame::BuildSome => {
-            let v = results.pop().expect("some");
+            let v = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "some" }))?;
             results.push(TV::new_option(Some(v)));
             Ok(())
         }
         TvFrame::BuildContract { contract_ty } => {
-            let addr = results.pop().expect("contract addr");
+            let addr = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "contract addr" }))?;
             let t_addr = match addr {
                 TV::Address(a) => a,
                 _ => {
@@ -3809,7 +3859,7 @@ fn step_typecheck_value<'a, 'b>(
             elem_t,
             mut acc,
         } => {
-            let elem = results.pop().expect("list elem");
+            let elem = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "list elem" }))?;
             acc.push(Rc::new(elem));
             if let Some((next, rest)) = remaining.split_first() {
                 frames.push(TvFrame::ListAccum {
@@ -3833,7 +3883,7 @@ fn step_typecheck_value<'a, 'b>(
             mut acc,
             prev,
         } => {
-            let elem = results.pop().expect("set elem");
+            let elem = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "set elem" }))?;
             set_ordering_check(ctx, &set_ty, &prev, &elem)?;
             let next_prev = Some(elem.clone());
             acc.insert(elem);
@@ -3865,7 +3915,7 @@ fn step_typecheck_value<'a, 'b>(
             stage,
         } => match stage {
             MapStage::AwaitingKey { v_expr } => {
-                let key = results.pop().expect("map key");
+                let key = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "map key" }))?;
                 frames.push(TvFrame::MapAccum {
                     remaining,
                     key_t,
@@ -3883,7 +3933,7 @@ fn step_typecheck_value<'a, 'b>(
                 Ok(())
             }
             MapStage::AwaitingValue { key } => {
-                let value = results.pop().expect("map value");
+                let value = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "map value" }))?;
                 map_key_ordering_check(ctx, &map_ty, &prev_key, &key)?;
                 let next_prev = Some(key.clone());
                 let mut acc = acc;
@@ -3936,7 +3986,7 @@ fn step_typecheck_value<'a, 'b>(
             stage,
         } => match stage {
             BigMapDiffStage::AwaitingKey { v_expr } => {
-                let key = results.pop().expect("big_map key");
+                let key = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "big_map key" }))?;
                 // Decide what to do with v_expr.
                 match v_expr {
                     V::App(Prim::Some, [inner], _) => {
@@ -4002,7 +4052,7 @@ fn step_typecheck_value<'a, 'b>(
                 Ok(())
             }
             BigMapDiffStage::AwaitingValue { key } => {
-                let value = results.pop().expect("big_map value");
+                let value = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "big_map value" }))?;
                 map_key_ordering_check(ctx, &map_ty, &prev_key, &key)?;
                 let next_prev = Some(key.clone());
                 let mut acc = acc;
@@ -4041,9 +4091,9 @@ fn step_typecheck_value<'a, 'b>(
             }
         },
         TvFrame::BuildTicketExplicit { content_type } => {
-            let amount = results.pop().expect("ticket amount");
-            let content = results.pop().expect("ticket content");
-            let ticketer = results.pop().expect("ticket ticketer");
+            let amount = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "ticket amount" }))?;
+            let content = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "ticket content" }))?;
+            let ticketer = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "ticket ticketer" }))?;
             let ticketer = match ticketer {
                 TV::Address(a) => a,
                 _ => {
@@ -4073,7 +4123,7 @@ fn step_typecheck_value<'a, 'b>(
             Ok(())
         }
         TvFrame::BuildTicketLegacy { content_type } => {
-            let pair = results.pop().expect("ticket legacy pair");
+            let pair = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "ticket legacy pair" }))?;
             match pair {
                 TV::Pair(left, right) => {
                     let address = match TypedValue::unwrap_rc(left) {
