@@ -120,18 +120,22 @@ val data_dir : t -> string
 (** Get the identity file of a dal node. *)
 val identity_file : t -> string
 
-(** [run ?wait_ready ?env ?event_level node] launches the given dal
-    node where env is a map of environment variable.
+(** [run ?wait_ready ?env ?event_level ?ignore_l1_history_check node] launches
+    the given dal node where env is a map of environment variable.
 
     If [wait_ready] is [true], the promise waits for the dal node to be ready.
     [true] by default.
 
     [event_level] allows to determine the printed levels. By default,
-    it is set to [`Info]. *)
+    it is set to [`Info].
+
+    If [ignore_l1_history_check] is [true], the node is started with the
+    [--ignore-l1-history-check] flag. [false] by default. *)
 val run :
   ?wait_ready:bool ->
   ?env:string String_map.t ->
   ?event_level:Daemon.Level.default_level ->
+  ?ignore_l1_history_check:bool ->
   t ->
   unit Lwt.t
 
