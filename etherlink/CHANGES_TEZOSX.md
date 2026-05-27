@@ -4,6 +4,13 @@
 
 ### EVM Runtime
 
+- Alias materialization is now atomic: if the forwarder initialization
+  fails (revert, halt, or a gas budget below the intrinsic cost), the
+  delegation `code_hash` write is rolled back instead of being left
+  behind. Previously a failed init left a half-materialized account that
+  a later call would bless without re-running initialization,
+  permanently bricking the alias (uninitialized forwarder). (!21978)
+
 ### Michelson Runtime
 
 - Aliases originated as part of a native atomic calls are now surfaced via
