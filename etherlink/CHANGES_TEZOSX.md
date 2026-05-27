@@ -49,6 +49,18 @@
   `/evm/eth_accounts/eth_codes/`. Add `/evm/eth_accounts` as the fourth
   SafeStorage safe root (storage version 59). (!21933)
 
+- Move ephemeral simulation and trace IPC out of `/evm/` and
+  `/tez/world_state/` into `/base/`: `/evm/simulation_result` to
+  `/base/evm_simulation_result`, `/evm/simulation_http_traces` to
+  `/base/simulation_http_traces`, `/evm/trace/` to
+  `/base/trace/`, `/evm/world_state/__http_trace/traces/` to
+  `/base/__http_trace/traces/`, and `/tez/world_state/simulation_result` to
+  `/base/tez_simulation_result`. No data migration runs — these paths are
+  populated only inside ephemeral `simulate_and_read` calls. A dedicated
+  `SafeStorage::promote_http_trace()` mirrors the existing `promote_trace()`
+  so per-tx HTTP traces land at the new `/base/__http_trace/traces/`
+  location after their replay (storage version 60). (!21957)
+
 ### Internals
 
 - MIR: harden the Michelson runtime — internal aborts now surface as

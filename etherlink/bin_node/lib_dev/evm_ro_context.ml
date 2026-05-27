@@ -751,7 +751,12 @@ module Http_tracer = struct
     let open Lwt_result_syntax in
     let (Ethereum_types.Hash (Hex hash)) = transaction_hash in
     let hash = String.lowercase_ascii hash in
-    let path = Durable_storage_path.Http_trace.for_tx ~transaction_hash:hash in
+    let* storage_version = Durable_storage.storage_version state in
+    let path =
+      Durable_storage_path.Http_trace.for_tx
+        ~storage_version
+        ~transaction_hash:hash
+    in
     let* bytes_opt = Durable_storage.read_opt (Raw_path path) state in
     match bytes_opt with
     | None -> return []

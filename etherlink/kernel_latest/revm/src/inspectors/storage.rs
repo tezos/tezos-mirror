@@ -13,7 +13,7 @@ use tezos_smart_rollup_host::{
     storage::StorageV1,
 };
 
-const EVM_TRACE: RefPath = RefPath::assert_from(b"/evm/trace");
+const EVM_TRACE: RefPath = RefPath::assert_from(b"/base/trace");
 const CALL_TRACE: RefPath = RefPath::assert_from(b"/call_trace");
 const STRUCT_LOGS: RefPath = RefPath::assert_from(b"/struct_logs");
 const GAS: RefPath = RefPath::assert_from(b"/gas");

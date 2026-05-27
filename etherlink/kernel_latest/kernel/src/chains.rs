@@ -911,7 +911,7 @@ impl EvmChainConfig {
 }
 
 const TEZLINK_SIMULATION_RESULT_PATH: RefPath =
-    RefPath::assert_from(b"/tez/world_state/simulation_result");
+    RefPath::assert_from(b"/base/tez_simulation_result");
 
 fn tezos_operation_from_bytes(bytes: &[u8]) -> anyhow::Result<TezlinkOperation> {
     let operation = Operation::nom_read_exact(bytes).map_err(|decode_error| {

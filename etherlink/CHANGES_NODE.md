@@ -29,6 +29,13 @@
   `/evm/world_state/eth_codes/` paths otherwise. Operators must upgrade to this
   release before running a V59+ kernel; the release stays backward-compatible
   with pre-V59 kernels. (!21933)
+- Resolve simulation insight paths (`evm_simulation_result`,
+  `simulation_http_traces`, `tez_simulation_result`), tracer input/output
+  (`trace/`) and HTTP trace replay output (`__http_trace/traces/`) from
+  `/base/` on kernels at storage version 60 or higher, falling back to the
+  legacy `/evm/`, `/tez/world_state/` and `/evm/world_state/` paths otherwise.
+  Operators must upgrade to this release before running a V60+ kernel; the
+  release stays backward-compatible with pre-V60 kernels. (!21957)
 
 ### Documentation changes
 

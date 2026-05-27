@@ -6,12 +6,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let is_tracing_root_indexed_by_hash hash state =
+let is_tracing_root_indexed_by_hash ~storage_version hash state =
   let open Lwt_result_syntax in
   let* exists =
     Durable_storage.exists_dir
       (Raw_dir
          (Durable_storage_path.Trace.root_indexed_by_hash
+            ~storage_version
             ~transaction_hash:(Some hash)))
       state
   in
@@ -34,50 +35,63 @@ let check_tracer_activation ~state ~version =
   else return_unit
 
 module StructLoggerRead = struct
-  let read_logs_length state transaction_hash =
+  let read_logs_length ~storage_version state transaction_hash =
     let open Lwt_result_syntax in
     let* value =
       read_value
         ~default:(Bytes.of_string "\000")
         state
-        (Durable_storage_path.Trace.logs_length ~transaction_hash)
+        (Durable_storage_path.Trace.logs_length
+           ~storage_version
+           ~transaction_hash)
     in
     return (Bytes.to_string value |> Z.of_bits |> Z.to_int)
 
-  let read_opcode state transaction_hash opcode_index =
+  let read_opcode ~storage_version state transaction_hash opcode_index =
     read_value
       state
-      (Durable_storage_path.Trace.opcode ~transaction_hash opcode_index)
+      (Durable_storage_path.Trace.opcode
+         ~storage_version
+         ~transaction_hash
+         opcode_index)
 
-  let read_logs state transaction_hash =
+  let read_logs ~storage_version state transaction_hash =
     let open Lwt_result_syntax in
-    let* length = read_logs_length state transaction_hash in
+    let* length = read_logs_length ~storage_version state transaction_hash in
     let*? opcodes =
       List.init
         ~when_negative_length:(TzTrace.make (error_of_fmt "Invalid length"))
         length
         Fun.id
     in
-    List.map_es (read_opcode state transaction_hash) opcodes
+    List.map_es (read_opcode ~storage_version state transaction_hash) opcodes
 
-  let read_output state transaction_hash =
+  let read_output ~storage_version state transaction_hash =
     let open Lwt_result_syntax in
     let* gas =
-      read_value state (Durable_storage_path.Trace.output_gas ~transaction_hash)
+      read_value
+        state
+        (Durable_storage_path.Trace.output_gas
+           ~storage_version
+           ~transaction_hash)
     in
     let* failed =
       read_value
         state
-        (Durable_storage_path.Trace.output_failed ~transaction_hash)
+        (Durable_storage_path.Trace.output_failed
+           ~storage_version
+           ~transaction_hash)
     in
     let* return_value =
       read_value
       (* The key doesn't exist if there is no value returned by the transaction *)
         ~default:Bytes.empty
         state
-        (Durable_storage_path.Trace.output_return_value ~transaction_hash)
+        (Durable_storage_path.Trace.output_return_value
+           ~storage_version
+           ~transaction_hash)
     in
-    let* struct_logs = read_logs state transaction_hash in
+    let* struct_logs = read_logs ~storage_version state transaction_hash in
     Lwt.return
     @@ Tracer_types.StructLogger.output_binary_decoder
          ~gas
@@ -218,12 +232,15 @@ module CallTracerRead = struct
     {node with calls = list}
 
   (** [read_node evm_state i hash] reads line `i` of the trace of tx `hash` *)
-  let read_node ~state i transaction_hash =
+  let read_node ~storage_version ~state i transaction_hash =
     let open Lwt_result_syntax in
     let* bytes =
       read_value
         state
-        (Durable_storage_path.Trace.call_trace ~transaction_hash i)
+        (Durable_storage_path.Trace.call_trace
+           ~storage_version
+           ~transaction_hash
+           i)
     in
     let*! () =
       Tracer_event.read_line
@@ -233,21 +250,23 @@ module CallTracerRead = struct
 
   (** [call_trace_length evm_state hash] is used to findout how many lines
         there are, to be able to read them in reverse order. *)
-  let call_trace_length state transaction_hash =
+  let call_trace_length ~storage_version state transaction_hash =
     let open Lwt_result_syntax in
     let* value =
       read_value
         ~default:(Bytes.of_string "\000")
         state
-        (Durable_storage_path.Trace.call_trace_length ~transaction_hash)
+        (Durable_storage_path.Trace.call_trace_length
+           ~storage_version
+           ~transaction_hash)
     in
     return (Bytes.to_string value |> Z.of_bits |> Z.to_int)
 
   (** [read_outputs state] reads in the storage and interprets what
      the kernel stored. *)
-  let read_outputs ?transaction_hash state =
+  let read_outputs ~storage_version ?transaction_hash state =
     let open Lwt_result_syntax in
-    let* length = call_trace_length state transaction_hash in
+    let* length = call_trace_length ~storage_version state transaction_hash in
     (* there should at least be the top call *)
     if length = 0 then tzfail Tracer_types.Trace_not_found
     else
@@ -255,39 +274,45 @@ module CallTracerRead = struct
         let index = length - 1 - counter in
         if index < 0 then return None
         else
-          let* node = read_node ~state index transaction_hash in
+          let* node =
+            read_node ~storage_version ~state index transaction_hash
+          in
           return (Some node)
       in
       build_calltraces end_call_impl get_next
 
   (** [read_output state hash] reads in the storage and interprets what
      the kernel stored. *)
-  let read_output state transaction_hash =
+  let read_output ~storage_version state transaction_hash =
     let open Lwt_result_syntax in
-    let* outputs = read_outputs ?transaction_hash state in
+    let* outputs = read_outputs ~storage_version ?transaction_hash state in
     match outputs with
     | o :: _ -> return o
     | _ -> tzfail Tracer_types.Trace_not_found
 end
 
-let read_output config state root_indexed_hash =
+let read_output ~storage_version config state root_indexed_hash =
   let open Tracer_types in
   let open Lwt_result_syntax in
   match config.tracer with
   | StructLogger ->
-      let* output = StructLoggerRead.read_output state root_indexed_hash in
+      let* output =
+        StructLoggerRead.read_output ~storage_version state root_indexed_hash
+      in
       return (StructLoggerOutput output)
   | CallTracer ->
-      let* output = CallTracerRead.read_output state root_indexed_hash in
+      let* output =
+        CallTracerRead.read_output ~storage_version state root_indexed_hash
+      in
       return (CallTracerOutput output)
 
-let read_outputs config state =
+let read_outputs ~storage_version config state =
   let open Tracer_types in
   let open Lwt_result_syntax in
   match config.tracer with
   | CallTracer ->
       Lwt_result.bind
-        (CallTracerRead.read_outputs state)
+        (CallTracerRead.read_outputs ~storage_version state)
         (List.map_es (fun o -> return @@ CallTracerOutput o))
   | StructLogger -> tzfail @@ Tracer_types.Tracer_not_implemented "structLogger"
 
@@ -302,9 +327,10 @@ let trace_transaction (module Exe : Evm_execution.S) ~block_number
         ~state
         ~version:Tracer_types.(tracer_version_activation config.tracer)
     in
+    let* storage_version = Durable_storage.storage_version state in
     let* state =
       Durable_storage.write
-        (Raw_path Durable_storage_path.Trace.input)
+        (Raw_path (Durable_storage_path.Trace.input ~storage_version))
         (Bytes.of_string input)
         state
     in
@@ -315,10 +341,11 @@ let trace_transaction (module Exe : Evm_execution.S) ~block_number
   | Apply_failure -> tzfail Tracer_types.Trace_not_found
   | Apply_success {evm_state; _} ->
       let (Hash (Hex hash)) = transaction_hash in
+      let* storage_version = Durable_storage.storage_version evm_state in
       let* root_indexed_by_hash =
-        is_tracing_root_indexed_by_hash hash evm_state
+        is_tracing_root_indexed_by_hash ~storage_version hash evm_state
       in
-      read_output config evm_state root_indexed_by_hash
+      read_output ~storage_version config evm_state root_indexed_by_hash
 
 let trace_block (module Exe : Evm_execution.S)
     (module Block_storage : Block_storage_sig.S) ~block_number ~config =
@@ -352,9 +379,10 @@ let trace_block (module Exe : Evm_execution.S)
           ~state
           ~version:Tracer_types.(tracer_version_activation config.tracer)
       in
+      let* storage_version = Durable_storage.storage_version state in
       let* state =
         Durable_storage.write
-          (Raw_path Durable_storage_path.Trace.input)
+          (Raw_path (Durable_storage_path.Trace.input ~storage_version))
           (Bytes.of_string input)
           state
       in
@@ -364,7 +392,9 @@ let trace_block (module Exe : Evm_execution.S)
     let* traces =
       match apply_result with
       | Apply_failure -> tzfail Tracer_types.Trace_not_found
-      | Apply_success {evm_state; _} -> read_outputs config evm_state
+      | Apply_success {evm_state; _} ->
+          let* storage_version = Durable_storage.storage_version evm_state in
+          read_outputs ~storage_version config evm_state
     in
     (* Now assemble the hash and traces *)
     List.combine
@@ -390,9 +420,10 @@ let trace_call (module Exe : Evm_execution.S) ~call ~block ~config =
         ~state
         ~version:Tracer_types.(tracer_version_activation config.tracer)
     in
+    let* storage_version = Durable_storage.storage_version state in
     let* state =
       Durable_storage.write
-        (Raw_path Durable_storage_path.Trace.input)
+        (Raw_path (Durable_storage_path.Trace.input ~storage_version))
         (Bytes.of_string config_rlp)
         state
     in
@@ -411,4 +442,5 @@ let trace_call (module Exe : Evm_execution.S) ~call ~block ~config =
   let* evm_state =
     Exe.execute ~alter_evm_state:set_config simulation_input block
   in
-  read_output config evm_state None
+  let* storage_version = Durable_storage.storage_version evm_state in
+  read_output ~storage_version config evm_state None
