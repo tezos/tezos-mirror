@@ -41,6 +41,10 @@
   cleanly at the operation level (catchable revert) once the cap is
   reached, leaving the block intact. (!21972)
 - Error that can be user triggered now maps now doesn't block abort. (!21918)
+- EVM pre-execution validation failures (revm `validate()` errors such as a
+  forwarded gas limit below the intrinsic cost) on the cross-runtime call
+  and static-call path now surface as a catchable `400` instead of a
+  block-aborting `500`. (!21974)
 
 ### Storage versions
 
