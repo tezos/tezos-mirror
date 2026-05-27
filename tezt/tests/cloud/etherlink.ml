@@ -76,7 +76,13 @@ let setup_sequencer_sandbox (cloud : Cloud.t) ~name network kernel
   in
   let mode =
     Evm_node.Sandbox
-      {sequencer_config; network; funded_addresses; sequencer_keys = []}
+      {
+        sequencer_config;
+        network;
+        funded_addresses;
+        sequencer_keys = [];
+        michelson_hard_gas_limit_per_block = None;
+      }
   in
   let () = toplog "Launching the sandbox L2 node" in
   let add_cors rpc =

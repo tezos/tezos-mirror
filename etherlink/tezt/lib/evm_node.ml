@@ -99,11 +99,13 @@ type mode =
       network : string option;
       funded_addresses : string list;
       sequencer_keys : string list;
+      michelson_hard_gas_limit_per_block : int option;
     }
   | Tezlink_sandbox of {
       sequencer_config : sequencer_config;
       funded_addresses : string list;
       verbose : bool;
+      michelson_hard_gas_limit_per_block : int option;
     }
   | Rpc of mode
 
@@ -1027,7 +1029,14 @@ let run_args evm_node =
         ["run"; "sequencer"]
         @ Cli_arg.optional_arg "initial-kernel" Fun.id initial_kernel
         @ sequencer_args sequencer_config
-    | Sandbox {sequencer_config; network; funded_addresses; sequencer_keys} ->
+    | Sandbox
+        {
+          sequencer_config;
+          network;
+          funded_addresses;
+          sequencer_keys;
+          michelson_hard_gas_limit_per_block;
+        } ->
         let sequencer_keys =
           List.map (fun s -> ["--sequencer-key"; s]) sequencer_keys
           |> List.flatten
@@ -1038,12 +1047,26 @@ let run_args evm_node =
         @ sequencer_keys
         @ sequencer_args sequencer_config
         @ fund_args funded_addresses
-    | Tezlink_sandbox {sequencer_config; funded_addresses; verbose} ->
+        @ Cli_arg.optional_arg
+            "michelson-hard-gas-limit-per-block"
+            string_of_int
+            michelson_hard_gas_limit_per_block
+    | Tezlink_sandbox
+        {
+          sequencer_config;
+          funded_addresses;
+          verbose;
+          michelson_hard_gas_limit_per_block;
+        } ->
         ["run"; "tezlink"; "sandbox"]
         @ Cli_arg.optional_arg "kernel" Fun.id initial_kernel
         @ sequencer_args sequencer_config
         @ fund_args funded_addresses
         @ Cli_arg.optional_switch "verbose" verbose
+        @ Cli_arg.optional_arg
+            "michelson-hard-gas-limit-per-block"
+            string_of_int
+            michelson_hard_gas_limit_per_block
     | Observer _ ->
         ["run"; "observer"]
         @ Cli_arg.optional_arg "initial-kernel" Fun.id initial_kernel

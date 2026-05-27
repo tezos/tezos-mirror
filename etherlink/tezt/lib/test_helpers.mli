@@ -311,6 +311,7 @@ val init_sequencer_sandbox :
   ?sequencer_keys:Account.key list ->
   ?with_runtimes:Tezosx_runtime.t list ->
   ?enable_michelson_gas_refund:bool ->
+  ?michelson_hard_gas_limit_per_block:int ->
   unit ->
   Evm_node.t Lwt.t
 

@@ -239,6 +239,7 @@ let test_make_l2_kernel_installer_config chain_family =
         sequencer_keys = [];
         funded_addresses = [];
         network = None;
+        michelson_hard_gas_limit_per_block = None;
       }
   in
   let* sequencer =
