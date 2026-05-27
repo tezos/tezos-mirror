@@ -3482,7 +3482,11 @@ fn step_typecheck_value<'a, 'b>(
                     Ok(())
                 }
                 _ => Err(TcError::InvalidValueForType(
-                    format!("App(Pair, {vs:?}, [])"),
+                    // Format via the same synthetic App the recursive
+                    // typecheck_value built; auto-derived Debug on
+                    // Micheline keeps the format stable as Annotations'
+                    // Debug evolves.
+                    format!("{:?}", Micheline::App(Prim::Pair, vs, NO_ANNS)),
                     t,
                 )),
             }
@@ -9631,6 +9635,38 @@ mod typecheck_tests {
             ),
             Err(TcError::UnexpectedImplicitAccountType(Type::Int))
         );
+    }
+
+    // Locks in the wording of `InvalidValueForType` when typechecking an
+    // over-long Pair literal against a shorter Pair type. The new iterative
+    // worklist hand-formats the synthetic-pair tail; this test guards that
+    // the format stays byte-identical with `format!("{:?}", App(Pair, vs,
+    // NO_ANNS))`, which is what the recursive code emitted.
+    #[test]
+    fn invalid_value_for_type_n_ary_pair_tail_wording() {
+        let mut ctx = Ctx::default();
+        let result = typecheck_value(
+            &parse("Pair 1 2 3").unwrap(),
+            &mut ctx,
+            &Type::new_pair(Type::Int, Type::Int),
+        );
+        // Three values for a 2-tuple: the third value (3) hits the
+        // VisitPairTail fallback against the inner Type::Int.
+        let msg = match result {
+            Err(TcError::InvalidValueForType(s, _)) => s,
+            other => panic!("expected InvalidValueForType, got {other:?}"),
+        };
+        // Format must match what `format!("{:?}", App(Pair, [Int(2), Int(3)], NO_ANNS))`
+        // produces under the auto-derived Debug — same as the recursive code.
+        let expected = format!(
+            "{:?}",
+            Micheline::App(
+                Prim::Pair,
+                &[Micheline::Int(2.into()), Micheline::Int(3.into())],
+                NO_ANNS,
+            ),
+        );
+        assert_eq!(msg, expected, "n-ary pair tail wording diverged");
     }
 
     #[test]
