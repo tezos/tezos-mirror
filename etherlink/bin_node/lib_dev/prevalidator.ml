@@ -666,6 +666,8 @@ module Handlers = struct
     in
     let** op =
       Tezlink_prevalidation.parse_and_validate_for_queue
+        ?michelson_hard_gas_limit_per_block:
+          session.ctxt.michelson_hard_gas_limit_per_block
         ~simulator_mode
         ~nanotez_per_michelson_gas
         ~state:session.state

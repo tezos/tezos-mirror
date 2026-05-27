@@ -12,6 +12,9 @@
 type michelson_validation_config = {
   get_balance : Tezos_types.Contract.implicit -> Z.t tzresult Lwt.t;
   get_counter : Tezos_types.Contract.implicit -> Z.t option tzresult Lwt.t;
+  constants : Tezlink_constants.t;
+      (* Michelson runtime constants, resolved once when the config is built
+         (honoring the sandbox-only [hard_gas_limit_per_block] override). *)
 }
 
 type evm_validation_config = {
@@ -38,7 +41,11 @@ type validation_state = {
 
 let dummy_michelson_config =
   let open Lwt_result_syntax in
-  {get_balance = (fun _ -> return Z.zero); get_counter = (fun _ -> return_none)}
+  {
+    get_balance = (fun _ -> return Z.zero);
+    get_counter = (fun _ -> return_none);
+    constants = Tezlink_constants.all_constants ();
+  }
 
 let dummy_evm_config =
   let open Lwt_result_syntax in

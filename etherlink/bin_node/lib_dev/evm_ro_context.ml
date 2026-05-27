@@ -16,6 +16,11 @@ type t = {
   finalized_view : bool;
   execution_pool : Lwt_domain.pool;
   trace_host_funs : bool;
+  michelson_hard_gas_limit_per_block : int option;
+      (** Sandbox-only override for [Tezlink_constants]'s
+          [hard_gas_limit_per_block]. Populated from
+          [Sequencer.sandbox_config] in [Sequencer.main] when running under
+          [run sandbox] / [run tezlink sandbox]; [None] in production. *)
 }
 
 let get_evm_state ctxt hash =
@@ -257,8 +262,8 @@ let network_sanity_check ~network ctxt =
 
   return_unit
 
-let load ~pool ?network ?smart_rollup_address (configuration : Configuration.t)
-    =
+let load ~pool ?network ?smart_rollup_address
+    ?michelson_hard_gas_limit_per_block (configuration : Configuration.t) =
   let open Lwt_result_syntax in
   let* store =
     Evm_store.init
@@ -296,6 +301,7 @@ let load ~pool ?network ?smart_rollup_address (configuration : Configuration.t)
       finalized_view = configuration.finalized_view;
       execution_pool = pool;
       trace_host_funs = configuration.opentelemetry.trace_host_functions;
+      michelson_hard_gas_limit_per_block;
     }
   in
 

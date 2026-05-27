@@ -20,6 +20,11 @@ type sandbox_config = {
   kernel_verbosity : Events.kernel_log_level option;
   with_runtimes : (Tezosx.runtime * int option) list;
   tezlink : tezlink_sandbox option;
+  michelson_hard_gas_limit_per_block : int option;
+      (** Sandbox-only override for [Tezlink_constants]'s
+          [hard_gas_limit_per_block]. Plumbed into [Evm_ro_context.t] so that
+          downstream consumers (constants RPC, Tezlink prevalidation) observe
+          it without needing a global mutable cell. *)
 }
 
 let install_finalizer_seq server_public_finalizer server_private_finalizer
@@ -444,6 +449,9 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       ~pool
       ?network:(Option.bind sandbox_config (fun config -> config.network))
       ~smart_rollup_address:smart_rollup_address_typed
+      ?michelson_hard_gas_limit_per_block:
+        (Option.bind sandbox_config (fun config ->
+             config.michelson_hard_gas_limit_per_block))
       configuration
   in
   let* () = Evm_ro_context.preload_known_kernels ro_ctxt in
@@ -491,6 +499,9 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
         sequencer_sunset_sec = sequencer_config.sunset_sec;
         preconfirmation_stream_enabled =
           configuration.experimental_features.preconfirmation_stream_enabled;
+        michelson_hard_gas_limit_per_block =
+          Option.bind sandbox_config (fun config ->
+              config.michelson_hard_gas_limit_per_block);
       }
   in
   let* () =

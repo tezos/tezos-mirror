@@ -2994,8 +2994,20 @@ let fund_arg =
     ~placeholder:"0x...|tz..."
     Params.tezosx_account
 
+let michelson_hard_gas_limit_per_block_arg =
+  Tezos_clic.arg
+    ~long:"michelson-hard-gas-limit-per-block"
+    ~placeholder:"GAS"
+    ~doc:
+      (Format.sprintf
+         "Override the Michelson runtime's hard_gas_limit_per_block (default: \
+          %d)."
+         Evm_node_lib_dev_tezlink.Tezlink_constants
+         .default_hard_gas_limit_per_block)
+    Params.int
+
 let sandbox_config_args =
-  Tezos_clic.args13
+  Tezos_clic.args14
     preimages_arg
     preimages_endpoint_arg
     native_execution_policy_arg
@@ -3009,6 +3021,7 @@ let sandbox_config_args =
     (Client_config.password_filename_arg ())
     disable_da_fees_arg
     kernel_verbosity_arg
+    michelson_hard_gas_limit_per_block_arg
 
 let tezlink_fund_arg =
   let long = "fund" in
@@ -3177,7 +3190,8 @@ let sandbox_command =
                wallet_dir,
                password_filename,
                disable_da_fees,
-               kernel_verbosity ),
+               kernel_verbosity,
+               michelson_hard_gas_limit_per_block ),
              ( network,
                init_from_snapshot,
                funded_addresses,
@@ -3220,6 +3234,7 @@ let sandbox_command =
             kernel_verbosity;
             with_runtimes = Option.value ~default:[] with_runtimes;
             tezlink = None;
+            michelson_hard_gas_limit_per_block;
           }
       in
       let config_file =
@@ -3315,7 +3330,8 @@ let tezlink_sandbox_command =
                wallet_dir,
                password_filename,
                disable_da_fees,
-               kernel_verbosity ),
+               kernel_verbosity,
+               michelson_hard_gas_limit_per_block ),
              tezlink_funded_addresses ) )
          ()
        ->
@@ -3347,6 +3363,7 @@ let tezlink_sandbox_command =
                   funded_addresses =
                     Option.value ~default:[] tezlink_funded_addresses;
                 };
+            michelson_hard_gas_limit_per_block;
           }
       in
       let config_file =

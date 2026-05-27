@@ -10,6 +10,11 @@ type parameters = {
   maximum_number_of_chunks : int;
   sequencer_sunset_sec : int64;
   preconfirmation_stream_enabled : bool;
+  michelson_hard_gas_limit_per_block : int option;
+      (** Sandbox-only override for the Michelson runtime's per-block gas
+          cap. Resolved into the validation state's Michelson constants when
+          [init_validation_state] builds it, so [gas_limit_could_fit]
+          consults the same effective cap as the prevalidator. *)
 }
 
 (* The size of a delayed transaction is overapproximated to the maximum size
@@ -84,6 +89,7 @@ module Types = struct
     signer : Signer.map;
     maximum_number_of_chunks : int;
     sequencer_sunset_sec : int64;
+    michelson_hard_gas_limit_per_block : int option;
     mutable sunset : bool;
     mutable locked : bool;
     mutable preconfirmation_state : preconfirmation;
@@ -358,7 +364,8 @@ let validate_tezlink_op ~maximum_cumulative_size
         let*! () = Block_producer_events.operation_rejected hash msg in
         return (`Drop msg)
 
-let init_validation_state (head_info : Evm_context.head) =
+let init_validation_state ?michelson_hard_gas_limit_per_block
+    (head_info : Evm_context.head) =
   let open Lwt_result_syntax in
   let state = head_info.evm_state in
   let michelson_config =
@@ -368,7 +375,12 @@ let init_validation_state (head_info : Evm_context.head) =
         state
         (Tezos_types.Contract.of_implicit pkh)
     in
-    Validation_types.{get_balance; get_counter}
+    let constants =
+      Tezlink_constants.all_constants
+        ?hard_gas_limit_per_block:michelson_hard_gas_limit_per_block
+        ()
+    in
+    Validation_types.{get_balance; get_counter; constants}
   in
   let* minimum_base_fee_per_gas =
     Etherlink_durable_storage.minimum_base_fee_per_gas_opt state
@@ -406,7 +418,8 @@ let init_validation_state (head_info : Evm_context.head) =
   in
   return (Validation_types.empty_validation_state ~michelson_config ~evm_config)
 
-let pop_valid_tx (head_info : Evm_context.head) ~maximum_cumulative_size =
+let pop_valid_tx ?michelson_hard_gas_limit_per_block
+    (head_info : Evm_context.head) ~maximum_cumulative_size =
   let open Lwt_result_syntax in
   (* Low key optimization to avoid even checking the txpool if there is not
      enough space for the smallest transaction. *)
@@ -417,7 +430,9 @@ let pop_valid_tx (head_info : Evm_context.head) ~maximum_cumulative_size =
          Tezos_types.Operation.minimum_operation_size
   then return_nil
   else
-    let* initial_validation_state = init_validation_state head_info in
+    let* initial_validation_state =
+      init_validation_state ?michelson_hard_gas_limit_per_block head_info
+    in
     let* l =
       Tx_queue.pop_transactions
         ~maximum_cumulative_size
@@ -706,6 +721,8 @@ let produce_block (state : Types.state) ~force ~with_delayed_transactions =
             in
             let* transactions_and_hashes =
               pop_valid_tx
+                ?michelson_hard_gas_limit_per_block:
+                  state.michelson_hard_gas_limit_per_block
                 head_info
                 ~maximum_cumulative_size:remaining_cumulative_size
             in
@@ -808,7 +825,7 @@ let preconfirm_transaction ~maximum_cumulative_size validation_state ~raw_tx
       return (tx_hash, `Continue (wrapped_raw_tx, validation_state))
   | `Stop -> return (tx_hash, `Stop)
 
-let preconfirm_transactions
+let preconfirm_transactions ?michelson_hard_gas_limit_per_block
     (preconfirmation_state : Types.preconfirmation_state)
     ~maximum_number_of_chunks ~transactions =
   let open Lwt_result_syntax in
@@ -829,7 +846,9 @@ let preconfirm_transactions
             (head_info : Evm_context.head)
             ~maximum_number_of_chunks
         in
-        let* validation_state = init_validation_state head_info in
+        let* validation_state =
+          init_validation_state ?michelson_hard_gas_limit_per_block head_info
+        in
         return
           ( {
               validation_state with
@@ -838,7 +857,9 @@ let preconfirm_transactions
             },
             preconfirmation_state )
     | Selecting_delayed_txs {current_size; _} ->
-        let* validation_state = init_validation_state head_info in
+        let* validation_state =
+          init_validation_state ?michelson_hard_gas_limit_per_block head_info
+        in
         return ({validation_state with current_size}, preconfirmation_state)
     | Validating_txs {validation_state; _} ->
         return (validation_state, preconfirmation_state)
@@ -929,6 +950,8 @@ module Handlers = struct
           | Enabled preconfirmation_state ->
               let* preconfirmation_state, selected_txns_hashes =
                 preconfirm_transactions
+                  ?michelson_hard_gas_limit_per_block:
+                    state.michelson_hard_gas_limit_per_block
                   ~maximum_number_of_chunks:state.maximum_number_of_chunks
                   ~transactions
                   preconfirmation_state
@@ -952,6 +975,7 @@ module Handlers = struct
          maximum_number_of_chunks;
          sequencer_sunset_sec;
          preconfirmation_stream_enabled;
+         michelson_hard_gas_limit_per_block;
        } :
         Types.parameters) =
     Lwt_result_syntax.return
@@ -962,6 +986,7 @@ module Handlers = struct
           signer;
           maximum_number_of_chunks;
           sequencer_sunset_sec;
+          michelson_hard_gas_limit_per_block;
           preconfirmation_state =
             (if preconfirmation_stream_enabled then Awaiting_first_timestamp
              else Disabled);

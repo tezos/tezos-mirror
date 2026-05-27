@@ -55,6 +55,14 @@ let make (ctxt : Evm_ro_context.t) =
           @@ Ethereum_types.Block_parameter.Block_parameter
                (Number (Ethereum_types.quantity_of_z (Z.of_int32 num)))
 
+    let constants chain (_block : block_param) =
+      let open Lwt_result_syntax in
+      let `Main = chain in
+      return
+        (Tezlink_constants.all_constants
+           ?hard_gas_limit_per_block:ctxt.michelson_hard_gas_limit_per_block
+           ())
+
     let current_level chain block ~offset =
       let open Lwt_result_syntax in
       let `Main = chain in
@@ -67,7 +75,7 @@ let make (ctxt : Evm_ro_context.t) =
 
       let* block_number = shell_block_param_to_block_number block in
 
-      let constants = Tezlink_constants.all_constants in
+      let* constants = constants chain block in
       let level = Int32.add block_number offset in
       return
         Tezos_types.
@@ -78,11 +86,6 @@ let make (ctxt : Evm_ro_context.t) =
             cycle_position =
               Int32.(rem (sub level 1l) constants.parametric.blocks_per_cycle);
           }
-
-    let constants chain (_block : block_param) =
-      let open Lwt_result_syntax in
-      let `Main = chain in
-      return Tezlink_constants.all_constants
 
     let get_state ~block =
       let open Lwt_result_syntax in
