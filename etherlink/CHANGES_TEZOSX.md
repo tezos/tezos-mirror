@@ -45,6 +45,14 @@
   forwarded gas limit below the intrinsic cost) on the cross-runtime call
   and static-call path now surface as a catchable `400` instead of a
   block-aborting `500`. (!21974)
+- Fix temporary big-maps leaking into durable storage on the inbound
+  cross-runtime call path. The per-operation temporary big-map id was
+  seeded to `0` (a non-negative, i.e. non-temporary, id) and never
+  cleared, so transient big-maps allocated by a Michelson callee were
+  written to — and persisted in — the durable `/big_map/<id>`
+  namespace, colliding with real durable big-maps. The id is now seeded
+  to `-1` (temporary) and the temporaries are cleared after the call,
+  matching the native batch path. (!21991)
 
 ### Storage versions
 
