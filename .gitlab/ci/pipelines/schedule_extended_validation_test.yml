@@ -36,7 +36,7 @@ oc.docker:ci:amd64:
       dotenv: ci_image_tag.env
 
 oc.build_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-8afd610a
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
   stage: build
   tags:
   - gcp_very_high_cpu
