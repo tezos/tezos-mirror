@@ -12,6 +12,11 @@
 
 ### Command-line interface changes
 
+- The `run sandbox` and `run tezlink sandbox` commands accept
+  `--michelson-hard-gas-limit-per-block` to raise the Michelson per-block
+  gas cap (default 3M). Sandbox-only; intended for capacity benchmarking.
+  (!21968)
+
 ### Execution changes
 
 ### Storage changes
