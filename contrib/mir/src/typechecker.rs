@@ -583,6 +583,13 @@ enum PtyFrame<'a, 'b> {
         path: Vec<Direction>,
         kind: BuildKind,
     },
+    /// Run `ensure_prop` on the result currently on top of `results`,
+    /// without consuming it. Used to enforce property checks at the same
+    /// point the recursive code did — in particular, the Map/BigMap key
+    /// `Comparable` check fires immediately after the key is parsed,
+    /// *before* the value subtree is parsed. Keeps the failure point
+    /// (and gas-exhaustion point) bit-identical with the recursive code.
+    EnsureProp { prop: TypeProperty },
 }
 
 enum BuildKind {
@@ -929,26 +936,59 @@ fn parse_ty_with_entrypoints<'a, 'b>(
                     ),
                     App(set, ..) => return unexpected(),
 
-                    App(map, [k, v], _) => push_pair_children_visit(
-                        &mut frames,
-                        ty,
-                        with_entrypoints,
-                        path,
-                        BuildKind::Map,
-                        k,
-                        v,
-                    ),
+                    App(map, [k, v], _) => {
+                        // Push order matches the recursive code's evaluation
+                        // order: parse k → ensure k is Comparable → parse v →
+                        // build new_map. LIFO pop yields that sequence.
+                        frames.push(PtyFrame::Build {
+                            ty,
+                            with_entrypoints,
+                            path,
+                            kind: BuildKind::Map,
+                        });
+                        frames.push(PtyFrame::Visit {
+                            ty: v,
+                            with_entrypoints: false,
+                            path: Vec::new(),
+                        });
+                        frames.push(PtyFrame::EnsureProp {
+                            prop: TypeProperty::Comparable,
+                        });
+                        frames.push(PtyFrame::Visit {
+                            ty: k,
+                            with_entrypoints: false,
+                            path: Vec::new(),
+                        });
+                    }
                     App(map, ..) => return unexpected(),
 
-                    App(big_map, [k, v], _) => push_pair_children_visit(
-                        &mut frames,
-                        ty,
-                        with_entrypoints,
-                        path,
-                        BuildKind::BigMap,
-                        k,
-                        v,
-                    ),
+                    App(big_map, [k, v], _) => {
+                        // Push order matches the recursive code: parse k →
+                        // ensure k Comparable → parse v → ensure v BigMapValue
+                        // → build new_big_map.
+                        frames.push(PtyFrame::Build {
+                            ty,
+                            with_entrypoints,
+                            path,
+                            kind: BuildKind::BigMap,
+                        });
+                        frames.push(PtyFrame::EnsureProp {
+                            prop: TypeProperty::BigMapValue,
+                        });
+                        frames.push(PtyFrame::Visit {
+                            ty: v,
+                            with_entrypoints: false,
+                            path: Vec::new(),
+                        });
+                        frames.push(PtyFrame::EnsureProp {
+                            prop: TypeProperty::Comparable,
+                        });
+                        frames.push(PtyFrame::Visit {
+                            ty: k,
+                            with_entrypoints: false,
+                            path: Vec::new(),
+                        });
+                    }
                     App(big_map, ..) => return unexpected(),
 
                     Seq(..)
@@ -985,16 +1025,19 @@ fn parse_ty_with_entrypoints<'a, 'b>(
                         Type::new_lambda(arg, ret)
                     }
                     BuildKind::Map => {
+                        // ensure_prop(k, Comparable) already ran via the
+                        // EnsureProp frame between Visit(k) and Visit(v),
+                        // preserving recursive-order failure semantics.
                         let v = results.pop().expect("map v");
                         let k = results.pop().expect("map k");
-                        k.ensure_prop(gas, TypeProperty::Comparable)?;
                         Type::new_map(k, v)
                     }
                     BuildKind::BigMap => {
+                        // ensure_prop(k, Comparable) and ensure_prop(v,
+                        // BigMapValue) ran via EnsureProp frames between
+                        // the Visits.
                         let v = results.pop().expect("big_map v");
                         let k = results.pop().expect("big_map k");
-                        k.ensure_prop(gas, TypeProperty::Comparable)?;
-                        v.ensure_prop(gas, TypeProperty::BigMapValue)?;
                         Type::new_big_map(k, v)
                     }
                     BuildKind::Option => {
@@ -1033,6 +1076,14 @@ fn parse_ty_with_entrypoints<'a, 'b>(
                     routed_annotations,
                     &mut results,
                 )?;
+            }
+            PtyFrame::EnsureProp { prop } => {
+                // Run ensure_prop on the result currently on top of `results`
+                // without consuming it; the result remains available for the
+                // surrounding Build frame to pop. Borrowing avoids a clone
+                // of the (possibly deep) Type.
+                let t = results.last().expect("ensure_prop target");
+                t.ensure_prop(gas, prop)?;
             }
         }
     }
@@ -9641,6 +9692,48 @@ mod typecheck_tests {
             ),
             Err(TcError::UnexpectedImplicitAccountType(Type::Int))
         );
+    }
+
+    // Regression for the ordering bug surfaced on !21983 (note 3376561578):
+    // for a map type with both a non-comparable key and a value that itself
+    // fails parsing, the recursive code reported the key's `Comparable`
+    // failure first; the iterative MR2 worklist (pre-fix) reported the value
+    // error first because the value Visit ran before the key check. Fix:
+    // EnsureProp frame slotted between Visit(k) and Visit(v).
+    #[test]
+    fn map_key_comparable_check_fires_before_value_parsing() {
+        // Single-arg `pair int` is a valid Micheline but rejected by
+        // parse_ty (pair needs at least 2 type args). With the bug, the
+        // value's parse_ty error surfaces first; with the fix, the key's
+        // `Comparable` failure (list isn't comparable) surfaces first,
+        // matching the recursive code.
+        let err = parse_ty(&mut Gas::default(), &parse("map (list unit) (pair int)").unwrap())
+            .expect_err("must reject");
+        match err {
+            TcError::InvalidTypeProperty(TypeProperty::Comparable, t) => {
+                assert_eq!(t, Type::new_list(Type::Unit),
+                    "must surface the key Comparable error, not the value error");
+            }
+            other => panic!(
+                "expected InvalidTypeProperty(Comparable, list unit); got {other:?}",
+            ),
+        }
+    }
+
+    #[test]
+    fn big_map_value_check_fires_after_value_parsing() {
+        // big_map is fine on `int -> nat`, but `big_map int big_map int nat`
+        // must reject the value as not-BigMapValue. The check fires after
+        // the value is parsed — same as the recursive order.
+        let err = parse_ty(
+            &mut Gas::default(),
+            &parse("big_map int (big_map int nat)").unwrap(),
+        )
+        .expect_err("nested big_map must reject");
+        match err {
+            TcError::InvalidTypeProperty(TypeProperty::BigMapValue, _) => {}
+            other => panic!("expected BigMapValue rejection; got {other:?}"),
+        }
     }
 
     // Locks in the wording of `InvalidValueForType` when a legacy-ticket
