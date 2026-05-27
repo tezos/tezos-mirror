@@ -226,8 +226,8 @@ val subkeys : dir -> Pvm.State.t -> string trace tzresult Lwt.t
 
 (** {2 Deprecated untyped API}
 
-    The functions below operate on raw durable storage paths (strings) with
-    manual decoders. They will be removed once all callers have migrated to the
+    The function below operates on raw durable storage paths (strings) with
+    manual decoders. It will be removed once all callers have migrated to the
     typed GADT API above ({!read}, {!read_opt}, {!write}, ...).
 
     @deprecated Use the typed path API instead. *)
@@ -241,30 +241,3 @@ val inspect_durable_and_decode_opt :
   string ->
   (bytes -> 'a) ->
   ('a option, tztrace) result Lwt.t
-
-(** @deprecated Use {!read_opt} with [Option.value] instead. *)
-val inspect_durable_and_decode_default :
-  default:'a ->
-  Pvm.Context.tree ->
-  string ->
-  (bytes -> 'a) ->
-  ('a, tztrace) result Lwt.t
-
-(** @deprecated Use {!read} instead. *)
-val inspect_durable_and_decode :
-  Pvm.Context.tree -> string -> (bytes -> 'a) -> ('a, tztrace) result Lwt.t
-
-(** @deprecated Use the typed path API instead. *)
-val l2_minimum_base_fee_per_gas :
-  Pvm.Context.tree -> L2_types.chain_id -> Z.t tzresult Lwt.t
-
-(** @deprecated Use the typed path API instead. *)
-val l2_da_fee_per_byte :
-  Pvm.Context.tree -> L2_types.chain_id -> Z.t tzresult Lwt.t
-
-(** @deprecated Use the typed path API instead. *)
-val l2_maximum_gas_per_transaction :
-  Pvm.Context.tree -> L2_types.chain_id -> Z.t tzresult Lwt.t
-
-(** @deprecated Use the typed path API instead. *)
-val world_state : Pvm.Context.tree -> L2_types.chain_id -> string tzresult Lwt.t
