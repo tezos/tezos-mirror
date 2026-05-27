@@ -3960,7 +3960,6 @@ fn visit_value<'a, 'b>(
                 vs.len(),
             )?)?;
             visit_map_or_bigmap_inmem(
-                v,
                 t.clone(),
                 vs,
                 key_t,
@@ -3979,7 +3978,6 @@ fn visit_value<'a, 'b>(
                 vs.len(),
             )?)?;
             visit_map_or_bigmap_inmem(
-                v,
                 t.clone(),
                 vs,
                 key_t,
@@ -4244,7 +4242,6 @@ fn visit_value<'a, 'b>(
 
 /// Shared setup for the (T::Map, Seq) and (T::BigMap, Seq) arms.
 fn visit_map_or_bigmap_inmem<'a, 'b>(
-    v: &'b Micheline<'a>,
     map_ty: Type,
     vs: &'b [Micheline<'a>],
     key_t: Type,
@@ -4257,7 +4254,6 @@ fn visit_map_or_bigmap_inmem<'a, 'b>(
 
     if let Some((first_elt, rest)) = vs.split_first() {
         let (k_expr, v_expr) = expect_elt(first_elt, &map_ty)?;
-        let _ = v;
         frames.push(TvFrame::MapAccum {
             remaining: rest,
             key_t: key_t.clone(),
