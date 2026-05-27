@@ -18,7 +18,6 @@ use crate::ast::*;
 use crate::context::*;
 use crate::gas::Gas;
 use crate::interpreter::*;
-use crate::irrefutable_match::irrefutable_match;
 use crate::lexer::Prim;
 use crate::parser::spanned_lexer;
 use crate::parser::Parser;
@@ -234,13 +233,19 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         // We process self address and parameter fields first because if specified, we need them to
         // populate the context for type checking the output stack.
         let self_addr = match m_self {
-            Some(s) => Some(
-                irrefutable_match!(
-                typecheck_value(&s, &mut Ctx::default(), &Type::Address)?;
-                TypedValue::Address
-                )
-                .hash,
-            ),
+            Some(s) => {
+                let typed = typecheck_value(&s, &mut Ctx::default(), &Type::Address)?;
+                let address = match typed {
+                    TypedValue::Address(addr) => addr,
+                    other => {
+                        return Err(format!(
+                            "invalid `self` field: expected address, got {other:?}"
+                        )
+                        .into())
+                    }
+                };
+                Some(address.hash)
+            }
             None => None,
         };
 
@@ -250,21 +255,35 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         };
 
         let source = match m_source {
-            Some(s) => Some(irrefutable_match!(
-            typecheck_value(&s, &mut Ctx::default(), &Type::KeyHash)?;
-            TypedValue::KeyHash
-            )),
+            Some(s) => {
+                let typed = typecheck_value(&s, &mut Ctx::default(), &Type::KeyHash)?;
+                match typed {
+                    TypedValue::KeyHash(kh) => Some(kh),
+                    other => {
+                        return Err(format!(
+                            "invalid `source` field: expected key_hash, got {other:?}"
+                        )
+                        .into())
+                    }
+                }
+            }
             None => None,
         };
 
         let sender = match m_sender {
-            Some(s) => Some(
-                irrefutable_match!(
-                typecheck_value(&s, &mut Ctx::default(), &Type::Address)?;
-                TypedValue::Address
-                )
-                .hash,
-            ),
+            Some(s) => {
+                let typed = typecheck_value(&s, &mut Ctx::default(), &Type::Address)?;
+                let address = match typed {
+                    TypedValue::Address(addr) => addr,
+                    other => {
+                        return Err(format!(
+                            "invalid `sender` field: expected address, got {other:?}"
+                        )
+                        .into())
+                    }
+                };
+                Some(address.hash)
+            }
             None => None,
         };
 
@@ -272,11 +291,18 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             Some(oc) => {
                 let mut a = HashMap::new();
                 for (ahm, ctm) in oc {
-                    let address_hash = irrefutable_match!(
+                    let typed_address =
                         typecheck_value(&ahm, &mut Ctx::default(), &Type::Address)?;
-                        TypedValue::Address)
-                    .hash;
-                    let entrypoints = ctm.get_entrypoints(&mut Gas::default()).unwrap();
+                    let address_hash = match typed_address {
+                        TypedValue::Address(Address { hash, entrypoint: _ }) => hash,
+                        other => {
+                            return Err(format!(
+                                "invalid address in `other_contracts`: expected address, got {other:?}"
+                            )
+                            .into())
+                        }
+                    };
+                    let entrypoints = ctm.get_entrypoints(&mut Gas::default())?;
                     match a.get(&address_hash) {
                         None => {
                             a.insert(address_hash, entrypoints);
@@ -295,11 +321,16 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             Some(bm) => {
                 let mut a = BTreeMap::new();
                 for (idx, key_ty, val_ty, elts) in bm {
-                    let idx: BigMapId = irrefutable_match!(
-                        typecheck_value(&idx, &mut Ctx::default(), &Type::Int)?;
-                        TypedValue::Int)
-                    .clone()
-                    .into();
+                    let typed_idx = typecheck_value(&idx, &mut Ctx::default(), &Type::Int)?;
+                    let idx: BigMapId = match typed_idx {
+                        TypedValue::Int(i) => i.into(),
+                        other => {
+                            return Err(format!(
+                                "invalid big map index: expected int, got {other:?}"
+                            )
+                            .into())
+                        }
+                    };
                     let key_ty = parse_ty(&mut Gas::default(), &key_ty)?;
                     let val_ty = parse_ty(&mut Gas::default(), &val_ty)?;
                     let elts = match elts {
@@ -308,24 +339,25 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                     };
                     let descr: BTreeMap<TypedValue<'a>, TypedValue<'a>> = elts
                         .iter()
-                        .map(|elt| {
-                            match elt {
+                        .map(
+                            |elt| -> Result<(TypedValue<'a>, TypedValue<'a>), Box<dyn Error>> {
+                                match elt {
                                 // If Micheline::App stores its arguments in a Vec,
                                 // pattern match with a condition to ensure length is 2
                                 Micheline::App(Prim::Elt, kv, _) if kv.len() == 2 => {
                                     let (k_raw, v_raw) = (&kv[0], &kv[1]);
-                                    let k = typecheck_value(k_raw, &mut Ctx::default(), &key_ty)
-                                        .unwrap();
-                                    let v = typecheck_value(v_raw, &mut Ctx::default(), &val_ty)
-                                        .unwrap();
+                                    let k = typecheck_value(k_raw, &mut Ctx::default(), &key_ty)?;
+                                    let v = typecheck_value(v_raw, &mut Ctx::default(), &val_ty)?;
                                     Ok((k, v))
                                 }
                                 _ => Err(
-                                    "Each big map element must be of the form `Elt <key> <value>`.",
+                                    "Each big map element must be of the form `Elt <key> <value>`."
+                                        .into(),
                                 ),
                             }
-                        })
-                        .collect::<Result<BTreeMap<_, _>, _>>()?;
+                            },
+                        )
+                        .collect::<Result<BTreeMap<_, _>, Box<dyn Error>>>()?;
 
                     a.insert(idx, MapInfo::new(descr, key_ty, val_ty));
                 }
@@ -457,11 +489,15 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             amount: m_amount,
             balance: m_balance,
             chain_id: m_chain_id
-                .map(|v| {
-                    Ok::<_, TcError>(irrefutable_match!(
-                    typecheck_value(&v, &mut Ctx::default(), &Type::ChainId)?;
-                    TypedValue::ChainId
-                    ))
+                .map(|v| -> Result<crate::ast::ChainId, Box<dyn Error>> {
+                    let typed = typecheck_value(&v, &mut Ctx::default(), &Type::ChainId)?;
+                    match typed {
+                        TypedValue::ChainId(id) => Ok(id),
+                        other => Err(format!(
+                            "invalid `chain_id` field: expected chain_id, got {other:?}"
+                        )
+                        .into()),
+                    }
                 })
                 .transpose()?,
             parameter,
