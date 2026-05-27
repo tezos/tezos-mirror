@@ -23,7 +23,7 @@
     1. Clear all previous allocations.
 
     2. Greedily allocate from [CLST_deposits] all registered delegates in
-    public-key-hash order. *)
+    registered fee order. *)
 val rebalance_at_cycle_end :
   Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t
 
