@@ -4210,8 +4210,14 @@ fn visit_value<'a, 'b>(
                 Type::Address,
                 Type::new_pair(content_type.clone(), Type::Nat),
             );
+            // Recursive call into the iterative driver. Any Err inside the
+            // synthetic pair typecheck is remapped to InvalidValueForType
+            // against the ticket type, matching the recursive form's
+            // outer `_ => Err(invalid())` arm. Pushing BuildTicketLegacy
+            // afterwards keeps the deconstruction in the worklist.
+            let pair = typecheck_value(m, ctx, &pair_t).map_err(|_| invalid())?;
+            results.push(pair);
             frames.push(TvFrame::BuildTicketLegacy { content_type });
-            frames.push(TvFrame::Visit { v: m, t: pair_t });
         }
         #[cfg(feature = "bls")]
         (T::Bls12381Fr, V::Int(i)) => {
@@ -9635,6 +9641,32 @@ mod typecheck_tests {
             ),
             Err(TcError::UnexpectedImplicitAccountType(Type::Int))
         );
+    }
+
+    // Locks in the wording of `InvalidValueForType` when a legacy-ticket
+    // value (the 3-tuple form) is malformed. The recursive code wrapped
+    // the synthetic pair typecheck in a match whose `_ =>` arm remapped
+    // any failure to `InvalidValueForType(value, ticket_ty)`. The new
+    // worklist must do the same via the recursive `typecheck_value` call
+    // with an explicit Err remap.
+    #[test]
+    fn invalid_value_for_type_legacy_ticket_malformed() {
+        let mut ctx = Ctx::default();
+        // A string value against `ticket int`: the synthetic pair-typecheck
+        // fails on the outer Pair, and the error must be remapped to
+        // reference the ticket type, not the synthetic pair type.
+        let result = typecheck_value(
+            &parse("\"not_a_pair\"").unwrap(),
+            &mut ctx,
+            &Type::new_ticket(Type::Int),
+        );
+        match result {
+            Err(TcError::InvalidValueForType(_, t)) => {
+                assert_eq!(t, Type::new_ticket(Type::Int),
+                    "ticket Err must reference the ticket type, not the synthetic pair");
+            }
+            other => panic!("expected InvalidValueForType(_, ticket int), got {other:?}"),
+        }
     }
 
     // Locks in the wording of `InvalidValueForType` when typechecking an
