@@ -14,6 +14,25 @@ use tezos_data_encoding::types::Narith;
 use tezos_smart_rollup::types::PublicKey;
 use thiserror::Error;
 
+/// Per-write fixed overhead for a single durable-store write
+/// (independent of payload size): path resolution, PVM host call
+/// boundary, journal bookkeeping.
+///
+/// Interim value aligned with L1's `Storage_costs.write_access`
+/// (`200_000` base, in `storage_costs.ml`).
+///
+/// TODO(L2-1316): replace with a benchmarked value.
+pub(crate) const STORAGE_WRITE_BASE_MILLIGAS: u64 = 200_000;
+
+/// Per-byte cost for a durable-store write, applied to the payload
+/// size of each write.
+///
+/// Interim value matches L1's `4 × written_bytes` term in
+/// `Storage_costs.write_access`.
+///
+/// TODO(L2-1316): replace with a benchmarked value.
+pub(crate) const STORAGE_WRITE_PER_BYTE_MILLIGAS: u64 = 4;
+
 /// Tracks gas consumption during the execution of a single manager
 /// operation, including all its internal sub-operations.
 pub struct TezlinkOperationGas {
