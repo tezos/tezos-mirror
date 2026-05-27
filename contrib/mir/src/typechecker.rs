@@ -1179,6 +1179,38 @@ enum StepResult<'a, 'b> {
     OpenSeq {
         body: &'b [Micheline<'a>],
     },
+    /// LAMBDA / LAMBDA_REC instruction: route the body through the outer
+    /// worklist driver so nested LAMBDAs do not grow the Rust call stack
+    /// one frame per nesting level. The body runs on a fresh `[in_ty]`
+    /// stack (or `[self_ty, in_ty]` for LAMBDA_REC) with
+    /// `self_entrypoints = None` and `in_view = false`.
+    OpenLambda {
+        body: &'b [Micheline<'a>],
+        in_ty: Type,
+        out_ty: Type,
+        recursive: bool,
+        micheline_code: Micheline<'a>,
+    },
+    /// MAP block on a List / Option / Map. The body runs on a clone of the
+    /// outer stack plus `inner_ty` pushed on top (the element / pair type).
+    /// `kind` records which container to rewrap with after the body completes.
+    OpenMapBlock {
+        body: &'b [Micheline<'a>],
+        inner_ty: Type,
+        kind: MapKind,
+    },
+}
+
+/// Which container wraps the result of a `MAP` block — selected from the
+/// outer stack's source type before the body runs.
+enum MapKind {
+    /// MAP over `list e` → result is `list e'`.
+    List,
+    /// MAP over `option e` → result is `option e'`.
+    Option,
+    /// MAP over `map k e` → result is `map k e'`. Carries the unchanged
+    /// key type so the After frame can rewrap.
+    Map(Type),
 }
 
 /// Worklist frame for the iterative instruction typechecker driver.
@@ -1233,6 +1265,29 @@ enum TcIFrame<'a, 'b> {
         protected: TypeStack,
     },
     AfterSeq,
+    /// Finalize a `LAMBDA` / `LAMBDA_REC` instruction whose body was just
+    /// typechecked on a fresh stack. Pops the body's instructions from the
+    /// outer `block_results`, unifies the body's resulting stack with
+    /// `[out_ty]`, builds the Lambda struct, restores the outer state, and
+    /// pushes `I::Lambda(...)` onto the (now-restored) outer
+    /// `block_results`.
+    AfterLambda {
+        in_ty: Type,
+        out_ty: Type,
+        recursive: bool,
+        micheline_code: Micheline<'a>,
+        saved_outer_stack: FailingTypeStack,
+        saved_self_entrypoints: Option<&'b Entrypoints>,
+        saved_in_view: bool,
+    },
+    /// Finalize a `MAP` block. Pops the body's instructions, pops the
+    /// inner-result type off the body's stack, restores the outer stack,
+    /// pushes the rewrapped container type, and pushes `I::Map(...)` onto
+    /// the outer `block_results`.
+    AfterMapBlock {
+        kind: MapKind,
+        saved_outer_stack: FailingTypeStack,
+    },
 }
 
 /// Iterative driver: typechecks every nested block from one explicit
@@ -1240,7 +1295,7 @@ enum TcIFrame<'a, 'b> {
 fn typecheck<'a, 'b>(
     ast: &'b [Micheline<'a>],
     gas: &mut Gas,
-    self_entrypoints: Option<&Entrypoints>,
+    self_entrypoints: Option<&'b Entrypoints>,
     opt_stack: &mut FailingTypeStack,
     in_view: bool,
 ) -> Result<Vec<Instruction<'a>>, TcError> {
@@ -1251,6 +1306,12 @@ fn typecheck<'a, 'b>(
     // One accumulator per active block. The root accumulator is at index 0;
     // nested blocks push and pop their own.
     let mut block_results: Vec<Vec<Instruction<'a>>> = vec![Vec::new()];
+    // Mutable state across the driver: switched by Open/After Lambda frames
+    // when a LAMBDA / LAMBDA_REC body is entered (fresh scope with
+    // self_entrypoints=None, in_view=false). MAP_BLOCK does NOT switch
+    // these — it inherits the outer context.
+    let mut cur_self_entrypoints = self_entrypoints;
+    let mut cur_in_view = in_view;
     while let Some(frame) = frames.pop() {
         match frame {
             TcIFrame::NextInstr { block, idx } => {
@@ -1270,9 +1331,9 @@ fn typecheck<'a, 'b>(
                 let step = typecheck_instruction_step(
                     instr,
                     gas,
-                    self_entrypoints,
+                    cur_self_entrypoints,
                     opt_stack,
-                    in_view,
+                    cur_in_view,
                 )?;
                 match step {
                     StepResult::Done(typed) => {
@@ -1428,6 +1489,75 @@ fn typecheck<'a, 'b>(
                         block_results.push(Vec::new());
                         frames.push(TcIFrame::NextInstr { block: body, idx: 0 });
                     }
+                    StepResult::OpenLambda {
+                        body,
+                        in_ty,
+                        out_ty,
+                        recursive,
+                        micheline_code,
+                    } => {
+                        // Save outer state.
+                        let saved_self_entrypoints = cur_self_entrypoints;
+                        let saved_in_view = cur_in_view;
+                        // Build the body's initial stack: [in_ty] for plain
+                        // LAMBDA, [self_ty, in_ty] for LAMBDA_REC (self_ty on
+                        // bottom so the body can DUP / EXEC self).
+                        let body_initial = if recursive {
+                            let self_ty = Type::new_lambda(in_ty.clone(), out_ty.clone());
+                            tc_stk![self_ty, in_ty.clone()]
+                        } else {
+                            tc_stk![in_ty.clone()]
+                        };
+                        let saved_outer_stack = std::mem::replace(opt_stack, body_initial);
+                        cur_self_entrypoints = None;
+                        cur_in_view = false;
+                        // Continue the outer block after the lambda
+                        // resolves.
+                        frames.push(parent);
+                        frames.push(TcIFrame::AfterLambda {
+                            in_ty,
+                            out_ty,
+                            recursive,
+                            micheline_code,
+                            saved_outer_stack,
+                            saved_self_entrypoints,
+                            saved_in_view,
+                        });
+                        block_results.push(Vec::new());
+                        frames.push(TcIFrame::NextInstr { block: body, idx: 0 });
+                    }
+                    StepResult::OpenMapBlock {
+                        body,
+                        inner_ty,
+                        kind,
+                    } => {
+                        // The body runs on a CLONE of the outer post-pop
+                        // stack with `inner_ty` pushed (matches the
+                        // recursive `typecheck_map_block` which clones
+                        // `stack` before pushing). AfterMapBlock restores
+                        // the outer stack and rewraps with the container
+                        // type. self_entrypoints / in_view stay inherited.
+                        let body_initial = match opt_stack {
+                            FailingTypeStack::Ok(s) => {
+                                let mut cloned = s.clone();
+                                cloned.push(inner_ty);
+                                FailingTypeStack::Ok(cloned)
+                            }
+                            // If the outer stack is already failing, the
+                            // body inherits the failure (matches the
+                            // recursive behavior — typecheck_map_block on a
+                            // failing nested stack is propagated by typecheck).
+                            FailingTypeStack::Failed => FailingTypeStack::Failed,
+                        };
+                        let saved_outer_stack = std::mem::replace(opt_stack, body_initial);
+                        frames.push(parent);
+                        frames.push(TcIFrame::AfterMapBlock {
+                            kind,
+                            saved_outer_stack,
+                        });
+                        block_results.push(Vec::new());
+                        frames.push(TcIFrame::NextInstr { block: body, idx: 0 });
+                    }
                 }
             }
             TcIFrame::AfterIfThen {
@@ -1579,6 +1709,100 @@ fn typecheck<'a, 'b>(
                     .last_mut()
                     .expect("seq parent")
                     .push(Instruction::Seq(body));
+            }
+            TcIFrame::AfterLambda {
+                in_ty,
+                out_ty,
+                recursive,
+                micheline_code,
+                saved_outer_stack,
+                saved_self_entrypoints,
+                saved_in_view,
+            } => {
+                let body_instrs = block_results.pop().ok_or(TcError::InternalError(
+                    TcInvariant::EmptyResultStack { expected: "lambda body" },
+                ))?;
+                // Unify body's resulting stack with [out_ty], matching the
+                // recursive `typecheck_lambda` which calls
+                // `unify_stacks(gas, stk, tc_stk![out_ty.clone()])`.
+                unify_stacks(gas, opt_stack, tc_stk![out_ty.clone()])?;
+                // Restore outer context.
+                *opt_stack = saved_outer_stack;
+                cur_self_entrypoints = saved_self_entrypoints;
+                cur_in_view = saved_in_view;
+                let code = Rc::from(body_instrs);
+                let lam = if recursive {
+                    Lambda::LambdaRec {
+                        micheline_code,
+                        code,
+                        in_ty,
+                        out_ty,
+                    }
+                } else {
+                    Lambda::Lambda {
+                        micheline_code,
+                        code,
+                    }
+                };
+                block_results
+                    .last_mut()
+                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack {
+                        expected: "lambda parent",
+                    }))?
+                    .push(Instruction::Lambda(lam));
+            }
+            TcIFrame::AfterMapBlock {
+                kind,
+                saved_outer_stack,
+            } => {
+                let body_instrs = block_results.pop().ok_or(TcError::InternalError(
+                    TcInvariant::EmptyResultStack { expected: "map body" },
+                ))?;
+                // Mirror the recursive `typecheck_map_block` error path:
+                //   - body's stack must be Ok (else MapBlockFail);
+                //   - top must be `ty2` (else MapBlockEmptyStack);
+                //   - rest must equal the outer post-pop stack (else the
+                //     stack-shape error from ensure_stacks_eq).
+                let body_stack = std::mem::replace(opt_stack, saved_outer_stack);
+                let mut body_stack = match body_stack {
+                    FailingTypeStack::Ok(s) => s,
+                    FailingTypeStack::Failed => return Err(TcError::MapBlockFail),
+                };
+                let ty2 = body_stack.pop().ok_or(TcError::MapBlockEmptyStack)?;
+                match opt_stack {
+                    FailingTypeStack::Ok(outer) => {
+                        ensure_stacks_eq(gas, outer, &body_stack)?;
+                    }
+                    FailingTypeStack::Failed => {
+                        // Outer was already failing pre-MAP; preserve the
+                        // failing state and skip the rewrap (no Ok stack
+                        // to push onto).
+                        return Err(TcError::FailNotInTail);
+                    }
+                }
+                let (instr, wrapped) = match kind {
+                    MapKind::List => (
+                        Instruction::Map(overloads::Map::List, body_instrs),
+                        Type::new_list(ty2),
+                    ),
+                    MapKind::Option => (
+                        Instruction::Map(overloads::Map::Option, body_instrs),
+                        Type::new_option(ty2),
+                    ),
+                    MapKind::Map(kty) => (
+                        Instruction::Map(overloads::Map::Map, body_instrs),
+                        Type::new_map(kty, ty2),
+                    ),
+                };
+                if let FailingTypeStack::Ok(s) = opt_stack {
+                    s.push(wrapped);
+                }
+                block_results
+                    .last_mut()
+                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack {
+                        expected: "map parent",
+                    }))?
+                    .push(instr);
             }
         }
     }
@@ -2369,43 +2593,31 @@ fn typecheck_instruction_step<'a, 'b>(
         (App(ITER, expect_args!(1 seq), _), _) => unexpected_micheline!(),
 
         (App(MAP, [Seq(nested_instrs)], ..), [.., T::List(..)]) => {
-            // Get the element type
+            // Pop the source container; the body runs on a clone of the
+            // post-pop stack with the inner type pushed. AfterMapBlock
+            // restores the outer stack and rewraps with new_list(ty2).
             let ty1 = pop!(T::List).as_ref().clone();
-
-            // Typecheck the nested instructions.
-            let (nested_instrs, ty2) =
-                typecheck_map_block(nested_instrs, ty1, gas, self_entrypoints, stack, in_view)?;
-
-            stack.push(Type::new_list(ty2));
-            I::Map(overloads::Map::List, nested_instrs)
+            return Ok(StepResult::OpenMapBlock {
+                body: nested_instrs,
+                inner_ty: ty1,
+                kind: MapKind::List,
+            });
         }
         (App(MAP, [Seq(nested_instrs)], ..), [.., T::Option(..)]) => {
-            // Get the element type
             let ty1 = pop!(T::Option).as_ref().clone();
-
-            // Typecheck the nested instructions.
-            let (nested_instrs, ty2) =
-                typecheck_map_block(nested_instrs, ty1, gas, self_entrypoints, stack, in_view)?;
-
-            stack.push(Type::new_option(ty2));
-            I::Map(overloads::Map::Option, nested_instrs)
+            return Ok(StepResult::OpenMapBlock {
+                body: nested_instrs,
+                inner_ty: ty1,
+                kind: MapKind::Option,
+            });
         }
         (App(MAP, [Seq(nested_instrs)], ..), [.., T::Map(..)]) => {
-            // Get the element type
             let (kty, ty1) = pop!(T::Map).as_ref().clone();
-
-            // Typecheck the nested instructions.
-            let (nested_instrs, ty2) = typecheck_map_block(
-                nested_instrs,
-                T::new_pair(kty.clone(), ty1),
-                gas,
-                self_entrypoints,
-                stack,
-                in_view,
-            )?;
-
-            stack.push(Type::new_map(kty, ty2));
-            I::Map(overloads::Map::Map, nested_instrs)
+            return Ok(StepResult::OpenMapBlock {
+                body: nested_instrs,
+                inner_ty: T::new_pair(kty.clone(), ty1),
+                kind: MapKind::Map(kty),
+            });
         }
         (App(MAP, [Seq(_)], _), [.., _]) => no_overload!(MAP),
         (App(MAP, [Seq(_)], _), []) => no_overload!(MAP, len 1),
@@ -2913,9 +3125,20 @@ fn typecheck_instruction_step<'a, 'b>(
         (App(prim @ (LAMBDA | LAMBDA_REC), [ty1, ty2, Seq(instrs)], _), ..) => {
             let in_ty = parse_ty(gas, ty1)?;
             let out_ty = parse_ty(gas, ty2)?;
+            // Push the lambda's resulting type onto the outer stack now;
+            // the AfterLambda frame will keep this when it restores the
+            // outer context after the body has been typechecked through
+            // the worklist driver. Avoids recursing into typecheck_lambda
+            // (and from there back into typecheck) on every nested LAMBDA.
             stack.push(Type::new_lambda(in_ty.clone(), out_ty.clone()));
-            let res = typecheck_lambda(instrs, gas, in_ty, out_ty, matches!(prim, LAMBDA_REC))?;
-            I::Lambda(res)
+            let micheline_code = Micheline::Seq(instrs);
+            return Ok(StepResult::OpenLambda {
+                body: instrs,
+                in_ty,
+                out_ty,
+                recursive: matches!(prim, LAMBDA_REC),
+                micheline_code,
+            });
         }
         (App(LAMBDA | LAMBDA_REC, expect_args!(3 last_seq), _), _) => unexpected_micheline!(),
 
@@ -4386,45 +4609,6 @@ pub fn typecheck_view<'a>(
     let code = Rc::from(typecheck(instrs, gas, None, stk, true)?);
     unify_stacks(gas, stk, tc_stk![out_ty])?;
     Ok(code)
-}
-
-/// Typechecks the instruction block for a `MAP` instruction.
-///
-/// Given a `ty1` and a stack of type `A`,
-/// the instruction block is expected to have the type `ty1 : A => ty2 : A` for some type `ty2`.
-///
-/// Returns the typechecked instructions and the inferred type `ty2`
-fn typecheck_map_block<'a>(
-    nested: &[Micheline<'a>],
-    ty1: Type,
-    gas: &mut Gas,
-    self_entrypoints: Option<&Entrypoints>,
-    stack: &TypeStack,
-    in_view: bool,
-) -> Result<(Vec<Instruction<'a>>, Type), TcError> {
-    let mut nested_stack = stack.clone();
-    nested_stack.push(ty1);
-    let mut opt_nested_stack = FailingTypeStack::Ok(nested_stack);
-
-    // Types:
-    //   stack :: A
-    //   opt_nested_stack :: ty1 : A
-
-    // Typecheck the nested instructions.
-    let nested: Vec<Instruction<'a>> = typecheck(
-        nested,
-        gas,
-        self_entrypoints,
-        &mut opt_nested_stack,
-        in_view,
-    )?;
-
-    // Assert that the `opt_nested_stack` now has the type `ty2 : A`, for some `ty2`.
-    // NB: the nested instruction block cannot fail, otherwise we cannot infer `ty2`.
-    let nested_stack = opt_nested_stack.access_mut(TcError::MapBlockFail)?;
-    let ty2 = nested_stack.pop().ok_or(TcError::MapBlockEmptyStack)?;
-    ensure_stacks_eq(gas, stack, nested_stack)?;
-    Ok((nested, ty2))
 }
 
 fn validate_u10(n: &BigInt) -> Result<u16, TcError> {
@@ -9700,6 +9884,53 @@ mod typecheck_tests {
     // failure first; the iterative MR2 worklist (pre-fix) reported the value
     // error first because the value Visit ran before the key check. Fix:
     // EnsureProp frame slotted between Visit(k) and Visit(v).
+    // Regression: pre-fix, nested LAMBDAs grew the Rust call stack by one
+    // frame per nesting level (`typecheck_instruction_step` → `typecheck_lambda`
+    // → `typecheck` recursion). With the OpenLambda/AfterLambda worklist
+    // refactor, depth is bounded by gas/heap only. Each body is
+    // `LAMBDA unit unit { inner } ; DROP` so the body's residual stack
+    // ends at `[unit]` and unifies with `out_ty = unit`. Run on a 1 MiB
+    // worker thread matching the kernel budget; `mem::forget` skips the
+    // recursive Drop on `Instruction`/`Type` (gated on MR4).
+    #[test]
+    fn deeply_nested_lambda_typechecks_without_stack_overflow() {
+        use std::thread;
+        const DEPTH: usize = 8_000;
+        thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+                let unit_ty = Micheline::App(Prim::unit, &[], NO_ANNS);
+                let drop_instr = Micheline::App(Prim::DROP, &[], NO_ANNS);
+                // Innermost body is just empty (stack stays [unit]).
+                let mut current: &[Micheline<'_>] = &[];
+                for _ in 0..DEPTH {
+                    let lambda = Micheline::App(
+                        Prim::LAMBDA,
+                        arena.alloc_extend([
+                            unit_ty.clone(),
+                            unit_ty.clone(),
+                            Micheline::Seq(current),
+                        ]),
+                        NO_ANNS,
+                    );
+                    // Wrap: `LAMBDA unit unit { current } ; DROP` keeps
+                    // the body's stack at [unit] for the surrounding
+                    // lambda's out_ty unification.
+                    current = arena.alloc_extend([lambda, drop_instr.clone()]);
+                }
+                let mut gas = Gas::new(u32::MAX);
+                let stk = &mut tc_stk![];
+                let result = typecheck(current, &mut gas, None, stk, false);
+                std::mem::forget(std::mem::replace(stk, tc_stk![]));
+                let body = result.expect("deep lambda nesting must typecheck");
+                std::mem::forget(body);
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
+    }
+
     #[test]
     fn map_key_comparable_check_fires_before_value_parsing() {
         // Single-arg `pair int` is a valid Micheline but rejected by
