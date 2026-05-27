@@ -1525,11 +1525,11 @@ module Base_images = struct
     make_img "debian-homebrew:trixie" "master-be43e621"
 
   (* [debian-rust-trixie] *)
-  (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2481391601
-     which contains libclang for building rocksdb in CI.
+  (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2555089489
+     Contains libclang for building rocksdb in CI.
      May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
-     https://gitlab.com/tezos/tezos/-/commit/8afd610a/pipelines *)
-  let debian_rust_trixie = make_img "debian-rust:trixie" "master-8afd610a"
+     https://gitlab.com/tezos/tezos/-/commit/23205065/pipelines *)
+  let debian_rust_trixie = make_img "debian-rust:trixie" "master-23205065"
 
   let docker_version = docker_version
 
