@@ -503,4 +503,29 @@ mod tests {
             TezosXRuntimeError::BadRequest(_)
         ));
     }
+
+    #[test]
+    fn classify_interpret_error_internal_error_is_bad_request() {
+        use mir::interpreter::InterpretInvariant;
+        // `InterpretError::InternalError` is the interpreter-side parallel
+        // of `TcError::InternalError`: it surfaces invariant violations
+        // unreachable for typechecked input. It must route to BadRequest
+        // (catchable revert), matching how `TcError::InternalError`
+        // already does — never silently to OutOfGas.
+        for inv in [
+            InterpretInvariant::EmptyValueStackPop,
+            InterpretInvariant::TypeMismatchOnPop { expected: "V::Foo" },
+            InterpretInvariant::TypeMismatchOnTop { expected: "V::Foo" },
+            InterpretInvariant::TypeMismatch { expected: "V::Foo" },
+            InterpretInvariant::UnreachableState,
+            InterpretInvariant::ExpectedPairResult,
+            InterpretInvariant::ExpectedListOperation,
+            InterpretInvariant::ExpectedOperationElement,
+        ] {
+            assert!(matches!(
+                classify_interpret_error(InterpretError::InternalError(inv)),
+                TezosXRuntimeError::BadRequest(_)
+            ));
+        }
+    }
 }
