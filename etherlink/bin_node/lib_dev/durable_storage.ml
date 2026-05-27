@@ -915,7 +915,7 @@ let list_runtimes state =
   in
   List.filter_map_ep check_runtime Tezosx.known_runtimes
 
-exception Invalid_block_structure of string
+exception Block_not_found of string
 
 type dir =
   | Raw_dir of string

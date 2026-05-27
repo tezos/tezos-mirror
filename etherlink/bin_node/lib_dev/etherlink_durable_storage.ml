@@ -237,7 +237,7 @@ let block_by_hash ?known_storage_version state ~full_transaction_object
       Durable_storage.read_opt (Evm_legacy_block_by_hash block_hash) state
     in
     match block_opt with
-    | None -> raise @@ Invalid_block_structure "Couldn't decode bytes"
+    | None -> raise @@ Block_not_found "No block found at the requested path"
     | Some block -> populate_tx_objects state ~full_transaction_object block
 
 let current_block ?known_storage_version state ~full_transaction_object =
@@ -252,9 +252,7 @@ let current_block ?known_storage_version state ~full_transaction_object =
     let block =
       match block_opt with
       | Some block -> block
-      | None ->
-          raise
-          @@ Invalid_block_structure "Couldn't decode bytes of current block"
+      | None -> raise @@ Block_not_found "No current block found"
     in
     if full_transaction_object then
       let* transaction_objects =
@@ -303,7 +301,8 @@ let blocks_by_number state ~full_transaction_object ~number =
           Durable_storage.read_opt (Evm_legacy_block_by_hash block_hash) state
         in
         match block_opt with
-        | None -> raise @@ Invalid_block_structure "Couldn't decode bytes"
+        | None ->
+            raise @@ Block_not_found "No block found at the requested path"
         | Some block -> populate_tx_objects state ~full_transaction_object block
         )
 
@@ -343,7 +342,7 @@ let base_fee_per_gas_opt state =
       let* block = current_block state ~full_transaction_object:false in
       return block.baseFeePerGas)
     (function
-      | Durable_storage.Invalid_block_structure _ -> return_none
+      | Durable_storage.Block_not_found _ -> return_none
       | exn -> Lwt.reraise exn)
 
 let base_fee_per_gas state =

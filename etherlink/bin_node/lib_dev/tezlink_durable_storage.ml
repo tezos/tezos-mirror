@@ -135,7 +135,8 @@ let nth_block state n =
       match block_opt with
       | None ->
           raise
-          @@ Durable_storage.Invalid_block_structure "Couldn't decode bytes"
+          @@ Durable_storage.Block_not_found
+               "No block found at the requested path"
       | Some block -> return block)
 
 let nth_block_hash state n =

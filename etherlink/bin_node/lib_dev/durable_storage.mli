@@ -234,6 +234,6 @@ val exists_dir : dir -> Pvm.State.t -> bool tzresult Lwt.t
 (** [subkeys d state] lists the immediate subkeys directly under [d]. *)
 val subkeys : dir -> Pvm.State.t -> string trace tzresult Lwt.t
 
-(** Raised by legacy block readers when the stored bytes cannot be
-    decoded as a block. *)
-exception Invalid_block_structure of string
+(** Raised by the legacy block readers when no block is found at the
+    requested path. *)
+exception Block_not_found of string
