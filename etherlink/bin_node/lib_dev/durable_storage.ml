@@ -917,13 +917,6 @@ let list_runtimes state =
 
 exception Invalid_block_structure of string
 
-let inspect_durable_and_decode_opt state path decode =
-  let open Lwt_result_syntax in
-  let* bytes = read_opt (Raw_path path) state in
-  match bytes with
-  | Some bytes -> return_some (decode bytes)
-  | None -> return_none
-
 type dir =
   | Raw_dir of string
   | Delayed_inbox

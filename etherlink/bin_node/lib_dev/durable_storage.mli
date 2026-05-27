@@ -234,20 +234,6 @@ val exists_dir : dir -> Pvm.State.t -> bool tzresult Lwt.t
 (** [subkeys d state] lists the immediate subkeys directly under [d]. *)
 val subkeys : dir -> Pvm.State.t -> string trace tzresult Lwt.t
 
-(** {2 Deprecated untyped API}
-
-    The function below operates on raw durable storage paths (strings) with
-    manual decoders. It will be removed once all callers have migrated to the
-    typed GADT API above ({!read}, {!read_opt}, {!write}, ...).
-
-    @deprecated Use the typed path API instead. *)
-
-(** @deprecated Use the typed path API instead. *)
+(** Raised by legacy block readers when the stored bytes cannot be
+    decoded as a block. *)
 exception Invalid_block_structure of string
-
-(** @deprecated Use {!read_opt} instead. *)
-val inspect_durable_and_decode_opt :
-  Pvm.Context.tree ->
-  string ->
-  (bytes -> 'a) ->
-  ('a option, tztrace) result Lwt.t
