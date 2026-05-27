@@ -35,6 +35,11 @@
 
 ### Native Atomic Composability
 
+- Cross-runtime calls now enforce a maximum chain depth
+  (`X-Tezos-CRAC-Depth` ≤ 128): a self-recursive Michelson↔EVM gateway
+  cycle that previously wedged sequencer block production now fails
+  cleanly at the operation level (catchable revert) once the cap is
+  reached, leaving the block intact. (!21972)
 - Error that can be user triggered now maps now doesn't block abort. (!21918)
 
 ### Storage versions

@@ -11,9 +11,9 @@ pub use tezosx_types::headers;
 pub use tezosx_types::{
     gas, resolve_routing, AliasInfo, Classification, CrossRuntimeContext,
     KernelStorageError, Origin, RoutingDecision, RuntimeId, TezosXRuntimeError,
-    ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_DEPTH,
-    X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER,
-    X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
+    ERR_FORBIDDEN_TEZOS_HEADER, MAX_CRAC_DEPTH, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER,
+    X_TEZOS_CRAC_DEPTH, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT,
+    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
 };
 
 #[cfg(feature = "testing")]
