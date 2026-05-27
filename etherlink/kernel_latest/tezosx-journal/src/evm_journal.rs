@@ -80,6 +80,15 @@ pub struct EvmJournal {
     original_source: Option<OriginalSource>,
     crac_chain_depth: u32,
     revm_call_depth: Option<u32>,
+    /// Originator of the inbound CRAC being serviced — the
+    /// `X-Tezos-Source` alias parsed into an EVM `Address`. When `Some`,
+    /// the kernel's custom `ORIGIN` opcode pushes this address instead
+    /// of `TxEnv.caller`, so `tx.origin` carries the real outer-tx
+    /// originator across an `EVM <-> Michelson` boundary while
+    /// `TxEnv.caller` (and thus `msg.sender`, the nonce bump, the value
+    /// deduction, etc.) keep their standard REVM meaning — the
+    /// immediate caller's alias (L2-1363 / L2-1441).
+    cross_runtime_originator: Option<Address>,
 }
 
 impl EvmJournal {
@@ -92,6 +101,7 @@ impl EvmJournal {
             original_source: None,
             crac_chain_depth: 0,
             revm_call_depth: None,
+            cross_runtime_originator: None,
         }
     }
 }
@@ -106,6 +116,17 @@ impl EvmJournal {
         self.original_source = None;
         self.crac_chain_depth = 0;
         self.revm_call_depth = None;
+        self.cross_runtime_originator = None;
+    }
+
+    /// See the field doc on [`Self::cross_runtime_originator`].
+    pub fn cross_runtime_originator(&self) -> Option<Address> {
+        self.cross_runtime_originator
+    }
+
+    /// See the field doc on [`Self::cross_runtime_originator`].
+    pub fn set_cross_runtime_originator(&mut self, originator: Option<Address>) {
+        self.cross_runtime_originator = originator;
     }
 
     pub fn crac_chain_depth(&self) -> u32 {
