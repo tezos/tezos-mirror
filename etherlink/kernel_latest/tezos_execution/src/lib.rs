@@ -175,7 +175,6 @@ pub fn storage_write_cost_milligas(count: u64, payload_bytes: u64) -> u64 {
 
 /// Charge gas for a sequence of `count` durable-store writes whose
 /// combined payload is `payload_bytes`.
-#[allow(dead_code)]
 pub(crate) fn consume_storage_write_milligas(
     operation_gas: &mut TezlinkOperationGas,
     count: u64,
@@ -197,7 +196,6 @@ pub fn storage_read_cost_milligas(count: u64, payload_bytes: u64) -> u64 {
 
 /// Charge gas for a sequence of `count` durable-store reads whose
 /// combined payload is `payload_bytes`.
-#[allow(dead_code)]
 pub(crate) fn consume_storage_read_milligas(
     operation_gas: &mut TezlinkOperationGas,
     count: u64,
@@ -209,7 +207,6 @@ pub(crate) fn consume_storage_read_milligas(
 
 /// Counters are often being read and updated (code size, paid bytes, etc.). When
 /// charging gas for these operations, we use an upper-bound of their size.
-#[allow(dead_code)]
 const COUNTER_SIZE: u64 = 32;
 
 fn reveal<Host, C: Context>(
@@ -1162,6 +1159,22 @@ where
         .originated_from_kt1(&contract)
         .map_err(|_| OriginationError::FailedToFetchOriginated)?;
 
+    // Charge gas for the 4 durable writes performed by `smart_contract.init`.
+    // The code and storage have their own size.
+    // And then three small counters: code size and storage size are combined for
+    // used bytes, and paid bytes.
+    let init_payload_bytes =
+        (script_code.len() as u64).saturating_add(new_storage.len() as u64);
+    consume_storage_write_milligas(ctx.operation_gas, 1, init_payload_bytes)
+        .map_err(OriginationError::OutOfGas)?;
+    consume_storage_write_milligas(ctx.operation_gas, 2, COUNTER_SIZE)
+        .map_err(OriginationError::OutOfGas)?;
+
+    // Charge gas for the three small counter reads (code size, storage size,
+    // paid bytes) performed by `update_storage_space` inside `account.init`.
+    consume_storage_read_milligas(ctx.operation_gas, 3, COUNTER_SIZE)
+        .map_err(OriginationError::OutOfGas)?;
+
     let StorageSpace {
         used_bytes: total_size,
         allocated_bytes: paid_storage_size_diff,
@@ -1179,6 +1192,13 @@ where
     let balance_updates =
         compute_balance_updates(sender_account, &smart_contract, initial_balance)
             .map_err(|e| OriginationError::FailedToComputeBalanceUpdate(e.to_string()))?;
+
+    // `apply_balance_changes` writes and reads the giver and receiver balances,
+    // two reads and writes each for an amount, so 4 reads and 4 writes in total.
+    consume_storage_write_milligas(ctx.operation_gas, 4, COUNTER_SIZE)
+        .map_err(OriginationError::OutOfGas)?;
+    consume_storage_read_milligas(ctx.operation_gas, 4, COUNTER_SIZE)
+        .map_err(OriginationError::OutOfGas)?;
 
     // Apply the initial-balance transfer (sender → smart_contract).
     apply_balance_changes(
