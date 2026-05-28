@@ -788,7 +788,19 @@ impl ChainConfigTrait for EvmChainConfig {
                 let tx_hash = operation.tx_hash;
                 let crac_id =
                     tezosx_journal::CracId::new(0, block_in_progress.michelson_index);
-                let mut journal = TezosXJournal::new(crac_id);
+                // The seed must NOT be the operation's real hash: the
+                // normal Michelson path inside `apply_tezos_operation`
+                // builds its own `OriginationNonce::initial(real_hash)`
+                // starting at index 0, and if the journal's CRAC nonce
+                // shared the same seed both nonces would derive
+                // colliding KT1s at index 1.  Use a synthetic seed so
+                // the two nonce universes stay disjoint.
+                let operation_hash = TezosXJournal::synthetic_operation_hash(
+                    &crac_id,
+                    self.chain_id.low_u64(),
+                    block_in_progress.number.low_u64(),
+                );
+                let mut journal = TezosXJournal::new(crac_id, operation_hash);
                 let result = apply_tezos_operation(
                     &self.michelson_chain_config.chain_id,
                     block_in_progress,
@@ -1441,7 +1453,19 @@ impl ChainConfigTrait for MichelsonChainConfig {
                 let tx_hash = operation.tx_hash;
                 let crac_id =
                     tezosx_journal::CracId::new(0, block_in_progress.michelson_index);
-                let mut journal = TezosXJournal::new(crac_id);
+                // The seed must NOT be the operation's real hash: the
+                // normal Michelson path inside `apply_tezos_operation`
+                // builds its own `OriginationNonce::initial(real_hash)`
+                // starting at index 0, and if the journal's CRAC nonce
+                // shared the same seed both nonces would derive
+                // colliding KT1s at index 1.  Use a synthetic seed so
+                // the two nonce universes stay disjoint.
+                let operation_hash = TezosXJournal::synthetic_operation_hash(
+                    &crac_id,
+                    self.get_chain_id().low_u64(),
+                    block_in_progress.number.low_u64(),
+                );
+                let mut journal = TezosXJournal::new(crac_id, operation_hash);
                 // Not supported in standalone Tezlink (no ExperimentalFeatures).
                 let enable_gas_refund = false;
                 let result = apply_tezos_operation(

@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use tezos_crypto_rs::hash::OperationHash;
 use tezos_smart_rollup_host::{
     path::{concat, OwnedPath, Path, RefPath},
     runtime::RuntimeError,
@@ -44,6 +45,13 @@ struct ExternalCheckpoint {
     /// Length of `pending_crac_receipts` at the time the checkpoint was
     /// created.  On revert, receipts are truncated back to this count.
     receipt_count: usize,
+    /// `origination_index` at the time the checkpoint was created.
+    /// On revert, the index is rolled back to this value so that
+    /// `CREATE_CONTRACT` slots consumed inside the reverted EVM frame
+    /// are freed for reuse by subsequent inbound CRACs.  On commit
+    /// the saved value is dropped (the index already reflects the
+    /// post-frame state).
+    origination_index: u32,
 }
 
 /// Error returned by [`MichelsonJournal::set_dispatch_result`].
@@ -80,7 +88,7 @@ struct Snapshot {
     from_path: OwnedPath,
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct MichelsonJournal {
     snapshots: Vec<Snapshot>,
     external_checkpoints: Vec<ExternalCheckpoint>,
@@ -134,11 +142,59 @@ pub struct MichelsonJournal {
     /// them block-wide from the flat list order at block
     /// finalization.
     pending_alias_origination_internals: Vec<InternalOperationSum>,
+    /// Operation hash of this synthetic Michelson manager operation.
+    /// Set once at construction and never mutated thereafter; read
+    /// through [`Self::operation_hash`].  A child KT1 originated
+    /// through an inbound `CREATE_CONTRACT` is
+    /// `digest_160(operation_hash[32] || index[4])`, so this value
+    /// MUST be deterministic AND unique: two child KT1s may collide
+    /// only when their indices collide, never across two distinct
+    /// synthetic operations.  See [`crate::TezosXJournal::new`] for
+    /// the exact seed computation.
+    operation_hash: OperationHash,
+    /// Monotonic origination-nonce index, incremented once per
+    /// `CREATE_CONTRACT` executed through an inbound CRAC.  Persisted
+    /// across multiple inbound CRAC handler invocations within the
+    /// same synthetic Michelson manager operation so two sequential
+    /// CRACs (e.g. an EVM transaction calling two distinct Michelson
+    /// callees in turn) get consecutive indices — and therefore
+    /// distinct child KT1s — rather than restarting from 0 each time.
+    origination_index: u32,
+}
+
+impl Default for MichelsonJournal {
+    /// `Default` constructs the journal with `OperationHash::default()`
+    /// (32 zero bytes) as the operation hash.  This is **not safe for
+    /// production**: every inbound-CRAC `CREATE_CONTRACT` will collide
+    /// on the same KT1.  Use [`MichelsonJournal::new`] in production
+    /// with a deterministically-derived seed; the `Default` impl
+    /// exists purely to keep tests that don't exercise origination
+    /// paths terse.
+    fn default() -> Self {
+        Self::new(OperationHash::default())
+    }
 }
 
 impl MichelsonJournal {
-    pub fn new() -> Self {
-        Self::default()
+    /// Construct a fresh Michelson journal for one synthetic Michelson
+    /// manager operation.  [`operation_hash`] seeds the inbound-CRAC
+    /// origination nonce; it MUST be derived deterministically from
+    /// the originating transaction's context (typically
+    /// `blake2b(crac:<block_number>:<crac_id>)`) so two distinct
+    /// synthetic ops in the same block see different seeds.
+    pub fn new(operation_hash: OperationHash) -> Self {
+        Self {
+            snapshots: Vec::new(),
+            external_checkpoints: Vec::new(),
+            dispatch_result_slots: Vec::new(),
+            pending_crac_receipts: Vec::new(),
+            failed_crac_receipts: Vec::new(),
+            backtracked_crac_receipts: Vec::new(),
+            next_receipt_seq: 0,
+            pending_alias_origination_internals: Vec::new(),
+            operation_hash,
+            origination_index: 0,
+        }
     }
 
     /// Claim the next execution-order sequence number.  `u64` overflow
@@ -195,6 +251,37 @@ impl MichelsonJournal {
     ) -> Vec<InternalOperationSum> {
         std::mem::take(&mut self.pending_alias_origination_internals)
     }
+
+    /// Operation hash of this synthetic Michelson manager operation.
+    /// Set once at construction and stable for the journal's life.
+    pub fn operation_hash(&self) -> &OperationHash {
+        &self.operation_hash
+    }
+
+    /// Current inbound-CRAC origination-nonce index — the count of
+    /// `CREATE_CONTRACT`s already performed in this synthetic
+    /// Michelson manager operation.  Combined with
+    /// [`Self::operation_hash`] to derive the next child KT1 as
+    /// `digest_160(operation_hash || index+1)`.
+    ///
+    /// Persisted across multiple inbound CRAC handler invocations
+    /// within the same synthetic op so two sequential CRACs see
+    /// consecutive indices — and therefore distinct child KT1s —
+    /// rather than restarting from 0 each time.  Pair every read
+    /// with [`set_origination_index`](Self::set_origination_index)
+    /// to write the post-execution value back.
+    pub fn origination_index(&self) -> u32 {
+        self.origination_index
+    }
+
+    /// Persist `index` as the new origination-nonce index, typically
+    /// called by the inbound-CRAC handler at the end of an
+    /// `execute_entrypoint_call` to record the count of
+    /// `CREATE_CONTRACT`s performed in that call.  The next inbound
+    /// CRAC will resume from this value.
+    pub fn set_origination_index(&mut self, index: u32) {
+        self.origination_index = index;
+    }
 }
 
 pub fn indexed_path<T: Path>(depth: usize, path: &T) -> Result<OwnedPath, RuntimeError> {
@@ -205,12 +292,14 @@ pub fn indexed_path<T: Path>(depth: usize, path: &T) -> Result<OwnedPath, Runtim
 
 impl MichelsonJournal {
     // Called by an external journal on checkpoint creation.
-    // Records the current snapshot count and receipt count as the
-    // lower boundary for this call frame.
+    // Records the current snapshot count, receipt count and
+    // origination-nonce index as the lower boundary for this call
+    // frame.
     pub fn push_external_checkpoint(&mut self) {
         self.external_checkpoints.push(ExternalCheckpoint {
             snapshot_watermark: self.snapshots.len(),
             receipt_count: self.pending_crac_receipts.len(),
+            origination_index: self.origination_index,
         });
     }
 
@@ -274,7 +363,13 @@ impl MichelsonJournal {
             .unwrap_or(ExternalCheckpoint {
                 snapshot_watermark: 0,
                 receipt_count: 0,
+                origination_index: 0,
             });
+        // The saved origination index is dropped on commit: any
+        // increments performed during this frame are kept, so a later
+        // CRAC in the same synthetic op continues from the post-frame
+        // value rather than re-using already-burned indices.
+        let _ = checkpoint.origination_index;
         let drain_from = if self.external_checkpoints.is_empty() {
             checkpoint.snapshot_watermark
         } else {
@@ -309,7 +404,18 @@ impl MichelsonJournal {
             .unwrap_or(ExternalCheckpoint {
                 snapshot_watermark: 0,
                 receipt_count: 0,
+                origination_index: 0,
             });
+        // Roll the origination-nonce index back to its value at
+        // checkpoint entry: any `CREATE_CONTRACT` performed inside the
+        // reverted EVM frame is undone (the child KT1 was never
+        // durably written, since Michelson is all-or-nothing inside a
+        // CRAC and the snapshot mechanism above also reverts the
+        // durable state), and the freed indices are reusable by the
+        // next CRAC.  Done unconditionally so a partial inbound CRAC
+        // followed by a caller-side EVM revert does not leak burned
+        // indices.
+        self.origination_index = checkpoint.origination_index;
         // Drain (not truncate) the CRAC receipts pushed during this
         // frame, transform their statuses to `BackTracked`, and
         // migrate them to the backtracked list.  Like
@@ -429,7 +535,7 @@ mod tests {
     fn test_us1_evm_calls_mich_failwith() {
         let mut host = MockHost::default();
         let world = world_path();
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
 
         write_data(&mut host, &world, b"v0");
 
@@ -457,7 +563,7 @@ mod tests {
     fn test_us2_evm_calls_deep_mich_chain_all_revert() {
         let mut host = MockHost::default();
         let world = world_path();
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
 
         write_data(&mut host, &world, b"v0");
 
@@ -500,7 +606,7 @@ mod tests {
     fn test_us3_mich_nested_in_inner_evm_failwith_caught() {
         let mut host = MockHost::default();
         let world = world_path();
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
 
         write_data(&mut host, &world, b"v0");
 
@@ -543,7 +649,7 @@ mod tests {
     fn test_us4_mich_outer_evm_no_catch_mich_failwith_all_revert() {
         let mut host = MockHost::default();
         let world = world_path();
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
 
         write_data(&mut host, &world, b"v0");
 
@@ -579,7 +685,7 @@ mod tests {
     fn test_us5_evm_try_mich_succeeds_then_evm_op_fails() {
         let mut host = MockHost::default();
         let world = world_path();
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
 
         write_data(&mut host, &world, b"v0");
 
@@ -605,7 +711,7 @@ mod tests {
     fn test_us6_deep_alternating_stack_innermost_failwith() {
         let mut host = MockHost::default();
         let world = world_path();
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
 
         write_data(&mut host, &world, b"v0");
 
@@ -661,7 +767,7 @@ mod tests {
     fn test_us7_mich_evm_succeed_then_outer_evm_reverts() {
         let mut host = MockHost::default();
         let world = world_path();
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
 
         write_data(&mut host, &world, b"v0");
 
@@ -694,7 +800,7 @@ mod tests {
     fn test_us8_mich_outer_second_evm_call_reverts_all() {
         let mut host = MockHost::default();
         let world = world_path();
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
 
         write_data(&mut host, &world, b"v0");
 
@@ -737,7 +843,7 @@ mod tests {
     fn test_us9_evm_subcall_crac_commits_then_outer_reverts() {
         let mut host = MockHost::default();
         let world = world_path();
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
 
         write_data(&mut host, &world, b"v0");
 
@@ -770,7 +876,7 @@ mod tests {
     fn test_edge_revert_on_empty_journal() {
         let mut host = MockHost::default();
         let world = world_path();
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
 
         write_data(&mut host, &world, b"v0");
 
@@ -785,7 +891,7 @@ mod tests {
     fn test_edge_external_frame_no_cracs_revert_noop() {
         let mut host = MockHost::default();
         let world = world_path();
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
 
         write_data(&mut host, &world, b"v0");
 
@@ -807,7 +913,7 @@ mod tests {
     fn test_edge_external_frame_no_cracs_commit_noop() {
         let mut host = MockHost::default();
         let world = world_path();
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
 
         write_data(&mut host, &world, b"v0");
 
@@ -829,7 +935,7 @@ mod tests {
     fn test_edge_watermark_isolates_earlier_snapshots() {
         let mut host = MockHost::default();
         let world = world_path();
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
 
         write_data(&mut host, &world, b"v0");
 
@@ -878,7 +984,7 @@ mod tests {
     fn test_us9b_evm_subcall_crac_commits_then_outer_commits() {
         let mut host = MockHost::default();
         let world = world_path();
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
 
         write_data(&mut host, &world, b"v0");
 
@@ -907,7 +1013,7 @@ mod tests {
     fn test_sequential_subcalls_with_cracs_outer_reverts() {
         let mut host = MockHost::default();
         let world = world_path();
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
 
         write_data(&mut host, &world, b"v0");
 
@@ -942,7 +1048,7 @@ mod tests {
     fn test_sequential_subcalls_with_cracs_outer_commits() {
         let mut host = MockHost::default();
         let world = world_path();
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
 
         write_data(&mut host, &world, b"v0");
 
@@ -974,7 +1080,7 @@ mod tests {
     fn test_subcall_two_cracs_outer_reverts() {
         let mut host = MockHost::default();
         let world = world_path();
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
 
         write_data(&mut host, &world, b"v0");
 
@@ -1005,7 +1111,7 @@ mod tests {
     fn test_subcall_two_cracs_outer_commits() {
         let mut host = MockHost::default();
         let world = world_path();
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
 
         write_data(&mut host, &world, b"v0");
 
@@ -1034,7 +1140,7 @@ mod tests {
     fn test_three_nested_evm_frames_outer_reverts() {
         let mut host = MockHost::default();
         let world = world_path();
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
 
         write_data(&mut host, &world, b"v0");
 
@@ -1066,7 +1172,7 @@ mod tests {
     fn test_subcall_reverts_then_outer_reverts() {
         let mut host = MockHost::default();
         let world = world_path();
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
 
         write_data(&mut host, &world, b"v0");
 
@@ -1093,7 +1199,7 @@ mod tests {
     fn test_subcall_reverts_then_outer_commits() {
         let mut host = MockHost::default();
         let world = world_path();
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
 
         write_data(&mut host, &world, b"v0");
 
@@ -1201,7 +1307,7 @@ mod tests {
     fn test_revert_frame_migrates_receipts_to_backtracked() {
         let mut host = MockHost::default();
         let world = world_path();
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
         write_data(&mut host, &world, b"v0");
 
         // A checkpoint
@@ -1247,7 +1353,7 @@ mod tests {
     fn test_revert_frame_does_not_re_revert_backtracked() {
         let mut host = MockHost::default();
         let world = world_path();
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
         write_data(&mut host, &world, b"v0");
 
         // A checkpoint
@@ -1271,7 +1377,7 @@ mod tests {
     // `take_dispatch_result` both signal `NoSlot`.
     #[test]
     fn test_dispatch_result_no_slot() {
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
         assert_eq!(
             journal.set_dispatch_result(vec![1, 2, 3]),
             Err(DispatchSlotError::NoSlot)
@@ -1287,7 +1393,7 @@ mod tests {
     // signals `NoSlot`.
     #[test]
     fn test_dispatch_result_set_then_take() {
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
         journal.push_dispatch_slot();
         journal.set_dispatch_result(vec![0xCA, 0xFE]).unwrap();
         assert_eq!(journal.take_dispatch_result(), Ok(Some(vec![0xCA, 0xFE])));
@@ -1302,7 +1408,7 @@ mod tests {
     // distinct from `Err(NoSlot)` which means no slot at all.
     #[test]
     fn test_dispatch_result_take_empty_slot() {
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
         journal.push_dispatch_slot();
         assert_eq!(journal.take_dispatch_result(), Ok(None));
     }
@@ -1311,7 +1417,7 @@ mod tests {
     // first value survives and is what `take_dispatch_result` yields.
     #[test]
     fn test_dispatch_result_double_set_fails() {
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
         journal.push_dispatch_slot();
         journal.set_dispatch_result(vec![0x01]).unwrap();
         assert_eq!(
@@ -1325,7 +1431,7 @@ mod tests {
     // inner level, and the outer slot survives untouched.
     #[test]
     fn test_dispatch_result_nested_slots_independent() {
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
 
         // Outer slot deposits its payload.
         journal.push_dispatch_slot();
@@ -1349,11 +1455,89 @@ mod tests {
     // dispatch-slot invariant.
     #[test]
     fn test_dispatch_result_disjoint_from_external_checkpoint() {
-        let mut journal = MichelsonJournal::new();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
         journal.push_external_checkpoint();
         assert_eq!(
             journal.set_dispatch_result(vec![0x01]),
             Err(DispatchSlotError::NoSlot)
         );
+    }
+
+    // --- origination nonce state ---
+
+    fn dummy_hash(b: u8) -> OperationHash {
+        OperationHash::from([b; 32])
+    }
+
+    // `operation_hash` is set by the constructor and stable for the
+    // life of the journal; subsequent inbound CRACs all see the same
+    // seed.
+    #[test]
+    fn test_operation_hash_set_by_constructor() {
+        let journal = MichelsonJournal::new(dummy_hash(0xAA));
+        assert_eq!(*journal.operation_hash(), dummy_hash(0xAA));
+    }
+
+    // The index returned by `origination_index()` is the value last
+    // written via `set_origination_index`; consecutive inbound CRACs
+    // in the same synthetic op observe consecutive indices.
+    #[test]
+    fn test_origination_nonce_index_persists_across_calls() {
+        let mut journal = MichelsonJournal::new(dummy_hash(0x01));
+        assert_eq!(journal.origination_index(), 0);
+        journal.set_origination_index(3); // CRAC A originated 3 children
+        assert_eq!(journal.origination_index(), 3);
+        journal.set_origination_index(5); // CRAC B originated 2 more
+        assert_eq!(journal.origination_index(), 5);
+    }
+
+    // Reverting an EVM frame rolls the origination index back to the
+    // value at frame entry, so child-KT1 slots burned inside the
+    // reverted frame are released for reuse.
+    #[test]
+    fn test_origination_index_rolls_back_on_revert_frame() {
+        let mut host = MockHost::default();
+        let mut journal = MichelsonJournal::new(dummy_hash(0x42));
+        // Outer EVM frame enters at index 0.
+        journal.push_external_checkpoint();
+        // Inbound CRAC inside that frame originated two children.
+        journal.set_origination_index(2);
+        assert_eq!(journal.origination_index(), 2);
+        // Outer frame reverts: index must drop back to 0.
+        journal.revert_frame(&mut host).unwrap();
+        assert_eq!(journal.origination_index(), 0);
+    }
+
+    // Committing an EVM frame keeps the increments performed inside
+    // it.  The next inbound CRAC continues from the post-frame
+    // index, never re-using already-burned KT1 slots.
+    #[test]
+    fn test_origination_index_persists_on_commit_frame() {
+        let mut host = MockHost::default();
+        let mut journal = MichelsonJournal::new(dummy_hash(0x42));
+        journal.push_external_checkpoint();
+        journal.set_origination_index(2);
+        journal.commit_frame(&mut host).unwrap();
+        assert_eq!(journal.origination_index(), 2);
+    }
+
+    // Nested frames: an inner revert only rolls back the inner
+    // frame's increments; the outer's prior increments survive.
+    #[test]
+    fn test_origination_index_nested_revert_only_inner() {
+        let mut host = MockHost::default();
+        let mut journal = MichelsonJournal::new(dummy_hash(0x42));
+        // Outer frame
+        journal.push_external_checkpoint();
+        journal.set_origination_index(2); // outer CRAC originated 2
+                                          // Inner frame
+        journal.push_external_checkpoint();
+        journal.set_origination_index(5); // inner CRAC originated 3 more
+                                          // Inner reverts: index back to 2 (outer's tail), NOT to 0.
+        journal.revert_frame(&mut host).unwrap();
+        assert_eq!(journal.origination_index(), 2);
+        // Outer commits: index stays at 2.
+        journal.commit_frame(&mut host).unwrap();
+        assert_eq!(journal.origination_index(), 2);
     }
 }

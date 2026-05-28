@@ -11082,6 +11082,680 @@ let test_crac_evm_to_tez_high_gas =
   Log.debug ~prefix "Verify EVM bridge counter (incremented before+after CRAC)" ;
   EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_bridge
 
+(* ======================================================================
+ * L2-1366 regression: inbound-CRAC origination-nonce isolation.
+ *
+ * Before the fix, every inbound CRAC handler invocation built its own
+ * local `OriginationNonce::initial(OperationHash::default())` from a
+ * constant 32-byte seed.  The KT1 of a child originated through MIR
+ * `CREATE_CONTRACT` is `digest_160(operation_hash[32] || index[4])`,
+ * so without any block / operation / CRAC entropy in the seed every
+ * inbound-CRAC `CREATE_CONTRACT` collapsed onto the same KT1 and
+ * silently overwrote any previously-deployed child.
+ *
+ * The fix derives the operation hash from
+ * `blake2b(crac:<block_number>:<crac_id>)` AND persists the
+ * origination index in the Michelson journal across the inbound-CRAC
+ * handler invocations of a single synthetic Michelson manager
+ * operation.  This guarantees three properties end-to-end:
+ *
+ *   1. cross-operation isolation (two top-level EVM txs in the same
+ *      block);
+ *   2. cross-block isolation (two CRACs in different blocks);
+ *   3. intra-operation isolation (two inbound CRACs triggered by the
+ *      same top-level EVM transaction, e.g. one EVM contract calling
+ *      two distinct Michelson callees in turn — the case the
+ *      block-number/crac-id seed alone could not catch because both
+ *      CRACs share the same seed).
+ *
+ * The three tests below pin each property; a fourth pre-fix
+ * verification asserts the children never collapse onto the legacy
+ * constant address.
+ * ====================================================================== *)
+
+(* Pre-fix collision target: `digest_160([0;32] || 0x00000001)`.  Any
+   child KT1 equal to this constant is the signature of the original
+   constant-seed bug. *)
+let crac_orig_buggy_constant_kt1 = "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm"
+
+(* Find the CREATE_CONTRACT child KT1 sourced by [callee_kt1] (the
+   originated child performed inside that callee's %run).  The
+   CREATE_CONTRACT child is distinguished from the per-CRAC alias
+   originations (sourced by the NULL_PKH handler) by its source being
+   the callee itself. *)
+let crac_orig_child_kt1_for_callee ~prefix ~op_list ~callee_kt1 =
+  let children =
+    List.concat_map
+      (fun op ->
+        let top = JSON.(op |-> "contents" |=> 0) in
+        let internals =
+          JSON.(top |-> "metadata" |-> "internal_operation_results" |> as_list)
+        in
+        List.concat_map
+          (fun iop ->
+            let kind = JSON.(iop |-> "kind" |> as_string) in
+            let src = JSON.(iop |-> "source" |> as_string) in
+            if kind = "origination" && src = callee_kt1 then
+              JSON.(iop |-> "result" |-> "originated_contracts" |> as_list)
+              |> List.map JSON.as_string
+            else [])
+          internals)
+      op_list
+  in
+  Log.info
+    "%s: CREATE_CONTRACT child(ren) sourced by callee %s = [%s]"
+    prefix
+    callee_kt1
+    (String.concat "; " children) ;
+  match children with
+  | [child] -> child
+  | [] ->
+      Test.fail
+        "%s: no CREATE_CONTRACT child sourced by callee %s found in any \
+         manager op"
+        prefix
+        callee_kt1
+  | _ ->
+      Test.fail
+        "%s: expected exactly one CREATE_CONTRACT child sourced by callee %s, \
+         got %d"
+        prefix
+        callee_kt1
+        (List.length children)
+
+(* Find every CREATE_CONTRACT child KT1 originated through any of the
+   given [callee_kt1s] across the supplied manager ops.  Used by the
+   intra-tx test, where a single Michelson op merges the originations
+   from two sequential inbound CRACs under one synthetic receipt. *)
+let crac_orig_child_kt1s_for_callees ~prefix ~op_list ~callee_kt1s =
+  let callees = List.sort_uniq String.compare callee_kt1s in
+  let children =
+    List.concat_map
+      (fun op ->
+        let top = JSON.(op |-> "contents" |=> 0) in
+        let internals =
+          JSON.(top |-> "metadata" |-> "internal_operation_results" |> as_list)
+        in
+        List.concat_map
+          (fun iop ->
+            let kind = JSON.(iop |-> "kind" |> as_string) in
+            let src = JSON.(iop |-> "source" |> as_string) in
+            if kind = "origination" && List.mem src callees then
+              JSON.(iop |-> "result" |-> "originated_contracts" |> as_list)
+              |> List.map JSON.as_string
+            else [])
+          internals)
+      op_list
+  in
+  Log.info
+    "%s: CREATE_CONTRACT children sourced by callees [%s] = [%s]"
+    prefix
+    (String.concat "; " callees)
+    (String.concat "; " children) ;
+  children
+
+(* Register a test exposing the raw [sequencer_setup] (we need direct
+   access to [sc_rollup_address] / [sc_rollup_node] / [client] /
+   [l1_contracts] to originate Michelson contracts via the delayed
+   inbox, which the CRAC runner wrapper hides). *)
+let crac_orig_register ~title ~tags body =
+  let with_runtimes = Tezosx_runtime.[Tezos] in
+  let tags =
+    ["tezosx"]
+    @ List.map Tezosx_runtime.tag with_runtimes
+    @ ["crac"; "origination"; "l2_1366"]
+    @ tags
+  in
+  Setup.register_test
+    ~__FILE__
+    ~rpc_server:Evm_node.Resto
+    ~title
+    ~time_between_blocks:Nothing
+    ~tags
+    ~kernel:Latest
+    ~with_runtimes
+    ~enable_dal:false
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@ fun sequencer_setup protocol ->
+  let {
+    Setup.sc_rollup_address;
+    sc_rollup_node;
+    l1_contracts;
+    sequencer;
+    client;
+    evm_version;
+    _;
+  } =
+    sequencer_setup
+  in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let source = Constant.bootstrap5 in
+  let ref_nonce = ref 0 in
+  let evm_nonce () =
+    let n = !ref_nonce in
+    incr ref_nonce ;
+    n
+  in
+  let ref_counter = ref 1 in
+  let tez_counter () =
+    let c = !ref_counter in
+    incr ref_counter ;
+    c
+  in
+  body
+    ~sc_rollup_address
+    ~sc_rollup_node
+    ~l1_contracts
+    ~sequencer
+    ~client
+    ~evm_version
+    ~sender
+    ~source
+    ~evm_nonce
+    ~tez_counter
+    protocol
+
+(* Originate the Michelson callee fixture: a parameterless %run that
+   performs exactly one CREATE_CONTRACT. *)
+let crac_orig_originate_create_on_run ~sc_rollup_address ~sc_rollup_node ~client
+    ~l1_contracts ~sequencer ~source ~counter protocol =
+  TezContract.originate_contract_via_delayed_inbox
+    ~sc_rollup_address
+    ~sc_rollup_node
+    ~client
+    ~l1_contracts
+    ~sequencer
+    ~source
+    ~counter
+    ~script_name:["mini_scenarios"; "crac_originate_on_run"]
+    ~init_storage_data:"0"
+    protocol
+
+(* Deploy + initialise an EVM bridge whose run() NACs into the given
+   Michelson %run target. *)
+let crac_orig_deploy_bridge ~evm_version ~sequencer ~sender ~nonce ~kt1 =
+  let* addr =
+    EvmCrossRuntimeRunnerTez.deploy ~evm_version ~sequencer ~sender ~nonce ()
+  in
+  let* () =
+    EvmCrossRuntimeRunnerTez.init
+      ~sequencer
+      ~sender
+      ~nonce:(nonce + 1)
+      ~value:Wei.zero
+      ~tez_contract_target_address:kt1
+      addr
+  in
+  return addr
+
+(* Craft + send a raw EVM run() tx to the mempool without producing a
+   block.  Used to land two distinct top-level CRACs in the same block. *)
+let crac_orig_send_run_no_block ~sequencer ~sender ~nonce ~address =
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:sender.Eth_account.private_key
+      ~chain_id:EvmContract.tezosx_evm_chain_id
+      ~nonce
+      ~gas:2_000_000
+      ~gas_price:1_000_000_000
+      ~value:Wei.zero
+      ~address
+      ~signature:"run()"
+      ~arguments:[]
+      ()
+  in
+  Rpc.send_raw_transaction ~raw_tx sequencer
+
+(* PRIMARY: two distinct top-level EVM txs in ONE block, each NACing
+   into a Michelson callee that performs CREATE_CONTRACT.  With the
+   fix, the two children must derive DISTINCT KT1s. *)
+let test_crac_orig_two_txs_one_block =
+  crac_orig_register
+    ~title:
+      "CRAC: two inbound-CRAC CREATE_CONTRACT in two txs / one block produce \
+       distinct KT1s"
+    ~tags:["collision"]
+  @@
+  fun ~sc_rollup_address
+      ~sc_rollup_node
+      ~l1_contracts
+      ~sequencer
+      ~client
+      ~evm_version
+      ~sender
+      ~source
+      ~evm_nonce
+      ~tez_counter
+      protocol
+    ->
+  let prefix = "CRAC-ORIG" in
+  Log.debug ~prefix "Originate Michelson CREATE_CONTRACT callee #1" ;
+  let* _, kt1_callee_1 =
+    crac_orig_originate_create_on_run
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:(tez_counter ())
+      protocol
+  in
+  Log.debug ~prefix "Originate Michelson CREATE_CONTRACT callee #2" ;
+  let* _, kt1_callee_2 =
+    crac_orig_originate_create_on_run
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:(tez_counter ())
+      protocol
+  in
+  Log.debug ~prefix "Deploy EVM bridge #1 -> callee #1" ;
+  let n1 = evm_nonce () in
+  let* bridge_1 =
+    crac_orig_deploy_bridge
+      ~evm_version
+      ~sequencer
+      ~sender
+      ~nonce:n1
+      ~kt1:kt1_callee_1
+  in
+  let _ =
+    evm_nonce ()
+    (* consumed by bridge init *)
+  in
+  Log.debug ~prefix "Deploy EVM bridge #2 -> callee #2" ;
+  let n2 = evm_nonce () in
+  let* bridge_2 =
+    crac_orig_deploy_bridge
+      ~evm_version
+      ~sequencer
+      ~sender
+      ~nonce:n2
+      ~kt1:kt1_callee_2
+  in
+  let _ = evm_nonce () in
+  (* Send both run() txs to the mempool, then produce one block so both
+     land as two distinct top-level operations in the same block. *)
+  Log.debug ~prefix "Send both run() txs to mempool (no block yet)" ;
+  let*@ _h1 =
+    crac_orig_send_run_no_block
+      ~sequencer
+      ~sender
+      ~nonce:(evm_nonce ())
+      ~address:bridge_1
+  in
+  let*@ _h2 =
+    crac_orig_send_run_no_block
+      ~sequencer
+      ~sender
+      ~nonce:(evm_nonce ())
+      ~address:bridge_2
+  in
+  Log.debug ~prefix "Produce ONE block containing both txs" ;
+  let*@ _block_number = Rpc.produce_block sequencer in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage
+      ~sequencer
+      ~expected_counter:2
+      bridge_1
+  in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage
+      ~sequencer
+      ~expected_counter:2
+      bridge_2
+  in
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  let op_list = JSON.(ops |> as_list) in
+  Log.info
+    "%s: %d Michelson manager operation(s) in block"
+    prefix
+    (List.length op_list) ;
+  Check.(
+    (List.length op_list = 2)
+      int
+      ~error_msg:"expected 2 top-level Michelson ops (one per EVM tx), got %L") ;
+  let child_1 =
+    crac_orig_child_kt1_for_callee ~prefix ~op_list ~callee_kt1:kt1_callee_1
+  in
+  let child_2 =
+    crac_orig_child_kt1_for_callee ~prefix ~op_list ~callee_kt1:kt1_callee_2
+  in
+  Log.info
+    "%s OBSERVABLE: child_op1=%s child_op2=%s (must be DISTINCT)"
+    prefix
+    child_1
+    child_2 ;
+  Check.(
+    (child_1 <> child_2)
+      string
+      ~error_msg:
+        "regression: two inbound-CRAC CREATE_CONTRACTs in one block collided \
+         onto the same KT1 (%L). The origination-nonce seed has lost its \
+         per-operation entropy.") ;
+  Check.(
+    (child_1 <> crac_orig_buggy_constant_kt1)
+      string
+      ~error_msg:
+        "regression: child_1 equals the pre-fix constant collision KT1 (%L) — \
+         the constant-seed bug is back.") ;
+  Check.(
+    (child_2 <> crac_orig_buggy_constant_kt1)
+      string
+      ~error_msg:
+        "regression: child_2 equals the pre-fix constant collision KT1 (%L) — \
+         the constant-seed bug is back.") ;
+  unit
+
+(* SCOPE: two CRACs landing in DIFFERENT blocks must also produce
+   distinct KT1s.  Pre-fix, they collided on the same constant address
+   regardless of block; post-fix the block_number is mixed into the
+   seed so cross-block isolation also holds. *)
+let test_crac_orig_two_txs_two_blocks =
+  crac_orig_register
+    ~title:
+      "CRAC: two inbound-CRAC CREATE_CONTRACT in two txs / two blocks produce \
+       distinct KT1s"
+    ~tags:["cross_block"]
+  @@
+  fun ~sc_rollup_address
+      ~sc_rollup_node
+      ~l1_contracts
+      ~sequencer
+      ~client
+      ~evm_version
+      ~sender
+      ~source
+      ~evm_nonce
+      ~tez_counter
+      protocol
+    ->
+  let prefix = "CRAC-ORIG-BLK" in
+  let* _, kt1_callee_1 =
+    crac_orig_originate_create_on_run
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:(tez_counter ())
+      protocol
+  in
+  let* _, kt1_callee_2 =
+    crac_orig_originate_create_on_run
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:(tez_counter ())
+      protocol
+  in
+  (* The two callees were originated via the native delayed-inbox path
+     (real per-op hash); their addresses must already be distinct — this
+     guards the fixture itself. *)
+  Check.(
+    (kt1_callee_1 <> kt1_callee_2)
+      string
+      ~error_msg:
+        "native control: two natively-originated callees collided on %L — the \
+         native-path origination nonce seeding regressed.") ;
+  let n1 = evm_nonce () in
+  let* bridge_1 =
+    crac_orig_deploy_bridge
+      ~evm_version
+      ~sequencer
+      ~sender
+      ~nonce:n1
+      ~kt1:kt1_callee_1
+  in
+  let _ = evm_nonce () in
+  let n2 = evm_nonce () in
+  let* bridge_2 =
+    crac_orig_deploy_bridge
+      ~evm_version
+      ~sequencer
+      ~sender
+      ~nonce:n2
+      ~kt1:kt1_callee_2
+  in
+  let _ = evm_nonce () in
+  (* Block 1: only bridge_1 fires. *)
+  let*@ _h1 =
+    crac_orig_send_run_no_block
+      ~sequencer
+      ~sender
+      ~nonce:(evm_nonce ())
+      ~address:bridge_1
+  in
+  let*@ _b1 = Rpc.produce_block sequencer in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  let* ops1 = fetch_recent_michelson_manager_ops sequencer in
+  let child_1 =
+    crac_orig_child_kt1_for_callee
+      ~prefix
+      ~op_list:JSON.(ops1 |> as_list)
+      ~callee_kt1:kt1_callee_1
+  in
+  (* Block 2: only bridge_2 fires. *)
+  let*@ _h2 =
+    crac_orig_send_run_no_block
+      ~sequencer
+      ~sender
+      ~nonce:(evm_nonce ())
+      ~address:bridge_2
+  in
+  let*@ _b2 = Rpc.produce_block sequencer in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  let* ops2 = fetch_recent_michelson_manager_ops sequencer in
+  let child_2 =
+    crac_orig_child_kt1_for_callee
+      ~prefix
+      ~op_list:JSON.(ops2 |> as_list)
+      ~callee_kt1:kt1_callee_2
+  in
+  Log.info
+    "%s OBSERVABLE (cross-block): child_block1=%s child_block2=%s (must be \
+     DISTINCT)"
+    prefix
+    child_1
+    child_2 ;
+  Check.(
+    (child_1 <> child_2)
+      string
+      ~error_msg:
+        "regression: two inbound-CRAC CREATE_CONTRACTs in separate blocks \
+         still collided on %L. The block-number entropy in the \
+         origination-nonce seed is missing.") ;
+  Check.(
+    (child_1 <> crac_orig_buggy_constant_kt1)
+      string
+      ~error_msg:
+        "regression: cross-block child_1 equals the pre-fix constant collision \
+         KT1 (%L).") ;
+  Check.(
+    (child_2 <> crac_orig_buggy_constant_kt1)
+      string
+      ~error_msg:
+        "regression: cross-block child_2 equals the pre-fix constant collision \
+         KT1 (%L).") ;
+  unit
+
+(* INTRA-TX: a SINGLE top-level EVM transaction triggering TWO
+   sequential inbound CRACs, each performing CREATE_CONTRACT on a
+   distinct Michelson callee.  Both CRACs share the same `block_number`
+   and `crac_id`, so a seed-only fix would leave them colliding —
+   this test fails until the origination-nonce index is also
+   persisted across handler invocations.  An EVM "main" contract is
+   wired to call two bridges; one EVM call produces one synthetic
+   Michelson manager op carrying both CREATE_CONTRACTs, and we
+   assert the two children are distinct KT1s. *)
+let test_crac_orig_two_cracs_one_tx =
+  crac_orig_register
+    ~title:
+      "CRAC: two inbound-CRAC CREATE_CONTRACT in a single EVM tx produce \
+       distinct KT1s"
+    ~tags:["intra_tx"]
+  @@
+  fun ~sc_rollup_address
+      ~sc_rollup_node
+      ~l1_contracts
+      ~sequencer
+      ~client
+      ~evm_version
+      ~sender
+      ~source
+      ~evm_nonce
+      ~tez_counter
+      protocol
+    ->
+  let prefix = "CRAC-ORIG-INTRA" in
+  Log.debug ~prefix "Originate Michelson CREATE_CONTRACT callee #1" ;
+  let* _, kt1_callee_1 =
+    crac_orig_originate_create_on_run
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:(tez_counter ())
+      protocol
+  in
+  Log.debug ~prefix "Originate Michelson CREATE_CONTRACT callee #2" ;
+  let* _, kt1_callee_2 =
+    crac_orig_originate_create_on_run
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:(tez_counter ())
+      protocol
+  in
+  let n1 = evm_nonce () in
+  let* bridge_1 =
+    crac_orig_deploy_bridge
+      ~evm_version
+      ~sequencer
+      ~sender
+      ~nonce:n1
+      ~kt1:kt1_callee_1
+  in
+  let _ = evm_nonce () in
+  let n2 = evm_nonce () in
+  let* bridge_2 =
+    crac_orig_deploy_bridge
+      ~evm_version
+      ~sequencer
+      ~sender
+      ~nonce:n2
+      ~kt1:kt1_callee_2
+  in
+  let _ = evm_nonce () in
+  (* EVM "main" caller that, on `run()`, invokes both bridges in order.
+     `multi_run_caller` Solidity contract: `run()` iterates its
+     configured callees calling each one's `run()`. *)
+  let* main_addr =
+    EvmMultiRunCaller.deploy
+      ~evm_version
+      ~sequencer
+      ~sender
+      ~nonce:(evm_nonce ())
+      ()
+  in
+  let* () =
+    EvmMultiRunCaller.init
+      ~sequencer
+      ~sender
+      ~nonce:(evm_nonce ())
+      ~value:Wei.zero
+      ~revert:false
+      ~callees:[(bridge_1, false); (bridge_2, false)]
+      main_addr
+  in
+  Log.debug ~prefix "Send single run() tx triggering both CRACs in sequence" ;
+  let*@ _h =
+    crac_orig_send_run_no_block
+      ~sequencer
+      ~sender
+      ~nonce:(evm_nonce ())
+      ~address:main_addr
+  in
+  let*@ _block_number = Rpc.produce_block sequencer in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  let op_list = JSON.(ops |> as_list) in
+  Log.info
+    "%s: %d Michelson manager operation(s) in block"
+    prefix
+    (List.length op_list) ;
+  (* Re-entrant inner CRACs of the same EVM tx are folded into ONE
+     synthetic Michelson manager op (`merge_crac_internals`).  Both
+     CREATE_CONTRACTs must therefore appear as internal originations
+     of that single op. *)
+  Check.(
+    (List.length op_list = 1)
+      int
+      ~error_msg:
+        "expected 1 synthetic Michelson manager op for the merged intra-tx \
+         CRACs, got %L") ;
+  let children =
+    crac_orig_child_kt1s_for_callees
+      ~prefix
+      ~op_list
+      ~callee_kt1s:[kt1_callee_1; kt1_callee_2]
+  in
+  Check.(
+    (List.length children = 2)
+      int
+      ~error_msg:
+        "expected exactly 2 CREATE_CONTRACT children (one per inbound CRAC), \
+         got %L") ;
+  let child_1 = List.nth children 0 in
+  let child_2 = List.nth children 1 in
+  Log.info
+    "%s OBSERVABLE (intra-tx): child_a=%s child_b=%s (must be DISTINCT)"
+    prefix
+    child_1
+    child_2 ;
+  Check.(
+    (child_1 <> child_2)
+      string
+      ~error_msg:
+        "regression: two inbound CRACs triggered by a SINGLE EVM tx collided \
+         on the same KT1 (%L). The origination-nonce index is not being \
+         persisted across handler invocations within one synthetic op.") ;
+  Check.(
+    (child_1 <> crac_orig_buggy_constant_kt1)
+      string
+      ~error_msg:
+        "regression: intra-tx child_a equals the pre-fix constant collision \
+         KT1 (%L).") ;
+  Check.(
+    (child_2 <> crac_orig_buggy_constant_kt1)
+      string
+      ~error_msg:
+        "regression: intra-tx child_b equals the pre-fix constant collision \
+         KT1 (%L).") ;
+  unit
+
 let () =
   test_crac_evm_to_tez [Alpha] ;
   test_crac_evm_multiple_independent_crossings [Alpha] ;
@@ -11195,4 +11869,7 @@ let () =
   test_crac_collect_result_nested_independent_slots [Alpha] ;
   test_crac_collect_result_large_payload_oog [Alpha] ;
   test_crac_tezosx_caller_balance_stays_zero [Alpha] ;
-  test_crac_evm_to_tez_high_gas [Alpha]
+  test_crac_evm_to_tez_high_gas [Alpha] ;
+  test_crac_orig_two_txs_one_block [Alpha] ;
+  test_crac_orig_two_txs_two_blocks [Alpha] ;
+  test_crac_orig_two_cracs_one_tx [Alpha]

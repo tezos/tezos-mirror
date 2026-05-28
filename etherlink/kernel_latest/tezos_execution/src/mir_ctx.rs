@@ -1629,8 +1629,10 @@ pub mod tests {
         // The test exercises `lookup_view_storage_balance` directly,
         // not the enshrined-view hook, so journal and registry are
         // just placeholders that satisfy the type system.
-        let mut journal =
-            tezosx_journal::TezosXJournal::new(tezosx_journal::CracId::new(1, 0));
+        let mut journal = tezosx_journal::TezosXJournal::new(
+            tezosx_journal::CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let registry = tezosx_interfaces::testing::UnimplementedRegistry;
         let mut ctx = Ctx {
             tc_ctx: &mut tc_ctx,
@@ -2162,8 +2164,10 @@ pub mod tests {
             },
         };
 
-        let mut journal =
-            tezosx_journal::TezosXJournal::new(tezosx_journal::CracId::new(1, 0));
+        let mut journal = tezosx_journal::TezosXJournal::new(
+            tezosx_journal::CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         // The synthetic-view dispatcher under test short-circuits on
         // `Type::Unit` before any registry call, so unwiring all
         // registry methods catches any future regression where a code

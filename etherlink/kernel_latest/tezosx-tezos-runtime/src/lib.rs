@@ -689,7 +689,28 @@ where
         big_map_diff: BTreeMap::new(),
         next_temporary_id: &mut next_temp_id,
     };
-    let mut nonce = OriginationNonce::initial(OperationHash::default());
+    // Resume the inbound-CRAC origination nonce from the Michelson
+    // journal so two sequential inbound CRACs in the same synthetic
+    // op (e.g. an EVM transaction calling two distinct Michelson
+    // callees in turn) keep monotonically increasing indices and
+    // therefore derive distinct child KT1s — child KT1 is
+    // `digest_160(operation_hash[32] || index[4])`, so without this
+    // each handler invocation would restart from index 0 and the
+    // two CRACs' `CREATE_CONTRACT`s would land on the same KT1
+    // (L2-1366).
+    //
+    // The operation hash is set on the journal at construction time
+    // by the caller (`TezosXJournal::new`) and is stable for the
+    // rest of the journal's lifetime; the canonical derivation
+    // (`crac:<block_number>:<crac_id>`) makes two different
+    // synthetic Michelson manager operations see distinct seeds
+    // (cross-operation and cross-block isolation), mirroring the
+    // per-op-hash entropy the native L1 path obtains from the real
+    // operation hash in `tezos_execution::apply_operation`.
+    let mut nonce = OriginationNonce {
+        operation: journal.michelson.operation_hash().clone(),
+        index: journal.michelson.origination_index(),
+    };
     let mut counter = 0u128;
     let mut operation_ctx = OperationCtx {
         source: &source_account,
@@ -747,7 +768,7 @@ where
                 })
             })
             .collect::<Result<_, TezosXRuntimeError>>()?;
-    let result = match cross_runtime_transfer(
+    let transfer_result = cross_runtime_transfer(
         &mut tc_ctx,
         &mut operation_ctx,
         registry,
@@ -758,7 +779,19 @@ where
         &parameters,
         &parser,
         &mut nonce_counter,
-    ) {
+    );
+    // Persist the post-execution origination index back to the
+    // journal on every path (success, failure, OOG): MIR has had
+    // its mutable borrow of `nonce` released by `cross_runtime_transfer`
+    // returning, so `nonce.index` now reflects all `CREATE_CONTRACT`s
+    // performed during this inbound CRAC.  Writing it back here lets
+    // the next inbound CRAC in the same synthetic op (e.g. a second
+    // EVM→Michelson call in the same transaction) resume from a
+    // distinct index rather than re-using an already-consumed slot.
+    // A subsequent `revert_frame` on the enclosing EVM frame will
+    // roll the index back to the value captured at frame entry.
+    journal.michelson.set_origination_index(nonce.index);
+    let result = match transfer_result {
         Ok(r) => r,
         Err(CracTransferError {
             error,

@@ -1,0 +1,29 @@
+# Inbound-CRAC origination-nonce regression fixture (L2-1366).
+# A Michelson contract exposing a parameterless `%run` entrypoint that
+# performs exactly one CREATE_CONTRACT. Used as the CRAC callee reached
+# from an EVM bridge that calls %run with Unit.
+#
+# storage `nat %count` is bumped so we can confirm the entrypoint ran.
+# The child contract is a trivial unit/unit contract.
+#
+# CREATE_CONTRACT consumes, from the top: option key_hash, mutez, and the
+# child's initial storage value; it pushes: operation, then address.
+parameter (unit %run);
+storage nat;
+code { CDR ;                          # nat (count)
+       PUSH nat 1 ; ADD ;             # count := count + 1   :: nat
+       NONE key_hash ;                # option key_hash : nat
+       AMOUNT ;                       # mutez : option key_hash : nat
+       SWAP ;                         # option key_hash : mutez : nat
+       PUSH unit Unit ;               # unit : option key_hash : mutez : nat
+       SWAP ;                         # option key_hash : unit : mutez : nat
+       DIG 2 ;                        # mutez : option key_hash : unit : nat
+       DIG 1 ;                        # option key_hash : mutez : unit : nat
+       CREATE_CONTRACT
+         { parameter unit ;
+           storage unit ;
+           code { CDR ; NIL operation ; PAIR } } ;
+       # stack: operation : address : nat
+       DIP { DROP } ;                 # operation : nat   (drop child KT1 addr)
+       NIL operation ; SWAP ; CONS ;  # (list operation) : nat
+       PAIR }

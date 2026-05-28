@@ -182,11 +182,57 @@ pub struct TezosXJournal {
 }
 
 impl TezosXJournal {
-    pub fn new(crac_id: CracId) -> Self {
+    /// Construct a fresh journal for one synthetic Michelson manager
+    /// operation.  [`operation_hash`] is propagated to the Michelson
+    /// journal where it seeds the inbound-CRAC origination nonce; it
+    /// MUST be derived deterministically from `crac_id` and the
+    /// originating block so two synthetic ops in the same block see
+    /// distinct seeds — see
+    /// [`Self::synthetic_operation_hash`] for the canonical
+    /// derivation.
+    pub fn new(
+        crac_id: CracId,
+        operation_hash: tezos_crypto_rs::hash::OperationHash,
+    ) -> Self {
         Self {
+            evm: EvmJournal::default(),
+            michelson: MichelsonJournal::new(operation_hash),
+            finalized_http_traces: Vec::new(),
+            pending_http_traces: Vec::new(),
             crac_id,
-            ..Default::default()
         }
+    }
+
+    /// Canonical derivation for the synthetic operation hash that
+    /// seeds an inbound-CRAC origination nonce.  Hashing
+    /// `crac:<chain_id>:<block_number>:<crac_id>` gives every synthetic
+    /// Michelson manager operation a distinct seed across operations,
+    /// blocks AND chains.  This mirrors L1, where the operation hash is
+    /// the hash of the signed bytes whose signature is bound to the
+    /// chain id via the signing watermark — so identical operation
+    /// bytes on two chains yield different op hashes (and child KT1s).
+    /// Folding `chain_id` in keeps the kernel safe if the same binary
+    /// runs on multiple chains (test scenarios, replays, forks).  Used
+    /// by production journal-construction sites; tests that don't care
+    /// about origination addresses may pass `OperationHash::default()`
+    /// to [`Self::new`] directly.
+    //
+    // TODO: https://linear.app/tezos/issue/L2-1440
+    // Tezos-originated paths also use this synthetic seed today to
+    // keep the CRAC and native-Michelson origination-nonce universes
+    // disjoint.  Once a single `OriginationNonce` is shared between
+    // both paths inside one synthetic op, those sites can drop the
+    // synthetic seed and pass the real `op.hash()` to
+    // [`Self::new`], matching L1's per-operation nonce semantics.
+    pub fn synthetic_operation_hash(
+        crac_id: &CracId,
+        chain_id: u64,
+        block_number: u64,
+    ) -> tezos_crypto_rs::hash::OperationHash {
+        let seed = format!("crac:{chain_id}:{block_number}:{crac_id}");
+        tezos_crypto_rs::hash::OperationHash::from(tezos_crypto_rs::blake2b::digest_256(
+            seed.as_bytes(),
+        ))
     }
 
     /// Record an HTTP request. The trace is pushed onto an internal stack;
@@ -253,9 +299,40 @@ mod tests {
         }
     }
 
+    // Golden vector for `synthetic_operation_hash`.
+    //
+    // Pins the digest of the seed `crac:1:2:3-4` so any drift in the
+    // format template, `CracId::Display`, or the digest function
+    // surfaces here rather than only via Tezt regressions watching
+    // KT1 churn.  Regenerate by running this test and copying the
+    // bytes printed in the failure message.
+    #[test]
+    fn test_synthetic_operation_hash_golden() {
+        let hash = TezosXJournal::synthetic_operation_hash(
+            &CracId::new(3, 4),
+            /* chain_id = */ 1,
+            /* block_number = */ 2,
+        );
+        // blake2b-256(b"crac:1:2:3-4")
+        let expected = tezos_crypto_rs::hash::OperationHash::from([
+            0xbe, 0x50, 0x3b, 0x8c, 0x52, 0x5d, 0x46, 0x29, 0x82, 0x75, 0x82, 0x6d, 0x4c,
+            0x53, 0x1f, 0xcb, 0x21, 0x7d, 0x3e, 0xf3, 0xc3, 0xc0, 0xd3, 0x94, 0xb8, 0x5a,
+            0xf6, 0xad, 0xc9, 0xc3, 0x2c, 0x7e,
+        ]);
+        assert_eq!(
+            hash,
+            expected,
+            "synthetic_operation_hash drifted from golden vector; got {:02x?}",
+            hash.as_ref()
+        );
+    }
+
     #[test]
     fn test_crac_id_available_from_creation() {
-        let journal = TezosXJournal::new(test_crac_id());
+        let journal = TezosXJournal::new(
+            test_crac_id(),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         assert_eq!(journal.crac_id().origin_runtime, 1);
         assert_eq!(journal.crac_id().tx_index, 42);
         assert_eq!(journal.crac_id().to_string(), "1-42");
@@ -263,13 +340,19 @@ mod tests {
 
     #[test]
     fn test_verify_crac_id_matching() {
-        let journal = TezosXJournal::new(test_crac_id());
+        let journal = TezosXJournal::new(
+            test_crac_id(),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         assert!(journal.verify_crac_id("1-42").is_ok());
     }
 
     #[test]
     fn test_verify_crac_id_mismatch() {
-        let journal = TezosXJournal::new(test_crac_id());
+        let journal = TezosXJournal::new(
+            test_crac_id(),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         assert!(journal.verify_crac_id("0-99").is_err());
     }
 
@@ -284,14 +367,23 @@ mod tests {
 
     #[test]
     fn test_crac_id_is_stable() {
-        let j1 = TezosXJournal::new(test_crac_id());
-        let j2 = TezosXJournal::new(test_crac_id());
+        let j1 = TezosXJournal::new(
+            test_crac_id(),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
+        let j2 = TezosXJournal::new(
+            test_crac_id(),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         assert_eq!(j1.crac_id(), j2.crac_id());
     }
 
     #[test]
     fn test_record_request_and_response() {
-        let mut journal = TezosXJournal::new(test_crac_id());
+        let mut journal = TezosXJournal::new(
+            test_crac_id(),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
 
         let request = http::Request::builder()
             .method("POST")
@@ -324,7 +416,10 @@ mod tests {
 
     #[test]
     fn test_nested_traces() {
-        let mut journal = TezosXJournal::new(test_crac_id());
+        let mut journal = TezosXJournal::new(
+            test_crac_id(),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
 
         // Outer call: EVM → Tezos
         let req1 = http::Request::builder()

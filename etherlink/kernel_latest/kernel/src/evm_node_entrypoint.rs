@@ -304,8 +304,20 @@ where
     // For Tezos transactions, call apply_tezos_operation directly with an
     // external journal so we can capture HTTP traces.  For Ethereum
     // transactions, go through the normal apply_transaction path.
+    let trace_crac_id = tezosx_journal::CracId::new(0, 0);
+    // Both arms seed the journal via `synthetic_operation_hash`.  The
+    // normal Michelson path that runs inside `apply_tezos_operation`
+    // builds its own `OriginationNonce::initial(real_hash)` starting
+    // at index 0, so reusing the real hash here would let CRACs and
+    // normal originations collide on a child KT1.  A synthetic seed
+    // keeps the two nonce universes disjoint.
+    let trace_operation_hash = tezosx_journal::TezosXJournal::synthetic_operation_hash(
+        &trace_crac_id,
+        eth_chain_id.low_u64(),
+        block_in_progress.number.low_u64(),
+    );
     let mut trace_journal =
-        tezosx_journal::TezosXJournal::new(tezosx_journal::CracId::new(0, 0));
+        tezosx_journal::TezosXJournal::new(trace_crac_id, trace_operation_hash);
     let execution_result = match transaction {
         chains::TezosXTransaction::Tezos(operation) => {
             let enable_gas_refund = evm_config
