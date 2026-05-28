@@ -1602,6 +1602,27 @@ mod drop_safety {
         });
     }
 
+    #[test]
+    fn drop_shared_deeply_nested_lambda_instruction() {
+        // The common runtime case: the lambda body `Rc` is shared (AST
+        // instruction + a pushed lambda value hold the same code). The first
+        // owner to drop hits `Rc::get_mut` == None and skips draining; the
+        // *last* owner finds each body sole-owned and drains it iteratively.
+        // Neither drop may overflow.
+        on_kernel_stack(|| {
+            let mut instr = Instruction::Drop(None);
+            for _ in 0..DEPTH {
+                instr = Instruction::Lambda(Lambda::Lambda {
+                    micheline_code: Micheline::Seq(&[]),
+                    code: vec![instr].into(),
+                });
+            }
+            let shared = instr.clone(); // top code Rc now refcount 2
+            drop(instr); // get_mut == None at the shared level: skipped
+            drop(shared); // last owner: drains iteratively
+        });
+    }
+
     fn deep_pair(depth: usize) -> TypedValue<'static> {
         let mut v = TypedValue::Unit;
         for _ in 0..depth {
