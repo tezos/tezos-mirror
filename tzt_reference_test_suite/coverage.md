@@ -1056,8 +1056,10 @@ Among tests on values serialization:
 - [packunpack_nat_00.tzt](packunpack_nat_00.tzt)
 - [packunpack_string_00.tzt](packunpack_string_00.tzt)
 - [packunpack_timestamp_00.tzt](packunpack_timestamp_00.tzt)
-
-Tested only with conjunction with `PACK`
+- [unpack_string_00.tzt](unpack_string_00.tzt)
+- [unpack_string_01.tzt](unpack_string_01.tzt)
+- [unpack_string_02.tzt](unpack_string_02.tzt)
+- [unpack_string_03.tzt](unpack_string_03.tzt)
 
 ### `UNPAIR`
 
@@ -1424,4 +1426,3 @@ Instructions with missing edge cases:
 - `PUSH` for more pushable types
 - `SENDER` when sender != source
 - `SET_DELEGATE` with `None`
-- `UNPACK` standalone tests (without `PACK`)

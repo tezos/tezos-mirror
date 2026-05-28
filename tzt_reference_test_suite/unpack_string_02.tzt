@@ -1,0 +1,6 @@
+# Tab (0x09) in a UNPACK string payload. Like carriage return, TAB is
+# outside L1's permitted set (newline + printable ASCII), so the
+# decode fails and UNPACK pushes None.
+code { UNPACK string } ;
+input { Stack_elt bytes 0x05010000000109 } ;
+output { Stack_elt (option string) None }

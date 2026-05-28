@@ -1,0 +1,8 @@
+# Carriage return (0x0d) in a UNPACK string payload. L1's string type
+# accepts only newline (0x0a) and printable ASCII (0x20..=0x7e), so it
+# rejects this as a non-printable character and UNPACK pushes None.
+# MIR used to accept 0x0d and push Some "a\rb" (L2-1357); it must now
+# match L1.
+code { UNPACK string } ;
+input { Stack_elt bytes 0x050100000003610d62 } ;
+output { Stack_elt (option string) None }
