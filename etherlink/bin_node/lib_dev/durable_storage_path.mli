@@ -36,19 +36,9 @@ val michelson_contract_storage : Tezos_types.Contract.t -> path
 val michelson_contract_code : Tezos_types.Contract.t -> path
 
 (** [michelson_contract_balance contract] is the durable storage path of
-    [contract]'s balance under the Tezlink Path data model
+    [contract]'s balance under the legacy Path data model
     ([/tez/tez_accounts/contracts/index/<hex>/balance]). *)
 val michelson_contract_balance : Tezos_types.Contract.t -> path
-
-(** [michelson_contract_manager contract] is the durable storage path of
-    [contract]'s revealed-public-key manager under the Tezlink Path data
-    model ([/tez/tez_accounts/contracts/index/<hex>/manager]). *)
-val michelson_contract_manager : Tezos_types.Contract.t -> path
-
-(** [michelson_contract_counter contract] is the durable storage path of
-    [contract]'s nonce under the Tezlink Path data model
-    ([/tez/tez_accounts/contracts/index/<hex>/counter]). *)
-val michelson_contract_counter : Tezos_types.Contract.t -> path
 
 (** [/kernel/boot.wasm] — path of the kernel's WASM blob, the entry
     point [Pvm.Kernel] runs. Writable by the EVM node only for

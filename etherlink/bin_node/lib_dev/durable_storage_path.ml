@@ -132,12 +132,6 @@ let michelson_contract_code contract =
 let michelson_contract_balance contract =
   michelson_contract_dir contract ^ "/balance"
 
-let michelson_contract_manager contract =
-  michelson_contract_dir contract ^ "/manager"
-
-let michelson_contract_counter contract =
-  michelson_contract_dir contract ^ "/counter"
-
 let michelson_ledger_root = "/tez/tez_accounts/tezosx"
 
 let tez_world_state_root = TEZ.World_state.root
