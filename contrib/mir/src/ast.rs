@@ -896,6 +896,36 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<TypedValue
             // rather than recursing through the default `TypedValue` destructor.
             stack.push(replace(&mut t.content, TV::Unit));
         }
+        TV::Operation(info) => {
+            // Operations carry `TypedValue` payloads (transfer parameter, emit
+            // value, originated storage) that may be deep; drain them.
+            match &mut info.operation {
+                Operation::TransferTokens(tt) => stack.push(replace(&mut tt.param, TV::Unit)),
+                Operation::Emit(e) => stack.push(replace(&mut e.value, TV::Unit)),
+                Operation::CreateContract(c) => stack.push(replace(&mut c.storage, TV::Unit)),
+                Operation::SetDelegate(_) => {}
+            }
+        }
+        TV::BigMap(m) => {
+            // The in-memory keys/values (and the lazy-storage overlay diff) are
+            // owned `TypedValue`s that may be deep; drain them.
+            match &mut m.content {
+                big_map::BigMapContent::InMemory(map) => {
+                    for (k, v) in take(map) {
+                        stack.push(k);
+                        stack.push(v);
+                    }
+                }
+                big_map::BigMapContent::FromId(from_id) => {
+                    for (k, v) in take(&mut from_id.overlay) {
+                        stack.push(k);
+                        if let Some(v) = v {
+                            stack.push(v);
+                        }
+                    }
+                }
+            }
+        }
         _ => {}
     }
 }
@@ -1569,6 +1599,42 @@ mod drop_safety {
                 });
             }
             drop(instr);
+        });
+    }
+
+    fn deep_pair(depth: usize) -> TypedValue<'static> {
+        let mut v = TypedValue::Unit;
+        for _ in 0..depth {
+            v = TypedValue::new_pair(TypedValue::Unit, v);
+        }
+        v
+    }
+
+    #[test]
+    fn drain_deep_operation_value() {
+        // An operation carries a `TypedValue` payload (here an EMIT value) that
+        // may be deep; it must be drained, not recurse on the default destructor.
+        on_kernel_stack(|| {
+            let mut tv = TypedValue::Operation(Box::new(OperationInfo {
+                operation: Operation::Emit(Emit {
+                    tag: None,
+                    value: deep_pair(DEPTH),
+                    arg_ty: Or::Left(Type::Unit),
+                }),
+                counter: 0,
+            }));
+            drain_deep_typed_value(&mut tv);
+        });
+    }
+
+    #[test]
+    fn drain_deep_bigmap_value() {
+        // A big_map's in-memory values are owned `TypedValue`s that may be deep.
+        on_kernel_stack(|| {
+            let mut map = std::collections::BTreeMap::new();
+            map.insert(TypedValue::Unit, deep_pair(DEPTH));
+            let mut tv = TypedValue::BigMap(BigMap::new(Type::Unit, Type::Unit, map));
+            drain_deep_typed_value(&mut tv);
         });
     }
 }
