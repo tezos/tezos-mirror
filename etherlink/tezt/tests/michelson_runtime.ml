@@ -3554,6 +3554,7 @@ let test_michelson_gas_backlog_on_failed_op =
       ~prg:
         Michelson_script.(
           find ["mini_scenarios"; "fail_on_false"] protocol |> path)
+      ~fee_cap:Tez.(of_int 4)
       ~burn_cap:Tez.one
       client_tezlink
   in
@@ -3567,6 +3568,7 @@ let test_michelson_gas_backlog_on_failed_op =
       ~src:Constant.bootstrap1.public_key_hash
       ~init:"Unit"
       ~prg:Michelson_script.(find ["mini_scenarios"; "loop"] protocol |> path)
+      ~fee_cap:Tez.(of_int 60)
       ~burn_cap:Tez.one
       client_tezlink
   in
@@ -3583,9 +3585,9 @@ let test_michelson_gas_backlog_on_failed_op =
         let*@ _ = Rpc.produce_block ~timestamp:(next_timestamp ()) sequencer in
         unit)
   in
-  (* Fee must cover execution gas costs. 15 tez is enough for gas_limit = 10,000. *)
-  let fee = Tez.of_mutez_int 15_000_000 in
-  let fee_cap = Tez.of_mutez_int 20_000_000 in
+  (* Fee must cover execution gas costs. 3800 tez is enough for gas_limit = 10,000. *)
+  let fee = Tez.of_mutez_int 3_800_000_000 in
+  let fee_cap = Tez.of_mutez_int 4_000_000_000 in
   (* Both operations below are guaranteed to fail:
      - fail_on_false.tz + False = immediate FAILWITH
      - loop.tz + 1,500,000 iterations with gas_limit=10,000 = gas exhaustion

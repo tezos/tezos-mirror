@@ -1516,7 +1516,7 @@ mod tests {
 
     fn test_context() -> CrossRuntimeContext {
         CrossRuntimeContext {
-            gas_limit: 1_000_000,
+            gas_limit: 5_000_000,
             timestamp: U256::from(0),
             block_number: U256::from(0),
         }
@@ -1547,7 +1547,7 @@ mod tests {
                 evm_alias_info("0x1234567890abcdef1234567890abcdef12345678"),
                 None,
                 test_context(),
-                1_000_000,
+                5_000_000,
             )
             .expect("ensure_alias should succeed");
 
@@ -1574,7 +1574,7 @@ mod tests {
                 evm_alias_info(evm_address),
                 None,
                 test_context(),
-                1_000_000,
+                5_000_000,
             )
             .expect("ensure_alias should succeed");
 
@@ -1612,7 +1612,7 @@ mod tests {
                 evm_alias_info(evm_address),
                 None,
                 test_context(),
-                1_000_000,
+                5_000_000,
             )
             .expect("ensure_alias should succeed");
 
@@ -1645,7 +1645,7 @@ mod tests {
                 evm_alias_info(evm_address),
                 None,
                 test_context(),
-                1_000_000,
+                5_000_000,
             )
             .expect("ensure_alias should succeed");
 
@@ -1671,7 +1671,7 @@ mod tests {
                 evm_alias_info(evm_address),
                 None,
                 test_context(),
-                1_000_000,
+                5_000_000,
             )
             .unwrap();
         let alias2 = runtime
@@ -1682,7 +1682,7 @@ mod tests {
                 evm_alias_info(evm_address),
                 None,
                 test_context(),
-                1_000_000,
+                5_000_000,
             )
             .unwrap();
 
@@ -1703,7 +1703,7 @@ mod tests {
                 evm_alias_info("0x1111111111111111111111111111111111111111"),
                 None,
                 test_context(),
-                1_000_000,
+                5_000_000,
             )
             .unwrap();
         let alias2 = runtime
@@ -1714,7 +1714,7 @@ mod tests {
                 evm_alias_info("0x2222222222222222222222222222222222222222"),
                 None,
                 test_context(),
-                1_000_000,
+                5_000_000,
             )
             .unwrap();
 
@@ -1740,7 +1740,7 @@ mod tests {
                 evm_alias_info(evm_address),
                 None,
                 test_context(),
-                1_000_000,
+                5_000_000,
             )
             .unwrap();
 
@@ -1761,7 +1761,7 @@ mod tests {
         // cost is zero — only the first call pays for the storage init
         // (via the `originate_contract` receipt) and the classification
         // write.
-        let first_consumed = 1_000_000 - first.1;
+        let first_consumed = 5_000_000 - first.1;
         let second_consumed = 500_000 - second.1;
         assert!(
             second_consumed < first_consumed / 10,
@@ -1793,7 +1793,7 @@ mod tests {
                 evm_alias_info(evm_address),
                 None,
                 test_context(),
-                1_000_000,
+                5_000_000,
             )
             .unwrap();
 
@@ -1819,7 +1819,7 @@ mod tests {
                 evm_alias_info(evm_address),
                 None,
                 test_context(),
-                1_000_000,
+                5_000_000,
             )
             .unwrap();
 
@@ -1858,7 +1858,7 @@ mod tests {
             evm_alias_info(evm_address),
             None,
             test_context(),
-            1_000_000,
+            5_000_000,
         );
         assert!(res.is_err());
     }
