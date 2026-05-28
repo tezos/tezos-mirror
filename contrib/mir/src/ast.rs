@@ -667,10 +667,11 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
             BuildSeqOf { count: usize },
             /// Pops 3: `prim3(Transfer_tokens, param, addr, mutez)`.
             BuildTransferTokens,
-            /// Pops 1: `prim1(Emit, [value, arg_ty_mich], annots)`.
+            /// Pops 1: `prim_n(Emit, [value, arg_ty_mich])`, then annotates
+            /// with the field tag (so the annotation gas charge is applied).
             BuildEmit {
                 arg_ty_mich: Micheline<'b>,
-                annots: Annotations<'b>,
+                tag: Option<FieldAnnotation<'b>>,
             },
             /// Pops 1: `App(Create_contract, [code, delegate, mutez, storage], no_anns)`.
             BuildCreateContract {
@@ -843,13 +844,9 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                     (&typ).into_micheline_optimized_legacy(arena, gas)?
                                 }
                             };
-                            let annots: Annotations<'a> = match em.tag {
-                                Some(tag) => [Annotation::Field(tag.into_cow())].into(),
-                                None => annotations::NO_ANNS,
-                            };
                             frames.push(TvImFrame::BuildEmit {
                                 arg_ty_mich,
-                                annots,
+                                tag: em.tag,
                             });
                             frames.push(TvImFrame::Visit(em.value));
                         }
@@ -903,20 +900,14 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                     let param = results.pop().expect("BuildTransferTokens: missing param");
                     results.push(V::prim3(arena, Prim::Transfer_tokens, param, addr, mutez, gas)?);
                 }
-                TvImFrame::BuildEmit {
-                    arg_ty_mich,
-                    annots,
-                } => {
+                TvImFrame::BuildEmit { arg_ty_mich, tag } => {
                     let value_mich = results.pop().expect("BuildEmit: missing value");
-                    let mut node = Micheline::prim_n_arr(
-                        arena,
-                        Prim::Emit,
-                        [value_mich, arg_ty_mich],
-                        gas,
-                    )?;
-                    // Preserve the precomputed annot vector by stamping it on.
-                    if let Micheline::App(_, _, ref mut a) = node {
-                        *a = annots;
+                    let mut node =
+                        Micheline::prim_n_arr(arena, Prim::Emit, [value_mich, arg_ty_mich], gas)?;
+                    // Use `annotate` (not a raw stamp-on) so the field-tag
+                    // annotation is charged `unparsing_cost::annotation`.
+                    if let Some(tag) = tag {
+                        node.annotate(Annotation::Field(tag.into_cow()), gas)?;
                     }
                     results.push(node);
                 }
@@ -1743,6 +1734,43 @@ mod test_untypers {
         // should be triggered during traversal, not only after.
         let result = outer_list.into_micheline_optimized_legacy(&arena, &mut gas);
         assert_eq!(result, Err(OutOfGas));
+    }
+
+    /// Unparsing an `EMIT` value with a field tag must charge
+    /// `unparsing_cost::annotation` for the tag — the old `*a = annots`
+    /// stamp-on skipped it, under-charging tagged emits.
+    #[test]
+    fn emit_with_tag_charges_annotation_gas() {
+        use crate::gas::unparsing_cost;
+
+        fn emit(tag: Option<FieldAnnotation<'static>>) -> TypedValue<'static> {
+            TypedValue::Operation(Box::new(OperationInfo {
+                operation: Operation::Emit(Emit {
+                    tag,
+                    value: TypedValue::Unit,
+                    arg_ty: Or::Left(Type::Unit),
+                }),
+                counter: 0,
+            }))
+        }
+        fn unparse(tv: TypedValue<'static>) -> u32 {
+            let arena = Arena::new();
+            let mut gas = Gas::default();
+            tv.into_micheline_optimized_legacy(&arena, &mut gas).unwrap();
+            Gas::default().milligas().unwrap() - gas.milligas().unwrap()
+        }
+
+        let used_no_tag = unparse(emit(None));
+        let used_tag = unparse(emit(Some(FieldAnnotation::from_str_unchecked("foo"))));
+        let expected = unparsing_cost::annotation(&Annotation::Field(
+            FieldAnnotation::from_str_unchecked("foo").into_cow(),
+        ))
+        .unwrap();
+        assert_eq!(
+            used_tag - used_no_tag,
+            expected,
+            "EMIT field tag must charge unparsing_cost::annotation"
+        );
     }
 }
 
