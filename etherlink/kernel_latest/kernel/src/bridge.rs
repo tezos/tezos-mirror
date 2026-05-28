@@ -704,6 +704,8 @@ mod tests {
         bridge::{DepositInfo, DepositReceiver, DEPOSIT_EVENT_TOPIC},
         chains::EvmLimits,
     };
+    use revm_etherlink::precompiles::constants::FEED_DEPOSIT_ADDR;
+    use revm_etherlink::storage::world_state_handler::StorageAccount;
 
     use super::{apply_tezosx_xtz_deposit, Deposit};
 
@@ -1030,6 +1032,14 @@ mod tests {
         };
         assert!(!outcome.result.is_success());
         assert!(outcome.result.logs().is_empty());
+
+        // Even though the EVM call returned Ok with a non-success result
+        // (balance overflow on the receiver), the prefund must be refunded
+        // on the `Ok`-with-revert arm too, so no value is stranded on
+        // FEED_DEPOSIT_ADDR.
+        let feed_account = StorageAccount::from_address(&FEED_DEPOSIT_ADDR).unwrap();
+        let feed_info = feed_account.info(&mut host).unwrap();
+        assert_eq!(feed_info.balance, alloy_primitives::U256::ZERO);
     }
 
     #[test]

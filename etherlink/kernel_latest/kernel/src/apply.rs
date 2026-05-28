@@ -826,7 +826,14 @@ where
     let to = Some(alloy_to_h160(&XTZ_BRIDGE_SOL_ADDR));
     let gas_limit = XTZ_DEPOSIT_EXECUTION_COST;
     let value = deposit.amount;
-    // We prefund the feeder address for the xtz deposit.
+    // Prefund the feeder address for the xtz deposit. The REVM credit-
+    // checkpoint mechanism (`TransactionOrigin::CrossRuntime { credit }`)
+    // can't be reused here: it wraps the transaction in an extra
+    // `journaled_state.checkpoint()`, which increments REVM's call depth
+    // and shifts the top-level frame off depth 0 — breaking the
+    // `CallTracer` whose flush hook keys on `depth == 0`. We therefore
+    // keep the prefund out-of-band and explicitly refund on every
+    // !is_success() exit below.
     caller_account.add_balance(host, u256_to_alloy(&value))?;
     let call_data = handle_xtz_depositCall {
         deposit: SolXTZDeposit::from(deposit),
@@ -862,7 +869,16 @@ where
             access_list: revm::context::transaction::AccessList::default(),
         },
     ) {
-        Ok(execution_outcome) => Ok(execution_outcome),
+        Ok(execution_outcome) => {
+            // An EVM-internal revert returns `Ok` with a non-success result,
+            // so we must also refund the prefund here, otherwise the deposit
+            // value is stranded on FEED_DEPOSIT_ADDR while the receiver is
+            // uncredited.
+            if !execution_outcome.result.is_success() {
+                caller_account.sub_balance(host, u256_to_alloy(&value))?;
+            }
+            Ok(execution_outcome)
+        }
         Err(err) => {
             // Something went wrong, we remove the added balance for the xtz deposit.
             caller_account.sub_balance(host, u256_to_alloy(&value))?;

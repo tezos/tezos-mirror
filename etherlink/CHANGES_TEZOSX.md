@@ -38,6 +38,10 @@
   still carry `gas_price = 0` for the caller debit and basefee burn, and
   the EIP-1559 basefee preflight is disabled for cross-runtime origins so
   the live basefee doesn't reject the `gas_price = 0` call. (!22022)
+- XTZ-deposit feeder now refunds the prefund on EVM-internal revert
+  (`Ok`-with-revert), not only on the `Err` arm — previously the deposit
+  value could be stranded on `FEED_DEPOSIT_ADDR` while the receiver was
+  uncredited. (!22017)
 
 ### Michelson Runtime
 
