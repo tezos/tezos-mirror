@@ -80,6 +80,12 @@ module Attributes = struct
     let execution_gas qty =
       ("etherlink.block.execution_gas", `Int (Z.to_int qty))
 
+    let evm_execution_gas qty =
+      ("etherlink.block.evm_execution_gas", `Int (Z.to_int qty))
+
+    let michelson_execution_gas qty =
+      ("etherlink.block.michelson_execution_gas", `Int (Z.to_int qty))
+
     let transaction_count qty = ("etherlink.block.transactions_count", `Int qty)
   end
 end

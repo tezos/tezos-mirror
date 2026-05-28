@@ -148,6 +148,8 @@ blueprint_application:
           "gas_used": $bignum,
           "block_hash": $unistring,
           "execution_gas": $bignum,
+          "runtime_execution_gas": { "evm": $bignum,
+                                     "michelson": $bignum },
           "process_time": $timespan.system } }
     $bignum:
       /* Big number

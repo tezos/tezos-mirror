@@ -97,6 +97,23 @@ module type Tezlink_protocol = sig
     Tezos_types.level -> block_header_metadata tzresult
 end
 
+(** Milligas split for a Tez (sub-)block.
+
+    Direction: this record lives on the {b Michelson side}.
+    - [top_level]: milligas consumed by real Michelson operations.
+    - [crac_from_evm]: milligas consumed by synthetic CRAC sub-operations
+      initiated from an EVM caller (EVM{->}Michelson direction).  This gas
+      is already billed to the initiating EVM transaction, so it must be
+      subtracted from the EVM-side total to keep the per-runtime breakdown
+      additive.
+
+    See {!evm_execution_gas_breakdown} in [evm_context.ml] for the
+    symmetric EVM-side record. *)
+type consumed_milligas_breakdown = {top_level : Z.t; crac_from_evm : Z.t}
+
+let empty_consumed_milligas_breakdown =
+  {top_level = Z.zero; crac_from_evm = Z.zero}
+
 module type Tezlink_block_service = sig
   module Tezlink_proto : Tezlink_protocol
 
@@ -118,6 +135,12 @@ module type Tezlink_block_service = sig
 
   val deserialize_operations_header :
     bytes -> (Operation_hash.t * Operation.shell_header * bytes) list tzresult
+
+  (** [consumed_milligas_breakdown bytes] sums the [consumed_milligas]
+      leaves of the operation receipts in [bytes] into the two buckets
+      of [consumed_milligas_breakdown]. *)
+  val consumed_milligas_breakdown :
+    bytes -> consumed_milligas_breakdown tzresult
 end
 
 let voting_period ~cycles_per_voting_period ~position ~level_info =
@@ -434,6 +457,108 @@ module Make_block_service
            }
             : operation))
       operations
+
+  (* Synthetic [source] used for EVM->Michelson CRAC receipts; mirrors
+     [NULL_PKH] in [tezos_execution/src/lib.rs]. *)
+  let crac_source_marker = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
+
+  let add_top_level breakdown g =
+    {breakdown with top_level = Z.add breakdown.top_level g}
+
+  let add_crac_from_evm breakdown g =
+    {breakdown with crac_from_evm = Z.add breakdown.crac_from_evm g}
+
+  (* Sum every [consumed_milligas] leaf inside [json]; branches without
+     the field contribute zero. *)
+  let rec sum_consumed_milligas : Data_encoding.Json.t -> Z.t = function
+    | `O fields ->
+        List.fold_left
+          (fun acc (k, v) ->
+            if String.equal k "consumed_milligas" then
+              match v with
+              | `String s -> (
+                  try Z.add acc (Z.of_string s) with Invalid_argument _ -> acc)
+              | _ -> acc
+            else Z.add acc (sum_consumed_milligas v))
+          Z.zero
+          fields
+    | `A items ->
+        List.fold_left
+          (fun acc item -> Z.add acc (sum_consumed_milligas item))
+          Z.zero
+          items
+    | _ -> Z.zero
+
+  let contents_of_json (json : Data_encoding.Json.t) =
+    match json with
+    | `O fields -> (
+        match List.assoc ~equal:String.equal "contents" fields with
+        | Some (`A l) -> l
+        | _ -> [])
+    | _ -> []
+
+  let source_of_content (json : Data_encoding.Json.t) =
+    match json with
+    | `O fields -> (
+        match List.assoc ~equal:String.equal "source" fields with
+        | Some (`String s) -> Some s
+        | _ -> None)
+    | _ -> None
+
+  (* Attribute a content's [consumed_milligas] to [crac_from_evm] if its
+     [source] is the synthetic CRAC marker, [top_level] otherwise.
+     The merged [operation_data_and_receipt_encoding] JSON carries
+     both [source] and (recursively) [consumed_milligas] inside the
+     same content object. *)
+  let attribute_content breakdown content =
+    let g = sum_consumed_milligas content in
+    match source_of_content content with
+    | Some s when String.equal s crac_source_marker ->
+        add_crac_from_evm breakdown g
+    | _ -> add_top_level breakdown g
+
+  let consumed_milligas_breakdown bytes =
+    let open Result_syntax in
+    let* headers = deserialize_operations_header bytes in
+    (* Walk via JSON because [source] and [consumed_milligas] are not
+       directly reachable through the protocol environment interface.
+       Use the merged [operation_data_and_receipt_encoding] (rather
+       than the data and receipt encodings separately): its JSON form
+       is [{"contents": [{"source": ..., "metadata": {...}}, ...]}],
+       so a single descent into ["contents"] yields per-content
+       objects carrying both the source and the consumed milligas. *)
+    let process_op breakdown (hash, op_receipt_bytes) =
+      let* op_data_and_receipt =
+        Data_encoding.Binary.of_bytes
+          Proto.operation_data_and_receipt_encoding
+          op_receipt_bytes
+        |> Result.map_error_e (fun read_error ->
+               tzfail
+               @@ Deserialize_operation
+                    ( Operation_hash.to_b58check hash,
+                      Format.asprintf
+                        "%a"
+                        Data_encoding.Binary.pp_read_error
+                        read_error,
+                      Hex.show (Hex.of_bytes op_receipt_bytes) ))
+      in
+      let contents =
+        contents_of_json
+          (Data_encoding.Json.construct
+             Proto.operation_data_and_receipt_encoding
+             op_data_and_receipt)
+      in
+      return
+      @@ List.fold_left
+           (fun breakdown content -> attribute_content breakdown content)
+           breakdown
+           contents
+    in
+    List.fold_left_e
+      (fun breakdown (hash, _shell_header, op_receipt_bytes) ->
+        process_op breakdown (hash, op_receipt_bytes))
+      empty_consumed_milligas_breakdown
+      headers
 end
 
 module Tezlink_imported_protocol = Tezlink_TALLiN_protocol

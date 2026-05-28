@@ -798,6 +798,43 @@ module State = struct
     let (Qty gas_used) = receipt.Transaction_receipt.gasUsed in
     Z.sub gas_used da_fees
 
+  (** EVM receipt gas split.
+
+      Direction: this record lives on the {b EVM side}.
+      - [top_level_gas]: gas consumed by real EVM transactions.
+      - [crac_from_michelson_gas]: gas from synthetic receipts originating
+        from a Michelson caller (Michelson{->}EVM direction).  This gas
+        re-expresses Michelson milligas in EVM units and is already billed
+        on the initiating Michelson op, so it must not be added to the EVM
+        side a second time.
+
+      See {!Tezos_services.consumed_milligas_breakdown} for the symmetric
+      Michelson-side record. *)
+  type evm_execution_gas_breakdown = {
+    top_level_gas : Z.t;
+    crac_from_michelson_gas : Z.t;
+  }
+
+  let empty_evm_execution_gas_breakdown =
+    {top_level_gas = Z.zero; crac_from_michelson_gas = Z.zero}
+
+  (* Sentinel [from] for synthetic Michelson->EVM CRAC receipts;
+     mirrors [TEZOSX_CALLER_H160] in [revm/precompiles/constants.rs]. *)
+  let tezosx_caller_h160 =
+    Ethereum_types.Address (Hex "7e20580000000000000000000000000000000001")
+
+  let accumulate_execution_gas breakdown receipt gas =
+    if
+      Ethereum_types.Address.equal
+        receipt.Transaction_receipt.from
+        tezosx_caller_h160
+    then
+      {
+        breakdown with
+        crac_from_michelson_gas = Z.add breakdown.crac_from_michelson_gas gas;
+      }
+    else {breakdown with top_level_gas = Z.add breakdown.top_level_gas gas}
+
   let store_block_unsafe ?tez_block ~compact_receipt_encoding ~base_fee_per_gas
       ~da_fee_per_byte conn evm_state block =
     let open Lwt_result_syntax in
@@ -837,32 +874,26 @@ module State = struct
               receipts
               transaction_objects
           in
-          let store_info_and_acc_gas cumulative_execution_gas (object_, receipt)
-              =
+          let store_info_and_acc_gas breakdown (object_, receipt) =
             let info = Transaction_info.of_receipt_and_object receipt object_ in
             let* () =
               Evm_store.Transactions.store ~compact_receipt_encoding conn info
             in
-            return
-              ( Z.add
-                  cumulative_execution_gas
-                  (execution_gas
-                     ~base_fee_per_gas
-                     ~da_fee_per_byte
-                     receipt
-                     object_),
-                receipt )
+            let gas =
+              execution_gas ~base_fee_per_gas ~da_fee_per_byte receipt object_
+            in
+            return (accumulate_execution_gas breakdown receipt gas, receipt)
           in
           let gas_and_receipts =
             List.fold_left_map_es
               store_info_and_acc_gas
-              Z.zero
+              empty_evm_execution_gas_breakdown
               receipts_and_objects
           in
           gas_and_receipts
         else
           List.fold_left_map_es
-            (fun cumulative_execution_gas hash ->
+            (fun breakdown hash ->
               let* receipt =
                 let* receipt_opt =
                   Etherlink_durable_storage.transaction_receipt
@@ -893,16 +924,11 @@ module State = struct
               let* () =
                 Evm_store.Transactions.store ~compact_receipt_encoding conn info
               in
-              return
-                ( Z.add
-                    cumulative_execution_gas
-                    (execution_gas
-                       ~base_fee_per_gas
-                       ~da_fee_per_byte
-                       receipt
-                       object_),
-                  receipt ))
-            Z.zero
+              let gas =
+                execution_gas ~base_fee_per_gas ~da_fee_per_byte receipt object_
+              in
+              return (accumulate_execution_gas breakdown receipt gas, receipt))
+            empty_evm_execution_gas_breakdown
             hashes
     | TxFull _ ->
         (* Block must be read without the transactions objects. Even though
@@ -1258,9 +1284,35 @@ module State = struct
       else return_none
     in
 
+    (* Walk the Tez (sub-)block's operation receipts and split the total
+       milligas into [top_level] (real Michelson work) and [crac_from_evm]
+       (synthetic CRAC sub-operations already billed to the initiating
+       EVM tx). See [Tezos_services.consumed_milligas_breakdown]. *)
+    let michelson_milligas_breakdown_of_tez_block tez_block =
+      let open Tezos_services in
+      let ( (module Proto : Tezlink_protocol),
+            (module Next_proto : Tezlink_protocol) ) =
+        Tezlink_directory.protocol_for_block_or_level
+          ~allowing_mock:false
+          (Ok tez_block)
+      in
+      let module Block_services = Make_block_service (Proto) (Next_proto) in
+      Lwt.return
+        (Block_services.consumed_milligas_breakdown
+           tez_block.L2_types.Tezos_block.operations)
+    in
+    (* floor(milligas / 1000), mirroring the kernel's milligas->gas
+       conversion ([michelson_milligas_to_evm_gas] in [kernel/src/chains.rs]
+       and the CRAC charge-back in [revm/precompiles/runtime_gateway.rs]). *)
+    let michelson_gas_of_milligas m = Z.div m (Z.of_int 1000) in
+    let empty_breakdown = Tezos_services.empty_consumed_milligas_breakdown in
     (* Store block and share receipts *)
-    let* evm_state, receipts, execution_gas =
-      let* execution_gas, receipts =
+    let* ( evm_state,
+           receipts,
+           execution_gas,
+           evm_execution_gas,
+           michelson_execution_gas ) =
+      let* receipts, evm_breakdown, michelson_breakdown =
         match block with
         | Eth block ->
             let* da_fee_per_byte =
@@ -1269,25 +1321,67 @@ module State = struct
             let* (Qty base_fee_per_gas) =
               Etherlink_durable_storage.base_fee_per_gas evm_state
             in
-            store_block_unsafe
-              ?tez_block:tezosx_tez_block
-              ~compact_receipt_encoding:
-                ctxt.configuration.experimental_features
-                  .compact_receipt_encoding
-              ~da_fee_per_byte
-              ~base_fee_per_gas
-              conn
-              evm_state
-              block
+            let* evm_breakdown, receipts =
+              store_block_unsafe
+                ?tez_block:tezosx_tez_block
+                ~compact_receipt_encoding:
+                  ctxt.configuration.experimental_features
+                    .compact_receipt_encoding
+                ~da_fee_per_byte
+                ~base_fee_per_gas
+                conn
+                evm_state
+                block
+            in
+            let* michelson_breakdown =
+              match tezosx_tez_block with
+              | None -> return empty_breakdown
+              | Some tez_block ->
+                  michelson_milligas_breakdown_of_tez_block tez_block
+            in
+            return (receipts, evm_breakdown, michelson_breakdown)
         | Tez block ->
-            let+ receipts = store_tez_block_unsafe conn block in
-            (* TODO: support extracting the execution gas *)
-            (Z.zero, receipts)
+            let* receipts = store_tez_block_unsafe conn block in
+            let* michelson_breakdown =
+              michelson_milligas_breakdown_of_tez_block block
+            in
+            return
+              (receipts, empty_evm_execution_gas_breakdown, michelson_breakdown)
       in
       let* evm_state =
         Evm_state.clear_block_storage chain_family block evm_state
       in
-      return (evm_state, receipts, execution_gas)
+      let* multiplier_i64 =
+        Etherlink_durable_storage.michelson_to_evm_gas_multiplier evm_state
+      in
+      let multiplier = Z.of_int64 multiplier_i64 in
+      (* Discard [crac_from_michelson_gas]: it duplicates work already
+         counted on the Michelson side via [michelson_execution_gas]. *)
+      let raw_evm_gas = evm_breakdown.top_level_gas in
+      (* Strip the EVM->Michelson CRAC charge from [raw_evm_gas]: the
+         Michelson sub-execution's gas is already converted into EVM
+         units and included by the runtime gateway precompile. *)
+      let crac_michelson_evm_gas =
+        Z.div
+          (Z.mul michelson_breakdown.crac_from_evm multiplier)
+          (Z.of_int 1000)
+      in
+      let evm_execution_gas = Z.sub raw_evm_gas crac_michelson_evm_gas in
+      let michelson_milligas =
+        Z.add michelson_breakdown.top_level michelson_breakdown.crac_from_evm
+      in
+      let michelson_execution_gas =
+        michelson_gas_of_milligas michelson_milligas
+      in
+      let execution_gas =
+        Z.add evm_execution_gas (Z.mul michelson_execution_gas multiplier)
+      in
+      return
+        ( evm_state,
+          receipts,
+          execution_gas,
+          evm_execution_gas,
+          michelson_execution_gas )
     in
 
     List.iter (Lwt_watcher.notify receipt_watcher) receipts ;
@@ -1298,6 +1392,8 @@ module State = struct
             Block.number ctxt.session.next_blueprint_number;
             Block.transaction_count (List.length receipts);
             Block.execution_gas execution_gas;
+            Block.evm_execution_gas evm_execution_gas;
+            Block.michelson_execution_gas michelson_execution_gas;
           ]) ;
 
     (* Look for potential kernel upgrades *)
@@ -1320,7 +1416,13 @@ module State = struct
     in
 
     return
-      (evm_state, context, applied_kernel_upgrade, split_info, execution_gas)
+      ( evm_state,
+        context,
+        applied_kernel_upgrade,
+        split_info,
+        execution_gas,
+        evm_execution_gas,
+        michelson_execution_gas )
 
   (* Helper to find Divergence or Unsync in error trace.
     The exception emitted by `apply_blueprint_store_unsafe` is caught by
@@ -1344,7 +1446,7 @@ module State = struct
   (** [apply_blueprint_store_unsafe ctxt conn timestamp chunks payload
       delayed_transactions] applies the blueprint [chunks] on the head of
       [ctxt], and commit the resulting state and the blueprint signed [payload]
-      (when the promise is fulfilled) to Irmin and the node’s store.
+      (when the promise is fulfilled) to Irmin and the node's store.
 
       If instant confirmations are enabled, the block is instead assembled using the
       previously validated transactions. Resulting block hash is then matched against
@@ -1443,7 +1545,9 @@ module State = struct
                    context,
                    applied_kernel_upgrade,
                    split_info,
-                   execution_gas ) =
+                   execution_gas,
+                   evm_execution_gas,
+                   michelson_execution_gas ) =
               commit_application_result
                 ~ctxt
                 ~conn
@@ -1462,7 +1566,9 @@ module State = struct
                 applied_kernel_upgrade,
                 applied_sequencer_upgrade,
                 split_info,
-                execution_gas ))
+                execution_gas,
+                evm_execution_gas,
+                michelson_execution_gas ))
     | Apply_failure (* Did not produce a block *) ->
         let*! () =
           if is_sequencer ctxt then
@@ -1586,9 +1692,24 @@ module State = struct
       timestamp chunks payload delayed_transactions :
       ('a L2_types.block * L2_types.Tezos_block.t option) tzresult Lwt.t =
     let open Lwt_result_syntax in
-    let+ current_block, current_tezos_block, _execution_gas =
-      Misc.with_timing_f_e (fun (block, _tezos_block, execution_gas) ->
-          Blueprint_events.blueprint_applied block execution_gas)
+    let+ ( current_block,
+           current_tezos_block,
+           _execution_gas,
+           _evm_execution_gas,
+           _michelson_execution_gas ) =
+      Misc.with_timing_f_e
+        (fun
+          ( block,
+            _tezos_block,
+            execution_gas,
+            evm_execution_gas,
+            michelson_execution_gas )
+        ->
+          Blueprint_events.blueprint_applied
+            block
+            execution_gas
+            ~evm_execution_gas
+            ~michelson_execution_gas)
       @@ fun () ->
       let* ( evm_state,
              context,
@@ -1597,7 +1718,9 @@ module State = struct
              applied_kernel_upgrade,
              applied_sequencer_upgrade,
              split_info,
-             execution_gas ) =
+             execution_gas,
+             evm_execution_gas,
+             michelson_execution_gas ) =
         let* () = apply_evm_events conn ctxt events in
         apply_blueprint_store_unsafe
           ctxt
@@ -1654,7 +1777,12 @@ module State = struct
               {number = ctxt.session.next_blueprint_number; timestamp; payload};
           }
       in
-      return (current_block, current_tezos_block, execution_gas)
+      return
+        ( current_block,
+          current_tezos_block,
+          execution_gas,
+          evm_execution_gas,
+          michelson_execution_gas )
     in
     (current_block, current_tezos_block)
 
