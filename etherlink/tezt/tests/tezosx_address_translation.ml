@@ -49,7 +49,7 @@ let runtime_id_ethereum = "1"
     Source: `sol!` macro expansion in
     etherlink/kernel_latest/revm/src/precompiles/runtime_gateway.rs,
     validated by the `invalid_runtime_id_payload_shape` unit test (line ~1551). *)
-let invalid_runtime_id_selector = "e85c2efe"
+let invalid_runtime_id_selector = "6b95e955"
 
 (* ── EVM eth_call helpers ─────────────────────────────────────────────── *)
 
@@ -757,6 +757,165 @@ let test_evm_resolve_address_roundtrip_recorded () =
         "Expected reverse translated address to match original EVM sender, got \
          %L") ;
   unit
+(* ── EVM precompile tests — error paths (commit 3) ────────────────────── *)
+
+(** Edge: [originOf] with an invalid runtime ID (2) reverts with the ABI-encoded
+    [InvalidRuntimeId] Solidity custom error.
+    Encoding: 4-byte selector (0x6b95e955) + 32-byte zero-padded uint8 arg. *)
+let test_evm_origin_of_invalid_runtime_id () =
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~kernel:Latest
+    ~title:"originOf: invalid runtime ID reverts"
+    ~tags:
+      [
+        "tezosx";
+        "address_translation";
+        "origin_of";
+        "invalid_runtime";
+        "evm";
+        "revert";
+      ]
+  @@ fun sandbox ->
+  let addr = "0x1111111111111111111111111111111111111111" in
+  let* calldata = Cast.calldata ~args:[addr; "2"] "originOf(string,uint8)" in
+  let* err = eth_call_gateway_err ~sequencer:sandbox ~calldata in
+  let message = JSON.(err |-> "message" |> as_string) in
+  Check.(
+    (message =~ rex "execution reverted")
+      ~error_msg:"Expected revert for invalid runtimeId, got error message: %L") ;
+  (* ABI-encoded InvalidRuntimeId(uint8 received):
+     - bytes  0..3  : selector keccak256("InvalidRuntimeId(uint8)")[0..4] = 0x6b95e955
+     - bytes  4..35 : received (uint8 2), zero-padded to 32 bytes → last byte = 0x02
+     Total revert data: "0x" + 8 + 64 = 74 chars. *)
+  let data = JSON.(err |-> "data" |> as_string) in
+  (* Strip leading "0x" for structured checks. *)
+  let data_hex = String.sub data 2 (String.length data - 2) in
+  let selector = String.sub data_hex 0 8 in
+  let last_byte = String.sub data_hex (String.length data_hex - 2) 2 in
+  Check.(
+    (selector = invalid_runtime_id_selector)
+      string
+      ~error_msg:"Expected InvalidRuntimeId selector 0x6b95e955, got 0x%L") ;
+  Check.(
+    (last_byte = "02")
+      string
+      ~error_msg:"Expected received=0x02 in revert data last byte, got 0x%L") ;
+  unit
+
+(** Edge: [resolveAddress] with an invalid runtime ID reverts with the
+    ABI-encoded [InvalidRuntimeId] Solidity custom error. *)
+let test_evm_resolve_address_invalid_runtime_id () =
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~kernel:Latest
+    ~title:"resolveAddress: invalid runtime ID reverts"
+    ~tags:
+      [
+        "tezosx";
+        "address_translation";
+        "resolve_address";
+        "invalid_runtime";
+        "evm";
+        "revert";
+      ]
+  @@ fun sandbox ->
+  let addr = "0x1111111111111111111111111111111111111111" in
+  let* calldata =
+    Cast.calldata
+      ~args:[addr; "2"; runtime_id_tezos]
+      "resolveAddress(string,uint8,uint8)"
+  in
+  let* err = eth_call_gateway_err ~sequencer:sandbox ~calldata in
+  let message = JSON.(err |-> "message" |> as_string) in
+  Check.(
+    (message =~ rex "execution reverted")
+      ~error_msg:"Expected revert for invalid runtimeId, got error message: %L") ;
+  (* ABI-encoded InvalidRuntimeId(uint8 received):
+     - bytes  0..3  : selector keccak256("InvalidRuntimeId(uint8)")[0..4] = 0x6b95e955
+     - bytes  4..35 : received (uint8 2), zero-padded to 32 bytes → last byte = 0x02 *)
+  let data = JSON.(err |-> "data" |> as_string) in
+  let data_hex = String.sub data 2 (String.length data - 2) in
+  let selector = String.sub data_hex 0 8 in
+  let last_byte = String.sub data_hex (String.length data_hex - 2) 2 in
+  Check.(
+    (selector = invalid_runtime_id_selector)
+      string
+      ~error_msg:"Expected InvalidRuntimeId selector 0x6b95e955, got 0x%L") ;
+  Check.(
+    (last_byte = "02")
+      string
+      ~error_msg:"Expected received=0x02 in revert data last byte, got 0x%L") ;
+  unit
+
+(** B1: [originOf] with a non-base58 string and sourceRuntime=Tezos.
+    The Tezos runtime's [read_origin] silently returns Unknown for malformed
+    addresses (no base58 parse → Classification::Unknown, no charge).
+    The precompile therefore returns kind=0 (Unknown) — no revert. *)
+let test_evm_origin_of_malformed_tezos_address () =
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~kernel:Latest
+    ~title:"originOf: malformed Tezos address returns Unknown (no revert)"
+    ~tags:
+      [
+        "tezosx"; "address_translation"; "origin_of"; "malformed"; "tezos"; "evm";
+      ]
+  @@ fun sandbox ->
+  (* A string that is not a valid base58check Tezos address. *)
+  let addr = "not_a_valid_tezos_address" in
+  let* calldata =
+    Cast.calldata ~args:[addr; runtime_id_tezos] "originOf(string,uint8)"
+  in
+  let* hex = eth_call_gateway_ok ~sequencer:sandbox ~calldata in
+  let kind = uint_at hex 0 in
+  (* Malformed addresses are classified Unknown (kind=0), not reverted:
+     TezosRuntime::read_origin's base58 parse fails before any storage read
+     and yields Classification::Unknown. Reverting is reserved for an
+     out-of-range runtime id (InvalidRuntimeId). *)
+  Check.(
+    (kind = 0)
+      int
+      ~error_msg:"Expected kind=0 (Unknown) for malformed Tezos address, got %L") ;
+  unit
+
+(** B2: [originOf] with a non-hex-prefixed / too-short string and
+    sourceRuntime=Ethereum.
+    The Ethereum runtime's [read_origin] silently returns Unknown for malformed
+    addresses (Address::from_hex fails → Classification::Unknown, no charge).
+    The precompile returns kind=0 (Unknown) — no revert. *)
+let test_evm_origin_of_malformed_ethereum_address () =
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~kernel:Latest
+    ~title:"originOf: malformed Ethereum address returns Unknown (no revert)"
+    ~tags:
+      [
+        "tezosx";
+        "address_translation";
+        "origin_of";
+        "malformed";
+        "ethereum";
+        "evm";
+      ]
+  @@ fun sandbox ->
+  (* A string that is not a valid 0x-prefixed 20-byte hex Ethereum address. *)
+  let addr = "0xnothex" in
+  let* calldata =
+    Cast.calldata ~args:[addr; runtime_id_ethereum] "originOf(string,uint8)"
+  in
+  let* hex = eth_call_gateway_ok ~sequencer:sandbox ~calldata in
+  let kind = uint_at hex 0 in
+  (* Malformed addresses are classified Unknown (kind=0), not reverted:
+     EthereumRuntime::read_origin's hex parse fails before any storage read
+     and yields Classification::Unknown. Reverting is reserved for an
+     out-of-range runtime id (InvalidRuntimeId). *)
+  Check.(
+    (kind = 0)
+      int
+      ~error_msg:
+        "Expected kind=0 (Unknown) for malformed Ethereum address, got %L") ;
+  unit
 
 (* ── Registration ─────────────────────────────────────────────────────── *)
 
@@ -770,4 +929,8 @@ let () =
   test_evm_resolve_address_cross_source_tezos_to_eth () ;
   test_evm_backstop_derive_same_source () ;
   test_evm_resolve_address_roundtrip_derive_then_unknown () ;
-  test_evm_resolve_address_roundtrip_recorded ()
+  test_evm_resolve_address_roundtrip_recorded () ;
+  test_evm_origin_of_invalid_runtime_id () ;
+  test_evm_resolve_address_invalid_runtime_id () ;
+  test_evm_origin_of_malformed_tezos_address () ;
+  test_evm_origin_of_malformed_ethereum_address ()
