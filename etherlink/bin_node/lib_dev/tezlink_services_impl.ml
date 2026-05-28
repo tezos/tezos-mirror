@@ -139,37 +139,47 @@ let make (ctxt : Evm_ro_context.t) =
                  {code = lazy_expr code; storage = lazy_expr storage}
       | _ -> return_none
 
-    let manager_key chain block c =
+    let manager_key chain block (c : Tezos_types.Contract.t) =
       let open Lwt_result_syntax in
       (* TODO: #7831 !17664
          Support non-default chain and block parameters. *)
       let `Main = chain in
-      let* state = get_state ~block in
-      let* manager_opt = Tezlink_durable_storage.manager state c in
-      match manager_opt with
-      | Some (Public_key k) -> return_some k
-      | _ -> return_none
+      match c with
+      | Implicit source -> (
+          let* state = get_state ~block in
+          let* manager_opt = Tezlink_durable_storage.manager state source in
+          match manager_opt with
+          | Some (Public_key k) -> return_some k
+          | _ -> return_none)
+      | Originated _ -> return_none
 
-    let counter chain block c =
+    let counter chain block (c : Tezos_types.Contract.t) =
       let open Lwt_result_syntax in
       (* TODO: #7831 !17664
          Support non-default chain and block parameters. *)
       let `Main = chain in
-      let* state = get_state ~block in
-      Tezlink_durable_storage.counter state c
+      match c with
+      | Implicit source ->
+          let* state = get_state ~block in
+          Tezlink_durable_storage.counter state source
+      | Originated _ -> return_none
 
     let big_map_get chain block id key_hash =
       let open Lwt_result_syntax in
       let `Main = chain in
       let* state = get_state ~block in
-      Tezlink_durable_storage.big_map_get state id key_hash
+      Durable_storage.read_opt (Tezos_big_map_value (id, key_hash)) state
 
     let big_map_raw_info chain block id =
       let open Lwt_result_syntax in
       let `Main = chain in
       let* state = get_state ~block in
-      let* key_type = Tezlink_durable_storage.big_map_key_type state id in
-      let* value_type = Tezlink_durable_storage.big_map_value_type state id in
+      let* key_type =
+        Durable_storage.read_opt (Tezos_big_map_key_type id) state
+      in
+      let* value_type =
+        Durable_storage.read_opt (Tezos_big_map_value_type id) state
+      in
       match (key_type, value_type) with
       | Some kt, Some vt ->
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/8229

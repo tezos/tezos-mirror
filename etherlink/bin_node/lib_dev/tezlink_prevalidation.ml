@@ -153,8 +153,7 @@ let validate_manager_info ~state ~error_clue (Contents op : packed_contents) =
   let open Lwt_result_syntax in
   match op with
   | Manager_operation {source; operation; counter; _} -> (
-      let contract = Tezos_types.Contract.of_implicit source in
-      let* manager = Tezlink_durable_storage.manager state contract in
+      let* manager = Tezlink_durable_storage.manager state source in
       match (manager, operation) with
       | Some (Public_key _), Reveal _ ->
           tzfail_p
@@ -419,10 +418,7 @@ let rec validate_batch ~(ctxt : batch_validation_context)
 
 let validate_first_counter ~state ~source ~first_counter =
   let open Lwt_result_syntax in
-  let* counter =
-    Tezlink_durable_storage.counter state
-    @@ Tezos_types.Contract.of_implicit source
-  in
+  let* counter = Tezlink_durable_storage.counter state source in
   let counter = Option.value ~default:Z.zero counter in
   let*? first_counter = Tezos_types.Operation.counter_to_z first_counter in
   if Z.gt first_counter counter then
@@ -548,8 +544,9 @@ let parse_and_validate_for_queue ~simulator_mode ~nanotez_per_michelson_gas
   in
   let signature_check_cost = signature_cost pk op in
   let* balance_left =
-    Tezlink_durable_storage.balance state
-    @@ Tezos_types.Contract.of_implicit source
+    Tezlink_durable_storage.balance
+      state
+      (Tezos_types.Contract.of_implicit source)
   in
   let** () = validate_first_counter ~state ~source ~first_counter in
   let initial_context =
@@ -605,8 +602,12 @@ let parse_and_validate_for_queue ~simulator_mode ~nanotez_per_michelson_gas
     return (Ok operation)
 
 let init_blueprint_validation state () =
-  let get_counter = Tezlink_durable_storage.counter state in
-  let get_balance = Tezlink_durable_storage.balance_z state in
+  let get_counter pkh = Tezlink_durable_storage.counter state pkh in
+  let get_balance pkh =
+    Tezlink_durable_storage.balance_z
+      state
+      (Tezos_types.Contract.of_implicit pkh)
+  in
   let michelson_config = {get_balance; get_counter} in
   empty_validation_state
     ~michelson_config
@@ -628,7 +629,7 @@ let get_ read cache source =
     String.Map.find (Signature.V2.Public_key_hash.to_b58check source) cache
   with
   | Some v -> return v
-  | None -> read (Tezlink_imports.Imported_context.Contract.Implicit source)
+  | None -> read source
 
 let validate_for_blueprint state (operation : Tezos_types.Operation.t) =
   let open Lwt_result_syntax in

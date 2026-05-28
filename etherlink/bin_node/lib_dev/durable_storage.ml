@@ -208,14 +208,10 @@ type ('a, 'cap) path =
       Tezlink_imports.Imported_context.Big_map.Id.t
       -> (Tezlink_imports.Imported_context.Script.expr, ro) path
   | Tezlink_balance : Tezos_types.Contract.t -> (Tezos_types.Tez.t, ro) path
-  | Tezlink_manager : Tezos_types.Contract.t -> (Tezos_types.Manager.t, ro) path
-  | Tezlink_counter : Tezos_types.Contract.t -> (Z.t, ro) path
-  | Tezlink_block_by_hash :
-      Ethereum_types.block_hash
-      -> (L2_types.Tezos_block.t, ro) path
-  | Tezlink_block_hash_by_number :
-      Durable_storage_path.Block.number
-      -> (Ethereum_types.block_hash, ro) path
+  | Tezlink_manager :
+      Tezos_types.Contract.implicit
+      -> (Tezos_types.Manager.t option, ro) path
+  | Tezlink_counter : Tezos_types.Contract.implicit -> (Z.t option, ro) path
   | Blueprint_current_generation : (Ethereum_types.quantity, ro) path
   | Kernel_boot_wasm : (bytes, rw) path
   | Kernel_verbosity : (string, rw) path
@@ -729,49 +725,38 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
             safe_binary_decode
               Tezlink_imports.Imported_context.Script.expr_encoding;
         }
-  | Tezlink_balance contract ->
+  | Tezlink_balance (Originated _ as c) ->
       static_ro
         {
-          path = Durable_storage_path.michelson_contract_balance contract;
+          path = Durable_storage_path.michelson_contract_balance c;
           decode =
             infallible_decode
               (Data_encoding.Binary.of_bytes_exn Tezos_types.Tez.encoding);
         }
-  | Tezlink_manager contract ->
+  | Tezlink_balance (Implicit pkh) ->
       static_ro
         {
-          path = Durable_storage_path.michelson_contract_manager contract;
+          path = Tezosx.Durable_storage_path.Accounts.Tezos.info pkh;
+          decode = Tezosx.Tezos_runtime.extract_field (fun info -> info.balance);
+        }
+  | Tezlink_manager pkh ->
+      static_ro
+        {
+          path = Tezosx.Durable_storage_path.Accounts.Tezos.info pkh;
           decode =
-            infallible_decode
-              (Data_encoding.Binary.of_bytes_exn Tezos_types.Manager.encoding);
+            Tezosx.Tezos_runtime.extract_field (fun info ->
+                Option.map
+                  (fun pk -> Tezos_types.Manager.Public_key pk)
+                  info.public_key);
         }
-  | Tezlink_counter contract ->
+  | Tezlink_counter pkh ->
       static_ro
         {
-          path = Durable_storage_path.michelson_contract_counter contract;
+          path = Tezosx.Durable_storage_path.Accounts.Tezos.info pkh;
           decode =
-            infallible_decode
-              (Data_encoding.Binary.of_bytes_exn Data_encoding.n);
+            Tezosx.Tezos_runtime.extract_field (fun info ->
+                Some (Z.of_int64 info.nonce));
         }
-  | Tezlink_block_by_hash block_hash ->
-      static_ro
-        {
-          path =
-            Durable_storage_path.Block.by_hash
-              ~root:Durable_storage_path.tezosx_tezos_blocks_root
-              block_hash;
-          decode = infallible_decode L2_types.Tezos_block.block_from_kernel;
-        }
-  | Tezlink_block_hash_by_number number ->
-      versioned_ro (fun ~storage_version ->
-          {
-            path =
-              Durable_storage_path.Indexes.block_by_number
-                ~storage_version
-                ~root:Durable_storage_path.tezosx_tezos_blocks_root
-                number;
-            decode = infallible_decode Ethereum_types.decode_block_hash;
-          })
   | Blueprint_current_generation ->
       versioned_ro (fun ~storage_version ->
           {

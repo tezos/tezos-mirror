@@ -155,14 +155,10 @@ type ('a, 'cap) path =
       Tezlink_imports.Imported_context.Big_map.Id.t
       -> (Tezlink_imports.Imported_context.Script.expr, ro) path
   | Tezlink_balance : Tezos_types.Contract.t -> (Tezos_types.Tez.t, ro) path
-  | Tezlink_manager : Tezos_types.Contract.t -> (Tezos_types.Manager.t, ro) path
-  | Tezlink_counter : Tezos_types.Contract.t -> (Z.t, ro) path
-  | Tezlink_block_by_hash :
-      Ethereum_types.block_hash
-      -> (L2_types.Tezos_block.t, ro) path
-  | Tezlink_block_hash_by_number :
-      Durable_storage_path.Block.number
-      -> (Ethereum_types.block_hash, ro) path
+  | Tezlink_manager :
+      Tezos_types.Contract.implicit
+      -> (Tezos_types.Manager.t option, ro) path
+  | Tezlink_counter : Tezos_types.Contract.implicit -> (Z.t option, ro) path
   | Blueprint_current_generation : (Ethereum_types.quantity, ro) path
   | Kernel_boot_wasm : (bytes, rw) path
   | Kernel_verbosity : (string, rw) path

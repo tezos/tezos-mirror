@@ -10,8 +10,8 @@
     validation is done, e.g. contains functions to read the balance and counter
     of a contract in that context (i.e. the last block). *)
 type michelson_validation_config = {
-  get_balance : Tezos_types.Contract.t -> Z.t tzresult Lwt.t;
-  get_counter : Tezos_types.Contract.t -> Z.t option tzresult Lwt.t;
+  get_balance : Tezos_types.Contract.implicit -> Z.t tzresult Lwt.t;
+  get_counter : Tezos_types.Contract.implicit -> Z.t option tzresult Lwt.t;
 }
 
 type evm_validation_config = {

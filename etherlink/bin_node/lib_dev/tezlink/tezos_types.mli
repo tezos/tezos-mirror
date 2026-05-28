@@ -37,6 +37,8 @@ val convert_using_serialization :
 module Contract : sig
   type t = Tezlink_imports.Imported_context.Contract.t
 
+  type implicit = Signature.V2.Public_key_hash.t
+
   val encoding : t Data_encoding.t
 
   val implicit_encoding : Signature.V2.public_key_hash Data_encoding.t

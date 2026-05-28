@@ -362,8 +362,12 @@ let init_validation_state (head_info : Evm_context.head) =
   let open Lwt_result_syntax in
   let state = head_info.evm_state in
   let michelson_config =
-    let get_counter = Tezlink_durable_storage.counter state in
-    let get_balance = Tezlink_durable_storage.balance_z state in
+    let get_counter pkh = Tezlink_durable_storage.counter state pkh in
+    let get_balance pkh =
+      Tezlink_durable_storage.balance_z
+        state
+        (Tezos_types.Contract.of_implicit pkh)
+    in
     Validation_types.{get_balance; get_counter}
   in
   let* minimum_base_fee_per_gas =
