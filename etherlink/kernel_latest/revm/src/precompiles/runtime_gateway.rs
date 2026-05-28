@@ -260,17 +260,14 @@ fn dispatch_origin_of<Host: StorageV1, R: Registry>(
         )
             .abi_encode_params(),
         Classification::Alias(info) => {
-            let native_str = String::from_utf8(info.native_address).map_err(|e| {
+            let runtime = info.runtime;
+            let native_str = info.into_native_address_string().map_err(|e| {
                 CustomPrecompileError::Revert(
                     format!("originOf: alias native_address is not UTF-8: {e}"),
                     *gas,
                 )
             })?;
-            (
-                ORIGIN_KIND_ALIAS,
-                u16::from(u8::from(info.runtime)),
-                native_str,
-            )
+            (ORIGIN_KIND_ALIAS, u16::from(u8::from(runtime)), native_str)
                 .abi_encode_params()
         }
     };
@@ -330,7 +327,7 @@ fn dispatch_resolve_address<Host: StorageV1, R: Registry>(
         }
         Classification::Alias(info) if info.runtime == target_runtime => {
             // Direct recorded lookup — target address is in the Alias record.
-            let native_str = String::from_utf8(info.native_address).map_err(|e| {
+            let native_str = info.into_native_address_string().map_err(|e| {
                 CustomPrecompileError::Revert(
                     format!("resolveAddress: alias native_address is not UTF-8: {e}"),
                     *gas,

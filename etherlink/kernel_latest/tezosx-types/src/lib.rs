@@ -161,6 +161,19 @@ pub struct AliasInfo {
     pub native_address: Vec<u8>,
 }
 
+impl AliasInfo {
+    /// Decode [`Self::native_address`] as the UTF-8 string it is
+    /// invariantly supposed to be (see the type's doc comment),
+    /// consuming `self`. A non-UTF-8 payload is data corruption;
+    /// callers should surface it as a runtime-local kernel error, not
+    /// silently substitute `U+FFFD`.
+    pub fn into_native_address_string(
+        self,
+    ) -> Result<String, std::string::FromUtf8Error> {
+        String::from_utf8(self.native_address)
+    }
+}
+
 /// Classification record stored at an account classification path.
 #[derive(Clone, Debug, Eq, PartialEq, BinWriter, NomReader, HasEncoding)]
 #[encoding(tags = "u8")]
