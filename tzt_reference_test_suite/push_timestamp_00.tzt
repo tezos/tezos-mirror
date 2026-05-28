@@ -1,0 +1,5 @@
+# PUSH timestamp with a canonical decimal-string literal. Control case
+# for push_timestamp_01..03.
+code { PUSH timestamp "1571659294" } ;
+input { } ;
+output { Stack_elt timestamp 1571659294 }

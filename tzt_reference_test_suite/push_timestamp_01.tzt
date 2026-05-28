@@ -1,0 +1,7 @@
+# PUSH timestamp with a decimal-string literal larger than i64::MAX. L1's
+# `Script_timestamp.of_string` falls back to `Z.of_string` and accepts
+# any arbitrary-precision integer string; MIR used to reject this with
+# `invalid value for type Timestamp` (L2-1375).
+code { PUSH timestamp "99999999999999999999" } ;
+input { } ;
+output { Stack_elt timestamp 99999999999999999999 }
