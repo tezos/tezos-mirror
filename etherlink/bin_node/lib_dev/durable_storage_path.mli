@@ -40,6 +40,25 @@ val michelson_contract_code : Tezos_types.Contract.t -> path
     ([/tez/tez_accounts/contracts/index/<hex>/balance]). *)
 val michelson_contract_balance : Tezos_types.Contract.t -> path
 
+(** [tezos_big_map_value id key_hash] is the durable storage path of
+    big_map [id]'s value at [key_hash]
+    ([/tez/tez_accounts/big_map/<id>/<key_hex>]). *)
+val tezos_big_map_value :
+  Tezlink_imports.Imported_context.Big_map.Id.t ->
+  Tezlink_imports.Imported_protocol.Script_expr_hash.t ->
+  path
+
+(** [tezos_big_map_key_type id] is the durable storage path of big_map
+    [id]'s declared key type ([/tez/tez_accounts/big_map/<id>/key_type]). *)
+val tezos_big_map_key_type :
+  Tezlink_imports.Imported_context.Big_map.Id.t -> path
+
+(** [tezos_big_map_value_type id] is the durable storage path of big_map
+    [id]'s declared value type
+    ([/tez/tez_accounts/big_map/<id>/value_type]). *)
+val tezos_big_map_value_type :
+  Tezlink_imports.Imported_context.Big_map.Id.t -> path
+
 (** [/kernel/boot.wasm] — path of the kernel's WASM blob, the entry
     point [Pvm.Kernel] runs. Writable by the EVM node only for
     debugger / replay overrides. *)

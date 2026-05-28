@@ -686,17 +686,9 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
               Tezlink_imports.Imported_context.Script.expr_encoding;
         }
   | Tezos_big_map_value (id, key_hash) ->
-      let raw_hash =
-        Tezlink_imports.Imported_protocol.Script_expr_hash.to_bytes key_hash
-      in
-      let (`Hex key_hex) = Hex.of_bytes raw_hash in
       static_ro
         {
-          path =
-            Durable_storage_path.tezos_big_map_root ^ "/"
-            ^ Z.to_string
-                (Tezlink_imports.Imported_context.Big_map.Id.unparse_to_z id)
-            ^ "/" ^ key_hex;
+          path = Durable_storage_path.tezos_big_map_value id key_hash;
           decode =
             safe_binary_decode
               Tezlink_imports.Imported_context.Script.expr_encoding;
@@ -704,11 +696,7 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
   | Tezos_big_map_key_type id ->
       static_ro
         {
-          path =
-            Durable_storage_path.tezos_big_map_root ^ "/"
-            ^ Z.to_string
-                (Tezlink_imports.Imported_context.Big_map.Id.unparse_to_z id)
-            ^ "/key_type";
+          path = Durable_storage_path.tezos_big_map_key_type id;
           decode =
             safe_binary_decode
               Tezlink_imports.Imported_context.Script.expr_encoding;
@@ -716,11 +704,7 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
   | Tezos_big_map_value_type id ->
       static_ro
         {
-          path =
-            Durable_storage_path.tezos_big_map_root ^ "/"
-            ^ Z.to_string
-                (Tezlink_imports.Imported_context.Big_map.Id.unparse_to_z id)
-            ^ "/value_type";
+          path = Durable_storage_path.tezos_big_map_value_type id;
           decode =
             safe_binary_decode
               Tezlink_imports.Imported_context.Script.expr_encoding;

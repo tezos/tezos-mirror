@@ -132,6 +132,21 @@ let michelson_contract_code contract =
 let michelson_contract_balance contract =
   michelson_contract_dir contract ^ "/balance"
 
+let tezos_big_map_dir id =
+  tezos_big_map_root ^ "/"
+  ^ Z.to_string (Tezlink_imports.Imported_context.Big_map.Id.unparse_to_z id)
+
+let tezos_big_map_value id key_hash =
+  let raw_hash =
+    Tezlink_imports.Imported_protocol.Script_expr_hash.to_bytes key_hash
+  in
+  let (`Hex key_hex) = Hex.of_bytes raw_hash in
+  tezos_big_map_dir id ^ "/" ^ key_hex
+
+let tezos_big_map_key_type id = tezos_big_map_dir id ^ "/key_type"
+
+let tezos_big_map_value_type id = tezos_big_map_dir id ^ "/value_type"
+
 let michelson_ledger_root = "/tez/tez_accounts/tezosx"
 
 let tez_world_state_root = TEZ.World_state.root
