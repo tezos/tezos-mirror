@@ -24,13 +24,23 @@ module EVM = struct
   let root = "/evm"
 
   let make s = root ^ s
+
+  module World_state = struct
+    let world_state = "/world_state"
+
+    let make s = make (world_state ^ s)
+  end
 end
 
 module TEZ = struct
-  module World_state = struct
-    let root = "/tez/world_state"
+  let root = "/tez"
 
-    let make s = root ^ s
+  let make s = root ^ s
+
+  module World_state = struct
+    let world_state = "/world_state"
+
+    let make s = make (world_state ^ s)
   end
 end
 
@@ -43,12 +53,6 @@ let evm_node_flag ~storage_version =
     evm_node_flag_base
   else evm_node_flag_legacy
 
-module World_state = struct
-  let root = "/world_state"
-
-  let make s = EVM.make (root ^ s)
-end
-
 module EVM_ETH_ACCOUNTS = struct
   let root = "/evm/eth_accounts"
 
@@ -58,7 +62,7 @@ end
 module Single_tx = struct
   let input_tx_base = BASE.make "/instant_confirmation/input_tx"
 
-  let input_tx_legacy = World_state.make "/single_tx/input_tx"
+  let input_tx_legacy = EVM.World_state.make "/single_tx/input_tx"
 
   let input_tx ~storage_version =
     if Storage_version.ipc_paths_moved_to_base ~storage_version then
@@ -90,23 +94,23 @@ let delayed_input ~storage_version =
 module Assemble_block = struct
   let input_base = BASE.make "/instant_confirmation/assemble_block/input"
 
-  let input_legacy = World_state.make "/assemble_block/input"
+  let input_legacy = EVM.World_state.make "/assemble_block/input"
 
   let input ~storage_version =
     if Storage_version.ipc_paths_moved_to_base ~storage_version then input_base
     else input_legacy
 end
 
-let etherlink_root = World_state.make ""
+let etherlink_root = EVM.World_state.make ""
 
-let etherlink_safe_root = "/tmp" ^ World_state.make ""
+let etherlink_safe_root = "/tmp" ^ etherlink_root
 
 let michelson_contracts_index = "/tez/tez_accounts/contracts/index"
 
 (** [/tez/tez_accounts/big_map] — root of the Michelson big_map subtree
     that the kernel ([etherlink/kernel_latest/tezos_execution/src/context.rs])
     writes under the Tezlink context root. *)
-let tezos_big_map_root = "/tez/tez_accounts/big_map"
+let tezos_big_map_root = TEZ.make "/tez_accounts/big_map"
 
 (** [/kernel/boot.wasm] — path of the kernel's WASM blob, the entry
     point [Pvm.Kernel] runs. Writable by the EVM node only for
@@ -149,8 +153,6 @@ let tezos_big_map_value_type id = tezos_big_map_dir id ^ "/value_type"
 
 let michelson_ledger_root = "/tez/tez_accounts/tezosx"
 
-let tez_world_state_root = TEZ.World_state.root
-
 (** TezosX: Tezos blocks live in the Michelson world-state keyspace. *)
 let tezosx_tezos_blocks_root = TEZ.World_state.make "/tez_blocks"
 
@@ -166,19 +168,20 @@ let root_of_chain_family (type f) (chain_family : f L2_types.chain_family) =
 
 let chain_id ~storage_version =
   if Storage_version.evm_config_moved_to_world_state ~storage_version then
-    World_state.make "/chain_id"
+    EVM.World_state.make "/chain_id"
   else EVM.make "/chain_id"
 
 let michelson_runtime_chain_id = TEZ.World_state.make "/chain_id"
 
-let minimum_base_fee_per_gas = World_state.make "/fees/minimum_base_fee_per_gas"
+let minimum_base_fee_per_gas =
+  EVM.World_state.make "/fees/minimum_base_fee_per_gas"
 
-let backlog = World_state.make "/fees/backlog"
+let backlog = EVM.World_state.make "/fees/backlog"
 
-let da_fee_per_byte = World_state.make "/fees/da_fee_per_byte"
+let da_fee_per_byte = EVM.World_state.make "/fees/da_fee_per_byte"
 
 let michelson_to_evm_gas_multiplier =
-  World_state.make "/fees/michelson_to_evm_gas_multiplier"
+  EVM.World_state.make "/fees/michelson_to_evm_gas_multiplier"
 
 let kernel_version ~storage_version =
   if Storage_version.governance_config_moved_to_base ~storage_version then
@@ -208,7 +211,7 @@ let sequencer_upgrade ~storage_version =
   if
     Storage_version.sequencer_key_storage_migrated_to_world_state
       ~storage_version
-  then World_state.make "/sequencer_upgrade"
+  then EVM.World_state.make "/sequencer_upgrade"
   else EVM.make "/sequencer_upgrade"
 
 let delayed_inbox ~storage_version =
@@ -218,12 +221,12 @@ let delayed_inbox ~storage_version =
 
 let sequencer_pool_address ~storage_version =
   if Storage_version.evm_config_moved_to_world_state ~storage_version then
-    World_state.make "/sequencer_pool_address"
+    EVM.World_state.make "/sequencer_pool_address"
   else EVM.make "/sequencer_pool_address"
 
 let sequencer_key_legacy = EVM.make "/sequencer"
 
-let sequencer_key_world_state = World_state.make "/sequencer"
+let sequencer_key_world_state = EVM.World_state.make "/sequencer"
 
 let sequencer_key ~storage_version =
   if
@@ -234,7 +237,7 @@ let sequencer_key ~storage_version =
 
 let maximum_gas_per_transaction ~storage_version =
   if Storage_version.evm_config_moved_to_world_state ~storage_version then
-    World_state.make "/maximum_gas_per_transaction"
+    EVM.World_state.make "/maximum_gas_per_transaction"
   else EVM.make "/maximum_gas_per_transaction"
 
 let michelson_runtime_sunrise_level ~storage_version =
@@ -260,7 +263,7 @@ module Accounts = struct
   let accounts_root ~storage_version =
     if Storage_version.evm_accounts_isolated ~storage_version then
       EVM_ETH_ACCOUNTS.root
-    else World_state.make "/eth_accounts"
+    else EVM.World_state.make "/eth_accounts"
 
   let info_path = "/info"
 
@@ -343,7 +346,7 @@ module Code = struct
   let codes ~storage_version =
     if Storage_version.evm_accounts_isolated ~storage_version then
       EVM_ETH_ACCOUNTS.make "/eth_codes"
-    else World_state.make "/eth_codes"
+    else EVM.World_state.make "/eth_codes"
 
   let code_storage ~storage_version (Hash (Hex hash)) =
     codes ~storage_version ^ "/" ^ hash
@@ -429,13 +432,13 @@ module Indexes = struct
 end
 
 module Transaction_receipt = struct
-  let receipts = World_state.make "/transactions_receipts"
+  let receipts = EVM.World_state.make "/transactions_receipts"
 
   let receipt (Hash (Hex tx_hash)) = receipts ^ "/" ^ tx_hash
 end
 
 module Transaction_object = struct
-  let objects = World_state.make "/transactions_objects"
+  let objects = EVM.World_state.make "/transactions_objects"
 
   let object_ (Hash (Hex tx_hash)) = objects ^ "/" ^ tx_hash
 end
@@ -484,7 +487,7 @@ module Http_trace = struct
   let root ~storage_version =
     if Storage_version.simulation_trace_ipc_moved_to_base ~storage_version then
       BASE.make "/__http_trace/traces"
-    else World_state.make "/__http_trace/traces"
+    else EVM.World_state.make "/__http_trace/traces"
 
   let enabled_flag = BASE.make "/__http_trace_enabled"
 

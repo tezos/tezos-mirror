@@ -77,9 +77,6 @@ val contract_hex : Tezos_types.Contract.t -> string
     and cross-runtime alias subtree. *)
 val michelson_ledger_root : path
 
-(** Root of the Michelson world-state keyspace ([/tez/world_state]). *)
-val tez_world_state_root : path
-
 (** TezosX: root for Tezos blocks stored under the Michelson world state
     ([/tez/world_state/tez_blocks]). *)
 val tezosx_tezos_blocks_root : path
