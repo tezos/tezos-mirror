@@ -214,7 +214,10 @@ mod tests {
         });
         assert_eq!(
             Gas::default().milligas().unwrap() - ctx.gas.milligas().unwrap(),
-            1287
+            // Routing the public `Instruction::interpret` through the iterative
+            // driver charges one extra INTERPRET_RET for the outer top-level
+            // block compared to the old direct `interpret_one` call.
+            1287 + crate::gas::interpret_cost::INTERPRET_RET
         );
     }
 

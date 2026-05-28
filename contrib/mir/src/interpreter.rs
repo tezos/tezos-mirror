@@ -332,7 +332,7 @@ impl<'a> Instruction<'a> {
         arena: &'a Arena<Micheline<'a>>,
         stack: &mut IStack<'a>,
     ) -> Result<(), InterpretError<'a>> {
-        interpret_one(self, ctx, arena, stack)
+        interpret(std::slice::from_ref(self), ctx, arena, stack)
     }
 }
 
@@ -1931,15 +1931,15 @@ fn interpret_one<'a>(
                 }
             }
         },
-        I::Dip(opt_height, nested) => {
-            ctx.gas().consume(interpret_cost::dip(*opt_height)?)?;
-            let protected_height: u16 = opt_height.unwrap_or(1);
-            let mut protected = stack.split_off(protected_height as usize);
-            interpret(nested, ctx, arena, stack)?;
-            ctx.gas()
-                .consume(interpret_cost::undip(protected_height)?)?;
-            stack.append(&mut protected);
-        }
+        // Control-flow / sub-stack instructions are handled by the iterative
+        // driver (interpret_step returns StepResult::Open*). interpret_one is
+        // only reached via the driver's `_` fallthrough for non-control-flow
+        // ops, so seeing one here is a driver invariant violation.
+        I::Seq(..) | I::Dip(..) | I::If(..) | I::IfNone(..) | I::IfCons(..)
+        | I::IfLeft(..) | I::Loop(..) | I::LoopLeft(..) | I::Iter(..)
+        | I::Map(..) | I::Exec | I::IView { .. } => Err(InterpretError::InternalError(
+            InterpretInvariant::UnreachableState,
+        ))?,
         I::Drop(opt_height) => {
             ctx.gas().consume(interpret_cost::drop(*opt_height)?)?;
             let drop_height: usize = opt_height.unwrap_or(1) as usize;
@@ -1994,52 +1994,6 @@ fn interpret_one<'a>(
             let i = pop!(V::Int);
             stack.push(V::Bool(i.is_negative()));
         }
-        I::If(nested_t, nested_f) => {
-            ctx.gas().consume(interpret_cost::IF)?;
-            if pop!(V::Bool) {
-                interpret(nested_t, ctx, arena, stack)?;
-            } else {
-                interpret(nested_f, ctx, arena, stack)?;
-            }
-        }
-        I::IfNone(when_none, when_some) => {
-            ctx.gas().consume(interpret_cost::IF_NONE)?;
-            match pop!(V::Option) {
-                Some(x) => {
-                    stack.push(x);
-                    interpret(when_some, ctx, arena, stack)?
-                }
-                None => interpret(when_none, ctx, arena, stack)?,
-            }
-        }
-        I::IfCons(when_cons, when_nil) => {
-            ctx.gas().consume(interpret_cost::IF_CONS)?;
-            let lst = top_mut!(V::List);
-            match lst.uncons() {
-                Some(x) => {
-                    stack.push(x);
-                    interpret(when_cons, ctx, arena, stack)?
-                }
-                None => {
-                    pop!();
-                    interpret(when_nil, ctx, arena, stack)?;
-                }
-            }
-        }
-        I::IfLeft(when_left, when_right) => {
-            ctx.gas().consume(interpret_cost::IF_LEFT)?;
-            let or = pop!(V::Or);
-            match or {
-                Or::Left(x) => {
-                    stack.push(x);
-                    interpret(when_left, ctx, arena, stack)?
-                }
-                Or::Right(x) => {
-                    stack.push(x);
-                    interpret(when_right, ctx, arena, stack)?;
-                }
-            }
-        }
         I::Abs => {
             let i = pop!(V::Int);
             ctx.gas().consume(interpret_cost::abs(&i)?)?;
@@ -2091,106 +2045,6 @@ fn interpret_one<'a>(
                 } else {
                     i.to_signed_bytes_be()
                 }));
-            }
-        },
-        I::Loop(nested) => {
-            ctx.gas().consume(interpret_cost::LOOP_ENTER)?;
-            loop {
-                ctx.gas().consume(interpret_cost::LOOP)?;
-                if pop!(V::Bool) {
-                    interpret(nested, ctx, arena, stack)?;
-                } else {
-                    ctx.gas().consume(interpret_cost::LOOP_EXIT)?;
-                    break;
-                }
-            }
-        }
-        I::LoopLeft(nested) => {
-            ctx.gas().consume(interpret_cost::LOOP_LEFT_ENTER)?;
-            loop {
-                ctx.gas().consume(interpret_cost::LOOP)?;
-                match pop!(V::Or) {
-                    Or::Left(x) => {
-                        stack.push(x);
-                        interpret(nested, ctx, arena, stack)?;
-                    }
-                    Or::Right(x) => {
-                        stack.push(x);
-                        ctx.gas().consume(interpret_cost::LOOP_EXIT)?;
-                        break;
-                    }
-                }
-            }
-        }
-        I::Iter(overload, nested) => {
-            ctx.gas().consume(interpret_cost::ITER)?;
-            match overload {
-                overloads::Iter::List => {
-                    let lst = pop!(V::List);
-                    for i in lst {
-                        ctx.gas().consume(interpret_cost::PUSH)?;
-                        stack.push(i);
-                        interpret(nested, ctx, arena, stack)?;
-                    }
-                }
-                overloads::Iter::Set => {
-                    let set = pop!(V::Set);
-                    for v in set {
-                        ctx.gas().consume(interpret_cost::PUSH)?;
-                        stack.push(v);
-                        interpret(nested, ctx, arena, stack)?;
-                    }
-                }
-                overloads::Iter::Map => {
-                    let map = pop!(V::Map);
-                    for (k, v) in map {
-                        ctx.gas().consume(interpret_cost::PUSH)?;
-                        stack.push(V::Pair(k, v));
-                        interpret(nested, ctx, arena, stack)?;
-                    }
-                }
-            }
-        }
-        I::Map(overload, nested) => match overload {
-            overloads::Map::List => {
-                ctx.gas().consume(interpret_cost::MAP_LIST)?;
-                let list = pop!(V::List);
-                let result = list
-                    .into_iter()
-                    .map(|elem| {
-                        ctx.gas().consume(interpret_cost::PUSH)?;
-                        stack.push(elem);
-                        interpret(nested, ctx, arena, stack)?;
-                        Ok(pop!())
-                    })
-                    .collect::<Result<_, InterpretError>>()?;
-                stack.push(V::List(result));
-            }
-            overloads::Map::Option => {
-                ctx.gas().consume(interpret_cost::MAP_OPTION)?;
-                let option = pop!(V::Option);
-                let result = match option {
-                    Some(elem) => {
-                        ctx.gas().consume(interpret_cost::PUSH)?;
-                        stack.push(elem);
-                        interpret(nested, ctx, arena, stack)?;
-                        Some(pop!())
-                    }
-                    None => None,
-                };
-                stack.push(V::new_option(result));
-            }
-            overloads::Map::Map => {
-                ctx.gas().consume(interpret_cost::MAP_MAP)?;
-                let mut map = pop!(V::Map);
-                for (key, val) in map.iter_mut() {
-                    ctx.gas().consume(interpret_cost::PUSH)?;
-                    let val_temp = std::mem::replace(val, Rc::new(V::Unit));
-                    stack.push(V::Pair(key.clone(), val_temp));
-                    interpret(nested, ctx, arena, stack)?;
-                    *val = pop_rc!();
-                }
-                stack.push(V::Map(map));
             }
         },
         I::Push(v) => {
@@ -2688,45 +2542,6 @@ fn interpret_one<'a>(
             ctx.gas().consume(interpret_cost::LAMBDA)?;
             stack.push(V::Lambda(Closure::Lambda(lam.clone())));
         }
-        I::Exec => {
-            ctx.gas().consume(interpret_cost::EXEC)?;
-            let mut arg = pop!();
-            let mut closure = pop!(V::Lambda);
-            loop {
-                match closure {
-                    Closure::Lambda(ref lam) => {
-                        let mut res_stk = match &lam {
-                            Lambda::LambdaRec { code, .. } => {
-                                // NB: this `clone` is constant-time as `code` is Rc
-                                // See Note: Rc in lambdas
-                                let code = Rc::clone(code);
-                                let mut stk = stk![V::Lambda(closure), arg];
-                                interpret(&code, ctx, arena, &mut stk)?;
-                                stk
-                            }
-                            Lambda::Lambda { code, .. } => {
-                                let mut stk = stk![arg];
-                                interpret(code, ctx, arena, &mut stk)?;
-                                stk
-                            }
-                        };
-                        stack.push(res_stk.pop().ok_or(InterpretError::InternalError(
-                            InterpretInvariant::EmptyValueStackPop,
-                        ))?);
-                        break;
-                    }
-                    Closure::Apply {
-                        arg_val,
-                        closure: inner,
-                        ..
-                    } => {
-                        ctx.gas().consume(interpret_cost::PAIR)?; // reasonable estimation
-                        arg = V::new_pair(*arg_val, arg);
-                        closure = *inner;
-                    }
-                }
-            }
-        }
         I::Apply { arg_ty } => {
             let arg_val = pop!();
             let closure = pop!(V::Lambda);
@@ -3033,80 +2848,6 @@ fn interpret_one<'a>(
                 }),
                 counter,
             ))
-        }
-        I::Seq(nested) => interpret(nested, ctx, arena, stack)?,
-        I::IView { name, return_type } => {
-            let input = TypedValue::unwrap_rc(stack.pop().ok_or(InterpretError::InternalError(
-                InterpretInvariant::EmptyValueStackPop,
-            ))?);
-            let Address {
-                hash,
-                entrypoint: _,
-            } = pop!(V::Address);
-
-            ctx.gas().consume(interpret_cost::VIEW)?;
-
-            let kt1 = match hash {
-                AddressHash::Kt1(kt1) => kt1,
-                _ => {
-                    stack.push(V::Option(None));
-                    return Ok(());
-                }
-            };
-
-            if let Some(result) =
-                ctx.try_dispatch_enshrined_view(&kt1, name, &input, return_type, arena)
-            {
-                stack.push(V::new_option(result?));
-                return Ok(());
-            }
-
-
-            let Some((view, view_storage_ty, view_storage, view_balance)) =
-                ctx.lookup_view_storage_balance(&kt1, name, arena)?
-            else {
-                stack.push(V::Option(None));
-                return Ok(());
-            };
-
-            let storage_ty = view_storage_ty.parse_ty(ctx.gas())?;
-            let storage_ty_micheline =
-                storage_ty.into_micheline_optimized_legacy(arena, ctx.gas())?;
-
-            let storage = Micheline::decode_raw(arena, &view_storage, ctx.gas())??
-                .typecheck_value(ctx, &storage_ty_micheline)?;
-
-            let input_type = view.input_type.parse_ty(ctx.gas())?;
-            let output_type = view.output_type.parse_ty(ctx.gas())?;
-
-            if let Micheline::Seq(instrs) = view.code {
-                if let Ok(code) = crate::typechecker::typecheck_view(
-                    instrs,
-                    ctx.gas(),
-                    Type::Pair(Rc::new((input_type, storage_ty))),
-                    output_type,
-                ) {
-                    let mut stk = stk![TypedValue::new_pair(input, storage)];
-                    let old = (
-                        ctx.self_address(),
-                        ctx.sender(),
-                        ctx.amount(),
-                        ctx.balance(),
-                    );
-                    ctx.set_view_context(AddressHash::Kt1(kt1), old.0.clone(), 0, view_balance);
-                    let result = interpret(code.as_ref(), ctx, arena, &mut stk);
-                    ctx.set_view_context(old.0, old.1, old.2, old.3);
-                    result?;
-                    let result = TypedValue::unwrap_rc(stk.pop().ok_or(
-                        InterpretError::InternalError(InterpretInvariant::EmptyValueStackPop),
-                    )?);
-                    stack.push(V::new_option(Some(result)));
-                } else {
-                    stack.push(V::Option(None));
-                }
-            } else {
-                stack.push(V::Option(None));
-            }
         }
     }
     Ok(())
@@ -3755,8 +3496,8 @@ mod interpreter_tests {
         let mut stack = stk![V::nat(20), V::nat(5), V::nat(10)];
         let expected_stack = stk![V::nat(25), V::nat(10)];
         let mut ctx = Ctx::default();
-        assert!(interpret_one(
-            &Dip(None, vec![Add(overloads::Add::NatNat)]),
+        assert!(interpret(
+            &[Dip(None, vec![Add(overloads::Add::NatNat)])],
             &mut ctx,
             &mut stack
         )
@@ -3769,7 +3510,7 @@ mod interpreter_tests {
         let mut stack = stk![V::nat(20), V::nat(5), V::nat(10)];
         let expected_stack = stk![V::nat(5), V::nat(10)];
         let mut ctx = Ctx::default();
-        assert!(interpret_one(&Dip(Some(2), vec![Drop(None)]), &mut ctx, &mut stack).is_ok());
+        assert!(interpret(&[Dip(Some(2), vec![Drop(None)])], &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
     }
 
@@ -3870,8 +3611,8 @@ mod interpreter_tests {
         let mut stack = stk![V::int(20), V::int(5), V::Bool(true)];
         let expected_stack = stk![V::int(20)];
         let mut ctx = Ctx::default();
-        assert!(interpret_one(
-            &If(vec![Drop(None)], vec![Add(overloads::Add::IntInt)]),
+        assert!(interpret(
+            &[If(vec![Drop(None)], vec![Add(overloads::Add::IntInt)])],
             &mut ctx,
             &mut stack,
         )
@@ -3884,8 +3625,8 @@ mod interpreter_tests {
         let mut stack = stk![V::int(20), V::int(5), V::Bool(false)];
         let expected_stack = stk![V::int(25)];
         let mut ctx = Ctx::default();
-        assert!(interpret_one(
-            &If(vec![Drop(None)], vec![Add(overloads::Add::IntInt)]),
+        assert!(interpret(
+            &[If(vec![Drop(None)], vec![Add(overloads::Add::IntInt)])],
             &mut ctx,
             &mut stack,
         )
@@ -4053,12 +3794,12 @@ mod interpreter_tests {
         let mut stack = stk![V::nat(20), V::nat(10), V::Bool(false)];
         let expected_stack = stk![V::nat(20), V::nat(10)];
         let mut ctx = Ctx::default();
-        assert!(interpret_one(
-            &Loop(vec![
+        assert!(interpret(
+            &[Loop(vec![
                 Push(Rc::new(V::nat(1))),
                 Add(overloads::Add::NatNat),
                 Push(Rc::new(V::Bool(false)))
-            ]),
+            ])],
             &mut ctx,
             &mut stack,
         )
@@ -4071,12 +3812,12 @@ mod interpreter_tests {
         let mut stack = stk![V::nat(20), V::nat(10), V::Bool(true)];
         let expected_stack = stk![V::nat(20), V::nat(11)];
         let mut ctx = Ctx::default();
-        assert!(interpret_one(
-            &Loop(vec![
+        assert!(interpret(
+            &[Loop(vec![
                 Push(Rc::new(V::nat(1))),
                 Add(overloads::Add::NatNat),
                 Push(Rc::new(V::Bool(false)))
-            ]),
+            ])],
             &mut ctx,
             &mut stack,
         )
@@ -4089,13 +3830,13 @@ mod interpreter_tests {
         let mut stack = stk![V::nat(20), V::int(10), V::Bool(true)];
         let expected_stack = stk![V::nat(20), V::int(0)];
         let mut ctx = Ctx::default();
-        assert!(interpret_one(
-            &Loop(vec![
+        assert!(interpret(
+            &[Loop(vec![
                 Push(Rc::new(V::int(-1))),
                 Add(overloads::Add::IntInt),
                 Dup(None),
                 Gt
-            ]),
+            ])],
             &mut ctx,
             &mut stack,
         )
@@ -4108,7 +3849,7 @@ mod interpreter_tests {
         let mut stack = stk![V::new_or(Or::Right(V::nat(0)))];
         let mut ctx = Ctx::default();
         assert_eq!(
-            interpret_one(&LoopLeft(vec![Failwith(Type::Nat)]), &mut ctx, &mut stack),
+            interpret(&[LoopLeft(vec![Failwith(Type::Nat)])], &mut ctx, &mut stack),
             Ok(())
         );
         assert_eq!(stack, stk![V::nat(0)])
@@ -4119,11 +3860,11 @@ mod interpreter_tests {
         let mut stack = stk![V::new_or(Or::Left(V::nat(0)))];
         let mut ctx = Ctx::default();
         assert_eq!(
-            interpret_one(
-                &LoopLeft(vec![
+            interpret(
+                &[LoopLeft(vec![
                     Drop(None),
                     Push(Rc::new(V::new_or(Or::Right(V::int(1)))))
-                ]),
+                ])],
                 &mut ctx,
                 &mut stack
             ),
@@ -4142,8 +3883,8 @@ mod interpreter_tests {
             V::List(MichelsonList::new()),
             V::List((1..5).map(V::int).collect())
         ];
-        assert!(interpret_one(
-            &Iter(overloads::Iter::List, vec![Cons]),
+        assert!(interpret(
+            &[Iter(overloads::Iter::List, vec![Cons])],
             &mut Ctx::default(),
             &mut stack,
         )
@@ -4156,8 +3897,8 @@ mod interpreter_tests {
     #[test]
     fn test_iter_list_zero() {
         let mut stack = stk![V::Unit, V::List(MichelsonList::new())];
-        assert!(interpret_one(
-            &Iter(overloads::Iter::List, vec![Drop(None)]),
+        assert!(interpret(
+            &[Iter(overloads::Iter::List, vec![Drop(None)])],
             &mut Ctx::default(),
             &mut stack,
         )
@@ -4171,8 +3912,8 @@ mod interpreter_tests {
             V::List(MichelsonList::new()),
             V::Set(rc_set([V::int(1), V::int(2), V::int(3)]))
         ];
-        assert!(interpret_one(
-            &Iter(overloads::Iter::Set, vec![Cons]),
+        assert!(interpret(
+            &[Iter(overloads::Iter::Set, vec![Cons])],
             &mut Ctx::default(),
             &mut stack,
         )
@@ -4191,8 +3932,8 @@ mod interpreter_tests {
     #[test]
     fn test_iter_set_zero() {
         let mut stack = stk![V::int(0), V::Set(BTreeSet::new())];
-        assert!(interpret_one(
-            &Iter(overloads::Iter::Set, vec![Add(overloads::Add::IntInt)]),
+        assert!(interpret(
+            &[Iter(overloads::Iter::Set, vec![Add(overloads::Add::IntInt)])],
             &mut Ctx::default(),
             &mut stack,
         )
@@ -4210,8 +3951,8 @@ mod interpreter_tests {
                 (V::int(3), V::nat(3)),
             ]))
         ];
-        assert!(interpret_one(
-            &Iter(overloads::Iter::Map, vec![Cons]),
+        assert!(interpret(
+            &[Iter(overloads::Iter::Map, vec![Cons])],
             &mut Ctx::default(),
             &mut stack,
         )
@@ -4235,8 +3976,8 @@ mod interpreter_tests {
     #[test]
     fn test_iter_map_zero() {
         let mut stack = stk![V::int(0), V::Map(BTreeMap::new())];
-        assert!(interpret_one(
-            &Iter(overloads::Iter::Map, vec![Car, Add(overloads::Add::IntInt)]),
+        assert!(interpret(
+            &[Iter(overloads::Iter::Map, vec![Car, Add(overloads::Add::IntInt)])],
             &mut Ctx::default(),
             &mut stack,
         )
@@ -4256,7 +3997,7 @@ mod interpreter_tests {
             let mut ctx = Ctx::default();
 
             assert!(
-                interpret_one(&Map(overload, vec![ISome]), &mut ctx, &mut input_stack,).is_ok()
+                interpret(&[Map(overload, vec![ISome])], &mut ctx, &mut input_stack,).is_ok()
             );
 
             assert_eq!(input_stack, expected_stack);
@@ -4268,6 +4009,10 @@ mod interpreter_tests {
                     - interpret_cost::PUSH * collection_length
                     - interpret_cost::SOME * collection_length
                     - interpret_cost::INTERPRET_RET * collection_length
+                    // Routing through `interpret` (the iterative driver) instead
+                    // of `interpret_one` charges one extra INTERPRET_RET for the
+                    // outer top-level block.
+                    - interpret_cost::INTERPRET_RET
             );
         }
 
@@ -4315,7 +4060,7 @@ mod interpreter_tests {
         fn test(overload: overloads::Map, mut stack: IStack<'_>) {
             let expected_stack = stack.clone();
             assert!(
-                interpret_one(&Map(overload, vec![ISome]), &mut Ctx::default(), &mut stack,)
+                interpret(&[Map(overload, vec![ISome])], &mut Ctx::default(), &mut stack,)
                     .is_ok()
             );
             assert_eq!(stack, expected_stack);
@@ -4329,8 +4074,8 @@ mod interpreter_tests {
     #[test]
     fn test_map_in_order() {
         fn test(overload: overloads::Map, mut input_stack: IStack<'_>, expected_stack: IStack<'_>) {
-            assert!(interpret_one(
-                &Map(overload, vec![Cons, Unit]),
+            assert!(interpret(
+                &[Map(overload, vec![Cons, Unit])],
                 &mut Ctx::default(),
                 &mut input_stack,
             )
@@ -4378,11 +4123,11 @@ mod interpreter_tests {
     fn test_map_can_modify_underlying_stack() {
         let mut stack = stk![V::Bool(true), V::List(vec![V::Unit].into())];
         let expected_stack = stk![V::Bool(false), V::List(vec![V::Unit].into())];
-        assert!(interpret_one(
-            &Map(
+        assert!(interpret(
+            &[Map(
                 overloads::Map::List,
                 vec![Dip(None, vec![Not(overloads::Not::Bool)])]
-            ),
+            )],
             &mut Ctx::default(),
             &mut stack,
         )
@@ -4398,11 +4143,11 @@ mod interpreter_tests {
         // it runs on the stack from the previous iteration.
         let mut stack = stk![V::int(0), V::List(vec![V::int(1), V::int(2)].into())];
         let expected_stack = stk![V::int(3), V::List(vec![V::Unit, V::Unit].into())];
-        assert!(interpret_one(
-            &Map(
+        assert!(interpret(
+            &[Map(
                 overloads::Map::List,
                 vec![Add(overloads::Add::IntInt), Unit]
-            ),
+            )],
             &mut Ctx::default(),
             &mut stack,
         )
@@ -6375,7 +6120,7 @@ mod interpreter_tests {
             TypedValue::new_pair(TypedValue::int(1), TypedValue::nat(5))
         ];
         assert_eq!(
-            interpret_one(&Exec, &mut Ctx::default(), &mut stack),
+            interpret(&[Exec], &mut Ctx::default(), &mut stack),
             Ok(())
         );
         assert_eq!(stack, stk![TypedValue::int(6)]);
@@ -6407,7 +6152,7 @@ mod interpreter_tests {
             TypedValue::new_pair(TypedValue::Bool(true), TypedValue::nat(5))
         ];
         assert_eq!(
-            interpret_one(&Exec, &mut Ctx::default(), &mut stack),
+            interpret(&[Exec], &mut Ctx::default(), &mut stack),
             Ok(())
         );
         assert_eq!(stack, stk![TypedValue::nat(10)]);
@@ -6439,7 +6184,7 @@ mod interpreter_tests {
             TypedValue::new_pair(TypedValue::Bool(false), TypedValue::nat(5))
         ];
         assert_eq!(
-            interpret_one(&Exec, &mut Ctx::default(), &mut stack),
+            interpret(&[Exec], &mut Ctx::default(), &mut stack),
             Ok(())
         );
         assert_eq!(stack, stk![TypedValue::nat(5)]);
@@ -6494,7 +6239,7 @@ mod interpreter_tests {
         );
         stack.push(TypedValue::nat(5));
         assert_eq!(
-            interpret_one(&Exec, &mut Ctx::default(), &mut stack),
+            interpret(&[Exec], &mut Ctx::default(), &mut stack),
             Ok(())
         );
         assert_eq!(stack, stk![TypedValue::int(6)]);
@@ -6540,7 +6285,7 @@ mod interpreter_tests {
         );
         stack.push(TypedValue::nat(5));
         assert_eq!(
-            interpret_one(&Exec, &mut Ctx::default(), &mut stack),
+            interpret(&[Exec], &mut Ctx::default(), &mut stack),
             Ok(())
         );
         assert_eq!(stack, stk![TypedValue::nat(10)]);
@@ -6586,7 +6331,7 @@ mod interpreter_tests {
         );
         stack.push(TypedValue::nat(5));
         assert_eq!(
-            interpret_one(&Exec, &mut Ctx::default(), &mut stack),
+            interpret(&[Exec], &mut Ctx::default(), &mut stack),
             Ok(())
         );
         assert_eq!(stack, stk![TypedValue::nat(5)]);
