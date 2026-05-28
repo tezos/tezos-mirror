@@ -7,7 +7,6 @@
 use std::rc::Rc;
 
 use crate::gas::{Gas, OutOfGas};
-use crate::lexer::Prim;
 
 use super::{Instruction, IntoMicheline, Micheline, Type, TypedValue};
 
@@ -65,116 +64,16 @@ pub enum Closure<'a> {
 }
 
 impl<'a> IntoMicheline<'a> for Closure<'a> {
-    /// Unwinds the `Closure::Apply` chain into a heap allocated `Vec` and
-    /// assembles the result bottom up, so deeply nested `APPLY` chains do
-    /// not blow the WASM call stack on the previous recursive call to
-    /// `closure.into_micheline_optimized_legacy`.
+    /// Delegates to the iterative `TypedValue::Lambda(self)` unparser, whose
+    /// worklist flattens both the `Closure::Apply` spine and the captured arg
+    /// values (which may themselves be deep lambdas), so neither overflows the
+    /// WASM call stack.
     fn into_micheline_optimized_legacy(
         self,
         arena: &'a typed_arena::Arena<Micheline<'a>>,
         gas: &mut Gas,
     ) -> Result<Micheline<'a>, OutOfGas> {
-        // Walk the Apply spine, collecting (arg_ty, arg_val) pairs in outer
-        // to inner order. Stop at the terminal Lambda. Iterative so a deep
-        // APPLY chain does not blow the WASM call stack.
-        let mut applies: Vec<(Type, TypedValue<'a>)> = Vec::new();
-        let mut cur = self;
-        let terminal: Lambda<'a> = loop {
-            match cur {
-                Closure::Apply {
-                    arg_ty,
-                    arg_val,
-                    closure,
-                } => {
-                    applies.push((arg_ty, *arg_val));
-                    cur = *closure;
-                }
-                Closure::Lambda(lambda) => break lambda,
-            }
-        };
-
-        // No Applies: emit the bare lambda exactly as before.
-        if applies.is_empty() {
-            return Ok(match terminal {
-                Lambda::Lambda { micheline_code, .. } => micheline_code,
-                Lambda::LambdaRec { micheline_code, .. } => {
-                    Micheline::prim1(arena, Prim::Lambda_rec, micheline_code, gas)?
-                }
-            });
-        }
-
-        // Innermost Apply: the layer directly wrapping the terminal. Shape
-        // depends on the terminal variant: LambdaRec produces the
-        // PUSH; PAIR; LAMBDA_REC; SWAP; EXEC sequence; Lambda produces
-        // PUSH; PAIR; <code>.
-        let (inner_arg_ty, inner_arg_val) = applies.pop().expect("non-empty");
-        let mut acc: Micheline<'a> = match terminal {
-            Lambda::LambdaRec {
-                in_ty,
-                out_ty,
-                micheline_code,
-                ..
-            } => Micheline::seq_arr(
-                arena,
-                [
-                    Micheline::prim2(
-                        arena,
-                        Prim::PUSH,
-                        inner_arg_ty.into_micheline_optimized_legacy(arena, gas)?,
-                        inner_arg_val.into_micheline_optimized_legacy(arena, gas)?,
-                        gas,
-                    )?,
-                    Micheline::prim0(Prim::PAIR, gas)?,
-                    Micheline::prim3(
-                        arena,
-                        Prim::LAMBDA_REC,
-                        in_ty.into_micheline_optimized_legacy(arena, gas)?,
-                        out_ty.into_micheline_optimized_legacy(arena, gas)?,
-                        micheline_code,
-                        gas,
-                    )?,
-                    Micheline::prim0(Prim::SWAP, gas)?,
-                    Micheline::prim0(Prim::EXEC, gas)?,
-                ],
-                gas,
-            )?,
-            Lambda::Lambda { micheline_code, .. } => Micheline::seq_arr(
-                arena,
-                [
-                    Micheline::prim2(
-                        arena,
-                        Prim::PUSH,
-                        inner_arg_ty.into_micheline_optimized_legacy(arena, gas)?,
-                        inner_arg_val.into_micheline_optimized_legacy(arena, gas)?,
-                        gas,
-                    )?,
-                    Micheline::prim0(Prim::PAIR, gas)?,
-                    micheline_code,
-                ],
-                gas,
-            )?,
-        };
-
-        // Outer Apply layers: wrap acc in seq[PUSH(arg), PAIR, acc].
-        while let Some((arg_ty, arg_val)) = applies.pop() {
-            acc = Micheline::seq_arr(
-                arena,
-                [
-                    Micheline::prim2(
-                        arena,
-                        Prim::PUSH,
-                        arg_ty.into_micheline_optimized_legacy(arena, gas)?,
-                        arg_val.into_micheline_optimized_legacy(arena, gas)?,
-                        gas,
-                    )?,
-                    Micheline::prim0(Prim::PAIR, gas)?,
-                    acc,
-                ],
-                gas,
-            )?;
-        }
-
-        Ok(acc)
+        TypedValue::Lambda(self).into_micheline_optimized_legacy(arena, gas)
     }
 }
 

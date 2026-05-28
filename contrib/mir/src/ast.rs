@@ -691,6 +691,17 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                 id_part: Micheline<'b>,
                 count: usize,
             },
+            /// Pops `arg_ty_michs.len()` unparsed `APPLY` arg values (the
+            /// closure's captured `arg_val`s, drained via `Visit` so a deep
+            /// chain of lambda-valued args does not recurse) and assembles the
+            /// nested `seq[PUSH(arg_ty, arg_val); PAIR; …]` closure encoding.
+            /// `arg_ty_michs` are the (already unparsed) captured arg types,
+            /// outer-to-inner; `inner_tail` is the innermost seq's tail after
+            /// `PUSH; PAIR` (the lambda body, or `LAMBDA_REC; SWAP; EXEC`).
+            BuildClosure {
+                arg_ty_michs: Vec<Micheline<'b>>,
+                inner_tail: Vec<Micheline<'b>>,
+            },
         }
 
         let mut frames: Vec<TvImFrame<'a>> = vec![TvImFrame::Visit(self)];
@@ -717,9 +728,78 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                     TV::KeyHash(s) => results.push(V::bytes(s.to_bytes().unwrap(), gas)?),
                     TV::Timestamp(s) => results.push(V::int(s, gas)?),
                     TV::Contract(x) => results.push(V::bytes(x.to_bytes_vec(), gas)?),
-                    TV::Lambda(lam) => {
-                        // `Closure::into_micheline_optimized_legacy` is itself iterative.
-                        results.push(lam.into_micheline_optimized_legacy(arena, gas)?);
+                    TV::Lambda(closure) => {
+                        // Flatten the closure onto this worklist: a captured
+                        // `APPLY` arg (`Closure::Apply.arg_val`) may itself be a
+                        // deep lambda, so unparsing it via a recursive
+                        // `Closure -> TypedValue` call could overflow the stack.
+                        // The arg *types* (and a LambdaRec's in/out types) are
+                        // `Type`s, whose own `into_micheline` is iterative, so
+                        // they are unparsed synchronously here; only the arg
+                        // *values* are pushed back as `Visit` frames.
+                        let mut applies: Vec<(Type, TypedValue<'a>)> = Vec::new();
+                        let mut cur = closure;
+                        let terminal = loop {
+                            match cur {
+                                Closure::Apply {
+                                    arg_ty,
+                                    arg_val,
+                                    closure,
+                                } => {
+                                    applies.push((arg_ty, *arg_val));
+                                    cur = *closure;
+                                }
+                                Closure::Lambda(lambda) => break lambda,
+                            }
+                        };
+                        if applies.is_empty() {
+                            // Bare lambda: emit its stored Micheline directly.
+                            results.push(match terminal {
+                                Lambda::Lambda { micheline_code, .. } => micheline_code,
+                                Lambda::LambdaRec { micheline_code, .. } => {
+                                    V::prim1(arena, Prim::Lambda_rec, micheline_code, gas)?
+                                }
+                            });
+                        } else {
+                            // Tail of the innermost seq, after `PUSH; PAIR`.
+                            let inner_tail: Vec<V<'a>> = match terminal {
+                                Lambda::Lambda { micheline_code, .. } => vec![micheline_code],
+                                Lambda::LambdaRec {
+                                    in_ty,
+                                    out_ty,
+                                    micheline_code,
+                                    ..
+                                } => vec![
+                                    V::prim3(
+                                        arena,
+                                        Prim::LAMBDA_REC,
+                                        (&in_ty).into_micheline_optimized_legacy(arena, gas)?,
+                                        (&out_ty).into_micheline_optimized_legacy(arena, gas)?,
+                                        micheline_code,
+                                        gas,
+                                    )?,
+                                    V::prim0(Prim::SWAP, gas)?,
+                                    V::prim0(Prim::EXEC, gas)?,
+                                ],
+                            };
+                            let mut arg_ty_michs: Vec<V<'a>> = Vec::with_capacity(applies.len());
+                            let mut arg_vals: Vec<TypedValue<'a>> =
+                                Vec::with_capacity(applies.len());
+                            for (arg_ty, arg_val) in applies {
+                                arg_ty_michs
+                                    .push((&arg_ty).into_micheline_optimized_legacy(arena, gas)?);
+                                arg_vals.push(arg_val);
+                            }
+                            frames.push(TvImFrame::BuildClosure {
+                                arg_ty_michs,
+                                inner_tail,
+                            });
+                            // Reverse-push so arg values land in `results` in
+                            // outer-to-inner order.
+                            while let Some(arg_val) = arg_vals.pop() {
+                                frames.push(TvImFrame::Visit(arg_val));
+                            }
+                        }
                     }
                     #[cfg(feature = "bls")]
                     TV::Bls12381Fr(x) => results.push(V::bytes(x.to_bytes().to_vec(), gas)?),
@@ -936,6 +1016,33 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                     let slice = arena.alloc_extend(results.drain(start..));
                     let map_part = V::seq(slice, gas)?;
                     results.push(V::prim2(arena, Prim::Pair, id_part, map_part, gas)?);
+                }
+                TvImFrame::BuildClosure {
+                    mut arg_ty_michs,
+                    inner_tail,
+                } => {
+                    let k = arg_ty_michs.len();
+                    let start = results.len() - k;
+                    // Unparsed arg values, outer-to-inner (`results` order).
+                    let mut arg_val_michs: Vec<V<'a>> = results.drain(start..).collect();
+                    // Assemble inner-to-outer: pop the innermost (last) layer
+                    // first, then wrap outward.
+                    let at = arg_ty_michs.pop().expect("BuildClosure: arg_ty");
+                    let av = arg_val_michs.pop().expect("BuildClosure: arg_val");
+                    let mut inner: Vec<V<'a>> = Vec::with_capacity(2 + inner_tail.len());
+                    inner.push(V::prim2(arena, Prim::PUSH, at, av, gas)?);
+                    inner.push(V::prim0(Prim::PAIR, gas)?);
+                    inner.extend(inner_tail);
+                    #[allow(clippy::disallowed_methods)]
+                    let mut acc = V::seq(arena.alloc_extend(inner), gas)?;
+                    while let (Some(at), Some(av)) =
+                        (arg_ty_michs.pop(), arg_val_michs.pop())
+                    {
+                        let push = V::prim2(arena, Prim::PUSH, at, av, gas)?;
+                        let pair = V::prim0(Prim::PAIR, gas)?;
+                        acc = V::seq_arr(arena, [push, pair, acc], gas)?;
+                    }
+                    results.push(acc);
                 }
             }
         }
@@ -1927,6 +2034,34 @@ mod drop_safety {
             map.insert(TypedValue::Unit, deep_pair(DEPTH));
             let mut tv = TypedValue::BigMap(BigMap::new(Type::Unit, Type::Unit, map));
             drain_deep_typed_value(&mut tv);
+        });
+    }
+
+    #[test]
+    fn pack_deep_apply_arg_lambda() {
+        // A closure whose captured APPLY arg is itself a lambda, nested deeply
+        // (`Apply { arg_val: Lambda(Apply { arg_val: Lambda(…) }) }`), must
+        // unparse (PACK) without recursing through Closure -> TypedValue per
+        // level. The worklist drains each `arg_val` as a Visit frame instead.
+        use crate::ast::{Closure, Lambda};
+        on_kernel_stack(|| {
+            let mk_terminal = || {
+                Closure::Lambda(Lambda::Lambda {
+                    micheline_code: Micheline::Seq(&[]),
+                    code: Vec::new().into(),
+                })
+            };
+            let mut tv = TypedValue::Lambda(mk_terminal());
+            for _ in 0..DEPTH {
+                tv = TypedValue::Lambda(Closure::Apply {
+                    arg_ty: Type::Unit,
+                    arg_val: Box::new(tv),
+                    closure: Box::new(mk_terminal()),
+                });
+            }
+            let arena = Arena::new();
+            let mut gas = Gas::unmetered();
+            tv.into_micheline_optimized_legacy(&arena, &mut gas).unwrap();
         });
     }
 }
