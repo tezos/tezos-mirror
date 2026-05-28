@@ -470,6 +470,294 @@ let test_evm_resolve_address_cross_source_tezos_to_eth () =
        (cross-source routing returns Unknown)" ;
   unit
 
+(* ── EVM precompile tests — back-stop derive + round-trips (commit 2) ─── *)
+
+(** [originOf] of an EVM contract with bytecode (code_hash != KECCAK_EMPTY)
+    returns Native via the code-presence back-stop.  Then [resolveAddress]
+    with sourceRuntime=Ethereum, targetRuntime=Tezos returns a Derived alias.
+    Both reads execute under the EVM call-site's own runtime — this exercises
+    the same-source (back-stop derivation) path. *)
+let test_evm_backstop_derive_same_source () =
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~kernel:Latest
+    ~title:"originOf + resolveAddress: EVM back-stop derive (same-source path)"
+    ~tags:
+      [
+        "tezosx";
+        "address_translation";
+        "origin_of";
+        "resolve_address";
+        "backstop";
+        "derive";
+        "evm";
+        "alias";
+      ]
+  @@ fun sandbox ->
+  (* Deploy a minimal contract — gives it a non-empty code_hash so the back-stop
+     classifies it as Native. *)
+  let deployer = Eth_account.bootstrap_accounts.(1) in
+  let* contract_addr =
+    deploy_minimal_contract ~sequencer:sandbox ~sender:deployer ~nonce:0 ()
+  in
+
+  (* originOf(contract_addr, Ethereum) → Native, homeRuntime=Ethereum *)
+  let* origin_calldata =
+    Cast.calldata
+      ~args:[contract_addr; runtime_id_ethereum]
+      "originOf(string,uint8)"
+  in
+  let* origin_hex =
+    eth_call_gateway_ok ~sequencer:sandbox ~calldata:origin_calldata
+  in
+  let kind = uint_at origin_hex 0 in
+  let home_runtime = uint_at origin_hex 1 in
+  Check.(
+    (kind = 1) int ~error_msg:"Expected kind=1 (Native) from back-stop, got %L") ;
+  Check.(
+    (home_runtime = 1)
+      int
+      ~error_msg:"Expected homeRuntime=1 (Ethereum), got %L") ;
+
+  (* resolveAddress(contract_addr, Ethereum, Tezos) → classified=true, res=1
+     (Derived).  The derived KT1 depends on the deployed address, which is
+     deterministic but not known here, so we check only the classification. *)
+  let* resolve_calldata =
+    Cast.calldata
+      ~args:[contract_addr; runtime_id_ethereum; runtime_id_tezos]
+      "resolveAddress(string,uint8,uint8)"
+  in
+  let* resolve_hex =
+    eth_call_gateway_ok ~sequencer:sandbox ~calldata:resolve_calldata
+  in
+  let classified = bool_at resolve_hex 0 in
+  let res = uint_at resolve_hex 1 in
+  let translated = string_from resolve_hex 2 in
+  Check.is_true
+    ~__LOC__
+    classified
+    ~error_msg:"Expected classified=true for native EVM contract" ;
+  Check.(
+    (res = 1)
+      int
+      ~error_msg:"Expected res=1 (Derived) for EVM contract to Tezos, got %L") ;
+  Log.info "EVM contract %s → Tezos alias %s (Derived)" contract_addr translated ;
+  unit
+
+(** Round-trip failure: derive an EVM→Tezos alias (Derived), then ask
+    for the inverse Tezos→Ethereum translation.  Since the alias was computed
+    but not yet written to durable storage, the inverse lookup returns
+    classified=false (Unknown). *)
+let test_evm_resolve_address_roundtrip_derive_then_unknown () =
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~kernel:Latest
+    ~title:
+      "resolveAddress round-trip: derived alias has no materialized inverse"
+    ~tags:
+      [
+        "tezosx";
+        "address_translation";
+        "resolve_address";
+        "round_trip";
+        "derived";
+        "evm";
+      ]
+  @@ fun sandbox ->
+  (* Deploy a minimal contract — gives it a non-empty code_hash so the back-stop
+     classifies it as Native, enabling derivation of a KT1 alias. *)
+  let deployer = Eth_account.bootstrap_accounts.(2) in
+  let* contract_addr =
+    deploy_minimal_contract ~sequencer:sandbox ~sender:deployer ~nonce:0 ()
+  in
+
+  (* Step 1: resolveAddress(contract_addr, Ethereum, Tezos) → Derived. *)
+  let* calldata_fwd =
+    Cast.calldata
+      ~args:[contract_addr; runtime_id_ethereum; runtime_id_tezos]
+      "resolveAddress(string,uint8,uint8)"
+  in
+  let* hex_fwd =
+    eth_call_gateway_ok ~sequencer:sandbox ~calldata:calldata_fwd
+  in
+  let classified_fwd = bool_at hex_fwd 0 in
+  let res_fwd = uint_at hex_fwd 1 in
+  let derived_kt1 = string_from hex_fwd 2 in
+  Check.is_true
+    ~__LOC__
+    classified_fwd
+    ~error_msg:"Expected forward direction to be classified" ;
+  Check.(
+    (res_fwd = 1) int ~error_msg:"Expected res=1 (Derived) forward, got %L") ;
+  (* The derived KT1 is deterministic from the deployed contract address; we
+     don't hard-code it here since the address depends on the deployer nonce. *)
+  Log.info "Forward: %s → %s (Derived)" contract_addr derived_kt1 ;
+
+  (* Step 2: resolveAddress(derived_kt1, Tezos, Ethereum) → classified=false.
+     The alias was computed but never written, so the inverse /origin does
+     not exist in durable storage. *)
+  let* calldata_rev =
+    Cast.calldata
+      ~args:[derived_kt1; runtime_id_tezos; runtime_id_ethereum]
+      "resolveAddress(string,uint8,uint8)"
+  in
+  let* hex_rev =
+    eth_call_gateway_ok ~sequencer:sandbox ~calldata:calldata_rev
+  in
+  let classified_rev = bool_at hex_rev 0 in
+  Check.is_false
+    ~__LOC__
+    classified_rev
+    ~error_msg:
+      "Expected classified=false for the derived-only alias (inverse not yet \
+       materialized)" ;
+  unit
+
+(** Round-trip happy path: after a CRAC transfer, the EVM sender's
+    Tezos alias is materialized in durable storage.  Both directions of
+    [resolveAddress] should then return [Recorded]. *)
+let test_evm_resolve_address_roundtrip_recorded () =
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~kernel:Latest
+    ~uses_client:true
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+    ~title:
+      "resolveAddress round-trip: both directions Recorded after CRAC transfer"
+    ~tags:
+      (["tezosx"; "address_translation"]
+      @ runtime_tags [Tezos]
+      @ ["resolve_address"; "round_trip"; "recorded"; "crac"])
+  @@ fun sequencer ->
+  let* tez_client = tezlink_client sequencer in
+  (* Step 1: Originate a dummy sender.tz as the CRAC target.  Its [unit]
+     parameter accepts the gateway's empty payload; a [string]-parameter
+     contract would reject the empty call and revert the CRAC. *)
+  let* kt1_target =
+    originate_contract
+      ~tez_client
+      ~sequencer
+      ~src:Constant.bootstrap1
+      ~alias:"sender"
+      ~script_name:["opcodes"; "sender"]
+      ~init_storage_data:(sf {|"%s"|} Constant.bootstrap1.public_key_hash)
+      ()
+  in
+  (* Step 2: Send a CRAC from EVM to the Michelson contract.  This writes
+     the sender's Tezos alias into /origin on both sides. *)
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:sender.Eth_account.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas:3_000_000
+      ~gas_price:1_000_000_000
+      ~value:Wei.zero
+      ~address:evm_gateway_address
+      ~signature:"callMichelson(string,string,bytes)"
+      ~arguments:[kt1_target; ""; "0x"]
+      ()
+  in
+  let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
+  let*@ _block = Rpc.produce_block sequencer in
+  let*@ receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
+  (match receipt with
+  | Some r ->
+      Check.(
+        (r.status = true) bool ~error_msg:"CRAC transaction should succeed")
+  | None -> Test.fail "No receipt for CRAC transaction") ;
+
+  (* Step 3: Resolve the sender's Tezos alias via the RPC. *)
+  let* alias_result =
+    Rpc.Tezosx.tez_getEthereumTezosAddress sender.address sequencer
+  in
+  let kt1_alias = Result.get_ok alias_result in
+  Log.info "Sender %s → Tezos alias %s" sender.address kt1_alias ;
+
+  (* Step 4: resolveAddress(evm_addr, Ethereum, Tezos) should return
+     Recorded (the alias was written by the CRAC). *)
+  let* calldata_fwd =
+    Cast.calldata
+      ~args:[sender.address; runtime_id_ethereum; runtime_id_tezos]
+      "resolveAddress(string,uint8,uint8)"
+  in
+  let* hex_fwd = eth_call_gateway_ok ~sequencer ~calldata:calldata_fwd in
+  let classified_fwd = bool_at hex_fwd 0 in
+  let res_fwd = uint_at hex_fwd 1 in
+  let translated_fwd = string_from hex_fwd 2 in
+  Check.is_true
+    ~__LOC__
+    classified_fwd
+    ~error_msg:"Expected forward resolveAddress to be classified" ;
+  Check.(
+    (res_fwd = 0)
+      int
+      ~error_msg:"Expected res=0 (Recorded) forward after CRAC, got %L") ;
+  Check.(
+    (translated_fwd = kt1_alias)
+      string
+      ~error_msg:
+        "Expected forward translated address to match RPC alias, got %L") ;
+
+  (* Step 5: originOf(kt1_alias, Tezos) should return kind=2 (Alias),
+     homeRuntime=1 (Ethereum), nativeAddress=evm_sender.  The CRAC wrote the
+     inverse /origin entry so the KT1 is classified as an Alias of the EVM
+     sender in the Tezos runtime. *)
+  let* calldata_origin =
+    Cast.calldata ~args:[kt1_alias; runtime_id_tezos] "originOf(string,uint8)"
+  in
+  let* hex_origin = eth_call_gateway_ok ~sequencer ~calldata:calldata_origin in
+  let kind = uint_at hex_origin 0 in
+  let home_runtime = uint_at hex_origin 1 in
+  let native_address = string_from hex_origin 2 in
+  Check.(
+    (kind = 2)
+      int
+      ~error_msg:
+        "Expected kind=2 (Alias) for CRAC-classified KT1 from cross-source EVM \
+         originOf, got %L") ;
+  Check.(
+    (home_runtime = 1)
+      int
+      ~error_msg:
+        "Expected homeRuntime=1 (Ethereum) for KT1 alias originOf, got %L") ;
+  Check.(
+    (String.lowercase_ascii native_address
+    = String.lowercase_ascii sender.address)
+      string
+      ~error_msg:
+        "Expected nativeAddress = EVM sender for KT1 alias originOf, got %L") ;
+
+  (* Step 6: resolveAddress(kt1_alias, Tezos, Ethereum) should also return
+     Recorded (the inverse /origin was written by the same CRAC). *)
+  let* calldata_rev =
+    Cast.calldata
+      ~args:[kt1_alias; runtime_id_tezos; runtime_id_ethereum]
+      "resolveAddress(string,uint8,uint8)"
+  in
+  let* hex_rev = eth_call_gateway_ok ~sequencer ~calldata:calldata_rev in
+  let classified_rev = bool_at hex_rev 0 in
+  let res_rev = uint_at hex_rev 1 in
+  let translated_rev = string_from hex_rev 2 in
+  Check.is_true
+    ~__LOC__
+    classified_rev
+    ~error_msg:"Expected reverse resolveAddress to be classified" ;
+  Check.(
+    (res_rev = 0)
+      int
+      ~error_msg:"Expected res=0 (Recorded) reverse after CRAC, got %L") ;
+  Check.(
+    (String.lowercase_ascii translated_rev
+    = String.lowercase_ascii sender.address)
+      string
+      ~error_msg:
+        "Expected reverse translated address to match original EVM sender, got \
+         %L") ;
+  unit
+
 (* ── Registration ─────────────────────────────────────────────────────── *)
 
 let () =
@@ -479,4 +767,7 @@ let () =
   test_evm_origin_of_unknown_address () ;
   test_evm_resolve_address_unknown_source () ;
   test_evm_origin_of_cross_source_evm_as_tezos () ;
-  test_evm_resolve_address_cross_source_tezos_to_eth ()
+  test_evm_resolve_address_cross_source_tezos_to_eth () ;
+  test_evm_backstop_derive_same_source () ;
+  test_evm_resolve_address_roundtrip_derive_then_unknown () ;
+  test_evm_resolve_address_roundtrip_recorded ()
