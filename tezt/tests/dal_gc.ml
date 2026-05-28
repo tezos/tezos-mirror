@@ -427,7 +427,36 @@ let test_gc_common ~include_observer _protocol dal_parameters _cryptobox node
         wait_for_layer1_head dal_node (published_level + blocks_to_bake))
       [attester; dal_bootstrap; slot_producer]
   in
-  let* () = bake_for ~count:blocks_to_bake client in
+  (* Bake in [blocks_per_cycle]-sized chunks, waiting for the DAL nodes to
+     catch up between chunks: a single [bake_for ~count:blocks_to_bake]
+     floods L1 across many cycles instantly, and a DAL node processing the
+     backlog then asks L1 for a committee whose cycle seed the protocol has
+     already cleared from its context, crashing it
+     ("Missing key 'cycle/N/random_seed'"). Capping each chunk at
+     [blocks_per_cycle] keeps the DAL nodes within ~one cycle of L1 — well
+     within the seed-retention window — while remaining much faster than
+     baking one block at a time. *)
+  let chunk =
+    8
+    (* = sandbox [blocks_per_cycle] *)
+  in
+  let dal_nodes = [attester; dal_bootstrap; slot_producer] in
+  let rec bake_in_chunks remaining =
+    if remaining <= 0 then unit
+    else
+      let n = min chunk remaining in
+      let* pre = Client.level client in
+      let target_final = pre + n - 2 in
+      let chunk_waits =
+        List.map
+          (fun dal_node -> wait_for_layer1_final_block dal_node target_final)
+          dal_nodes
+      in
+      let* () = bake_for ~count:n client in
+      let* () = Lwt.join chunk_waits in
+      bake_in_chunks (remaining - n)
+  in
+  let* () = bake_in_chunks blocks_to_bake in
   let* () = Lwt.join wait_block_p in
   Log.info "Blocks baked !" ;
 
