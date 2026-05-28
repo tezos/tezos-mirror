@@ -488,11 +488,48 @@ fn interpret<'a, 'b>(
 
     let outcome = run_interp_driver(ctx, arena, &mut stacks, &mut frames);
 
+    // On error the driver `?`-returned before any pending `AfterView`
+    // frame could restore the saved view context. The recursive
+    // interpreter restored the context unconditionally before
+    // propagating a view-body error, so mirror that here. See
+    // `restore_pending_view_context`.
+    if outcome.is_err() {
+        restore_pending_view_context(ctx, &frames);
+    }
+
     // Restore the caller's stack from the bottom of the stack of stacks.
     *stack = stacks.pop().ok_or(InterpretError::InternalError(
         InterpretInvariant::UnreachableState,
     ))?;
     outcome
+}
+
+/// Reinstall the view context saved by the outermost pending `AfterView`
+/// frame, used on the error-unwind path. Frames are pushed innermost-last,
+/// so the *first* `AfterView` in `frames` carries the context that was
+/// live before any view was entered — restoring it returns the context to
+/// its pre-view state, matching the recursive interpreter which restored
+/// each level as it unwound. A no-op when no view is pending.
+fn restore_pending_view_context<'a>(
+    ctx: &mut impl CtxTrait<'a>,
+    frames: &[InterpFrame<'a, '_>],
+) {
+    if let Some(InterpFrame::AfterView {
+        saved_self_address,
+        saved_sender,
+        saved_amount,
+        saved_balance,
+    }) = frames
+        .iter()
+        .find(|f| matches!(f, InterpFrame::AfterView { .. }))
+    {
+        ctx.set_view_context(
+            saved_self_address.clone(),
+            saved_sender.clone(),
+            *saved_amount,
+            *saved_balance,
+        );
+    }
 }
 
 /// Borrow the active (top) sub stack. The stack of stacks always has at
@@ -7001,6 +7038,56 @@ mod interpreter_tests {
             start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::MIN_BLOCK_TIME + interpret_cost::INTERPRET_RET
         );
+    }
+
+    // Regression for !21984 review note 3376564679: on a view-body error
+    // the iterative driver `?`-returns before the `AfterView` frame can
+    // restore the saved view context, leaving the view's
+    // self_address/sender/amount/balance installed. `interpret` now calls
+    // `restore_pending_view_context` on the error path. This exercises that
+    // helper directly: it must reinstall the *outermost* pending view's
+    // saved context (matching the recursive interpreter's unwind), not the
+    // innermost.
+    #[test]
+    fn view_context_restored_on_error_unwind() {
+        let mut ctx = Ctx::default();
+        let orig_self = ctx.self_address.clone();
+        let orig_sender = ctx.sender.clone();
+        let orig_amount = ctx.amount;
+        let orig_balance = ctx.balance;
+
+        let inner: AddressHash = "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye".try_into().unwrap();
+
+        // Frames as they would look mid-unwind from a nested view: the
+        // outermost AfterView (lowest index) carries the original context;
+        // an inner AfterView carries an intermediate context. The restore
+        // must select the outermost.
+        let frames = vec![
+            super::InterpFrame::AfterView {
+                saved_self_address: orig_self.clone(),
+                saved_sender: orig_sender.clone(),
+                saved_amount: orig_amount,
+                saved_balance: orig_balance,
+            },
+            super::InterpFrame::AfterView {
+                saved_self_address: inner.clone(),
+                saved_sender: inner.clone(),
+                saved_amount: 1,
+                saved_balance: 2,
+            },
+        ];
+
+        // Live context overridden to a view's values (as set_view_context
+        // did on view entry).
+        ctx.set_view_context(inner.clone(), inner, 999, 12345);
+        assert_ne!(ctx.self_address, orig_self, "precondition: context overridden");
+
+        super::restore_pending_view_context(&mut ctx, &frames);
+
+        assert_eq!(ctx.self_address, orig_self, "self_address restored to outermost");
+        assert_eq!(ctx.sender, orig_sender);
+        assert_eq!(ctx.amount, orig_amount);
+        assert_eq!(ctx.balance, orig_balance);
     }
 
     #[test]
