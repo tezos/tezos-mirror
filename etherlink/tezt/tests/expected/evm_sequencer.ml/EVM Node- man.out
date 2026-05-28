@@ -43,9 +43,9 @@ Run commands:
       [--sequencer-key <edsk...>] [--genesis-timestamp <[TIMESTAMP]>]
       [--kernel <evm_kernel.wasm>] [-d --wallet-dir <path>]
       [-f --password-filename <filename>] [--disable-da-fees] [--kernel-verbosity <info>]
-      [--network <network>] [--init-from-snapshot [snapshot url or file path]]
-      [--fund <0x...|tz...>] [--replicate [url]]
-      [-r --with-runtime <RUNTIME[:TARGET_SUNRISE_LEVEL]>]
+      [--michelson-hard-gas-limit-per-block <GAS>] [--network <network>]
+      [--init-from-snapshot [snapshot url or file path]] [--fund <0x...|tz...>]
+      [--replicate [url]] [-r --with-runtime <RUNTIME[:TARGET_SUNRISE_LEVEL]>]
     Start the EVM node in sandbox mode. The sandbox mode is a sequencer-like mode that
     produces blocks with a fake key and no rollup node connection.
     --data-dir <data-dir>: The path to the EVM node data directory. Default is
@@ -115,6 +115,8 @@ Run commands:
     --disable-da-fees: Disable DA fees for this replay.
     --kernel-verbosity <info>: Sets kernel's logging verbosity, either `fatal`, `error`,
       `info`, `debug`.
+    --michelson-hard-gas-limit-per-block <GAS>: Override the Michelson runtime's
+      hard_gas_limit_per_block (default: 3000000).
     --network <network>: The network the EVM node will be connecting to. Can be `mainnet`,
       `testnet`, `shadownet` or `previewnet`.
       If set, defaults to the value of the environment variable `$EVM_NODE_NETWORK`.
@@ -150,7 +152,7 @@ Run commands:
       [--sequencer-key <edsk...>] [--genesis-timestamp <[TIMESTAMP]>]
       [--kernel <evm_kernel.wasm>] [-d --wallet-dir <path>]
       [-f --password-filename <filename>] [--disable-da-fees] [--kernel-verbosity <info>]
-      [--fund <edp...>]
+      [--michelson-hard-gas-limit-per-block <GAS>] [--fund <edp...>]
     Start the EVM node in tezlink sandbox mode. The sandbox mode is a sequencer-like mode that
     produces blocks with a fake key and no rollup node connection.
     --data-dir <data-dir>: The path to the EVM node data directory. Default is
@@ -220,6 +222,8 @@ Run commands:
     --disable-da-fees: Disable DA fees for this replay.
     --kernel-verbosity <info>: Sets kernel's logging verbosity, either `fatal`, `error`,
       `info`, `debug`.
+    --michelson-hard-gas-limit-per-block <GAS>: Override the Michelson runtime's
+      hard_gas_limit_per_block (default: 3000000).
     --fund <edp...>: The address of an account to provide with funds in Tezlink sandbox (can
       be repeated to fund multiple accounts)
   
