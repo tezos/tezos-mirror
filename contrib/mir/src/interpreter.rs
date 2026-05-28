@@ -332,7 +332,15 @@ impl<'a> Instruction<'a> {
         arena: &'a Arena<Micheline<'a>>,
         stack: &mut IStack<'a>,
     ) -> Result<(), InterpretError<'a>> {
-        interpret(std::slice::from_ref(self), ctx, arena, stack)
+        // Unwrap a top-level `Seq` so its body forms the outermost block,
+        // matching the recursive `interpret_one(Seq) -> interpret(body)`:
+        // both charge exactly one `INTERPRET_RET` (L1 `KNil`). Wrapping the
+        // `Seq` in a one-element slice would charge a second `INTERPRET_RET`
+        // for the synthetic outer block, over-charging every contract call.
+        match self {
+            Self::Seq(body) => interpret(body, ctx, arena, stack),
+            _ => interpret(std::slice::from_ref(self), ctx, arena, stack),
+        }
     }
 }
 
@@ -3007,6 +3015,39 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Add(overloads::Add::NatNat), &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
+    }
+
+    /// Regression (gas parity): `ContractScript::interpret` runs
+    /// `self.code.interpret(..)` and `self.code` is always a `Seq`. The
+    /// public `Instruction::interpret` unwraps a top-level `Seq` before
+    /// handing it to the iterative driver, so a contract's outer block
+    /// charges exactly one `INTERPRET_RET` (L1 `KNil`) — the same as running
+    /// the body as a bare block, and the same as the pre-iterative
+    /// `interpret_one(Seq) -> interpret(body)`. Without the unwrap the driver
+    /// would charge a second `INTERPRET_RET` for a synthetic wrapper block.
+    #[test]
+    fn top_level_seq_matches_block_gas() {
+        let body = vec![Push(Rc::new(V::int(1))), Drop(None)];
+
+        // Production shape: `Seq(body).interpret(..)`.
+        let arena_a: &Arena<Micheline> = Box::leak(Box::default());
+        let mut ctx_a = Ctx::default();
+        let mut stack_a: IStack = Stack::new();
+        Seq(body.clone())
+            .interpret(&mut ctx_a, arena_a, &mut stack_a)
+            .unwrap();
+        let gas_seq = Gas::default().milligas().unwrap() - ctx_a.gas().milligas().unwrap();
+
+        // The same instructions run as a single block must cost the same.
+        let mut ctx_b = Ctx::default();
+        let mut stack_b: IStack = Stack::new();
+        interpret(&body, &mut ctx_b, &mut stack_b).unwrap();
+        let gas_block = Gas::default().milligas().unwrap() - ctx_b.gas().milligas().unwrap();
+
+        assert_eq!(
+            gas_seq, gas_block,
+            "a top-level Seq must not charge an extra INTERPRET_RET vs the same block"
+        );
     }
 
     mod sub {
