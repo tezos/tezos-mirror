@@ -11,6 +11,7 @@ let () =
   Evm_node_capacity.register () ;
   Snailtracer.register () ;
   Uniswap.register () ;
-  Michelson_call.register ()
+  Michelson_call.register () ;
+  Fa_transfer.register ()
 
 let () = Test.run ()
