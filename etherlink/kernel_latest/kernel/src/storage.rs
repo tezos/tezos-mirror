@@ -1235,7 +1235,10 @@ mod tests {
     fn maybe_store_http_traces_is_noop_when_disabled() {
         let mut host = MockKernelHost::default();
         let tx_hash = [7u8; 32];
-        let journal = TezosXJournal::new(CracId::new(0, 0));
+        let journal = TezosXJournal::new(
+            CracId::new(0, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         super::maybe_store_http_traces_for_tx(&mut host, false, &tx_hash, &journal);
         let path = super::http_traces_path(&tx_hash).unwrap();
         assert!(matches!(host.store_has(&path), Ok(None)));
@@ -1249,7 +1252,10 @@ mod tests {
         // empty list per non-CRAC transaction on every replayed block.
         let mut host = MockKernelHost::default();
         let tx_hash = [42u8; 32];
-        let journal = TezosXJournal::new(CracId::new(0, 0));
+        let journal = TezosXJournal::new(
+            CracId::new(0, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         super::maybe_store_http_traces_for_tx(&mut host, true, &tx_hash, &journal);
         let path = super::http_traces_path(&tx_hash).unwrap();
         assert!(matches!(host.store_has(&path), Ok(None)));
@@ -1263,7 +1269,10 @@ mod tests {
         // the EVM node expects to decode through [Simulation.decode_http_traces].
         let mut host = MockKernelHost::default();
 
-        let mut journal = TezosXJournal::new(CracId::new(0, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(0, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let request = http::Request::builder()
             .method("GET")
             .uri("http://tezos/KT1abc/default")
@@ -1312,7 +1321,10 @@ mod tests {
         // (first call first).
         let mut host = MockKernelHost::default();
 
-        let mut journal = TezosXJournal::new(CracId::new(0, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(0, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
 
         // First exchange: GET /first.
         let req1 = http::Request::builder()

@@ -493,6 +493,13 @@ impl Evaluation {
         info.balance = info.balance.saturating_add(u256_to_alloy(&max_gas_to_pay));
         simulation_caller.set_info_without_code(host, info)?;
 
+        // Simulation only: an inbound CREATE_CONTRACT reached from a
+        // simulated call derives its KT1 from the zero seed and so
+        // diverges from production (which seeds via the real or
+        // `synthetic_operation_hash`). The persistent `origination_index`
+        // still keeps KT1s distinct within one simulation, so internal
+        // consistency holds; clients must not treat a simulated KT1 as
+        // authoritative.
         let mut journal = TezosXJournal::default();
         let sim_result = match revm_run_transaction(
             host,

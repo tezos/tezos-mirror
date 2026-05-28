@@ -721,7 +721,12 @@ where
     let call_data = transaction.data.clone();
     log_transaction_type(to, &call_data);
     let value = transaction.value;
-    let mut journal = TezosXJournal::new(crac_id);
+    let operation_hash = TezosXJournal::synthetic_operation_hash(
+        &crac_id,
+        block_constants.chain_id.low_u64(),
+        block_constants.number.low_u64(),
+    );
+    let mut journal = TezosXJournal::new(crac_id, operation_hash);
     let run_result = revm_run_transaction(
         host,
         registry,
@@ -827,7 +832,13 @@ where
     }
     .abi_encode();
     let effective_gas_price = block_constants.base_fee_per_gas();
-    let mut journal = TezosXJournal::default();
+    // Seed the journal with the deposit's own transaction hash so any
+    // origination nonce stays deterministic and unique even though the
+    // kernel-managed XTZ bridge does not NAC into Michelson today.
+    let mut journal = TezosXJournal::new(
+        CracId::default(),
+        tezos_crypto_rs::hash::OperationHash::from(transaction_hash),
+    );
     match revm_run_transaction(
         host,
         registry,
@@ -949,7 +960,13 @@ where
         .abi_encode(),
     };
     let effective_gas_price = block_constants.base_fee_per_gas();
-    let mut journal = TezosXJournal::default();
+    // Seed the journal with the deposit's own transaction hash so any
+    // origination nonce stays deterministic and unique even though the
+    // kernel-managed FA bridge does not NAC into Michelson today.
+    let mut journal = TezosXJournal::new(
+        CracId::default(),
+        tezos_crypto_rs::hash::OperationHash::from(transaction_hash),
+    );
     revm_run_transaction(
         host,
         registry,
@@ -1287,7 +1304,20 @@ where
             let op_hash = op.hash()?;
             // Delayed operations already paid L1 fees through the delayed inbox,
             // so DA fee check is not applicable.
-            let mut tezosx_journal = TezosXJournal::new(crac_id);
+            //
+            // The seed must NOT be the operation's real hash: the
+            // normal Michelson path inside `validate_and_apply_operation`
+            // builds its own `OriginationNonce::initial(op_hash)`
+            // starting at index 0, and if the journal's CRAC nonce
+            // shared the same seed both nonces would derive colliding
+            // KT1s at index 1.  Use a synthetic seed so the two nonce
+            // universes stay disjoint.
+            let synthetic_op_hash = TezosXJournal::synthetic_operation_hash(
+                &crac_id,
+                block_constants.chain_id.low_u64(),
+                block_constants.number.low_u64(),
+            );
+            let mut tezosx_journal = TezosXJournal::new(crac_id, synthetic_op_hash);
             let validation_result = tezos_execution::validate_and_apply_operation(
                 host,
                 registry,
@@ -1949,7 +1979,10 @@ mod tests {
     #[test]
     fn test_drain_merges_multiple_failed_receipts() {
         use tezosx_journal::{CracId, TezosXJournal};
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         journal
             .michelson
             .push_failed_crac_receipt(dummy_crac_receipt(vec![
@@ -1991,7 +2024,10 @@ mod tests {
     #[test]
     fn test_drain_mixed_forces_applied_top_level() {
         use tezosx_journal::{CracId, TezosXJournal};
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         // First-executed CRAC fails (top=Failed in the source receipt),
         // second one succeeds.
         let mut failed = dummy_crac_receipt(vec![make_transfer(0, 100)]);
@@ -2015,7 +2051,10 @@ mod tests {
     #[test]
     fn test_drain_all_failed_keeps_failed_top_level() {
         use tezosx_journal::{CracId, TezosXJournal};
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let mut r1 = dummy_crac_receipt(vec![make_transfer(0, 100)]);
         make_top_level_failed(&mut r1);
         let mut r2 = dummy_crac_receipt(vec![make_transfer(1, 200)]);
@@ -2040,7 +2079,10 @@ mod tests {
     #[test]
     fn test_drain_preserves_interleaved_execution_order() {
         use tezosx_journal::{CracId, TezosXJournal};
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         // Execution order: failed(100), pending(200), failed(300)
         journal
             .michelson

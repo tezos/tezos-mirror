@@ -1608,7 +1608,10 @@ mod tests {
         calldata.extend_from_slice(&selector);
         calldata.extend_from_slice(&abi_params);
 
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
         let result = dispatch_crac_call(
             &mut ctx,
@@ -1651,7 +1654,10 @@ mod tests {
         let dest = "0x1234567890123456789012345678901234567890";
         let amount = 1000u64;
 
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let mut ctx =
             MockCtx::new(&mut host, &mut journal, &registry, source, amount as i64);
         let result =
@@ -1687,7 +1693,10 @@ mod tests {
         let dest = "0x1234567890123456789012345678901234567890";
         let amount = 1000i64;
 
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
 
         // First transfer creates aliases (sender + source)
@@ -1851,7 +1860,10 @@ mod tests {
         host: &mut MockKernelHost,
     ) -> Result<TypedValue<'a>, TransferError> {
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let mut ctx = MockCtx::new(host, &mut journal, &registry, source, 0);
         typecheck_entrypoint_value(
@@ -2058,7 +2070,10 @@ mod tests {
         let dest = "0x1234567890123456789012345678901234567890";
         let amount = 0i64;
 
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
         let result =
             dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
@@ -2082,7 +2097,10 @@ mod tests {
         let dest = "0x1234567890123456789012345678901234567890";
         let amount = -1i64;
 
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
         let result =
             dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
@@ -2113,7 +2131,10 @@ mod tests {
         let dest = "0x1234567890123456789012345678901234567890";
         let amount = 100_000_000i64; // 100 tez in mutez
 
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
 
         let entrypoint = Entrypoint::default();
@@ -2154,7 +2175,10 @@ mod tests {
         .unwrap();
         let amount = 50_000_000i64;
 
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
         let mut gas = Gas::default();
 
@@ -2215,7 +2239,10 @@ mod tests {
         .unwrap();
         let dest = "0x1234567890123456789012345678901234567890";
         let amount = 100i64;
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
         let result =
             dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
@@ -2240,7 +2267,10 @@ mod tests {
         .unwrap();
         let dest = "0x1234567890123456789012345678901234567890";
 
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         let result =
             dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
@@ -2544,7 +2574,10 @@ mod tests {
         // 1_000_000 mutez = 1 TEZ
         let amount = 1_000_000i64;
 
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
         let result =
             dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
@@ -2568,7 +2601,10 @@ mod tests {
         // 1 mutez = 0.000001 TEZ
         let amount = 1i64;
 
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
         let result =
             dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
@@ -2587,7 +2623,10 @@ mod tests {
     fn test_typecheck_unknown_entrypoint_returns_error() {
         let mut host = MockKernelHost::default();
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         let value = Micheline::String("hello".to_string());
@@ -2609,7 +2648,10 @@ mod tests {
     fn test_typecheck_wrong_type_for_default_entrypoint() {
         let mut host = MockKernelHost::default();
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         // Default entrypoint expects a string, not bytes
@@ -2643,7 +2685,10 @@ mod tests {
     fn test_collect_result_typechecks_bytes() {
         let mut host = MockKernelHost::default();
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         let value = Micheline::Bytes(vec![0xDE, 0xAD, 0xBE, 0xEF]);
@@ -2660,7 +2705,10 @@ mod tests {
     fn test_collect_result_rejects_non_bytes() {
         let mut host = MockKernelHost::default();
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         let value = Micheline::String("not bytes".to_string());
@@ -2684,7 +2732,10 @@ mod tests {
         ])
         .unwrap();
 
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         // %collect_result writes to the dispatch slot opened by `serve`.
         // Simulate that here.
         journal.michelson.push_dispatch_slot();
@@ -2717,7 +2768,10 @@ mod tests {
         ])
         .unwrap();
 
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         // %collect_result writes to the dispatch slot opened by `serve`.
         // Simulate that here.
         journal.michelson.push_dispatch_slot();
@@ -2747,7 +2801,10 @@ mod tests {
         // No `push_dispatch_slot` — dispatching %collect_result outside
         // a `serve` invocation must surface the journal invariant as a
         // gateway error so the operation reverts cleanly.
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         let value = Micheline::Bytes(vec![0xCA, 0xFE]);
         let result = execute_enshrined_contract(
@@ -2776,7 +2833,10 @@ mod tests {
         ])
         .unwrap();
 
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         // %collect_result writes to the dispatch slot opened by `serve`.
         // Simulate that here.
         journal.michelson.push_dispatch_slot();
@@ -2824,7 +2884,10 @@ mod tests {
         ])
         .unwrap();
 
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         // Dispatch slot is set up; the rejection must happen even when
         // a slot exists, so it isn't masked by the no-slot check.
         journal.michelson.push_dispatch_slot();
@@ -2865,7 +2928,10 @@ mod tests {
         let mut host = MockKernelHost::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         journal.michelson.push_dispatch_slot();
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         ctx.operation_gas =
@@ -2887,7 +2953,10 @@ mod tests {
         let mut host = MockKernelHost::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         journal.michelson.push_dispatch_slot();
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         ctx.operation_gas = crate::gas::TezlinkOperationGas::start_milligas(
@@ -2912,7 +2981,10 @@ mod tests {
         let mut host = MockKernelHost::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         journal.michelson.push_dispatch_slot();
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         ctx.operation_gas = crate::gas::TezlinkOperationGas::start_milligas(
@@ -2962,7 +3034,10 @@ mod tests {
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
         // No `push_dispatch_slot` — `set_dispatch_result` fails.
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         ctx.operation_gas =
             crate::gas::TezlinkOperationGas::start_milligas(100_000).unwrap();
@@ -2989,7 +3064,10 @@ mod tests {
         let mut host = MockKernelHost::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         journal.michelson.push_dispatch_slot();
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         ctx.operation_gas =
@@ -3044,7 +3122,10 @@ mod tests {
             0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
         ])
         .unwrap();
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         let destination = make_test_address();
@@ -3075,7 +3156,10 @@ mod tests {
             0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
         ])
         .unwrap();
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         // Drain almost all gas so there isn't enough for the callback
@@ -3096,7 +3180,10 @@ mod tests {
             0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
         ])
         .unwrap();
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         // Simulate prior internal operations having consumed counters
@@ -3147,7 +3234,8 @@ mod tests {
         .unwrap();
 
         let crac_id = CracId::new(1, 0);
-        let mut journal = TezosXJournal::new(crac_id);
+        let mut journal =
+            TezosXJournal::new(crac_id, tezos_crypto_rs::hash::OperationHash::default());
         let entrypoint = Entrypoint::default();
 
         // Two gateway calls in the same tx
@@ -3190,7 +3278,8 @@ mod tests {
     #[test]
     fn test_journal_carries_crac_id() {
         let id = CracId::new(1, 5);
-        let journal = TezosXJournal::new(id);
+        let journal =
+            TezosXJournal::new(id, tezos_crypto_rs::hash::OperationHash::default());
         assert_eq!(*journal.crac_id(), id);
     }
 
@@ -3395,7 +3484,10 @@ mod tests {
             0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
         ])
         .unwrap();
-        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let ctx = MockCtx::new(
             &mut host,
             &mut journal,

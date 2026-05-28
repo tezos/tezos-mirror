@@ -7111,7 +7111,10 @@ mod tests {
         );
 
         let registry = crate::test_utils::MockRegistry::new("KT1_mock_alias".to_string());
-        let mut journal = TezosXJournal::new(tezosx_journal::CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            tezosx_journal::CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let processed = validate_and_apply_operation(
             &mut host,
             &registry,
@@ -7412,7 +7415,10 @@ mod tests {
         );
 
         let registry = crate::test_utils::MockRegistry::new("KT1_mock_alias".to_string());
-        let mut journal = TezosXJournal::new(tezosx_journal::CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            tezosx_journal::CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
@@ -7499,7 +7505,10 @@ mod tests {
         );
 
         let registry = crate::test_utils::MockRegistry::new("KT1_mock_alias".to_string());
-        let mut journal = TezosXJournal::new(tezosx_journal::CracId::new(1, 0));
+        let mut journal = TezosXJournal::new(
+            tezosx_journal::CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
