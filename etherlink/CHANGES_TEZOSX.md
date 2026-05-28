@@ -39,6 +39,10 @@
   threaded into the child's storage — are unaffected.) Indexers and
   tooling that map big map ids to positions in the storage type can
   rely on this for both origination paths. (!21953)
+- MIR: prevent kernel stack overflow on deeply nested Michelson — Micheline
+  (de)serialization, typechecking, and interpretation now run on iterative
+  heap worklists instead of recursion, so adversarially deep input is bounded
+  by gas rather than trapping the PVM. (!21982, !21983, !21984)
 
 ### Native Atomic Composability
 
