@@ -816,6 +816,12 @@ impl<'a> TypedValue<'a> {
 /// by move destructure of its variants throughout the codebase. Called from
 /// [`Instruction`]'s `Drop` (for `PUSH` constants) and by callers that build
 /// deep values explicitly before drop.
+///
+/// Note: runtime-built deep values (a `PAIR`/`CONS` comb on the value stack,
+/// values popped/returned or left on the stack at interpreter teardown) are
+/// not yet drained by any production site, so they still recurse on the
+/// default destructor. Closing that gap — wiring this in at the release sites
+/// or giving `TypedValue` an iterative `Drop` — is tracked in Linear L2-1446.
 pub fn drain_deep_typed_value(v: &mut TypedValue<'_>) {
     drain_iteratively(v, extract_tv_children);
 }
