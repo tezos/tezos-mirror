@@ -616,10 +616,6 @@ where
     let context =
         TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)?;
 
-    let sender_account = context.originated_from_kt1(&hdrs.sender).map_err(|e| {
-        TezosXRuntimeError::Custom(format!("Failed to fetch sender account: {e:?}"))
-    })?;
-
     // Verify the incoming CRAC ID matches the journal's (set by the
     // block builder).  This ensures consistency across runtime boundaries.
     if let Some(ref crac_id) = hdrs.crac_id {
@@ -773,18 +769,50 @@ where
                 })
             })
             .collect::<Result<_, TezosXRuntimeError>>()?;
-    let transfer_result = cross_runtime_transfer(
-        &mut tc_ctx,
-        &mut operation_ctx,
-        registry,
-        journal,
-        &sender_account,
-        &hdrs.amount,
-        &parsed.destination,
-        &parameters,
-        &parser,
-        &mut nonce_counter,
-    );
+    // Dispatch on the parsed `Contract` variant to build the right
+    // concrete account, mirroring the pattern used by
+    // `tezos_execution::transfer` for the destination.
+    let transfer_result = match &hdrs.sender {
+        Contract::Originated(kt1) => {
+            let sender_account = context.originated_from_kt1(kt1).map_err(|e| {
+                TezosXRuntimeError::Custom(format!(
+                    "Failed to fetch sender account: {e:?}"
+                ))
+            })?;
+            cross_runtime_transfer(
+                &mut tc_ctx,
+                &mut operation_ctx,
+                registry,
+                journal,
+                &sender_account,
+                &hdrs.amount,
+                &parsed.destination,
+                &parameters,
+                &parser,
+                &mut nonce_counter,
+            )
+        }
+        Contract::Implicit(pkh) => {
+            let sender_account =
+                context.implicit_from_public_key_hash(pkh).map_err(|e| {
+                    TezosXRuntimeError::Custom(format!(
+                        "Failed to fetch sender account: {e:?}"
+                    ))
+                })?;
+            cross_runtime_transfer(
+                &mut tc_ctx,
+                &mut operation_ctx,
+                registry,
+                journal,
+                &sender_account,
+                &hdrs.amount,
+                &parsed.destination,
+                &parameters,
+                &parser,
+                &mut nonce_counter,
+            )
+        }
+    };
     // Persist the post-execution origination index back to the
     // journal on every path (success, failure, OOG): MIR has had
     // its mutable borrow of `nonce` released by `cross_runtime_transfer`
@@ -837,7 +865,7 @@ where
                     match build_failed_crac_receipt(
                         &source_pkh,
                         &source_contract,
-                        &sender_account.contract(),
+                        &hdrs.sender,
                         &hdrs.amount,
                         &parsed.destination,
                         &parameters,
@@ -882,7 +910,7 @@ where
     // in the journal for the block builder.
     //
     // source_contract = alias(E_0) from X-Tezos-Source (top-level destination)
-    // sender_account.contract() = alias(E_1) from X-Tezos-Sender (internal sender)
+    // hdrs.sender    = alias(E_1) from X-Tezos-Sender (internal sender)
     //
     // Receipt builder runs BEFORE the consumed_milligas finalisation
     // below so the cost of its Micheline encodes is charged against
@@ -906,7 +934,7 @@ where
         let receipt = build_crac_receipt(
             &source_pkh,
             &source_contract,
-            &sender_account.contract(),
+            &hdrs.sender,
             &hdrs.amount,
             &parsed.destination,
             &parameters,

@@ -15,6 +15,7 @@ pub use tezosx_interfaces::{
 
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
 use tezos_data_encoding::types::Narith;
+use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezosx_interfaces::headers::{
@@ -35,8 +36,11 @@ pub struct MichelsonHeaders {
     pub timestamp: Timestamp,
     /// Block level.
     pub block_number: BlockNumber,
-    /// Sender KT1 contract address (for Michelson `SENDER`).
-    pub sender: ContractKt1Hash,
+    /// Sender contract address for Michelson `SENDER` — either an
+    /// originated KT1 or an implicit (tz1/tz2/tz3) account. The latter
+    /// is reachable when an implicit account calls the gateway directly
+    /// and through the EVM gateway's same-runtime round-trip (cf. !21963).
+    pub sender: Contract,
     /// CRAC origin KT1 contract address parsed from `X-Tezos-Source`.
     /// Used for CRAC receipt construction (alias of E_0).
     pub crac_origin_contract: Option<ContractKt1Hash>,
@@ -77,21 +81,26 @@ pub fn parse_request_headers(
         gas_limit: require_u64(headers, X_TEZOS_GAS_LIMIT)?,
         timestamp: Timestamp::from(require_i64(headers, X_TEZOS_TIMESTAMP)?),
         block_number: BlockNumber::from(require_u32(headers, X_TEZOS_BLOCK_NUMBER)?),
-        sender: require_kt1(headers, X_TEZOS_SENDER)?,
+        sender: require_contract(headers, X_TEZOS_SENDER)?,
         crac_origin_contract,
         crac_id,
         crac_depth,
     })
 }
 
-fn require_kt1(
+// Accept either an originated KT1 or an implicit (tz1/tz2/tz3) for the
+// SENDER header, matching standard Michelson semantics: a KT1 sees
+// `SENDER = tz1` when called directly by an implicit account, and the
+// gateway must deliver that same real-native identity on the round-trip
+// path (cf. !21963). See L2-1392.
+fn require_contract(
     headers: &http::HeaderMap,
     name: &str,
-) -> Result<ContractKt1Hash, TezosXRuntimeError> {
+) -> Result<Contract, TezosXRuntimeError> {
     let s = require_str(headers, name)?;
-    ContractKt1Hash::from_b58check(&s).map_err(|e| {
+    Contract::from_b58check(&s).map_err(|e| {
         TezosXRuntimeError::HeaderError(format!(
-            "Invalid {name}: expected KT1 address: {e}"
+            "Invalid {name}: expected KT1 or implicit address: {e}"
         ))
     })
 }
@@ -124,7 +133,7 @@ mod tests {
         assert_eq!(parsed.gas_limit, 1_000_000u64);
         assert_eq!(parsed.timestamp, Timestamp::from(1_000_000_i64));
         assert_eq!(parsed.block_number, BlockNumber::from(1u32));
-        assert_eq!(parsed.sender, ContractKt1Hash::from_b58check(KT1).unwrap());
+        assert_eq!(parsed.sender, Contract::from_b58check(KT1).unwrap());
         assert!(
             parsed.crac_origin_contract.is_none(),
             "no source → no CRAC origin contract"
@@ -257,7 +266,20 @@ mod tests {
     fn invalid_sender_returns_header_error() {
         let mut hdrs = required_headers();
         *hdrs.iter_mut().find(|(k, _)| *k == X_TEZOS_SENDER).unwrap() =
-            (X_TEZOS_SENDER, "not-a-kt1-address");
+            (X_TEZOS_SENDER, "not-a-contract-address");
+        let err = parse_request_headers(&headers_from(&hdrs)).unwrap_err();
+        assert!(matches!(err, TezosXRuntimeError::HeaderError(_)));
+    }
+
+    #[test]
+    fn sr1_sender_returns_header_error() {
+        // sr1 is a smart-rollup address — not a Michelson contract.
+        // In practice the gateway never injects one as SENDER (a smart
+        // rollup cannot execute Michelson), so this branch is defensive
+        // and maps to HeaderError → 500 like any gateway-bug path.
+        let mut hdrs = required_headers();
+        *hdrs.iter_mut().find(|(k, _)| *k == X_TEZOS_SENDER).unwrap() =
+            (X_TEZOS_SENDER, "sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf");
         let err = parse_request_headers(&headers_from(&hdrs)).unwrap_err();
         assert!(matches!(err, TezosXRuntimeError::HeaderError(_)));
     }
@@ -374,13 +396,16 @@ mod tests {
     // --- Sender edge cases ---
 
     #[test]
-    fn sender_tz1_address_rejected() {
+    fn sender_tz1_address_accepted() {
+        // An implicit account (tz1/tz2/tz3) is a legitimate SENDER in
+        // Michelson semantics — a KT1 sees `SENDER = tz1` when called
+        // directly by a user, and the same identity must survive the EVM
+        // gateway's round-trip path. L2-1392.
         let mut hdrs = required_headers();
-        // tz1 is not a valid KT1 address
         *hdrs.iter_mut().find(|(k, _)| *k == X_TEZOS_SENDER).unwrap() =
-            (X_TEZOS_SENDER, "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU");
-        let err = parse_request_headers(&headers_from(&hdrs)).unwrap_err();
-        assert!(matches!(err, TezosXRuntimeError::HeaderError(_)));
+            (X_TEZOS_SENDER, TZ1);
+        let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
+        assert_eq!(parsed.sender, Contract::from_b58check(TZ1).unwrap());
     }
 
     fn parse_with_crac_depth(depth: u32) -> Result<MichelsonHeaders, TezosXRuntimeError> {

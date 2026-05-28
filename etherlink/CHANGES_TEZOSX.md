@@ -123,6 +123,15 @@
     Gas constants: `ORIGIN_OF_BASE_COST = 1 500`,
     `RESOLVE_ADDRESS_BASE_COST = 1 500`, `CODE_BACKSTOP_COST = 2 100`
     (conditional, charged only when the EVM back-stop path executes).
+- `X-Tezos-Sender` on an inbound Michelson request now accepts an
+  implicit (`tz1`/`tz2`/`tz3`) account in addition to an originated
+  KT1, matching standard Michelson semantics (a KT1 sees `SENDER = tz1`
+  when called directly by a user) and the round-trip principle already
+  applied to same-runtime calls in !21963. The previous strict KT1
+  requirement rejected a legitimate `tz1` round-tripped from the EVM
+  gateway's stored alias `native_address`, which the gateway
+  reclassified as `CracError::BlockAbort` — a latent block-abort
+  trigger gated only by the per-hop gas geometry. (!22004)
 
 ### Storage versions
 
