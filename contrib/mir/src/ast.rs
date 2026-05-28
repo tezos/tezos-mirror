@@ -813,9 +813,9 @@ impl<'a> TypedValue<'a> {
 /// WASM stack.
 ///
 /// Not an `impl Drop` on [`TypedValue`] because that would forbid every
-/// by move destructure of its variants throughout the codebase. External
-/// callers that build deep values invoke this explicitly before drop.
-#[allow(dead_code)]
+/// by move destructure of its variants throughout the codebase. Called from
+/// [`Instruction`]'s `Drop` (for `PUSH` constants) and by callers that build
+/// deep values explicitly before drop.
 pub fn drain_deep_typed_value(v: &mut TypedValue<'_>) {
     drain_iteratively(v, extract_tv_children);
 }
@@ -1043,7 +1043,7 @@ fn extract_instr_children<'a>(
     node: &mut Instruction<'a>,
     stack: &mut Vec<Instruction<'a>>,
 ) {
-    use std::mem::take;
+    use std::mem::{replace, take};
     match node {
         Instruction::Dip(_, body)
         | Instruction::Loop(body)
@@ -1064,6 +1064,28 @@ fn extract_instr_children<'a>(
             }
             for instr in take(f) {
                 stack.push(instr);
+            }
+        }
+        Instruction::Push(rc) => {
+            // The pushed constant may be a deep value. It is a `TypedValue`,
+            // not an `Instruction`, so it cannot go on this worklist; drain it
+            // with its own iterative routine instead (when solely owned here).
+            let old = replace(rc, Rc::new(TypedValue::Unit));
+            if let Ok(mut tv) = Rc::try_unwrap(old) {
+                drain_deep_typed_value(&mut tv);
+            }
+        }
+        Instruction::Lambda(lambda) => {
+            // Push the lambda body's instructions onto the worklist so a
+            // lexically nested `LAMBDA { LAMBDA { … } }` does not recurse one
+            // frame per nesting level through the body `Rc<[Instruction]>`.
+            let code = match lambda {
+                Lambda::Lambda { code, .. } | Lambda::LambdaRec { code, .. } => code,
+            };
+            if let Some(slice) = Rc::get_mut(code) {
+                for slot in slice.iter_mut() {
+                    stack.push(replace(slot, Instruction::Drop(None)));
+                }
             }
         }
         _ => {}
@@ -1511,6 +1533,36 @@ mod drop_safety {
             };
             let mut tv = TypedValue::new_ticket(ticket);
             drain_deep_typed_value(&mut tv);
+        });
+    }
+
+    #[test]
+    fn drop_deep_push_constant() {
+        // Dropping `PUSH <deep constant>` must drain the pushed value rather
+        // than recurse through its `Rc<TypedValue>` spine.
+        on_kernel_stack(|| {
+            let mut content = TypedValue::Unit;
+            for _ in 0..DEPTH {
+                content = TypedValue::new_pair(TypedValue::Unit, content);
+            }
+            let instr = Instruction::Push(Rc::new(content));
+            drop(instr);
+        });
+    }
+
+    #[test]
+    fn drop_deeply_nested_lambda_instruction() {
+        // A lexically nested `LAMBDA { LAMBDA { … } }` must drain its body
+        // instructions onto the worklist, not recurse one frame per level.
+        on_kernel_stack(|| {
+            let mut instr = Instruction::Drop(None);
+            for _ in 0..DEPTH {
+                instr = Instruction::Lambda(Lambda::Lambda {
+                    micheline_code: Micheline::Seq(&[]),
+                    code: vec![instr].into(),
+                });
+            }
+            drop(instr);
         });
     }
 }
