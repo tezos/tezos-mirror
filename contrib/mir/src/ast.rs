@@ -256,7 +256,10 @@ impl Type {
     pub fn size_for_gas(&self) -> usize {
         use Type::*;
         let mut total: usize = 0;
-        let mut stack: Vec<&Type> = vec![self];
+        // SmallVec keeps the worklist on the stack for shallow types (the
+        // hot case: this runs per gas charge), spilling to the heap only for
+        // deep ones — avoiding a per-call heap allocation a `Vec` would force.
+        let mut stack: smallvec::SmallVec<[&Type; 8]> = smallvec::smallvec![self];
         while let Some(t) = stack.pop() {
             total += 1;
             match t {
@@ -335,7 +338,10 @@ impl Type {
 impl PartialEq for Type {
     fn eq(&self, other: &Self) -> bool {
         use Type::*;
-        let mut stack: Vec<(&Type, &Type)> = vec![(self, other)];
+        // SmallVec to avoid a per-call heap allocation on shallow types —
+        // this runs per control-flow stack-merge (IF/LOOP/MAP/ITER); deep
+        // types spill to the heap as before.
+        let mut stack: smallvec::SmallVec<[(&Type, &Type); 8]> = smallvec::smallvec![(self, other)];
         while let Some((a, b)) = stack.pop() {
             match (a, b) {
                 (Nat, Nat)
