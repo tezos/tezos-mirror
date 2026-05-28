@@ -25,6 +25,11 @@ val michelson_contracts_index : path
     that the kernel writes under the Tezlink context root. *)
 val tezos_big_map_root : path
 
+(** [michelson_contract_dir contract] is the durable storage path of [contract]'s directory
+    under the Michelson contracts index. The directory contains all data
+    related to the contract, including balance, storage and code. *)
+val michelson_contract_dir : Tezos_types.Contract.t -> path
+
 (** [michelson_contract_storage contract] is the durable storage path of
     [contract]'s Michelson storage script
     ([/tez/tez_accounts/contracts/index/<hex>/data/storage]). *)

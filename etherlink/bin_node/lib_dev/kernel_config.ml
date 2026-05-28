@@ -129,7 +129,7 @@ let make_l2 ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
               let path_prefix =
                 manager |> Signature.V2.Public_key.hash
                 |> Tezos_types.Contract.of_implicit
-                |> Tezlink_durable_storage.Path.account
+                |> Durable_storage_path.michelson_contract_dir
                 |> String.split_on_char '/' |> clean_path
               in
               make_instr ~path_prefix (Some (key, converter value))
@@ -168,7 +168,7 @@ let make_l2 ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
                in
 
                let path_prefix =
-                 address |> Tezlink_durable_storage.Path.account
+                 Durable_storage_path.michelson_contract_dir address
                  |> String.split_on_char '/' |> clean_path
                in
 
@@ -305,7 +305,7 @@ let make_tezos_bootstrap_contracts_instr tez_bootstrap_balance contracts =
          in
 
          let path_prefix =
-           Tezlink_durable_storage.Path.account address
+           Durable_storage_path.michelson_contract_dir address
            |> String.split_on_char '/' |> clean_path
          in
 

@@ -7,30 +7,6 @@
 (*****************************************************************************)
 open Tezos_types
 
-(** Raw-key path helpers for the Michelson contract subtree at
-    [michelson_contracts_index]. Used to seed bootstrap accounts via
-    [Evm_context.patch_state] (which takes a raw [key]) and as path
-    prefixes that mirror the typed [Durable_storage] constructors
-    that live under the same subtree. *)
-module Path = struct
-  let to_path encoding value =
-    let raw_key = Data_encoding.Binary.to_bytes_exn encoding value in
-    let (`Hex s) = Hex.of_bytes raw_key in
-    s
-
-  let big_map = "/tez/tez_accounts/big_map"
-
-  let account contract =
-    Durable_storage_path.michelson_contracts_index ^ "/"
-    ^ to_path Contract.encoding contract
-
-  let balance contract = account contract ^ "/balance"
-
-  let manager contract = account contract ^ "/manager"
-
-  let counter contract = account contract ^ "/counter"
-end
-
 (** Thin readers on top of [Durable_storage] for the Michelson-runtime
     implicit-account subtree (balance / manager / counter), plus the
     DA-fee mutez helper. The Originated/Implicit dispatch and the
