@@ -19,8 +19,8 @@ pub mod type_props;
 
 use type_props::TypeProperty;
 
-use crate::ast::annotations::{AnnotationError, NO_ANNS};
-use crate::ast::big_map::BigMap;
+use crate::ast::annotations::AnnotationError;
+use crate::ast::big_map::{self, BigMap, BigMapId};
 use crate::ast::micheline::{
     micheline_fields, micheline_instructions, micheline_literals, micheline_types,
     micheline_unsupported_instructions, micheline_unsupported_types, micheline_values,
@@ -60,6 +60,14 @@ pub enum TcError {
     /// Encountered FAIL instruction not in tail position.
     #[error("FAIL instruction is not in tail position")]
     FailNotInTail,
+    /// Typechecking would recurse beyond the protocol-defined depth limit
+    /// (10000). Mirrors L1's `Typechecking_too_many_recursive_calls` in
+    /// `src/proto_alpha/lib_protocol/script_ir_translator.ml:571`. Currently
+    /// guards the value-level Lambda recursion (`step_typecheck_value` →
+    /// `typecheck_lambda` → `typecheck`); the instruction-level LAMBDA path
+    /// is iterative and unbounded by gas.
+    #[error("too many recursive calls during typechecking")]
+    TypecheckingTooManyRecursiveCalls,
     /// Failed to interpret a number as a value of some type due to a numeric
     /// conversion error.
     #[error("numeric conversion failed: {0}")]
@@ -239,6 +247,80 @@ pub enum TcInvariant {
     ExpectedTicketNestedPair,
     #[error("expected Nat for ticket amount")]
     ExpectedTicketNatAmount,
+    #[error("worklist result stack unexpectedly empty: expected {expected}")]
+    EmptyResultStack { expected: &'static str },
+    /// The outer `FailingTypeStack` became `Failed` at a worklist site
+    /// that the driver invariant expected to be `Ok`. Distinct from
+    /// `EmptyResultStack` (about result-stack emptiness) — this one is
+    /// about the *type* stack having lost its `Ok` shape.
+    #[error("outer type stack unexpectedly Failed: {where_}")]
+    OuterStackUnexpectedlyFailed { where_: &'static str },
+    /// Worklist result-stack accumulator left with a non-singleton
+    /// cardinality where the driver invariant expects exactly one root
+    /// entry. Distinct from `EmptyResultStack` (about emptiness) — this
+    /// one is about the wrong *count*.
+    #[error("worklist accumulator wrong cardinality at {where_}: expected {expected}, got {got}")]
+    ResultStackLen {
+        expected: usize,
+        got: usize,
+        where_: &'static str,
+    },
+}
+
+/// L1 parity: mirrors `Typechecking_too_many_recursive_calls` (returned
+/// when `stack_depth > 10000` in `script_ir_translator.ml:571`).
+///
+/// Implementation rationale (vs. plumbing through `TypecheckingCtx`):
+/// the kernel runs in a single thread, so a thread-local + RAII guard
+/// keeps the counter balanced across every `?`-propagated `Err` without
+/// every recursive callsite needing manual save/restore. Under
+/// `panic = "abort"` (the kernel's profile via `sdk/rust/Cargo.toml`)
+/// `Drop` does not fire on panic, but the abort terminates the runtime
+/// before the next operation runs — the next operation re-initialises
+/// the thread-local, so counter pollution across operations is moot.
+/// Under `panic = "unwind"` (native embedders, debug tooling) `Drop`
+/// fires on the unwind path and the counter balances normally.
+const MAX_LAMBDA_TYPECHECK_DEPTH: u16 = 10_000;
+
+std::thread_local! {
+    static LAMBDA_TYPECHECK_DEPTH: std::cell::Cell<u16> = const { std::cell::Cell::new(0) };
+}
+
+struct LambdaTypecheckDepthGuard;
+
+impl LambdaTypecheckDepthGuard {
+    fn enter() -> Result<Self, TcError> {
+        LAMBDA_TYPECHECK_DEPTH.with(|d| {
+            let cur = d.get();
+            // L1 admits the call when `stack_depth <= 10000` (rejects on
+            // `stack_depth > 10000`); the depth counter is incremented
+            // *before* the recursive call, so the first 10001 entries
+            // succeed (`stack_depth` 0..=10000). MIR's counter is also
+            // pre-increment here — match the admit threshold exactly.
+            if cur > MAX_LAMBDA_TYPECHECK_DEPTH {
+                return Err(TcError::TypecheckingTooManyRecursiveCalls);
+            }
+            d.set(cur + 1);
+            Ok(LambdaTypecheckDepthGuard)
+        })
+    }
+}
+
+impl Drop for LambdaTypecheckDepthGuard {
+    fn drop(&mut self) {
+        LAMBDA_TYPECHECK_DEPTH.with(|d| {
+            let cur = d.get();
+            // Defense-in-depth: paired enter/Drop should never put the
+            // counter at 0 here. A debug-build trip surfaces an
+            // invariant violation that `saturating_sub` would silently
+            // mask in release.
+            debug_assert!(
+                cur > 0,
+                "LambdaTypecheckDepthGuard::Drop fired with counter at 0",
+            );
+            d.set(cur.saturating_sub(1));
+        });
+    }
 }
 
 impl From<TryFromBigIntError<()>> for TcError {
@@ -567,196 +649,527 @@ pub(crate) fn parse_ty<'a>(gas: &mut Gas, ty: &Micheline<'a>) -> Result<Type, Tc
     parse_ty_with_entrypoints(gas, ty, None, &mut HashMap::new(), Vec::new())
 }
 
-fn parse_ty_with_entrypoints<'a>(
+/// Worklist frame for the iterative type parser. Visit consumes the
+/// PARSE_TYPE_STEP cost, dispatches leaves inline and pushes Build plus
+/// child Visits for compound types so LIFO popping yields the recursive
+/// order.
+enum PtyFrame<'a, 'b> {
+    Visit {
+        ty: &'b Micheline<'a>,
+        with_entrypoints: bool,
+        path: Vec<Direction>,
+    },
+    Build {
+        ty: &'b Micheline<'a>,
+        with_entrypoints: bool,
+        path: Vec<Direction>,
+        kind: BuildKind,
+    },
+    /// Run `ensure_prop` on the result currently on top of `results`,
+    /// without consuming it. Used to enforce property checks at the same
+    /// point the recursive code did — in particular, the Map/BigMap key
+    /// `Comparable` check fires immediately after the key is parsed,
+    /// *before* the value subtree is parsed. Keeps the failure point
+    /// (and gas-exhaustion point) bit-identical with the recursive code.
+    EnsureProp { prop: TypeProperty },
+}
+
+enum BuildKind {
+    Pair,
+    Or,
+    Lambda,
+    Map,
+    BigMap,
+    Option,
+    List,
+    Set,
+    Ticket,
+    Contract,
+}
+
+/// Push the frames that drive a parse_ty visit of one nested type
+/// (Option, List, Set, Contract, Ticket): the outer `Build` frame for
+/// the parent followed by a `Visit` for the inner child. Children
+/// never carry an entrypoint path; entrypoint propagation lives on the
+/// outer Build via `with_entrypoints` / `path`.
+fn push_single_child_visit<'a, 'b>(
+    frames: &mut Vec<PtyFrame<'a, 'b>>,
+    ty: &'b Micheline<'a>,
+    with_entrypoints: bool,
+    path: Vec<Direction>,
+    kind: BuildKind,
+    child: &'b Micheline<'a>,
+) {
+    frames.push(PtyFrame::Build {
+        ty,
+        with_entrypoints,
+        path,
+        kind,
+    });
+    frames.push(PtyFrame::Visit {
+        ty: child,
+        with_entrypoints: false,
+        path: Vec::new(),
+    });
+}
+
+/// Push the frames that drive a parse_ty visit of two nested types
+/// (Lambda, Map, BigMap). Order: outer Build, then right child Visit,
+/// then left child Visit. LIFO popping yields left-then-right.
+fn push_pair_children_visit<'a, 'b>(
+    frames: &mut Vec<PtyFrame<'a, 'b>>,
+    ty: &'b Micheline<'a>,
+    with_entrypoints: bool,
+    path: Vec<Direction>,
+    kind: BuildKind,
+    left: &'b Micheline<'a>,
+    right: &'b Micheline<'a>,
+) {
+    frames.push(PtyFrame::Build {
+        ty,
+        with_entrypoints,
+        path,
+        kind,
+    });
+    frames.push(PtyFrame::Visit {
+        ty: right,
+        with_entrypoints: false,
+        path: Vec::new(),
+    });
+    frames.push(PtyFrame::Visit {
+        ty: left,
+        with_entrypoints: false,
+        path: Vec::new(),
+    });
+}
+
+/// Register the field annotation of this `ty` as an entrypoint if the
+/// node is being parsed as part of an entrypoint-bearing path, then push
+/// the parsed Type onto the result stack.
+fn finalize_node<'a, 'b>(
+    ty: &'b Micheline<'a>,
+    parsed_ty: Type,
+    with_entrypoints: bool,
+    path: Vec<Direction>,
+    entrypoints: Option<&mut Entrypoints>,
+    routed_annotations: &mut HashMap<FieldAnnotation<'a>, (Vec<Direction>, Type)>,
+    results: &mut Vec<Type>,
+) -> Result<(), TcError> {
+    if with_entrypoints {
+        if let Option::Some(eps) = entrypoints {
+            // we just ensured it's an application of some type primitive
+            let Micheline::App(_prim, _args, anns) = ty else {
+                return Err(TcError::InternalError(
+                    TcInvariant::ExpectedMichelineApp,
+                ));
+            };
+            if let Option::Some(field_ann) = anns.get_single_field_ann()? {
+                routed_annotations.insert(field_ann.clone(), (path, parsed_ty.clone()));
+                if let Ok(entrypoint) = Entrypoint::try_from(field_ann) {
+                    let entry = eps.entry(entrypoint);
+                    match entry {
+                        Entry::Occupied(e) => {
+                            return Err(TcError::DuplicateEntrypoint(e.key().clone()));
+                        }
+                        Entry::Vacant(e) => {
+                            e.insert(parsed_ty.clone());
+                        }
+                    };
+                }
+            }
+        }
+    }
+    results.push(parsed_ty);
+    Ok(())
+}
+
+fn parse_ty_with_entrypoints<'a, 'b>(
     gas: &mut Gas,
-    ty: &Micheline<'a>,
+    ty: &'b Micheline<'a>,
     mut entrypoints: Option<&mut Entrypoints>,
     routed_annotations: &mut HashMap<FieldAnnotation<'a>, (Vec<Direction>, Type)>,
     path: Vec<Direction>,
 ) -> Result<Type, TcError> {
     use Micheline::*;
-    use Prim::*;
-    gas.consume(gas::tc_cost::PARSE_TYPE_STEP)?;
-    fn make_pair<'a>(
-        gas: &mut Gas,
-        args: (&Micheline<'a>, &Micheline<'a>, &[Micheline<'a>]),
-        // NB: the tuple models a slice of at least 2 elements
-    ) -> Result<Type, TcError> {
-        Ok(match args {
-            (ty1, ty2, []) => Type::new_pair(parse_ty(gas, ty1)?, parse_ty(gas, ty2)?),
-            (ty1, ty2, [ty3, rest @ ..]) => {
-                Type::new_pair(parse_ty(gas, ty1)?, make_pair(gas, (ty2, ty3, rest))?)
-            }
-        })
-    }
-    let unexpected = || Err(TcError::UnexpectedMicheline(format!("{ty:?}")));
-    let parsed_ty = match ty {
-        App(int, [], _) => Type::Int,
-        App(int, ..) => unexpected()?,
+    let with_entrypoints_root = entrypoints.is_some();
+    let mut frames: Vec<PtyFrame<'a, 'b>> = vec![PtyFrame::Visit {
+        ty,
+        with_entrypoints: with_entrypoints_root,
+        path,
+    }];
+    let mut results: Vec<Type> = Vec::new();
 
-        App(nat, [], _) => Type::Nat,
-        App(nat, ..) => unexpected()?,
+    while let Some(frame) = frames.pop() {
+        match frame {
+            PtyFrame::Visit {
+                ty,
+                with_entrypoints,
+                path,
+            } => {
+                use Prim::*;
+                gas.consume(gas::tc_cost::PARSE_TYPE_STEP)?;
+                let unexpected = || Err(TcError::UnexpectedMicheline(format!("{ty:?}")));
+                // Small helper that captures the current Visit's metadata so
+                // leaf arms can finalize in one short line.
+                macro_rules! emit_leaf {
+                    ($t:expr) => {{
+                        finalize_node(
+                            ty,
+                            $t,
+                            with_entrypoints,
+                            path,
+                            entrypoints.as_deref_mut(),
+                            routed_annotations,
+                            &mut results,
+                        )?;
+                    }};
+                }
+                match ty {
+                    App(int, [], _) => emit_leaf!(Type::Int),
+                    App(int, ..) => return unexpected(),
 
-        App(bool, [], _) => Type::Bool,
-        App(bool, ..) => unexpected()?,
+                    App(nat, [], _) => emit_leaf!(Type::Nat),
+                    App(nat, ..) => return unexpected(),
 
-        App(mutez, [], _) => Type::Mutez,
-        App(mutez, ..) => unexpected()?,
+                    App(bool, [], _) => emit_leaf!(Type::Bool),
+                    App(bool, ..) => return unexpected(),
 
-        App(string, [], _) => Type::String,
-        App(string, ..) => unexpected()?,
+                    App(mutez, [], _) => emit_leaf!(Type::Mutez),
+                    App(mutez, ..) => return unexpected(),
 
-        App(operation, [], _) => Type::Operation,
-        App(operation, ..) => unexpected()?,
+                    App(string, [], _) => emit_leaf!(Type::String),
+                    App(string, ..) => return unexpected(),
 
-        App(never, [], _) => Type::Never,
-        App(never, ..) => unexpected()?,
+                    App(operation, [], _) => emit_leaf!(Type::Operation),
+                    App(operation, ..) => return unexpected(),
 
-        App(unit, [], _) => Type::Unit,
-        App(unit, ..) => unexpected()?,
+                    App(never, [], _) => emit_leaf!(Type::Never),
+                    App(never, ..) => return unexpected(),
 
-        App(address, [], _) => Type::Address,
-        App(address, ..) => unexpected()?,
+                    App(unit, [], _) => emit_leaf!(Type::Unit),
+                    App(unit, ..) => return unexpected(),
 
-        App(chain_id, [], _) => Type::ChainId,
-        App(chain_id, ..) => unexpected()?,
+                    App(address, [], _) => emit_leaf!(Type::Address),
+                    App(address, ..) => return unexpected(),
 
-        App(ticket, [t], _) => {
-            let t = parse_ty(gas, t)?;
-            // NB: The inner type of ticket only needs to be comparable.
-            // See https://tezos.gitlab.io/michelson-reference/#type-ticket
-            t.ensure_prop(gas, TypeProperty::Comparable)?;
-            Type::new_ticket(t)
-        }
-        App(ticket, ..) => unexpected()?,
+                    App(chain_id, [], _) => emit_leaf!(Type::ChainId),
+                    App(chain_id, ..) => return unexpected(),
 
-        App(timestamp, [], _) => Type::Timestamp,
-        App(timestamp, ..) => unexpected()?,
+                    App(timestamp, [], _) => emit_leaf!(Type::Timestamp),
+                    App(timestamp, ..) => return unexpected(),
 
-        App(pair, [ty1, ty2, rest @ ..], _) => make_pair(gas, (ty1, ty2, rest))?,
-        App(pair, ..) => unexpected()?,
+                    App(bytes, [], _) => emit_leaf!(Type::Bytes),
+                    App(bytes, ..) => return unexpected(),
 
-        App(or, [l, r], _) => Type::new_or(
-            parse_ty_with_entrypoints(gas, l, entrypoints.as_deref_mut(), routed_annotations, {
-                let mut new_path = path.clone();
-                new_path.push(Direction::Left);
-                new_path
-            })?,
-            parse_ty_with_entrypoints(gas, r, entrypoints.as_deref_mut(), routed_annotations, {
-                let mut new_path = path.clone();
-                new_path.push(Direction::Right);
-                new_path
-            })?,
-        ),
+                    App(key, [], _) => emit_leaf!(Type::Key),
+                    App(key, ..) => return unexpected(),
 
-        App(or, ..) => unexpected()?,
+                    App(key_hash, [], _) => emit_leaf!(Type::KeyHash),
+                    App(key_hash, ..) => return unexpected(),
 
-        App(option, [t], _) => Type::new_option(parse_ty(gas, t)?),
-        App(option, ..) => unexpected()?,
+                    App(signature, [], _) => emit_leaf!(Type::Signature),
+                    App(signature, ..) => return unexpected(),
 
-        App(list, [t], _) => Type::new_list(parse_ty(gas, t)?),
-        App(list, ..) => unexpected()?,
+                    #[cfg(feature = "bls")]
+                    App(bls12_381_fr, [], _) => emit_leaf!(Type::Bls12381Fr),
+                    #[cfg(feature = "bls")]
+                    App(bls12_381_fr, ..) => return unexpected(),
 
-        App(lambda, [ty1, ty2], _) => Type::new_lambda(parse_ty(gas, ty1)?, parse_ty(gas, ty2)?),
-        App(lambda, ..) => unexpected()?,
+                    #[cfg(feature = "bls")]
+                    App(bls12_381_g1, [], _) => emit_leaf!(Type::Bls12381G1),
+                    #[cfg(feature = "bls")]
+                    App(bls12_381_g1, ..) => return unexpected(),
 
-        App(contract, [t], _) => {
-            let t = parse_ty(gas, t)?;
-            // NB: despite `contract` type being duplicable and packable, its
-            // argument doesn't need to be. The only constraint is that it needs
-            // to be passable, as it represents the contract's parameter type.
-            // See https://tezos.gitlab.io/michelson-reference/#type-contract
-            t.ensure_prop(gas, TypeProperty::Passable)?;
-            Type::new_contract(t)
-        }
-        App(contract, ..) => unexpected()?,
+                    #[cfg(feature = "bls")]
+                    App(bls12_381_g2, [], _) => emit_leaf!(Type::Bls12381G2),
+                    #[cfg(feature = "bls")]
+                    App(bls12_381_g2, ..) => return unexpected(),
 
-        App(set, [k], _) => {
-            let k = parse_ty(gas, k)?;
-            k.ensure_prop(gas, TypeProperty::Comparable)?;
-            Type::new_set(k)
-        }
-        App(set, ..) => unexpected()?,
+                    App(ticket, [t], _) => push_single_child_visit(
+                        &mut frames,
+                        ty,
+                        with_entrypoints,
+                        path,
+                        BuildKind::Ticket,
+                        t,
+                    ),
+                    App(ticket, ..) => return unexpected(),
 
-        App(map, [k, v], _) => {
-            let k = parse_ty(gas, k)?;
-            k.ensure_prop(gas, TypeProperty::Comparable)?;
-            let v = parse_ty(gas, v)?;
-            Type::new_map(k, v)
-        }
-        App(map, ..) => unexpected()?,
-
-        App(big_map, [k, v], _) => {
-            let k = parse_ty(gas, k)?;
-            k.ensure_prop(gas, TypeProperty::Comparable)?;
-            let v = parse_ty(gas, v)?;
-            v.ensure_prop(gas, TypeProperty::BigMapValue)?;
-            Type::new_big_map(k, v)
-        }
-        App(big_map, ..) => unexpected()?,
-
-        App(bytes, [], _) => Type::Bytes,
-        App(bytes, ..) => unexpected()?,
-
-        App(key, [], _) => Type::Key,
-        App(key, ..) => unexpected()?,
-
-        App(key_hash, [], _) => Type::KeyHash,
-        App(key_hash, ..) => unexpected()?,
-
-        App(signature, [], _) => Type::Signature,
-        App(signature, ..) => unexpected()?,
-
-        #[cfg(feature = "bls")]
-        App(bls12_381_fr, [], _) => Type::Bls12381Fr,
-        #[cfg(feature = "bls")]
-        App(bls12_381_fr, ..) => unexpected()?,
-
-        #[cfg(feature = "bls")]
-        App(bls12_381_g1, [], _) => Type::Bls12381G1,
-        #[cfg(feature = "bls")]
-        App(bls12_381_g1, ..) => unexpected()?,
-
-        #[cfg(feature = "bls")]
-        App(bls12_381_g2, [], _) => Type::Bls12381G2,
-        #[cfg(feature = "bls")]
-        App(bls12_381_g2, ..) => unexpected()?,
-
-        Seq(..)
-        | micheline_fields!()
-        | micheline_instructions!()
-        | micheline_literals!()
-        | micheline_values!() => unexpected()?,
-
-        App(prim @ micheline_unsupported_types!(), ..) => Err(TcError::TodoType(*prim))?,
-    };
-
-    if let Option::Some(eps) = entrypoints {
-        // We just ensured it's an application of some type primitive.
-        let Micheline::App(_, _, anns) = ty else {
-            return Err(TcError::InternalError(
-                TcInvariant::ExpectedMichelineApp,
-            ));
-        };
-        if let Option::Some(field_ann) = anns.get_single_field_ann()? {
-            // NB: field annotations may be longer than entrypoints; however
-            // it's not an error to have an overly-long field annotation, it
-            // just doesn't count as an entrypoint.
-            routed_annotations.insert(field_ann.clone(), (path, parsed_ty.clone()));
-            if let Ok(entrypoint) = Entrypoint::try_from(field_ann) {
-                let entry = eps.entry(entrypoint);
-                match entry {
-                    Entry::Occupied(e) => {
-                        return Err(TcError::DuplicateEntrypoint(e.key().clone()));
+                    App(pair, [ty1, ty2, rest @ ..], _) => {
+                        // The recursive shape is right leaning:
+                        // new_pair(ty1, new_pair(ty2, new_pair(ty3, ...))).
+                        // We push N - 1 Build::Pair frames then the N children
+                        // in reverse so the first child pops first and the
+                        // outermost Build::Pair pops last.
+                        let total_children = 2 + rest.len();
+                        for _ in 0..(total_children - 1) {
+                            // All but the outermost Build::Pair are anonymous:
+                            // they do not carry the entrypoint path of the
+                            // original pair node; only the outermost one does.
+                            frames.push(PtyFrame::Build {
+                                ty,
+                                with_entrypoints: false,
+                                path: Vec::new(),
+                                kind: BuildKind::Pair,
+                            });
+                        }
+                        // Override the outermost Build::Pair (the first pushed)
+                        // to carry the real entrypoint metadata.
+                        let outermost_idx = frames.len() - (total_children - 1);
+                        frames[outermost_idx] = PtyFrame::Build {
+                            ty,
+                            with_entrypoints,
+                            path,
+                            kind: BuildKind::Pair,
+                        };
+                        // Push children in reverse so the first child pops first.
+                        for child in rest.iter().rev() {
+                            frames.push(PtyFrame::Visit {
+                                ty: child,
+                                with_entrypoints: false,
+                                path: Vec::new(),
+                            });
+                        }
+                        frames.push(PtyFrame::Visit {
+                            ty: ty2,
+                            with_entrypoints: false,
+                            path: Vec::new(),
+                        });
+                        frames.push(PtyFrame::Visit {
+                            ty: ty1,
+                            with_entrypoints: false,
+                            path: Vec::new(),
+                        });
                     }
-                    Entry::Vacant(e) => {
-                        e.insert(parsed_ty.clone());
+                    App(pair, ..) => return unexpected(),
+
+                    App(or, [l, r], _) => {
+                        let mut left_path = path.clone();
+                        left_path.push(Direction::Left);
+                        let mut right_path = path.clone();
+                        right_path.push(Direction::Right);
+                        frames.push(PtyFrame::Build {
+                            ty,
+                            with_entrypoints,
+                            path,
+                            kind: BuildKind::Or,
+                        });
+                        frames.push(PtyFrame::Visit {
+                            ty: r,
+                            with_entrypoints,
+                            path: right_path,
+                        });
+                        frames.push(PtyFrame::Visit {
+                            ty: l,
+                            with_entrypoints,
+                            path: left_path,
+                        });
+                    }
+                    App(or, ..) => return unexpected(),
+
+                    App(option, [t], _) => push_single_child_visit(
+                        &mut frames,
+                        ty,
+                        with_entrypoints,
+                        path,
+                        BuildKind::Option,
+                        t,
+                    ),
+                    App(option, ..) => return unexpected(),
+
+                    App(list, [t], _) => push_single_child_visit(
+                        &mut frames,
+                        ty,
+                        with_entrypoints,
+                        path,
+                        BuildKind::List,
+                        t,
+                    ),
+                    App(list, ..) => return unexpected(),
+
+                    App(lambda, [ty1, ty2], _) => push_pair_children_visit(
+                        &mut frames,
+                        ty,
+                        with_entrypoints,
+                        path,
+                        BuildKind::Lambda,
+                        ty1,
+                        ty2,
+                    ),
+                    App(lambda, ..) => return unexpected(),
+
+                    App(contract, [t], _) => push_single_child_visit(
+                        &mut frames,
+                        ty,
+                        with_entrypoints,
+                        path,
+                        BuildKind::Contract,
+                        t,
+                    ),
+                    App(contract, ..) => return unexpected(),
+
+                    App(set, [k], _) => push_single_child_visit(
+                        &mut frames,
+                        ty,
+                        with_entrypoints,
+                        path,
+                        BuildKind::Set,
+                        k,
+                    ),
+                    App(set, ..) => return unexpected(),
+
+                    App(map, [k, v], _) => {
+                        // Push order matches the recursive code's evaluation
+                        // order: parse k → ensure k is Comparable → parse v →
+                        // build new_map. LIFO pop yields that sequence.
+                        frames.push(PtyFrame::Build {
+                            ty,
+                            with_entrypoints,
+                            path,
+                            kind: BuildKind::Map,
+                        });
+                        frames.push(PtyFrame::Visit {
+                            ty: v,
+                            with_entrypoints: false,
+                            path: Vec::new(),
+                        });
+                        frames.push(PtyFrame::EnsureProp {
+                            prop: TypeProperty::Comparable,
+                        });
+                        frames.push(PtyFrame::Visit {
+                            ty: k,
+                            with_entrypoints: false,
+                            path: Vec::new(),
+                        });
+                    }
+                    App(map, ..) => return unexpected(),
+
+                    App(big_map, [k, v], _) => {
+                        // Push order matches the recursive code: parse k →
+                        // ensure k Comparable → parse v → ensure v BigMapValue
+                        // → build new_big_map.
+                        frames.push(PtyFrame::Build {
+                            ty,
+                            with_entrypoints,
+                            path,
+                            kind: BuildKind::BigMap,
+                        });
+                        frames.push(PtyFrame::EnsureProp {
+                            prop: TypeProperty::BigMapValue,
+                        });
+                        frames.push(PtyFrame::Visit {
+                            ty: v,
+                            with_entrypoints: false,
+                            path: Vec::new(),
+                        });
+                        frames.push(PtyFrame::EnsureProp {
+                            prop: TypeProperty::Comparable,
+                        });
+                        frames.push(PtyFrame::Visit {
+                            ty: k,
+                            with_entrypoints: false,
+                            path: Vec::new(),
+                        });
+                    }
+                    App(big_map, ..) => return unexpected(),
+
+                    Seq(..)
+                    | micheline_fields!()
+                    | micheline_instructions!()
+                    | micheline_literals!()
+                    | micheline_values!() => return unexpected(),
+
+                    App(prim @ micheline_unsupported_types!(), ..) => {
+                        return Err(TcError::TodoType(*prim));
+                    }
+                }
+            }
+            PtyFrame::Build {
+                ty,
+                with_entrypoints,
+                path,
+                kind,
+            } => {
+                let parsed = match kind {
+                    BuildKind::Pair => {
+                        let r = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "pair r" }))?;
+                        let l = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "pair l" }))?;
+                        Type::new_pair(l, r)
+                    }
+                    BuildKind::Or => {
+                        let r = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "or r" }))?;
+                        let l = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "or l" }))?;
+                        Type::new_or(l, r)
+                    }
+                    BuildKind::Lambda => {
+                        let ret = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "lambda ret" }))?;
+                        let arg = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "lambda arg" }))?;
+                        Type::new_lambda(arg, ret)
+                    }
+                    BuildKind::Map => {
+                        // ensure_prop(k, Comparable) already ran via the
+                        // EnsureProp frame between Visit(k) and Visit(v),
+                        // preserving recursive-order failure semantics.
+                        let v = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "map v" }))?;
+                        let k = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "map k" }))?;
+                        Type::new_map(k, v)
+                    }
+                    BuildKind::BigMap => {
+                        // ensure_prop(k, Comparable) and ensure_prop(v,
+                        // BigMapValue) ran via EnsureProp frames between
+                        // the Visits.
+                        let v = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "big_map v" }))?;
+                        let k = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "big_map k" }))?;
+                        Type::new_big_map(k, v)
+                    }
+                    BuildKind::Option => {
+                        let t = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "option t" }))?;
+                        Type::new_option(t)
+                    }
+                    BuildKind::List => {
+                        let t = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "list t" }))?;
+                        Type::new_list(t)
+                    }
+                    BuildKind::Set => {
+                        let t = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "set t" }))?;
+                        t.ensure_prop(gas, TypeProperty::Comparable)?;
+                        Type::new_set(t)
+                    }
+                    BuildKind::Ticket => {
+                        let t = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "ticket t" }))?;
+                        // The inner type of ticket only needs to be comparable.
+                        t.ensure_prop(gas, TypeProperty::Comparable)?;
+                        Type::new_ticket(t)
+                    }
+                    BuildKind::Contract => {
+                        let t = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "contract t" }))?;
+                        // The argument of contract only needs to be passable;
+                        // contract itself is duplicable and packable.
+                        t.ensure_prop(gas, TypeProperty::Passable)?;
+                        Type::new_contract(t)
                     }
                 };
+                finalize_node(
+                    ty,
+                    parsed,
+                    with_entrypoints,
+                    path,
+                    entrypoints.as_deref_mut(),
+                    routed_annotations,
+                    &mut results,
+                )?;
+            }
+            PtyFrame::EnsureProp { prop } => {
+                // Run ensure_prop on the result currently on top of `results`
+                // without consuming it; the result remains available for the
+                // surrounding Build frame to pop. Borrowing avoids a clone
+                // of the (possibly deep) Type.
+                let t = results.last().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "ensure_prop target" }))?;
+                t.ensure_prop(gas, prop)?;
             }
         }
     }
-    Ok(parsed_ty)
+    Ok(results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "root type" }))?)
 }
 
 #[allow(clippy::type_complexity)]
@@ -797,17 +1210,721 @@ fn parse_parameter_ty_with_entrypoints<'a>(
 ///
 /// Entrypoint map is carried as an argument, not as part of context, because it
 /// has to be locally overridden during typechecking.
-fn typecheck<'a>(
-    ast: &[Micheline<'a>],
+/// What a per instruction step yields. Non recursive arms produce a
+/// finished instruction; control flow arms with unbounded depth (IF
+/// family, LOOP family, ITER, DIP, SEQ, LAMBDA / LAMBDA_REC, MAP)
+/// produce an Open variant that the driver expands into nested block
+/// frames. The LAMBDA / MAP arms switch the driver into a fresh
+/// (LAMBDA) or cloned-and-extended (MAP) type-stack context for the
+/// body, then restore the outer context on the matching After frame.
+enum StepResult<'a, 'b> {
+    Done(Instruction<'a>),
+    OpenIf {
+        t_block: &'b [Micheline<'a>],
+        f_block: &'b [Micheline<'a>],
+        saved_f_stack: FailingTypeStack,
+    },
+    OpenIfNone {
+        none_block: &'b [Micheline<'a>],
+        some_block: &'b [Micheline<'a>],
+        some_top_ty: Type,
+    },
+    OpenIfCons {
+        cons_block: &'b [Micheline<'a>],
+        nil_block: &'b [Micheline<'a>],
+        list_ty: Type,
+        cons_top_ty: Type,
+    },
+    OpenIfLeft {
+        left_block: &'b [Micheline<'a>],
+        right_block: &'b [Micheline<'a>],
+        right_top_ty: Type,
+    },
+    OpenLoop {
+        body: &'b [Micheline<'a>],
+        initial_copy: FailingTypeStack,
+    },
+    OpenLoopLeft {
+        body: &'b [Micheline<'a>],
+        initial_copy: FailingTypeStack,
+        r_ty: Type,
+    },
+    OpenIter {
+        body: &'b [Micheline<'a>],
+        variant: overloads::Iter,
+        outer_opt_stack: FailingTypeStack,
+    },
+    OpenDip {
+        body: &'b [Micheline<'a>],
+        opt_height: Option<u16>,
+        protected: TypeStack,
+    },
+    OpenSeq {
+        body: &'b [Micheline<'a>],
+    },
+    /// LAMBDA / LAMBDA_REC instruction: route the body through the outer
+    /// worklist driver so nested LAMBDAs do not grow the Rust call stack
+    /// one frame per nesting level. The body runs on a fresh `[in_ty]`
+    /// stack (or `[self_ty, in_ty]` for LAMBDA_REC) with
+    /// `self_entrypoints = None` and `in_view = false`.
+    OpenLambda {
+        body: &'b [Micheline<'a>],
+        in_ty: Type,
+        out_ty: Type,
+        recursive: bool,
+        micheline_code: Micheline<'a>,
+    },
+    /// MAP block on a List / Option / Map. The body runs on a clone of the
+    /// outer stack plus `inner_ty` pushed on top (the element / pair type).
+    /// `kind` records which container to rewrap with after the body completes.
+    OpenMapBlock {
+        body: &'b [Micheline<'a>],
+        inner_ty: Type,
+        kind: MapKind,
+    },
+}
+
+/// Which container wraps the result of a `MAP` block — selected from the
+/// outer stack's source type before the body runs.
+enum MapKind {
+    /// MAP over `list e` → result is `list e'`.
+    List,
+    /// MAP over `option e` → result is `option e'`.
+    Option,
+    /// MAP over `map k e` → result is `map k e'`. Carries the unchanged
+    /// key type so the After frame can rewrap.
+    Map(Type),
+}
+
+/// Worklist frame for the iterative instruction typechecker driver.
+enum TcIFrame<'a, 'b> {
+    /// Process the next instruction in this block. When `idx == block.len()`,
+    /// the matching After frame finalizes.
+    NextInstr {
+        block: &'b [Micheline<'a>],
+        idx: usize,
+    },
+    AfterIfThen {
+        f_block: &'b [Micheline<'a>],
+        saved_f_stack: FailingTypeStack,
+    },
+    AfterIfFalse {
+        saved_t_stack: FailingTypeStack,
+    },
+    AfterIfNoneNone {
+        some_block: &'b [Micheline<'a>],
+        saved_some_stack: FailingTypeStack,
+    },
+    AfterIfNoneSome {
+        saved_none_stack: FailingTypeStack,
+    },
+    AfterIfConsCons {
+        nil_block: &'b [Micheline<'a>],
+        saved_nil_stack: FailingTypeStack,
+    },
+    AfterIfConsNil {
+        saved_cons_stack: FailingTypeStack,
+    },
+    AfterIfLeftLeft {
+        right_block: &'b [Micheline<'a>],
+        saved_right_stack: FailingTypeStack,
+    },
+    AfterIfLeftRight {
+        saved_left_stack: FailingTypeStack,
+    },
+    AfterLoop {
+        initial_copy: FailingTypeStack,
+    },
+    AfterLoopLeft {
+        initial_copy: FailingTypeStack,
+        r_ty: Type,
+    },
+    AfterIter {
+        variant: overloads::Iter,
+        outer_opt_stack: FailingTypeStack,
+    },
+    AfterDip {
+        opt_height: Option<u16>,
+        protected: TypeStack,
+    },
+    AfterSeq,
+    /// Finalize a `LAMBDA` / `LAMBDA_REC` instruction whose body was just
+    /// typechecked on a fresh stack. Pops the body's instructions from the
+    /// outer `block_results`, unifies the body's resulting stack with
+    /// `[out_ty]`, builds the Lambda struct, restores the outer state, and
+    /// pushes `I::Lambda(...)` onto the (now-restored) outer
+    /// `block_results`.
+    AfterLambda {
+        in_ty: Type,
+        out_ty: Type,
+        recursive: bool,
+        micheline_code: Micheline<'a>,
+        saved_outer_stack: FailingTypeStack,
+        saved_self_entrypoints: Option<&'b Entrypoints>,
+        saved_in_view: bool,
+    },
+    /// Finalize a `MAP` block. Pops the body's instructions, pops the
+    /// inner-result type off the body's stack, restores the outer stack,
+    /// pushes the rewrapped container type, and pushes `I::Map(...)` onto
+    /// the outer `block_results`.
+    AfterMapBlock {
+        kind: MapKind,
+        saved_outer_stack: FailingTypeStack,
+    },
+}
+
+/// Iterative driver: typechecks every nested block from one explicit
+/// worklist instead of recursing through `typecheck` / `typecheck_instruction`.
+fn typecheck<'a, 'b>(
+    ast: &'b [Micheline<'a>],
     gas: &mut Gas,
-    self_entrypoints: Option<&Entrypoints>,
+    self_entrypoints: Option<&'b Entrypoints>,
     opt_stack: &mut FailingTypeStack,
     in_view: bool,
 ) -> Result<Vec<Instruction<'a>>, TcError> {
-    ast.iter()
-        .map(|i| typecheck_instruction(i, gas, self_entrypoints, opt_stack, in_view))
-        .collect()
+    let mut frames: Vec<TcIFrame<'a, 'b>> = vec![TcIFrame::NextInstr {
+        block: ast,
+        idx: 0,
+    }];
+    // One accumulator per active block. The root accumulator is at index 0;
+    // nested blocks push and pop their own.
+    let mut block_results: Vec<Vec<Instruction<'a>>> = vec![Vec::new()];
+    // Mutable state across the driver: switched by Open/After Lambda frames
+    // when a LAMBDA / LAMBDA_REC body is entered (fresh scope with
+    // self_entrypoints=None, in_view=false). MAP_BLOCK does NOT switch
+    // these — it inherits the outer context.
+    let mut cur_self_entrypoints = self_entrypoints;
+    let mut cur_in_view = in_view;
+    while let Some(frame) = frames.pop() {
+        match frame {
+            TcIFrame::NextInstr { block, idx } => {
+                if idx >= block.len() {
+                    // Block finished; the next frame in line will consume
+                    // the top of `block_results`.
+                    continue;
+                }
+                let instr = &block[idx];
+                // Re-push NextInstr advanced so subsequent finalizations
+                // know where to resume; this re-push lands *below* any
+                // nested frames we are about to add for the current instr.
+                let parent = TcIFrame::NextInstr {
+                    block,
+                    idx: idx + 1,
+                };
+                let step = typecheck_instruction_step(
+                    instr,
+                    gas,
+                    cur_self_entrypoints,
+                    opt_stack,
+                    cur_in_view,
+                )?;
+                match step {
+                    StepResult::Done(typed) => {
+                        block_results.last_mut().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "block result" }))?.push(typed);
+                        frames.push(parent);
+                    }
+                    StepResult::OpenIf {
+                        t_block,
+                        f_block,
+                        saved_f_stack,
+                    } => {
+                        frames.push(parent);
+                        frames.push(TcIFrame::AfterIfThen {
+                            f_block,
+                            saved_f_stack,
+                        });
+                        block_results.push(Vec::new());
+                        frames.push(TcIFrame::NextInstr {
+                            block: t_block,
+                            idx: 0,
+                        });
+                    }
+                    StepResult::OpenIfNone {
+                        none_block,
+                        some_block,
+                        some_top_ty,
+                    } => {
+                        // The current opt_stack (post pop of the Option's
+                        // inner type) is what the None arm runs against;
+                        // the Some arm needs its own clone with `some_top_ty`
+                        // pushed on top.
+                        let mut some_stack: TypeStack = opt_stack
+                            .access_mut(TcError::FailNotInTail)?
+                            .clone();
+                        some_stack.push(some_top_ty);
+                        let saved_some_stack = FailingTypeStack::Ok(some_stack);
+                        frames.push(parent);
+                        frames.push(TcIFrame::AfterIfNoneNone {
+                            some_block,
+                            saved_some_stack,
+                        });
+                        block_results.push(Vec::new());
+                        frames.push(TcIFrame::NextInstr {
+                            block: none_block,
+                            idx: 0,
+                        });
+                    }
+                    StepResult::OpenIfCons {
+                        cons_block,
+                        nil_block,
+                        list_ty,
+                        cons_top_ty,
+                    } => {
+                        // current opt_stack is the post pop nil stack. Build
+                        // the cons stack: post pop + list_ty (the popped
+                        // list type, pushed back) + element type.
+                        let live = opt_stack.access_mut(TcError::FailNotInTail)?;
+                        let mut cons_stack: TypeStack = live.clone();
+                        cons_stack.push(list_ty);
+                        cons_stack.push(cons_top_ty);
+                        let cons_opt_stack = FailingTypeStack::Ok(cons_stack);
+                        // Save the nil stack (live), install the cons stack
+                        // as live so the cons arm runs against it.
+                        let saved_nil_stack = std::mem::replace(opt_stack, cons_opt_stack);
+                        frames.push(parent);
+                        frames.push(TcIFrame::AfterIfConsCons {
+                            nil_block,
+                            saved_nil_stack,
+                        });
+                        block_results.push(Vec::new());
+                        frames.push(TcIFrame::NextInstr {
+                            block: cons_block,
+                            idx: 0,
+                        });
+                    }
+                    StepResult::OpenIfLeft {
+                        left_block,
+                        right_block,
+                        right_top_ty,
+                    } => {
+                        // current opt_stack already has the left type pushed
+                        // (set up by the step before yielding). Build the
+                        // right stack from the clone.
+                        let mut right_stack: TypeStack = opt_stack
+                            .access_mut(TcError::FailNotInTail)?
+                            .clone();
+                        // Replace the top of right_stack (currently the
+                        // left type) with the right type.
+                        *right_stack.get_mut(0)? = right_top_ty;
+                        let saved_right_stack = FailingTypeStack::Ok(right_stack);
+                        frames.push(parent);
+                        frames.push(TcIFrame::AfterIfLeftLeft {
+                            right_block,
+                            saved_right_stack,
+                        });
+                        block_results.push(Vec::new());
+                        frames.push(TcIFrame::NextInstr {
+                            block: left_block,
+                            idx: 0,
+                        });
+                    }
+                    StepResult::OpenLoop {
+                        body,
+                        initial_copy,
+                    } => {
+                        frames.push(parent);
+                        frames.push(TcIFrame::AfterLoop { initial_copy });
+                        block_results.push(Vec::new());
+                        frames.push(TcIFrame::NextInstr { block: body, idx: 0 });
+                    }
+                    StepResult::OpenLoopLeft {
+                        body,
+                        initial_copy,
+                        r_ty,
+                    } => {
+                        frames.push(parent);
+                        frames.push(TcIFrame::AfterLoopLeft {
+                            initial_copy,
+                            r_ty,
+                        });
+                        block_results.push(Vec::new());
+                        frames.push(TcIFrame::NextInstr { block: body, idx: 0 });
+                    }
+                    StepResult::OpenIter {
+                        body,
+                        variant,
+                        outer_opt_stack,
+                    } => {
+                        frames.push(parent);
+                        frames.push(TcIFrame::AfterIter {
+                            variant,
+                            outer_opt_stack,
+                        });
+                        block_results.push(Vec::new());
+                        frames.push(TcIFrame::NextInstr { block: body, idx: 0 });
+                    }
+                    StepResult::OpenDip {
+                        body,
+                        opt_height,
+                        protected,
+                    } => {
+                        frames.push(parent);
+                        frames.push(TcIFrame::AfterDip {
+                            opt_height,
+                            protected,
+                        });
+                        block_results.push(Vec::new());
+                        frames.push(TcIFrame::NextInstr { block: body, idx: 0 });
+                    }
+                    StepResult::OpenSeq { body } => {
+                        frames.push(parent);
+                        frames.push(TcIFrame::AfterSeq);
+                        block_results.push(Vec::new());
+                        frames.push(TcIFrame::NextInstr { block: body, idx: 0 });
+                    }
+                    StepResult::OpenLambda {
+                        body,
+                        in_ty,
+                        out_ty,
+                        recursive,
+                        micheline_code,
+                    } => {
+                        // Save outer state.
+                        let saved_self_entrypoints = cur_self_entrypoints;
+                        let saved_in_view = cur_in_view;
+                        // Build the body's initial stack: [in_ty] for plain
+                        // LAMBDA, [self_ty, in_ty] for LAMBDA_REC (self_ty on
+                        // bottom so the body can DUP / EXEC self).
+                        let body_initial = if recursive {
+                            let self_ty = Type::new_lambda(in_ty.clone(), out_ty.clone());
+                            tc_stk![self_ty, in_ty.clone()]
+                        } else {
+                            tc_stk![in_ty.clone()]
+                        };
+                        let saved_outer_stack = std::mem::replace(opt_stack, body_initial);
+                        cur_self_entrypoints = None;
+                        cur_in_view = false;
+                        // Continue the outer block after the lambda
+                        // resolves.
+                        frames.push(parent);
+                        frames.push(TcIFrame::AfterLambda {
+                            in_ty,
+                            out_ty,
+                            recursive,
+                            micheline_code,
+                            saved_outer_stack,
+                            saved_self_entrypoints,
+                            saved_in_view,
+                        });
+                        block_results.push(Vec::new());
+                        frames.push(TcIFrame::NextInstr { block: body, idx: 0 });
+                    }
+                    StepResult::OpenMapBlock {
+                        body,
+                        inner_ty,
+                        kind,
+                    } => {
+                        // The body runs on a CLONE of the outer post-pop
+                        // stack with `inner_ty` pushed (matches the
+                        // recursive `typecheck_map_block` which clones
+                        // `stack` before pushing). AfterMapBlock restores
+                        // the outer stack and rewraps with the container
+                        // type. self_entrypoints / in_view stay inherited.
+                        let body_initial = match opt_stack {
+                            FailingTypeStack::Ok(s) => {
+                                let mut cloned = s.clone();
+                                cloned.push(inner_ty);
+                                FailingTypeStack::Ok(cloned)
+                            }
+                            // If the outer stack is already failing, the
+                            // body inherits the failure (matches the
+                            // recursive behavior — typecheck_map_block on a
+                            // failing nested stack is propagated by typecheck).
+                            FailingTypeStack::Failed => FailingTypeStack::Failed,
+                        };
+                        let saved_outer_stack = std::mem::replace(opt_stack, body_initial);
+                        frames.push(parent);
+                        frames.push(TcIFrame::AfterMapBlock {
+                            kind,
+                            saved_outer_stack,
+                        });
+                        block_results.push(Vec::new());
+                        frames.push(TcIFrame::NextInstr { block: body, idx: 0 });
+                    }
+                }
+            }
+            TcIFrame::AfterIfThen {
+                f_block,
+                saved_f_stack,
+            } => {
+                // Post-true opt_stack becomes the saved_t_stack; swap
+                // saved_f_stack into the live opt_stack so the false arm
+                // runs against it.
+                let saved_t_stack = std::mem::replace(opt_stack, saved_f_stack);
+                frames.push(TcIFrame::AfterIfFalse { saved_t_stack });
+                block_results.push(Vec::new());
+                frames.push(TcIFrame::NextInstr {
+                    block: f_block,
+                    idx: 0,
+                });
+            }
+            TcIFrame::AfterIfFalse { saved_t_stack } => {
+                let f_instructions = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "if false block" }))?;
+                let t_instructions = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "if true block" }))?;
+                // Match the recursive code's unify_stacks(post_true, post_false)
+                // so error messages name the same stacks in the same order.
+                let post_false = std::mem::replace(opt_stack, saved_t_stack);
+                unify_stacks(gas, opt_stack, post_false)?;
+                block_results
+                    .last_mut()
+                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "if parent" }))?
+                    .push(Instruction::If(t_instructions, f_instructions));
+            }
+            TcIFrame::AfterIfNoneNone {
+                some_block,
+                saved_some_stack,
+            } => {
+                let saved_none_stack = std::mem::replace(opt_stack, saved_some_stack);
+                frames.push(TcIFrame::AfterIfNoneSome { saved_none_stack });
+                block_results.push(Vec::new());
+                frames.push(TcIFrame::NextInstr {
+                    block: some_block,
+                    idx: 0,
+                });
+            }
+            TcIFrame::AfterIfNoneSome { saved_none_stack } => {
+                let some_instructions = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "if_none some" }))?;
+                let none_instructions = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "if_none none" }))?;
+                let post_some = std::mem::replace(opt_stack, saved_none_stack);
+                unify_stacks(gas, opt_stack, post_some)?;
+                block_results
+                    .last_mut()
+                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "if_none parent" }))?
+                    .push(Instruction::IfNone(none_instructions, some_instructions));
+            }
+            TcIFrame::AfterIfConsCons {
+                nil_block,
+                saved_nil_stack,
+            } => {
+                // post-cons live stack saved; install nil stack to run nil.
+                let saved_cons_stack = std::mem::replace(opt_stack, saved_nil_stack);
+                frames.push(TcIFrame::AfterIfConsNil { saved_cons_stack });
+                block_results.push(Vec::new());
+                frames.push(TcIFrame::NextInstr {
+                    block: nil_block,
+                    idx: 0,
+                });
+            }
+            TcIFrame::AfterIfConsNil { saved_cons_stack } => {
+                let nil_instructions = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "if_cons nil" }))?;
+                let cons_instructions = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "if_cons cons" }))?;
+                // Recursive code orders unify(opt_stack=post_nil, cons=post_cons)
+                // since the nil arm runs second; mirror that here.
+                unify_stacks(gas, opt_stack, saved_cons_stack)?;
+                block_results
+                    .last_mut()
+                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "if_cons parent" }))?
+                    .push(Instruction::IfCons(cons_instructions, nil_instructions));
+            }
+            TcIFrame::AfterIfLeftLeft {
+                right_block,
+                saved_right_stack,
+            } => {
+                let saved_left_stack = std::mem::replace(opt_stack, saved_right_stack);
+                frames.push(TcIFrame::AfterIfLeftRight { saved_left_stack });
+                block_results.push(Vec::new());
+                frames.push(TcIFrame::NextInstr {
+                    block: right_block,
+                    idx: 0,
+                });
+            }
+            TcIFrame::AfterIfLeftRight { saved_left_stack } => {
+                let right_instructions = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "if_left right" }))?;
+                let left_instructions = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "if_left left" }))?;
+                let post_right = std::mem::replace(opt_stack, saved_left_stack);
+                unify_stacks(gas, opt_stack, post_right)?;
+                block_results
+                    .last_mut()
+                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "if_left parent" }))?
+                    .push(Instruction::IfLeft(left_instructions, right_instructions));
+            }
+            TcIFrame::AfterLoop { initial_copy } => {
+                let body = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "loop body" }))?;
+                unify_stacks(gas, opt_stack, initial_copy)?;
+                // Pop the remaining bool (if not failed) and emit I::Loop.
+                opt_stack.access_mut(()).ok().map(Stack::pop);
+                block_results
+                    .last_mut()
+                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "loop parent" }))?
+                    .push(Instruction::Loop(body));
+            }
+            TcIFrame::AfterLoopLeft { initial_copy, r_ty } => {
+                let body = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "loop_left body" }))?;
+                unify_stacks(gas, opt_stack, initial_copy)?;
+                *opt_stack
+                    .access_mut(TcError::FailNotInTail)?
+                    .get_mut(0)? = r_ty;
+                block_results
+                    .last_mut()
+                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "loop_left parent" }))?
+                    .push(Instruction::LoopLeft(body));
+            }
+            TcIFrame::AfterIter {
+                variant,
+                outer_opt_stack,
+            } => {
+                let body = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "iter body" }))?;
+                // The live opt_stack is post-body inner stack; outer was
+                // saved separately. Unify them, then restore outer.
+                let post_body = std::mem::replace(opt_stack, outer_opt_stack);
+                unify_stacks(gas, opt_stack, post_body)?;
+                block_results
+                    .last_mut()
+                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "iter parent" }))?
+                    .push(Instruction::Iter(variant, body));
+            }
+            TcIFrame::AfterDip {
+                opt_height,
+                protected,
+            } => {
+                let body = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "dip body" }))?;
+                opt_stack
+                    .access_mut(TcError::FailNotInTail)?
+                    .append(&mut { protected });
+                block_results
+                    .last_mut()
+                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "dip parent" }))?
+                    .push(Instruction::Dip(opt_height, body));
+            }
+            TcIFrame::AfterSeq => {
+                let body = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "seq body" }))?;
+                block_results
+                    .last_mut()
+                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "seq parent" }))?
+                    .push(Instruction::Seq(body));
+            }
+            TcIFrame::AfterLambda {
+                in_ty,
+                out_ty,
+                recursive,
+                micheline_code,
+                saved_outer_stack,
+                saved_self_entrypoints,
+                saved_in_view,
+            } => {
+                let body_instrs = block_results.pop().ok_or(TcError::InternalError(
+                    TcInvariant::EmptyResultStack { expected: "lambda body" },
+                ))?;
+                // Unify body's resulting stack with [out_ty], matching the
+                // recursive `typecheck_lambda` which calls
+                // `unify_stacks(gas, stk, tc_stk![out_ty.clone()])`.
+                unify_stacks(gas, opt_stack, tc_stk![out_ty.clone()])?;
+                // Restore outer context.
+                *opt_stack = saved_outer_stack;
+                cur_self_entrypoints = saved_self_entrypoints;
+                cur_in_view = saved_in_view;
+                let code = Rc::from(body_instrs);
+                let lam = if recursive {
+                    Lambda::LambdaRec {
+                        micheline_code,
+                        code,
+                        in_ty,
+                        out_ty,
+                    }
+                } else {
+                    Lambda::Lambda {
+                        micheline_code,
+                        code,
+                    }
+                };
+                block_results
+                    .last_mut()
+                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack {
+                        expected: "lambda parent",
+                    }))?
+                    .push(Instruction::Lambda(lam));
+            }
+            TcIFrame::AfterMapBlock {
+                kind,
+                saved_outer_stack,
+            } => {
+                let body_instrs = block_results.pop().ok_or(TcError::InternalError(
+                    TcInvariant::EmptyResultStack { expected: "map body" },
+                ))?;
+                // Mirror the recursive `typecheck_map_block` error path:
+                //   - body's stack must be Ok (else MapBlockFail);
+                //   - top must be `ty2` (else MapBlockEmptyStack);
+                //   - rest must equal the outer post-pop stack (else the
+                //     stack-shape error from ensure_stacks_eq).
+                let body_stack = std::mem::replace(opt_stack, saved_outer_stack);
+                let mut body_stack = match body_stack {
+                    FailingTypeStack::Ok(s) => s,
+                    FailingTypeStack::Failed => return Err(TcError::MapBlockFail),
+                };
+                let ty2 = body_stack.pop().ok_or(TcError::MapBlockEmptyStack)?;
+                // The outer stack cannot be `Failed` here: the MAP arm
+                // only fires after a successful `pop!` from an `Ok`
+                // outer matching `[.., T::List(..) | T::Option(..) |
+                // T::Map(..)]`. Surface a structured `TcInvariant`
+                // rather than a panic if the invariant ever breaks.
+                let outer = match opt_stack {
+                    FailingTypeStack::Ok(s) => s,
+                    FailingTypeStack::Failed => {
+                        return Err(TcError::InternalError(
+                            TcInvariant::OuterStackUnexpectedlyFailed {
+                                where_: "AfterMapBlock: outer stack after MAP body",
+                            },
+                        ))
+                    }
+                };
+                ensure_stacks_eq(gas, outer, &body_stack)?;
+                let (instr, wrapped) = match kind {
+                    MapKind::List => (
+                        Instruction::Map(overloads::Map::List, body_instrs),
+                        Type::new_list(ty2),
+                    ),
+                    MapKind::Option => (
+                        Instruction::Map(overloads::Map::Option, body_instrs),
+                        Type::new_option(ty2),
+                    ),
+                    MapKind::Map(kty) => (
+                        Instruction::Map(overloads::Map::Map, body_instrs),
+                        Type::new_map(kty, ty2),
+                    ),
+                };
+                // `outer` is reborrowed from `opt_stack` for the rewrap;
+                // its `Ok` shape was already proven above.
+                outer.push(wrapped);
+                block_results
+                    .last_mut()
+                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack {
+                        expected: "map parent",
+                    }))?
+                    .push(instr);
+            }
+        }
+    }
+
+    // Driver invariant: when the worklist is exhausted, exactly one
+    // (root) accumulator remains. A mismatch is a programmer-invariant
+    // violation, surfaced as a structured `TcInvariant` rather than a
+    // raw panic — same contract as the per-frame pops cleaned up by the
+    // earlier panic-removal pass.
+    // Defense-in-depth: keep a debug_assert! so a misimplementation that
+    // leaves a non-singleton accumulator trips a clear stack trace in
+    // debug builds, on top of the structured Err return for release.
+    debug_assert_eq!(
+        block_results.len(),
+        1,
+        "block_results stack not drained: {} entries left",
+        block_results.len(),
+    );
+    if block_results.len() != 1 {
+        return Err(TcError::InternalError(TcInvariant::ResultStackLen {
+            expected: 1,
+            got: block_results.len(),
+            where_: "typecheck driver tail",
+        }));
+    }
+    block_results
+        .pop()
+        .ok_or(TcError::InternalError(TcInvariant::ResultStackLen {
+            expected: 1,
+            got: 0,
+            where_: "typecheck driver tail (after len check)",
+        }))
 }
+
 
 macro_rules! nothing_to_none {
     () => {
@@ -846,13 +1963,34 @@ fn stack_top_mut(stack: &mut TypeStack) -> Result<&mut Type, TcError> {
         .map_err(|_| TcError::InternalError(TcInvariant::EmptyTypeStack))
 }
 
-pub(crate) fn typecheck_instruction<'a>(
-    i: &Micheline<'a>,
+pub(crate) fn typecheck_instruction<'a, 'b>(
+    i: &'b Micheline<'a>,
     gas: &mut Gas,
     self_entrypoints: Option<&Entrypoints>,
     opt_stack: &mut FailingTypeStack,
     in_view: bool,
 ) -> Result<Instruction<'a>, TcError> {
+    let mut results = typecheck(
+        std::slice::from_ref(i),
+        gas,
+        self_entrypoints,
+        opt_stack,
+        in_view,
+    )?;
+    Ok(results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "typecheck_instruction produced one" }))?)
+}
+
+/// Per instruction step used by the iterative driver. For non recursive
+/// arms, returns `StepResult::Done(...)`; for unbounded depth control
+/// flow arms (IF family, LOOP family, ITER, DIP, SEQ), returns an Open
+/// variant that the driver expands into nested block frames.
+fn typecheck_instruction_step<'a, 'b>(
+    i: &'b Micheline<'a>,
+    gas: &mut Gas,
+    self_entrypoints: Option<&Entrypoints>,
+    opt_stack: &mut FailingTypeStack,
+    in_view: bool,
+) -> Result<StepResult<'a, 'b>, TcError> {
     use Instruction as I;
     use NoMatchingOverloadReason as NMOR;
     use Type as T;
@@ -972,7 +2110,7 @@ pub(crate) fn typecheck_instruction<'a>(
     }
 
     let stack_slice = stack.as_slice();
-    Ok(match (i, stack_slice.as_slice()) {
+    Ok(StepResult::Done(match (i, stack_slice.as_slice()) {
         (
             micheline_types!() | micheline_literals!() | micheline_fields!() | micheline_values!(),
             _,
@@ -1275,18 +2413,14 @@ pub(crate) fn typecheck_instruction<'a>(
                 _ => unexpected_micheline!(),
             };
             let protected_height = opt_height.unwrap_or(1) as usize;
-
             gas.consume(gas::tc_cost::dip_n(&opt_height)?)?;
-
             ensure_stack_len(Prim::DIP, stack, protected_height)?;
-            // Here we split off the protected portion of the stack, typecheck the code with the
-            // remaining unprotected part, then append the protected portion back on top.
-            let mut protected = stack.split_off(protected_height);
-            let nested = typecheck(nested, gas, self_entrypoints, opt_stack, in_view)?;
-            opt_stack
-                .access_mut(TcError::FailNotInTail)?
-                .append(&mut protected);
-            I::Dip(opt_height, nested)
+            let protected = stack.split_off(protected_height);
+            return Ok(StepResult::OpenDip {
+                body: nested,
+                opt_height,
+                protected,
+            });
         }
 
         (App(DROP, args, _), ..) => {
@@ -1393,16 +2527,12 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(LT, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(IF, [Seq(nested_t), Seq(nested_f)], _), [.., T::Bool]) => {
-            // pop the bool off the stack
             pop!();
-            // Clone the stack so that we have a copy to run one branch on.
-            // We can run the other branch on the live stack.
-            let mut f_opt_stack = opt_stack.clone();
-            let nested_t = typecheck(nested_t, gas, self_entrypoints, opt_stack, in_view)?;
-            let nested_f = typecheck(nested_f, gas, self_entrypoints, &mut f_opt_stack, in_view)?;
-            // If stacks unify after typecheck, all is good.
-            unify_stacks(gas, opt_stack, f_opt_stack)?;
-            I::If(nested_t, nested_f)
+            return Ok(StepResult::OpenIf {
+                t_block: nested_t,
+                f_block: nested_f,
+                saved_f_stack: FailingTypeStack::Ok(stack.clone()),
+            });
         }
         (App(IF, [Seq(_), Seq(_)], _), [.., t]) => {
             no_overload!(IF, TypesNotEqual(T::Bool, (*t).clone()))
@@ -1411,23 +2541,12 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(IF, expect_args!(2 seq), _), _) => unexpected_micheline!(),
 
         (App(IF_NONE, [Seq(when_none), Seq(when_some)], _), [.., T::Option(..)]) => {
-            // Extract option type
             let ty = pop!(T::Option);
-            // Clone the some_stack as we need to push a type on top of it
-            let mut some_stack: TypeStack = stack.clone();
-            some_stack.push(ty.as_ref().clone());
-            let mut some_opt_stack = FailingTypeStack::Ok(some_stack);
-            let when_none = typecheck(when_none, gas, self_entrypoints, opt_stack, in_view)?;
-            let when_some = typecheck(
-                when_some,
-                gas,
-                self_entrypoints,
-                &mut some_opt_stack,
-                in_view,
-            )?;
-            // If stacks unify, all is good
-            unify_stacks(gas, opt_stack, some_opt_stack)?;
-            I::IfNone(when_none, when_some)
+            return Ok(StepResult::OpenIfNone {
+                none_block: when_none,
+                some_block: when_some,
+                some_top_ty: ty.as_ref().clone(),
+            });
         }
         (App(IF_NONE, [Seq(_), Seq(_)], _), [.., t]) => {
             no_overload!(IF_NONE, NMOR::ExpectedOption((*t).clone()))
@@ -1436,24 +2555,14 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(IF_NONE, expect_args!(2 seq), _), _) => unexpected_micheline!(),
 
         (App(IF_CONS, [Seq(when_cons), Seq(when_nil)], _), [.., T::List(..)]) => {
-            // Clone the cons_stack as we need to push a type on top of it
-            let mut cons_stack: TypeStack = stack.clone();
-            // get the list element type
             let ty = pop!(T::List);
-            // push it to the cons stack
-            cons_stack.push(ty.as_ref().clone());
-            let mut cons_opt_stack = FailingTypeStack::Ok(cons_stack);
-            let when_cons = typecheck(
-                when_cons,
-                gas,
-                self_entrypoints,
-                &mut cons_opt_stack,
-                in_view,
-            )?;
-            let when_nil = typecheck(when_nil, gas, self_entrypoints, opt_stack, in_view)?;
-            // If stacks unify, all is good
-            unify_stacks(gas, opt_stack, cons_opt_stack)?;
-            I::IfCons(when_cons, when_nil)
+            let elem_ty = ty.as_ref().clone();
+            return Ok(StepResult::OpenIfCons {
+                cons_block: when_cons,
+                nil_block: when_nil,
+                list_ty: Type::List(ty),
+                cons_top_ty: elem_ty,
+            });
         }
         (App(IF_CONS, [Seq(_), Seq(_)], _), [.., t]) => {
             no_overload!(IF_CONS, NMOR::ExpectedList((*t).clone()))
@@ -1462,24 +2571,15 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(IF_CONS, expect_args!(2 seq), _), _) => unexpected_micheline!(),
 
         (App(IF_LEFT, [Seq(when_left), Seq(when_right)], _), [.., T::Or(..)]) => {
-            // get the list element type
             let (tl, tr) = pop!(T::Or).as_ref().clone();
-            // use main stack as left branch, cloned stack as right
-            let mut right_stack = stack.clone();
+            // The live stack becomes the left arm's stack; the driver
+            // builds the right arm's stack by cloning and swapping the top.
             stack.push(tl);
-            right_stack.push(tr);
-            let mut opt_right_stack = FailingTypeStack::Ok(right_stack);
-            let when_left = typecheck(when_left, gas, self_entrypoints, opt_stack, in_view)?;
-            let when_right = typecheck(
-                when_right,
-                gas,
-                self_entrypoints,
-                &mut opt_right_stack,
-                in_view,
-            )?;
-            // If stacks unify, all is good
-            unify_stacks(gas, opt_stack, opt_right_stack)?;
-            I::IfLeft(when_left, when_right)
+            return Ok(StepResult::OpenIfLeft {
+                left_block: when_left,
+                right_block: when_right,
+                right_top_ty: tr,
+            });
         }
         (App(IF_LEFT, [Seq(_), Seq(_)], _), [.., t]) => {
             no_overload!(IF_LEFT, NMOR::ExpectedOr((*t).clone()))
@@ -1541,17 +2641,12 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(ISNAT, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(LOOP, [Seq(nested)], _), [.., T::Bool]) => {
-            // copy stack for unifying with it later
             let opt_copy = FailingTypeStack::Ok(stack.clone());
-            // Pop the bool off the top
             pop!();
-            // Typecheck body with the current stack
-            let nested = typecheck(nested, gas, self_entrypoints, opt_stack, in_view)?;
-            // If the starting stack and result stack unify, all is good.
-            unify_stacks(gas, opt_stack, opt_copy)?;
-            // pop the remaining bool off (if not failed)
-            opt_stack.access_mut(()).ok().map(Stack::pop);
-            I::Loop(nested)
+            return Ok(StepResult::OpenLoop {
+                body: nested,
+                initial_copy: opt_copy,
+            });
         }
         (App(LOOP, [Seq(_)], _), [.., ty]) => {
             no_overload!(LOOP, TypesNotEqual(T::Bool, (*ty).clone()))
@@ -1560,17 +2655,14 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(LOOP, expect_args!(1 seq), _), _) => unexpected_micheline!(),
 
         (App(LOOP_LEFT, [Seq(nested)], _), [.., T::Or(_)]) => {
-            // copy current stack to unify with later
             let opt_copy = FailingTypeStack::Ok(stack.clone());
             let (l_ty, r_ty) = pop!(T::Or).as_ref().clone();
-            // loop body consumes left leaf and returns `or` again
             stack.push(l_ty);
-            let nested = typecheck(nested, gas, self_entrypoints, opt_stack, in_view)?;
-            unify_stacks(gas, opt_stack, opt_copy)?;
-            // the loop leaves the right leaf of `or` on the stack at the end
-            // this FailNotInTail should be impossible to get
-            *opt_stack.access_mut(TcError::FailNotInTail)?.get_mut(0)? = r_ty;
-            I::LoopLeft(nested)
+            return Ok(StepResult::OpenLoopLeft {
+                body: nested,
+                initial_copy: opt_copy,
+                r_ty,
+            });
         }
         (App(LOOP_LEFT, [Seq(_)], _), [.., ty]) => {
             no_overload!(LOOP_LEFT, NMOR::ExpectedOr((*ty).clone()))
@@ -1579,86 +2671,67 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(LOOP_LEFT, expect_args!(1 seq), _), _) => unexpected_micheline!(),
 
         (App(ITER, [Seq(nested)], ..), [.., T::List(..)]) => {
-            // get the list element type
             let ty = pop!(T::List);
-            // clone the rest of the stack
-            let mut inner_stack = stack.clone();
-            // push the element type to the top of the inner stack and typecheck
-            inner_stack.push(ty.as_ref().clone());
-            let mut opt_inner_stack = FailingTypeStack::Ok(inner_stack);
-            let nested = typecheck(nested, gas, self_entrypoints, &mut opt_inner_stack, in_view)?;
-            // If the starting stack (sans list) and result stack unify, all is good.
-            unify_stacks(gas, opt_stack, opt_inner_stack)?;
-            I::Iter(overloads::Iter::List, nested)
+            // Save the post pop outer stack, then push the element type so
+            // the live stack becomes the inner (body) stack.
+            let outer_opt_stack = FailingTypeStack::Ok(stack.clone());
+            stack.push(ty.as_ref().clone());
+            return Ok(StepResult::OpenIter {
+                body: nested,
+                variant: overloads::Iter::List,
+                outer_opt_stack,
+            });
         }
         (App(ITER, [Seq(nested)], _), [.., T::Set(..)]) => {
-            // get the set element type
             let ty = pop!(T::Set);
-            // clone the rest of the stack
-            let mut inner_stack = stack.clone();
-            // push the element type to the top of the inner stack and typecheck
-            inner_stack.push(ty.as_ref().clone());
-            let mut opt_inner_stack = FailingTypeStack::Ok(inner_stack);
-            let nested = typecheck(nested, gas, self_entrypoints, &mut opt_inner_stack, in_view)?;
-            // If the starting stack (sans set) and result stack unify, all is good.
-            unify_stacks(gas, opt_stack, opt_inner_stack)?;
-            I::Iter(overloads::Iter::Set, nested)
+            let outer_opt_stack = FailingTypeStack::Ok(stack.clone());
+            stack.push(ty.as_ref().clone());
+            return Ok(StepResult::OpenIter {
+                body: nested,
+                variant: overloads::Iter::Set,
+                outer_opt_stack,
+            });
         }
         (App(ITER, [Seq(nested)], _), [.., T::Map(..)]) => {
-            // get the map element type
             let kty_vty_box = pop!(T::Map);
-            // clone the rest of the stack
-            let mut inner_stack = stack.clone();
-            // push the element type to the top of the inner stack and typecheck
-            inner_stack.push(T::Pair(kty_vty_box));
-            let mut opt_inner_stack = FailingTypeStack::Ok(inner_stack);
-            let nested = typecheck(nested, gas, self_entrypoints, &mut opt_inner_stack, in_view)?;
-            // If the starting stack (sans map) and result stack unify, all is good.
-            unify_stacks(gas, opt_stack, opt_inner_stack)?;
-            I::Iter(overloads::Iter::Map, nested)
+            let outer_opt_stack = FailingTypeStack::Ok(stack.clone());
+            stack.push(T::Pair(kty_vty_box));
+            return Ok(StepResult::OpenIter {
+                body: nested,
+                variant: overloads::Iter::Map,
+                outer_opt_stack,
+            });
         }
         (App(ITER, [Seq(_)], _), [.., _]) => no_overload!(ITER),
         (App(ITER, [Seq(_)], _), []) => no_overload!(ITER, len 1),
         (App(ITER, expect_args!(1 seq), _), _) => unexpected_micheline!(),
 
         (App(MAP, [Seq(nested_instrs)], ..), [.., T::List(..)]) => {
-            // Get the element type
+            // Pop the source container; the body runs on a clone of the
+            // post-pop stack with the inner type pushed. AfterMapBlock
+            // restores the outer stack and rewraps with new_list(ty2).
             let ty1 = pop!(T::List).as_ref().clone();
-
-            // Typecheck the nested instructions.
-            let (nested_instrs, ty2) =
-                typecheck_map_block(nested_instrs, ty1, gas, self_entrypoints, stack, in_view)?;
-
-            stack.push(Type::new_list(ty2));
-            I::Map(overloads::Map::List, nested_instrs)
+            return Ok(StepResult::OpenMapBlock {
+                body: nested_instrs,
+                inner_ty: ty1,
+                kind: MapKind::List,
+            });
         }
         (App(MAP, [Seq(nested_instrs)], ..), [.., T::Option(..)]) => {
-            // Get the element type
             let ty1 = pop!(T::Option).as_ref().clone();
-
-            // Typecheck the nested instructions.
-            let (nested_instrs, ty2) =
-                typecheck_map_block(nested_instrs, ty1, gas, self_entrypoints, stack, in_view)?;
-
-            stack.push(Type::new_option(ty2));
-            I::Map(overloads::Map::Option, nested_instrs)
+            return Ok(StepResult::OpenMapBlock {
+                body: nested_instrs,
+                inner_ty: ty1,
+                kind: MapKind::Option,
+            });
         }
         (App(MAP, [Seq(nested_instrs)], ..), [.., T::Map(..)]) => {
-            // Get the element type
             let (kty, ty1) = pop!(T::Map).as_ref().clone();
-
-            // Typecheck the nested instructions.
-            let (nested_instrs, ty2) = typecheck_map_block(
-                nested_instrs,
-                T::new_pair(kty.clone(), ty1),
-                gas,
-                self_entrypoints,
-                stack,
-                in_view,
-            )?;
-
-            stack.push(Type::new_map(kty, ty2));
-            I::Map(overloads::Map::Map, nested_instrs)
+            return Ok(StepResult::OpenMapBlock {
+                body: nested_instrs,
+                inner_ty: T::new_pair(kty.clone(), ty1),
+                kind: MapKind::Map(kty),
+            });
         }
         (App(MAP, [Seq(_)], _), [.., _]) => no_overload!(MAP),
         (App(MAP, [Seq(_)], _), []) => no_overload!(MAP, len 1),
@@ -2166,9 +3239,20 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(prim @ (LAMBDA | LAMBDA_REC), [ty1, ty2, Seq(instrs)], _), ..) => {
             let in_ty = parse_ty(gas, ty1)?;
             let out_ty = parse_ty(gas, ty2)?;
+            // Push the lambda's resulting type onto the outer stack now;
+            // the AfterLambda frame will keep this when it restores the
+            // outer context after the body has been typechecked through
+            // the worklist driver. Avoids recursing into typecheck_lambda
+            // (and from there back into typecheck) on every nested LAMBDA.
             stack.push(Type::new_lambda(in_ty.clone(), out_ty.clone()));
-            let res = typecheck_lambda(instrs, gas, in_ty, out_ty, matches!(prim, LAMBDA_REC))?;
-            I::Lambda(res)
+            let micheline_code = Micheline::Seq(instrs);
+            return Ok(StepResult::OpenLambda {
+                body: instrs,
+                in_ty,
+                out_ty,
+                recursive: matches!(prim, LAMBDA_REC),
+                micheline_code,
+            });
         }
         (App(LAMBDA | LAMBDA_REC, expect_args!(3 last_seq), _), _) => unexpected_micheline!(),
 
@@ -2508,14 +3592,8 @@ pub(crate) fn typecheck_instruction<'a>(
             Err(TcError::TodoInstr(*prim))?
         }
 
-        (Seq(nested), _) => I::Seq(typecheck(
-            nested,
-            gas,
-            self_entrypoints,
-            opt_stack,
-            in_view,
-        )?),
-    })
+        (Seq(nested), _) => return Ok(StepResult::OpenSeq { body: nested }),
+    }))
 }
 
 pub(crate) fn typecheck_contract_address<'a>(
@@ -2592,240 +3670,240 @@ fn get_nth_field_ref(mut m: u16, mut ty: &mut Type) -> Result<&mut Type, Type> {
     })
 }
 
+/// Worklist frame for the iterative value typechecker. `'a` is the arena
+/// lifetime that owns `Micheline` content; `'b` is the borrow lifetime of
+/// the input passed to `typecheck_value` and may be shorter than `'a`.
+enum TvFrame<'a, 'b> {
+    /// Typecheck a Micheline value at the expected Type.
+    Visit { v: &'b Micheline<'a>, t: Type },
+    /// Behave as `Visit { v: App(Pair, vs, NO_ANNS), t }` without
+    /// constructing the synthetic Micheline (no arena is available).
+    VisitPairTail { vs: &'b [Micheline<'a>], t: Type },
+    /// Pop two `TypedValue`s, push `TV::new_pair`.
+    BuildPair,
+    /// Pop one `TypedValue`, wrap as `Or::Left`.
+    BuildLeft,
+    /// Pop one `TypedValue`, wrap as `Or::Right`.
+    BuildRight,
+    /// Pop one `TypedValue`, wrap as `Option::Some`.
+    BuildSome,
+    /// Pop a `TV::Address`, resolve a `Contract` at this type.
+    BuildContract { contract_ty: Rc<Type> },
+    /// List element iteration: one `Rc<TypedValue>` per remaining child.
+    ListAccum {
+        remaining: &'b [Micheline<'a>],
+        elem_t: Type,
+        acc: Vec<Rc<TypedValue<'a>>>,
+    },
+    /// Set element iteration with ordering check.
+    SetAccum {
+        remaining: &'b [Micheline<'a>],
+        elem_t: Type,
+        set_ty: Type,
+        acc: BTreeSet<TypedValue<'a>>,
+        prev: Option<TypedValue<'a>>,
+    },
+    /// Map or in-memory big map iteration.
+    MapAccum {
+        remaining: &'b [Micheline<'a>],
+        key_t: Type,
+        val_t: Type,
+        map_ty: Type,
+        finalize: MapFinalize,
+        acc: BTreeMap<TypedValue<'a>, TypedValue<'a>>,
+        prev_key: Option<TypedValue<'a>>,
+        stage: MapStage<'a, 'b>,
+    },
+    /// Big map from id with a diff overlay.
+    BigMapDiffAccum {
+        remaining: &'b [Micheline<'a>],
+        key_t: Type,
+        val_t: Type,
+        map_ty: Type,
+        big_map_id: BigMapId,
+        tk_final: Type,
+        tv_final: Type,
+        acc: BTreeMap<TypedValue<'a>, Option<TypedValue<'a>>>,
+        prev_key: Option<TypedValue<'a>>,
+        stage: BigMapDiffStage<'a, 'b>,
+    },
+    /// Ticket from the explicit four argument form: pop ticketer, content,
+    /// and amount results (in that LIFO order they were pushed) and build.
+    BuildTicketExplicit { content_type: Rc<Type> },
+    /// Ticket from the legacy pair form: pop one `TV::Pair`, destructure.
+    BuildTicketLegacy { content_type: Type },
+}
+
+/// How a map style iteration finishes once all elements are typed.
+enum MapFinalize {
+    /// Produces `TV::Map`.
+    Map,
+    /// Produces `TV::BigMap(BigMap::new(tk, tv, ...))`.
+    BigMapInMem { tk: Type, tv: Type },
+}
+
+enum MapStage<'a, 'b> {
+    AwaitingKey { v_expr: &'b Micheline<'a> },
+    AwaitingValue { key: TypedValue<'a> },
+}
+
+enum BigMapDiffStage<'a, 'b> {
+    AwaitingKey { v_expr: &'b Micheline<'a> },
+    AwaitingValue { key: TypedValue<'a> },
+}
+
+/// Check `set` ordering between `prev` and `next`. Returns `Err` on a
+/// duplicate or out of order element, consumes the comparison gas.
+fn set_ordering_check<'a>(
+    ctx: &mut impl TypecheckingCtx<'a>,
+    set_ty: &Type,
+    prev: &Option<TypedValue<'a>>,
+    next: &TypedValue<'a>,
+) -> Result<(), TcError> {
+    if let Some(prev) = prev {
+        ctx.gas().consume(gas::interpret_cost::compare(prev, next)?)?;
+        match prev.cmp(next) {
+            std::cmp::Ordering::Less => Ok(()),
+            std::cmp::Ordering::Equal => Err(TcError::DuplicateElements(set_ty.clone())),
+            std::cmp::Ordering::Greater => Err(TcError::ElementsNotSorted(set_ty.clone())),
+        }
+    } else {
+        Ok(())
+    }
+}
+
+/// Check map key ordering between `prev_key` and `next_key`.
+fn map_key_ordering_check<'a>(
+    ctx: &mut impl TypecheckingCtx<'a>,
+    map_ty: &Type,
+    prev_key: &Option<TypedValue<'a>>,
+    next_key: &TypedValue<'a>,
+) -> Result<(), TcError> {
+    if let Some(prev) = prev_key {
+        ctx.gas().consume(gas::interpret_cost::compare(prev, next_key)?)?;
+        match prev.cmp(next_key) {
+            std::cmp::Ordering::Less => Ok(()),
+            std::cmp::Ordering::Equal => Err(TcError::DuplicateElements(map_ty.clone())),
+            std::cmp::Ordering::Greater => Err(TcError::ElementsNotSorted(map_ty.clone())),
+        }
+    } else {
+        Ok(())
+    }
+}
+
 /// Typecheck a value. Assumes passed the type is valid, i.e. doesn't contain
 /// illegal types like `set operation` or `contract operation`.
-pub fn typecheck_value<'a>(
-    v: &Micheline<'a>,
+/// Destructure a Micheline as `Elt(key, val)` (the element shape inside
+/// a typed `map`, `big_map`, or `set`-encoded sequence). Returns the
+/// inner key and value Micheline, or a `TcError::InvalidEltForMap`
+/// carrying a cloned copy of `map_ty` for context. The clone runs only
+/// on the error path.
+fn expect_elt<'a, 'b>(
+    elt: &'b Micheline<'a>,
+    map_ty: &Type,
+) -> Result<(&'b Micheline<'a>, &'b Micheline<'a>), TcError> {
+    match elt {
+        Micheline::App(Prim::Elt, [k_expr, v_expr], _) => Ok((k_expr, v_expr)),
+        _ => Err(TcError::InvalidEltForMap(
+            format!("{elt:?}"),
+            map_ty.clone(),
+        )),
+    }
+}
+
+/// Typecheck a value. Assumes the passed type is valid, i.e. does not contain
+/// illegal types like `set operation` or `contract operation`.
+pub fn typecheck_value<'a, 'b>(
+    v: &'b Micheline<'a>,
     ctx: &mut impl TypecheckingCtx<'a>,
     t: &Type,
 ) -> Result<TypedValue<'a>, TcError> {
+    let mut frames: Vec<TvFrame<'a, 'b>> = vec![TvFrame::Visit {
+        v,
+        t: t.clone(),
+    }];
+    let mut results: Vec<TypedValue<'a>> = Vec::new();
+
+    while let Some(frame) = frames.pop() {
+        step_typecheck_value(frame, ctx, &mut frames, &mut results)?;
+    }
+    Ok(results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "typecheck_value root" }))?)
+}
+
+fn step_typecheck_value<'a, 'b>(
+    frame: TvFrame<'a, 'b>,
+    ctx: &mut impl TypecheckingCtx<'a>,
+    frames: &mut Vec<TvFrame<'a, 'b>>,
+    results: &mut Vec<TypedValue<'a>>,
+) -> Result<(), TcError> {
     use Micheline as V;
     use Type as T;
     use TypedValue as TV;
-    ctx.gas().consume(gas::tc_cost::VALUE_STEP)?;
-    macro_rules! invalid_value_for_type {
-        () => {
-            TcError::InvalidValueForType(format!("{v:?}"), t.clone())
-        };
-    }
-    Ok(match (t, v) {
-        (T::Nat, V::Int(n)) => TV::Nat(BigUint::try_from(n)?),
-        (T::Int, V::Int(n)) => TV::Int(n.clone()),
-        (T::Bool, V::App(Prim::True, [], _)) => TV::Bool(true),
-        (T::Bool, V::App(Prim::False, [], _)) => TV::Bool(false),
-        (T::Mutez, V::Int(n)) if !n.is_negative() => TV::Mutez(i64::try_from(n)?),
-        (T::String, V::String(s)) => TV::String(s.clone()),
-        (T::Unit, V::App(Prim::Unit, [], _)) => TV::Unit,
-        (T::Pair(pt), V::App(Prim::Pair, [vl, rest @ ..], _) | V::Seq([vl, rest @ ..]))
-            if !rest.is_empty() =>
-        {
-            let (tl, tr) = pt.as_ref();
-            let l = typecheck_value(vl, ctx, tl)?;
-            let r = match rest {
-                [vr] => typecheck_value(vr, ctx, tr)?,
-                vrs => typecheck_value(&V::App(Prim::Pair, vrs, NO_ANNS), ctx, tr)?,
-            };
-            TV::new_pair(l, r)
-        }
-        (T::Or(ot), V::App(prim @ (Prim::Left | Prim::Right), [val], _)) => {
-            let (tl, tr) = ot.as_ref();
-            let typed_val = match prim {
-                Prim::Left => crate::ast::Or::Left(typecheck_value(val, ctx, tl)?),
-                Prim::Right => crate::ast::Or::Right(typecheck_value(val, ctx, tr)?),
-                _ => {
-                    return Err(TcError::InternalError(
-                        TcInvariant::UnexpectedLeftRightPrim,
-                    ))
+
+    match frame {
+        TvFrame::Visit { v, t } => visit_value(v, t, ctx, frames, results),
+        TvFrame::VisitPairTail { vs, t } => {
+            // Implements the recursive code's
+            // `typecheck_value(&V::App(Pair, vrs, NO_ANNS), ctx, tr)` step
+            // without constructing the synthetic App: dispatch directly
+            // on (t, vs) as if vs were the args of an App(Pair).
+            ctx.gas().consume(gas::tc_cost::VALUE_STEP)?;
+            match (&t, vs) {
+                (T::Pair(pt), [vl, rest @ ..]) if !rest.is_empty() => {
+                    let (tl, tr) = pt.as_ref();
+                    frames.push(TvFrame::BuildPair);
+                    if rest.len() == 1 {
+                        frames.push(TvFrame::Visit {
+                            v: &rest[0],
+                            t: tr.clone(),
+                        });
+                    } else {
+                        frames.push(TvFrame::VisitPairTail {
+                            vs: rest,
+                            t: tr.clone(),
+                        });
+                    }
+                    frames.push(TvFrame::Visit {
+                        v: vl,
+                        t: tl.clone(),
+                    });
+                    Ok(())
                 }
-            };
-            TV::new_or(typed_val)
-        }
-        (T::Option(ty), V::App(Prim::Some, [v], _)) => {
-            let v = typecheck_value(v, ctx, ty)?;
-            TV::new_option(Some(v))
-        }
-        (T::Option(_), V::App(Prim::None, [], _)) => TV::new_option(None),
-        (T::List(ty), V::Seq(vs)) => TV::List(MichelsonList::from(
-            vs.iter()
-                .map(|v| typecheck_value(v, ctx, ty).map(Rc::new))
-                .collect::<Result<Vec<_>, TcError>>()?,
-        )),
-        (T::Set(ty), V::Seq(vs)) => {
-            let set = typecheck_set(ctx, t, ty, vs)?;
-            TV::Set(set.into_iter().map(Rc::new).collect())
-        }
-        (T::Map(m), V::Seq(vs)) => {
-            let (tk, tv) = m.as_ref();
-            let map = typecheck_map(ctx, t, tk, tv, vs)?;
-            TV::Map(
-                map.into_iter()
-                    .map(|(k, v)| (Rc::new(k), Rc::new(v)))
-                    .collect(),
-            )
-        }
-        // All valid instantiations of big map are mentioned in
-        // https://tezos.gitlab.io/michelson-reference/#type-big_map
-        (T::BigMap(m), V::Seq(vs)) => {
-            // In-memory big maps have the same syntax as regular maps
-            let (tk, tv) = m.as_ref();
-            let map = typecheck_map(ctx, t, tk, tv, vs)?;
-            TV::BigMap(BigMap::new(tk.clone(), tv.clone(), map))
-        }
-        (T::BigMap(m), v) => {
-            let (id, vs_opt, diff) = match v {
-                V::Int(i) => (i, None, false),
-                V::App(Prim::Pair, [V::Int(i), V::Seq(vs)], _) => (i, Some(vs), true),
-                _ => return Err(invalid_value_for_type!()),
-            };
-
-            let (tk, tv) = m.as_ref();
-
-            let big_map_id = id.clone().into();
-            let (key_type, value_type) = ctx
-                .big_map_get_type(&big_map_id)
-                .map_err(|e| TcError::LazyStorageError(e.to_string()))?
-                .ok_or(TcError::BigMapNotFound(id.clone()))?;
-
-            ensure_ty_eq(ctx.gas(), &key_type, tk)?;
-            ensure_ty_eq(ctx.gas(), &value_type, tv)?;
-
-            let overlay = if let Some(vs) = vs_opt {
-                typecheck_big_map(ctx, t, tk, tv, vs, diff)?
-            } else {
-                BTreeMap::default()
-            };
-            let content = big_map::BigMapContent::FromId(big_map::BigMapFromId {
-                id: big_map_id,
-                overlay,
-            });
-            TV::BigMap(BigMap {
-                content,
-                key_type: tk.clone(),
-                value_type: tv.clone(),
-            })
-        }
-        (T::Address, V::String(str)) => {
-            ctx.gas().consume(gas::tc_cost::KEY_HASH_READABLE)?;
-            TV::Address(
-                Address::from_base58_check(str)
-                    .map_err(|e| TcError::ByteReprError(T::Address, e))?,
-            )
-        }
-        (T::Address, V::Bytes(bs)) => {
-            ctx.gas().consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
-            TV::Address(Address::from_bytes(bs).map_err(|e| TcError::ByteReprError(T::Address, e))?)
-        }
-        (T::Contract(ty), addr) => {
-            let t_addr = match typecheck_value(addr, ctx, &T::Address)? {
-                TV::Address(addr) => addr,
-                _ => {
-                    return Err(TcError::InternalError(
-                        TcInvariant::TypecheckValueWrongVariant {
-                            expected: "TV::Address",
-                        },
-                    ))
-                }
-            };
-            typecheck_contract_address(ctx, t_addr, Entrypoint::default(), ty)
-                .map(TypedValue::Contract)?
-        }
-        (T::ChainId, V::String(str)) => {
-            ctx.gas().consume(gas::tc_cost::CHAIN_ID_READABLE)?;
-            TV::ChainId(
-                ChainId::from_base58_check(str).map_err(|x| TcError::ChainIdError(x.into()))?,
-            )
-        }
-        (T::ChainId, V::Bytes(bs)) => {
-            use tezos_crypto_rs::hash::HashTrait;
-            ctx.gas().consume(gas::tc_cost::CHAIN_ID_OPTIMIZED)?;
-            TV::ChainId(ChainId::try_from_bytes(bs).map_err(|x| TcError::ChainIdError(x.into()))?)
-        }
-        (T::Bytes, V::Bytes(bs)) => TV::Bytes(bs.clone()),
-        (T::Key, V::String(str)) => {
-            ctx.gas().consume(gas::tc_cost::KEY_READABLE)?;
-            TV::Key(
-                PublicKey::from_b58check(str)
-                    .map_err(|e| TcError::ByteReprError(T::Key, e.into()))?,
-            )
-        }
-        (T::Key, V::Bytes(bs)) => {
-            ctx.gas().consume(gas::tc_cost::KEY_OPTIMIZED)?;
-            TV::Key(
-                PublicKey::nom_read_exact(bs)
-                    .map_err(|e| TcError::ByteReprError(T::Key, e.into()))?,
-            )
-        }
-        (T::Signature, V::String(str)) => {
-            ctx.gas().consume(gas::tc_cost::KEY_READABLE)?;
-            TV::Signature(
-                Signature::from_base58_check(str)
-                    .map_err(|e| TcError::ByteReprError(T::Signature, e.into()))?,
-            )
-        }
-        (T::Signature, V::Bytes(bs)) => {
-            ctx.gas().consume(gas::tc_cost::KEY_OPTIMIZED)?;
-            TV::Signature(
-                Signature::try_from(bs.clone())
-                    .map_err(|e| TcError::ByteReprError(T::Signature, e.into()))?,
-            )
-        }
-        (T::KeyHash, V::String(str)) => {
-            ctx.gas().consume(gas::tc_cost::KEY_HASH_READABLE)?;
-            TV::KeyHash(
-                PublicKeyHash::from_b58check(str)
-                    .map_err(|e| TcError::ByteReprError(T::KeyHash, e.into()))?,
-            )
-        }
-        (T::KeyHash, V::Bytes(bs)) => {
-            ctx.gas().consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
-            TV::KeyHash(PublicKeyHash::nom_read_exact(bs).map_err(|err| {
-                TcError::ByteReprError(
-                    T::KeyHash,
-                    ByteReprError::WrongFormat(format!(
-                        "public key hash, optimized {}",
-                        convert_error(bs, err)
-                    )),
-                )
-            })?)
-        }
-        (T::Timestamp, V::Int(n)) => TV::Timestamp(n.clone()),
-        (T::Timestamp, V::String(n)) => {
-            ctx.gas()
-                .consume(gas::tc_cost::timestamp_decoding(n.len())?)?;
-            // First, try to parse the string as an integer
-            if let Ok(int_value) = n.parse::<i64>() {
-                TV::Timestamp(int_value.into())
-            } else {
-                // If integer parsing fails, try to parse as RFC3339 datetime
-                let dt = DateTime::parse_from_rfc3339(n);
-                match dt {
-                    Ok(dt) => TV::Timestamp(dt.timestamp().into()),
-                    Err(_) => return Err(invalid_value_for_type!()),
-                }
+                _ => Err(TcError::InvalidValueForType(
+                    // Format via the same synthetic App the recursive
+                    // typecheck_value built; auto-derived Debug on
+                    // Micheline keeps the format stable as Annotations'
+                    // Debug evolves.
+                    format!("{:?}", Micheline::App(Prim::Pair, vs, NO_ANNS)),
+                    t,
+                )),
             }
         }
-        (
-            T::Lambda(tys),
-            raw @ (V::Seq(instrs) | V::App(Prim::Lambda_rec, [V::Seq(instrs)], _)),
-        ) => {
-            let (in_ty, out_ty) = tys.as_ref();
-            TV::Lambda(Closure::Lambda(typecheck_lambda(
-                instrs,
-                ctx.gas(),
-                in_ty.clone(),
-                out_ty.clone(),
-                matches!(raw, V::App(Prim::Lambda_rec, ..)),
-            )?))
+        TvFrame::BuildPair => {
+            let r = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "pair r" }))?;
+            let l = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "pair l" }))?;
+            results.push(TV::new_pair(l, r));
+            Ok(())
         }
-        (
-            T::Ticket(content_type),
-            V::App(Prim::Ticket, [ticketer, content_type_bis, content, amount], _),
-        ) => {
-            let content_type_bis = parse_ty(ctx.gas(), content_type_bis)?;
-            ensure_ty_eq(ctx.gas(), content_type, &content_type_bis)?;
-            let ticketer = typecheck_value(ticketer, ctx, &T::Address)?;
-            let ticketer = match ticketer {
-                TV::Address(addr) => addr,
+        TvFrame::BuildLeft => {
+            let v = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "left" }))?;
+            results.push(TV::new_or(crate::ast::Or::Left(v)));
+            Ok(())
+        }
+        TvFrame::BuildRight => {
+            let v = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "right" }))?;
+            results.push(TV::new_or(crate::ast::Or::Right(v)));
+            Ok(())
+        }
+        TvFrame::BuildSome => {
+            let v = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "some" }))?;
+            results.push(TV::new_option(Some(v)));
+            Ok(())
+        }
+        TvFrame::BuildContract { contract_ty } => {
+            let addr = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "contract addr" }))?;
+            let t_addr = match addr {
+                TV::Address(a) => a,
                 _ => {
                     return Err(TcError::InternalError(
                         TcInvariant::TypecheckValueWrongVariant {
@@ -2834,10 +3912,264 @@ pub fn typecheck_value<'a>(
                     ))
                 }
             };
-            let content = typecheck_value(content, ctx, content_type)?;
-            let amount = typecheck_value(amount, ctx, &T::Nat)?;
+            results.push(
+                typecheck_contract_address(ctx, t_addr, Entrypoint::default(), &contract_ty)
+                    .map(TypedValue::Contract)?,
+            );
+            Ok(())
+        }
+        TvFrame::ListAccum {
+            remaining,
+            elem_t,
+            mut acc,
+        } => {
+            let elem = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "list elem" }))?;
+            acc.push(Rc::new(elem));
+            if let Some((next, rest)) = remaining.split_first() {
+                frames.push(TvFrame::ListAccum {
+                    remaining: rest,
+                    elem_t: elem_t.clone(),
+                    acc,
+                });
+                frames.push(TvFrame::Visit {
+                    v: next,
+                    t: elem_t,
+                });
+            } else {
+                results.push(TV::List(MichelsonList::from(acc)));
+            }
+            Ok(())
+        }
+        TvFrame::SetAccum {
+            remaining,
+            elem_t,
+            set_ty,
+            mut acc,
+            prev,
+        } => {
+            let elem = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "set elem" }))?;
+            set_ordering_check(ctx, &set_ty, &prev, &elem)?;
+            let next_prev = Some(elem.clone());
+            acc.insert(elem);
+            if let Some((next, rest)) = remaining.split_first() {
+                frames.push(TvFrame::SetAccum {
+                    remaining: rest,
+                    elem_t: elem_t.clone(),
+                    set_ty,
+                    acc,
+                    prev: next_prev,
+                });
+                frames.push(TvFrame::Visit {
+                    v: next,
+                    t: elem_t,
+                });
+            } else {
+                results.push(TV::Set(acc.into_iter().map(Rc::new).collect()));
+            }
+            Ok(())
+        }
+        TvFrame::MapAccum {
+            remaining,
+            key_t,
+            val_t,
+            map_ty,
+            finalize,
+            acc,
+            prev_key,
+            stage,
+        } => match stage {
+            MapStage::AwaitingKey { v_expr } => {
+                let key = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "map key" }))?;
+                frames.push(TvFrame::MapAccum {
+                    remaining,
+                    key_t,
+                    val_t: val_t.clone(),
+                    map_ty,
+                    finalize,
+                    acc,
+                    prev_key,
+                    stage: MapStage::AwaitingValue { key },
+                });
+                frames.push(TvFrame::Visit {
+                    v: v_expr,
+                    t: val_t,
+                });
+                Ok(())
+            }
+            MapStage::AwaitingValue { key } => {
+                let value = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "map value" }))?;
+                map_key_ordering_check(ctx, &map_ty, &prev_key, &key)?;
+                let next_prev = Some(key.clone());
+                let mut acc = acc;
+                acc.insert(key, value);
+                if let Some((next_elt, rest)) = remaining.split_first() {
+                    let (next_k_expr, next_v_expr) = expect_elt(next_elt, &map_ty)?;
+                    frames.push(TvFrame::MapAccum {
+                        remaining: rest,
+                        key_t: key_t.clone(),
+                        val_t,
+                        map_ty,
+                        finalize,
+                        acc,
+                        prev_key: next_prev,
+                        stage: MapStage::AwaitingKey {
+                            v_expr: next_v_expr,
+                        },
+                    });
+                    frames.push(TvFrame::Visit {
+                        v: next_k_expr,
+                        t: key_t,
+                    });
+                } else {
+                    match finalize {
+                        MapFinalize::Map => {
+                            results.push(TV::Map(
+                                acc.into_iter()
+                                    .map(|(k, v)| (Rc::new(k), Rc::new(v)))
+                                    .collect(),
+                            ));
+                        }
+                        MapFinalize::BigMapInMem { tk, tv } => {
+                            results.push(TV::BigMap(BigMap::new(tk, tv, acc)));
+                        }
+                    }
+                }
+                Ok(())
+            }
+        },
+        TvFrame::BigMapDiffAccum {
+            remaining,
+            key_t,
+            val_t,
+            map_ty,
+            big_map_id,
+            tk_final,
+            tv_final,
+            acc,
+            prev_key,
+            stage,
+        } => match stage {
+            BigMapDiffStage::AwaitingKey { v_expr } => {
+                let key = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "big_map key" }))?;
+                // Decide what to do with v_expr.
+                match v_expr {
+                    V::App(Prim::Some, [inner], _) => {
+                        frames.push(TvFrame::BigMapDiffAccum {
+                            remaining,
+                            key_t,
+                            val_t: val_t.clone(),
+                            map_ty,
+                            big_map_id,
+                            tk_final,
+                            tv_final,
+                            acc,
+                            prev_key,
+                            stage: BigMapDiffStage::AwaitingValue { key },
+                        });
+                        frames.push(TvFrame::Visit {
+                            v: inner,
+                            t: val_t,
+                        });
+                    }
+                    V::App(Prim::None, [], _) => {
+                        // None entry: no value typecheck; commit (key, None)
+                        // right away and continue with the next Elt.
+                        map_key_ordering_check(ctx, &map_ty, &prev_key, &key)?;
+                        let next_prev = Some(key.clone());
+                        let mut acc = acc;
+                        acc.insert(key, None);
+                        if let Some((next_elt, rest)) = remaining.split_first() {
+                            let (next_k_expr, next_v_expr) = expect_elt(next_elt, &map_ty)?;
+                            frames.push(TvFrame::BigMapDiffAccum {
+                                remaining: rest,
+                                key_t: key_t.clone(),
+                                val_t,
+                                map_ty,
+                                big_map_id,
+                                tk_final,
+                                tv_final,
+                                acc,
+                                prev_key: next_prev,
+                                stage: BigMapDiffStage::AwaitingKey {
+                                    v_expr: next_v_expr,
+                                },
+                            });
+                            frames.push(TvFrame::Visit {
+                                v: next_k_expr,
+                                t: key_t,
+                            });
+                        } else {
+                            results.push(TV::BigMap(BigMap {
+                                content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
+                                    id: big_map_id,
+                                    overlay: acc,
+                                }),
+                                key_type: tk_final,
+                                value_type: tv_final,
+                            }));
+                        }
+                    }
+                    other => {
+                        return Err(TcError::InvalidEltForMap(format!("{other:?}"), map_ty));
+                    }
+                }
+                Ok(())
+            }
+            BigMapDiffStage::AwaitingValue { key } => {
+                let value = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "big_map value" }))?;
+                map_key_ordering_check(ctx, &map_ty, &prev_key, &key)?;
+                let next_prev = Some(key.clone());
+                let mut acc = acc;
+                acc.insert(key, Some(value));
+                if let Some((next_elt, rest)) = remaining.split_first() {
+                    let (next_k_expr, next_v_expr) = expect_elt(next_elt, &map_ty)?;
+                    frames.push(TvFrame::BigMapDiffAccum {
+                        remaining: rest,
+                        key_t: key_t.clone(),
+                        val_t,
+                        map_ty,
+                        big_map_id,
+                        tk_final,
+                        tv_final,
+                        acc,
+                        prev_key: next_prev,
+                        stage: BigMapDiffStage::AwaitingKey {
+                            v_expr: next_v_expr,
+                        },
+                    });
+                    frames.push(TvFrame::Visit {
+                        v: next_k_expr,
+                        t: key_t,
+                    });
+                } else {
+                    results.push(TV::BigMap(BigMap {
+                        content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
+                            id: big_map_id,
+                            overlay: acc,
+                        }),
+                        key_type: tk_final,
+                        value_type: tv_final,
+                    }));
+                }
+                Ok(())
+            }
+        },
+        TvFrame::BuildTicketExplicit { content_type } => {
+            let amount = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "ticket amount" }))?;
+            let content = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "ticket content" }))?;
+            let ticketer = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "ticket ticketer" }))?;
+            let ticketer = match ticketer {
+                TV::Address(a) => a,
+                _ => {
+                    return Err(TcError::InternalError(
+                        TcInvariant::TypecheckValueWrongVariant {
+                            expected: "TV::Address",
+                        },
+                    ))
+                }
+            };
             let amount = match amount {
-                TV::Nat(amount) => amount,
+                TV::Nat(n) => n,
                 _ => {
                     return Err(TcError::InternalError(
                         TcInvariant::TypecheckValueWrongVariant {
@@ -2846,26 +4178,20 @@ pub fn typecheck_value<'a>(
                     ))
                 }
             };
-            TV::new_ticket(Ticket {
+            results.push(TV::new_ticket(Ticket {
                 ticketer: ticketer.hash,
                 content_type: content_type.as_ref().clone(),
                 content,
                 amount,
-            })
+            }));
+            Ok(())
         }
-        (T::Ticket(content_type), m) => {
-            let content_type = content_type.as_ref();
-            match typecheck_value(
-                m,
-                ctx,
-                &Type::new_pair(
-                    Type::Address,
-                    Type::new_pair(content_type.clone(), Type::Nat),
-                ),
-            ) {
-                Ok(TV::Pair(left, right)) => {
+        TvFrame::BuildTicketLegacy { content_type } => {
+            let pair = results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "ticket legacy pair" }))?;
+            match pair {
+                TV::Pair(left, right) => {
                     let address = match TypedValue::unwrap_rc(left) {
-                        TV::Address(addr) => addr,
+                        TV::Address(a) => a,
                         _ => {
                             return Err(TcError::InternalError(
                                 TcInvariant::TypecheckValueWrongVariant {
@@ -2875,52 +4201,490 @@ pub fn typecheck_value<'a>(
                         }
                     };
                     let (content, amount) = match TypedValue::unwrap_rc(right) {
-                        TV::Pair(content, amount) => (content, amount),
+                        TV::Pair(c, a) => (c, a),
                         _ => {
                             return Err(TcError::InternalError(
                                 TcInvariant::ExpectedTicketNestedPair,
                             ))
                         }
                     };
-                    TV::new_ticket(Ticket {
+                    let amount = match TypedValue::unwrap_rc(amount) {
+                        TV::Nat(n) => n,
+                        _ => {
+                            return Err(TcError::InternalError(
+                                TcInvariant::ExpectedTicketNatAmount,
+                            ))
+                        }
+                    };
+                    results.push(TV::new_ticket(Ticket {
                         ticketer: address.hash,
-                        content_type: content_type.clone(),
+                        content_type,
                         content: TypedValue::unwrap_rc(content),
-                        amount: match TypedValue::unwrap_rc(amount) {
-                            TV::Nat(amount) => amount,
-                            _ => {
-                                return Err(TcError::InternalError(
-                                    TcInvariant::ExpectedTicketNatAmount,
-                                ))
-                            }
-                        },
-                    })
+                        amount,
+                    }));
+                    Ok(())
                 }
-                _ => return Err(invalid_value_for_type!()),
+                other => {
+                    // The synthetic pair value did not typecheck as a Pair,
+                    // which means the legacy ticket form was rejected.
+                    Err(TcError::InvalidValueForType(
+                        format!("{other:?}"),
+                        Type::new_ticket(content_type),
+                    ))
+                }
             }
+        }
+    }
+}
+
+fn visit_value<'a, 'b>(
+    v: &'b Micheline<'a>,
+    t: Type,
+    ctx: &mut impl TypecheckingCtx<'a>,
+    frames: &mut Vec<TvFrame<'a, 'b>>,
+    results: &mut Vec<TypedValue<'a>>,
+) -> Result<(), TcError> {
+    use Micheline as V;
+    use Type as T;
+    use TypedValue as TV;
+
+    ctx.gas().consume(gas::tc_cost::VALUE_STEP)?;
+    let invalid = || TcError::InvalidValueForType(format!("{v:?}"), t.clone());
+
+    match (&t, v) {
+        (T::Nat, V::Int(n)) => results.push(TV::Nat(BigUint::try_from(n)?)),
+        (T::Int, V::Int(n)) => results.push(TV::Int(n.clone())),
+        (T::Bool, V::App(Prim::True, [], _)) => results.push(TV::Bool(true)),
+        (T::Bool, V::App(Prim::False, [], _)) => results.push(TV::Bool(false)),
+        (T::Mutez, V::Int(n)) if !n.is_negative() => results.push(TV::Mutez(i64::try_from(n)?)),
+        (T::String, V::String(s)) => results.push(TV::String(s.clone())),
+        (T::Unit, V::App(Prim::Unit, [], _)) => results.push(TV::Unit),
+        (T::Pair(pt), V::App(Prim::Pair, [vl, rest @ ..], _) | V::Seq([vl, rest @ ..]))
+            if !rest.is_empty() =>
+        {
+            let (tl, tr) = pt.as_ref();
+            frames.push(TvFrame::BuildPair);
+            if rest.len() == 1 {
+                frames.push(TvFrame::Visit {
+                    v: &rest[0],
+                    t: tr.clone(),
+                });
+            } else {
+                frames.push(TvFrame::VisitPairTail {
+                    vs: rest,
+                    t: tr.clone(),
+                });
+            }
+            frames.push(TvFrame::Visit {
+                v: vl,
+                t: tl.clone(),
+            });
+        }
+        (T::Or(ot), V::App(prim @ (Prim::Left | Prim::Right), [val], _)) => {
+            let (tl, tr) = ot.as_ref();
+            match prim {
+                Prim::Left => {
+                    frames.push(TvFrame::BuildLeft);
+                    frames.push(TvFrame::Visit {
+                        v: val,
+                        t: tl.clone(),
+                    });
+                }
+                Prim::Right => {
+                    frames.push(TvFrame::BuildRight);
+                    frames.push(TvFrame::Visit {
+                        v: val,
+                        t: tr.clone(),
+                    });
+                }
+                _ => {
+                    return Err(TcError::InternalError(
+                        TcInvariant::UnexpectedLeftRightPrim,
+                    ))
+                }
+            }
+        }
+        (T::Option(ty), V::App(Prim::Some, [inner], _)) => {
+            frames.push(TvFrame::BuildSome);
+            frames.push(TvFrame::Visit {
+                v: inner,
+                t: ty.as_ref().clone(),
+            });
+        }
+        (T::Option(_), V::App(Prim::None, [], _)) => results.push(TV::new_option(None)),
+        (T::List(ty), V::Seq(vs)) => {
+            if let Some((first, rest)) = vs.split_first() {
+                let elem_t = ty.as_ref().clone();
+                frames.push(TvFrame::ListAccum {
+                    remaining: rest,
+                    elem_t: elem_t.clone(),
+                    acc: Vec::with_capacity(vs.len()),
+                });
+                frames.push(TvFrame::Visit { v: first, t: elem_t });
+            } else {
+                results.push(TV::List(MichelsonList::default()));
+            }
+        }
+        (T::Set(ty), V::Seq(vs)) => {
+            let elem_t = ty.as_ref().clone();
+            ctx.gas().consume(gas::tc_cost::construct_set(
+                elem_t.size_for_gas(),
+                vs.len(),
+            )?)?;
+            if let Some((first, rest)) = vs.split_first() {
+                frames.push(TvFrame::SetAccum {
+                    remaining: rest,
+                    elem_t: elem_t.clone(),
+                    set_ty: t.clone(),
+                    acc: BTreeSet::new(),
+                    prev: None,
+                });
+                frames.push(TvFrame::Visit { v: first, t: elem_t });
+            } else {
+                results.push(TV::Set(BTreeSet::new()));
+            }
+        }
+        (T::Map(m), V::Seq(vs)) => {
+            let (tk, tv) = m.as_ref();
+            let key_t = tk.clone();
+            ctx.gas().consume(gas::tc_cost::construct_map(
+                key_t.size_for_gas(),
+                vs.len(),
+            )?)?;
+            visit_map_or_bigmap_inmem(
+                t.clone(),
+                vs,
+                key_t,
+                tv.clone(),
+                MapFinalize::Map,
+                frames,
+                results,
+            )?;
+        }
+        (T::BigMap(m), V::Seq(vs)) => {
+            // In-memory big map: same syntax as a regular map.
+            let (tk, tv) = m.as_ref();
+            let key_t = tk.clone();
+            ctx.gas().consume(gas::tc_cost::construct_map(
+                key_t.size_for_gas(),
+                vs.len(),
+            )?)?;
+            visit_map_or_bigmap_inmem(
+                t.clone(),
+                vs,
+                key_t,
+                tv.clone(),
+                MapFinalize::BigMapInMem {
+                    tk: tk.clone(),
+                    tv: tv.clone(),
+                },
+                frames,
+                results,
+            )?;
+        }
+        (T::BigMap(m), v) => {
+            let (id, vs_opt, diff) = match v {
+                V::Int(i) => (i, None, false),
+                V::App(Prim::Pair, [V::Int(i), V::Seq(vs)], _) => (i, Some(vs), true),
+                _ => return Err(invalid()),
+            };
+            let (tk, tv) = m.as_ref();
+            let big_map_id: BigMapId = id.clone().into();
+            let (key_type, value_type) = ctx
+                .big_map_get_type(&big_map_id)
+                .map_err(|e| TcError::LazyStorageError(e.to_string()))?
+                .ok_or(TcError::BigMapNotFound(id.clone()))?;
+            ensure_ty_eq(ctx.gas(), &key_type, tk)?;
+            ensure_ty_eq(ctx.gas(), &value_type, tv)?;
+
+            let map_ty = t.clone();
+            let tk_final = tk.clone();
+            let tv_final = tv.clone();
+            let key_t = tk.clone();
+            let val_t = tv.clone();
+
+            match vs_opt {
+                None => {
+                    results.push(TV::BigMap(BigMap {
+                        content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
+                            id: big_map_id,
+                            overlay: BTreeMap::default(),
+                        }),
+                        key_type: tk_final,
+                        value_type: tv_final,
+                    }));
+                }
+                Some(vs) => {
+                    ctx.gas().consume(gas::tc_cost::construct_map(
+                        key_t.size_for_gas(),
+                        vs.len(),
+                    )?)?;
+                    if let Some((first_elt, rest)) = vs.split_first() {
+                        let (k_expr, v_expr) = expect_elt(first_elt, &map_ty)?;
+                        if !diff {
+                            // Non-diff form happens only when vs_opt is None;
+                            // reaching here means we matched the diff shape.
+                            // Keep this branch for safety even though `diff`
+                            // is always true once vs_opt is Some.
+                        }
+                        frames.push(TvFrame::BigMapDiffAccum {
+                            remaining: rest,
+                            key_t: key_t.clone(),
+                            val_t,
+                            map_ty,
+                            big_map_id,
+                            tk_final,
+                            tv_final,
+                            acc: BTreeMap::new(),
+                            prev_key: None,
+                            stage: BigMapDiffStage::AwaitingKey { v_expr },
+                        });
+                        frames.push(TvFrame::Visit {
+                            v: k_expr,
+                            t: key_t,
+                        });
+                    } else {
+                        // Empty diff: build with empty overlay.
+                        results.push(TV::BigMap(BigMap {
+                            content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
+                                id: big_map_id,
+                                overlay: BTreeMap::default(),
+                            }),
+                            key_type: tk_final,
+                            value_type: tv_final,
+                        }));
+                    }
+                }
+            }
+        }
+        (T::Address, V::String(str)) => {
+            ctx.gas().consume(gas::tc_cost::KEY_HASH_READABLE)?;
+            results.push(TV::Address(
+                Address::from_base58_check(str)
+                    .map_err(|e| TcError::ByteReprError(T::Address, e))?,
+            ));
+        }
+        (T::Address, V::Bytes(bs)) => {
+            ctx.gas().consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
+            results.push(TV::Address(
+                Address::from_bytes(bs).map_err(|e| TcError::ByteReprError(T::Address, e))?,
+            ));
+        }
+        (T::Contract(ty), addr) => {
+            frames.push(TvFrame::BuildContract {
+                contract_ty: ty.clone(),
+            });
+            frames.push(TvFrame::Visit {
+                v: addr,
+                t: T::Address,
+            });
+        }
+        (T::ChainId, V::String(str)) => {
+            ctx.gas().consume(gas::tc_cost::CHAIN_ID_READABLE)?;
+            results.push(TV::ChainId(
+                ChainId::from_base58_check(str).map_err(|x| TcError::ChainIdError(x.into()))?,
+            ));
+        }
+        (T::ChainId, V::Bytes(bs)) => {
+            use tezos_crypto_rs::hash::HashTrait;
+            ctx.gas().consume(gas::tc_cost::CHAIN_ID_OPTIMIZED)?;
+            results.push(TV::ChainId(
+                ChainId::try_from_bytes(bs).map_err(|x| TcError::ChainIdError(x.into()))?,
+            ));
+        }
+        (T::Bytes, V::Bytes(bs)) => results.push(TV::Bytes(bs.clone())),
+        (T::Key, V::String(str)) => {
+            ctx.gas().consume(gas::tc_cost::KEY_READABLE)?;
+            results.push(TV::Key(
+                PublicKey::from_b58check(str)
+                    .map_err(|e| TcError::ByteReprError(T::Key, e.into()))?,
+            ));
+        }
+        (T::Key, V::Bytes(bs)) => {
+            ctx.gas().consume(gas::tc_cost::KEY_OPTIMIZED)?;
+            results.push(TV::Key(
+                PublicKey::nom_read_exact(bs)
+                    .map_err(|e| TcError::ByteReprError(T::Key, e.into()))?,
+            ));
+        }
+        (T::Signature, V::String(str)) => {
+            ctx.gas().consume(gas::tc_cost::KEY_READABLE)?;
+            results.push(TV::Signature(
+                Signature::from_base58_check(str)
+                    .map_err(|e| TcError::ByteReprError(T::Signature, e.into()))?,
+            ));
+        }
+        (T::Signature, V::Bytes(bs)) => {
+            ctx.gas().consume(gas::tc_cost::KEY_OPTIMIZED)?;
+            results.push(TV::Signature(
+                Signature::try_from(bs.clone())
+                    .map_err(|e| TcError::ByteReprError(T::Signature, e.into()))?,
+            ));
+        }
+        (T::KeyHash, V::String(str)) => {
+            ctx.gas().consume(gas::tc_cost::KEY_HASH_READABLE)?;
+            results.push(TV::KeyHash(
+                PublicKeyHash::from_b58check(str)
+                    .map_err(|e| TcError::ByteReprError(T::KeyHash, e.into()))?,
+            ));
+        }
+        (T::KeyHash, V::Bytes(bs)) => {
+            ctx.gas().consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
+            results.push(TV::KeyHash(PublicKeyHash::nom_read_exact(bs).map_err(
+                |err| {
+                    TcError::ByteReprError(
+                        T::KeyHash,
+                        ByteReprError::WrongFormat(format!(
+                            "public key hash, optimized {}",
+                            convert_error(bs, err)
+                        )),
+                    )
+                },
+            )?));
+        }
+        (T::Timestamp, V::Int(n)) => results.push(TV::Timestamp(n.clone())),
+        (T::Timestamp, V::String(n)) => {
+            ctx.gas()
+                .consume(gas::tc_cost::timestamp_decoding(n.len())?)?;
+            if let Ok(int_value) = n.parse::<i64>() {
+                results.push(TV::Timestamp(int_value.into()));
+            } else {
+                let dt = DateTime::parse_from_rfc3339(n);
+                match dt {
+                    Ok(dt) => results.push(TV::Timestamp(dt.timestamp().into())),
+                    Err(_) => return Err(invalid()),
+                }
+            }
+        }
+        (
+            T::Lambda(tys),
+            raw @ (V::Seq(instrs) | V::App(Prim::Lambda_rec, [V::Seq(instrs)], _)),
+        ) => {
+            let (in_ty, out_ty) = tys.as_ref();
+            // The value-level Lambda path recurses through `typecheck_lambda`
+            // → `typecheck` → `step_typecheck_instruction` (PUSH) →
+            // `typecheck_value` → this arm. Each level adds Rust frames; an
+            // adversarial nested `PUSH (lambda …) {PUSH (lambda …) {…}}` can
+            // exhaust the kernel's 1 MiB WASM stack within a single
+            // operation's gas budget. Mirror L1's defense — see
+            // `script_ir_translator.ml:571` for the `stack_depth > 10000`
+            // check that returns `Typechecking_too_many_recursive_calls`.
+            // RAII guard ensures depth balance even on Err propagation.
+            let _depth_guard = LambdaTypecheckDepthGuard::enter()?;
+            results.push(TV::Lambda(Closure::Lambda(typecheck_lambda(
+                instrs,
+                ctx.gas(),
+                in_ty.clone(),
+                out_ty.clone(),
+                matches!(raw, V::App(Prim::Lambda_rec, ..)),
+            )?)));
+        }
+        (
+            T::Ticket(content_type),
+            V::App(Prim::Ticket, [ticketer, content_type_bis, content, amount], _),
+        ) => {
+            let parsed_bis = parse_ty(ctx.gas(), content_type_bis)?;
+            ensure_ty_eq(ctx.gas(), content_type, &parsed_bis)?;
+            // BuildTicketExplicit pops 3 in LIFO order: amount, content, ticketer.
+            frames.push(TvFrame::BuildTicketExplicit {
+                content_type: content_type.clone(),
+            });
+            frames.push(TvFrame::Visit {
+                v: amount,
+                t: T::Nat,
+            });
+            frames.push(TvFrame::Visit {
+                v: content,
+                t: content_type.as_ref().clone(),
+            });
+            frames.push(TvFrame::Visit {
+                v: ticketer,
+                t: T::Address,
+            });
+        }
+        (T::Ticket(content_type), m) => {
+            let content_type = content_type.as_ref().clone();
+            let pair_t = Type::new_pair(
+                Type::Address,
+                Type::new_pair(content_type.clone(), Type::Nat),
+            );
+            // Recursive call into the iterative driver. Any Err inside the
+            // synthetic pair typecheck is remapped to InvalidValueForType
+            // against the ticket type, matching the recursive form's
+            // outer `_ => Err(invalid())` arm. Pushing BuildTicketLegacy
+            // afterwards keeps the deconstruction in the worklist.
+            let pair = typecheck_value(m, ctx, &pair_t).map_err(|_| invalid())?;
+            results.push(pair);
+            frames.push(TvFrame::BuildTicketLegacy { content_type });
         }
         #[cfg(feature = "bls")]
         (T::Bls12381Fr, V::Int(i)) => {
             ctx.gas().consume(gas::tc_cost::BLS_FR)?;
-            TV::Bls12381Fr(bls::Fr::from_big_int(i))
+            results.push(TV::Bls12381Fr(bls::Fr::from_big_int(i)));
         }
         #[cfg(feature = "bls")]
         (T::Bls12381Fr, V::Bytes(bs)) => {
             ctx.gas().consume(gas::tc_cost::BLS_FR)?;
-            TV::Bls12381Fr(bls::Fr::from_bytes(bs).ok_or_else(|| invalid_value_for_type!())?)
+            results.push(TV::Bls12381Fr(
+                bls::Fr::from_bytes(bs).ok_or_else(invalid)?,
+            ));
         }
         #[cfg(feature = "bls")]
         (T::Bls12381G1, V::Bytes(bs)) => {
             ctx.gas().consume(gas::tc_cost::BLS_G1)?;
-            TV::new_bls12381_g1(bls::G1::from_bytes(bs).ok_or_else(|| invalid_value_for_type!())?)
+            results.push(TV::new_bls12381_g1(
+                bls::G1::from_bytes(bs).ok_or_else(invalid)?,
+            ));
         }
         #[cfg(feature = "bls")]
         (T::Bls12381G2, V::Bytes(bs)) => {
             ctx.gas().consume(gas::tc_cost::BLS_G2)?;
-            TV::new_bls12381_g2(bls::G2::from_bytes(bs).ok_or_else(|| invalid_value_for_type!())?)
+            results.push(TV::new_bls12381_g2(
+                bls::G2::from_bytes(bs).ok_or_else(invalid)?,
+            ));
         }
-        (_, _) => return Err(invalid_value_for_type!()),
-    })
+        (_, _) => return Err(invalid()),
+    }
+    Ok(())
+}
+
+/// Shared setup for the (T::Map, Seq) and (T::BigMap, Seq) arms.
+fn visit_map_or_bigmap_inmem<'a, 'b>(
+    map_ty: Type,
+    vs: &'b [Micheline<'a>],
+    key_t: Type,
+    val_t: Type,
+    finalize: MapFinalize,
+    frames: &mut Vec<TvFrame<'a, 'b>>,
+    results: &mut Vec<TypedValue<'a>>,
+) -> Result<(), TcError> {
+    use TypedValue as TV;
+
+    if let Some((first_elt, rest)) = vs.split_first() {
+        let (k_expr, v_expr) = expect_elt(first_elt, &map_ty)?;
+        frames.push(TvFrame::MapAccum {
+            remaining: rest,
+            key_t: key_t.clone(),
+            val_t,
+            map_ty,
+            finalize,
+            acc: BTreeMap::new(),
+            prev_key: None,
+            stage: MapStage::AwaitingKey { v_expr },
+        });
+        frames.push(TvFrame::Visit {
+            v: k_expr,
+            t: key_t,
+        });
+    } else {
+        match finalize {
+            MapFinalize::Map => results.push(TV::Map(BTreeMap::new())),
+            MapFinalize::BigMapInMem { tk, tv } => {
+                results.push(TV::BigMap(BigMap::new(tk, tv, BTreeMap::new())))
+            }
+        }
+    }
+    Ok(())
 }
 
 #[allow(missing_docs)]
@@ -2971,199 +4735,12 @@ pub fn typecheck_view<'a>(
     Ok(code)
 }
 
-/// Typechecks the instruction block for a `MAP` instruction.
-///
-/// Given a `ty1` and a stack of type `A`,
-/// the instruction block is expected to have the type `ty1 : A => ty2 : A` for some type `ty2`.
-///
-/// Returns the typechecked instructions and the inferred type `ty2`
-fn typecheck_map_block<'a>(
-    nested: &[Micheline<'a>],
-    ty1: Type,
-    gas: &mut Gas,
-    self_entrypoints: Option<&Entrypoints>,
-    stack: &TypeStack,
-    in_view: bool,
-) -> Result<(Vec<Instruction<'a>>, Type), TcError> {
-    let mut nested_stack = stack.clone();
-    nested_stack.push(ty1);
-    let mut opt_nested_stack = FailingTypeStack::Ok(nested_stack);
-
-    // Types:
-    //   stack :: A
-    //   opt_nested_stack :: ty1 : A
-
-    // Typecheck the nested instructions.
-    let nested: Vec<Instruction<'a>> = typecheck(
-        nested,
-        gas,
-        self_entrypoints,
-        &mut opt_nested_stack,
-        in_view,
-    )?;
-
-    // Assert that the `opt_nested_stack` now has the type `ty2 : A`, for some `ty2`.
-    // NB: the nested instruction block cannot fail, otherwise we cannot infer `ty2`.
-    let nested_stack = opt_nested_stack.access_mut(TcError::MapBlockFail)?;
-    let ty2 = nested_stack.pop().ok_or(TcError::MapBlockEmptyStack)?;
-    ensure_stacks_eq(gas, stack, nested_stack)?;
-    Ok((nested, ty2))
-}
-
 fn validate_u10(n: &BigInt) -> Result<u16, TcError> {
     let res = u16::try_from(n).map_err(|_| TcError::ExpectedU10(n.clone()))?;
     if res >= 1024 {
         return Err(TcError::ExpectedU10(n.clone()));
     }
     Ok(res)
-}
-
-fn typecheck_set<'a>(
-    ctx: &mut impl TypecheckingCtx<'a>,
-    set_ty: &Type,
-    elem_ty: &Type,
-    vs: &[Micheline<'a>],
-) -> Result<BTreeSet<TypedValue<'a>>, TcError> {
-    ctx.gas().consume(gas::tc_cost::construct_set(
-        elem_ty.size_for_gas(),
-        vs.len(),
-    )?)?;
-
-    let mut prev_elt = None;
-    let mut set = BTreeSet::new();
-
-    for elt in vs.iter() {
-        let elt = typecheck_value(elt, ctx, elem_ty)?;
-        if let Some(prev_elt) = prev_elt {
-            ctx.gas()
-                .consume(gas::interpret_cost::compare(&prev_elt, &elt)?)?;
-            match prev_elt.cmp(&elt) {
-                std::cmp::Ordering::Less => (),
-                std::cmp::Ordering::Equal => {
-                    return Err(TcError::DuplicateElements(set_ty.clone()))
-                }
-                std::cmp::Ordering::Greater => {
-                    return Err(TcError::ElementsNotSorted(set_ty.clone()))
-                }
-            };
-        };
-        prev_elt = Some(elt.clone());
-        set.insert(elt);
-    }
-    Ok(set)
-}
-
-fn typecheck_map<'a>(
-    ctx: &mut impl TypecheckingCtx<'a>,
-    map_ty: &Type,
-    key_type: &Type,
-    value_type: &Type,
-    vs: &[Micheline<'a>],
-) -> Result<BTreeMap<TypedValue<'a>, TypedValue<'a>>, TcError> {
-    ctx.gas().consume(gas::tc_cost::construct_map(
-        key_type.size_for_gas(),
-        vs.len(),
-    )?)?;
-
-    let mut prev_key = None;
-    let mut map = BTreeMap::new();
-
-    for mich in vs.iter() {
-        let (key, val) = match mich {
-            Micheline::App(Prim::Elt, [k_expr, v_expr], _) => {
-                let k = typecheck_value(k_expr, ctx, key_type)?;
-                let v = typecheck_value(v_expr, ctx, value_type)?;
-                (k, v)
-            }
-            _ => {
-                return Err(TcError::InvalidEltForMap(
-                    format!("{mich:?}"),
-                    map_ty.clone(),
-                ))
-            }
-        };
-        if let Some(prev_key) = prev_key {
-            ctx.gas()
-                .consume(gas::interpret_cost::compare(&prev_key, &key)?)?;
-            match prev_key.cmp(&key) {
-                std::cmp::Ordering::Less => (),
-                std::cmp::Ordering::Equal => {
-                    return Err(TcError::DuplicateElements(map_ty.clone()))
-                }
-                std::cmp::Ordering::Greater => {
-                    return Err(TcError::ElementsNotSorted(map_ty.clone()))
-                }
-            };
-        };
-        prev_key = Some(key.clone());
-        map.insert(key, val);
-    }
-    Ok(map)
-}
-
-fn typecheck_big_map<'a>(
-    ctx: &mut impl TypecheckingCtx<'a>,
-    map_ty: &Type,
-    key_type: &Type,
-    value_type: &Type,
-    vs: &[Micheline<'a>],
-    diff: bool,
-) -> Result<BTreeMap<TypedValue<'a>, Option<TypedValue<'a>>>, TcError> {
-    ctx.gas().consume(gas::tc_cost::construct_map(
-        key_type.size_for_gas(),
-        vs.len(),
-    )?)?;
-
-    let mut prev_key = None;
-    let mut map = BTreeMap::new();
-
-    for mich in vs.iter() {
-        let (key, val) = match mich {
-            Micheline::App(Prim::Elt, [k_expr, v_expr], _) => {
-                let k = typecheck_value(k_expr, ctx, key_type)?;
-                let v = if diff {
-                    match v_expr {
-                        Micheline::App(Prim::Some, [inner_val], _) => {
-                            let v = typecheck_value(inner_val, ctx, value_type)?;
-                            Some(v)
-                        }
-                        Micheline::App(Prim::None, [], _) => None,
-                        _ => {
-                            return Err(TcError::InvalidEltForMap(
-                                format!("{v_expr:?}"),
-                                map_ty.clone(),
-                            ))
-                        }
-                    }
-                } else {
-                    Some(typecheck_value(v_expr, ctx, value_type)?)
-                };
-                (k, v)
-            }
-            _ => {
-                return Err(TcError::InvalidEltForMap(
-                    format!("{mich:?}"),
-                    map_ty.clone(),
-                ))
-            }
-        };
-        if let Some(prev_key) = prev_key {
-            ctx.gas()
-                .consume(gas::interpret_cost::compare(&prev_key, &key)?)?;
-            match prev_key.cmp(&key) {
-                std::cmp::Ordering::Less => (),
-                std::cmp::Ordering::Equal => {
-                    return Err(TcError::DuplicateElements(map_ty.clone()))
-                }
-                std::cmp::Ordering::Greater => {
-                    return Err(TcError::ElementsNotSorted(map_ty.clone()))
-                }
-            };
-        };
-        prev_key = Some(key.clone());
-        map.insert(key, val);
-    }
-    Ok(map)
 }
 
 /// Ensures type stack is at least of the required length, otherwise returns
@@ -3247,6 +4824,115 @@ mod typecheck_tests {
     use std::rc::Rc;
     use Instruction::*;
     use Option::None;
+
+    /// Parses a 100k deep right leaning `pair` type without overflowing
+    /// the Rust call stack. Currently ignored: the parser completes, but
+    /// the resulting `Type` overflows on its own recursive Drop, which a
+    /// follow up commit converts to an iterative Drop.
+    #[test]
+    #[ignore]
+    fn deeply_nested_pair_parses() {
+        const DEPTH: usize = 100_000;
+        let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+        let int_app: Micheline<'_> = Micheline::App(Prim::int, &[], NO_ANNS);
+        let mut current: Micheline<'_> = int_app.clone();
+        for _ in 0..DEPTH {
+            let pair_args = arena.alloc_extend([int_app.clone(), current]);
+            current = Micheline::App(Prim::pair, pair_args, NO_ANNS);
+        }
+        let mut gas = Gas::new(u32::MAX);
+        let parsed = parse_ty(&mut gas, &current).expect("deep pair parses");
+        assert!(matches!(parsed, Type::Pair(_)));
+    }
+
+    /// Typechecks a 100k deep nested IF, demonstrating that the iterative
+    /// instruction typechecker driver no longer blows the Rust call stack.
+    /// Ignored: the resulting `Instruction` tree overflows on its own
+    /// recursive Drop (follow up).
+    #[test]
+    #[ignore]
+    fn deeply_nested_if_typechecks() {
+        const DEPTH: usize = 100_000;
+        // Build: IF { PUSH bool True ; IF { PUSH bool True ; IF { ... } { } } { } } { }
+        let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+        let mut current_then: &[Micheline<'_>] = &[];
+        for _ in 0..DEPTH {
+            // each layer: PUSH bool True ; IF { current_then } { }
+            let push_true = Micheline::App(
+                Prim::PUSH,
+                arena.alloc_extend([
+                    Micheline::App(Prim::bool, &[], NO_ANNS),
+                    Micheline::App(Prim::True, &[], NO_ANNS),
+                ]),
+                NO_ANNS,
+            );
+            let if_instr = Micheline::App(
+                Prim::IF,
+                arena.alloc_extend([
+                    Micheline::Seq(current_then),
+                    Micheline::Seq(&[]),
+                ]),
+                NO_ANNS,
+            );
+            current_then = arena.alloc_extend([push_true, if_instr]);
+        }
+        // Top level: push a True, then run the deeply nested IF.
+        let push_true = Micheline::App(
+            Prim::PUSH,
+            arena.alloc_extend([
+                Micheline::App(Prim::bool, &[], NO_ANNS),
+                Micheline::App(Prim::True, &[], NO_ANNS),
+            ]),
+            NO_ANNS,
+        );
+        let root_if = Micheline::App(
+            Prim::IF,
+            arena.alloc_extend([Micheline::Seq(current_then), Micheline::Seq(&[])]),
+            NO_ANNS,
+        );
+        let program = arena.alloc_extend([push_true, root_if]);
+        let mut gas = Gas::new(u32::MAX);
+        let mut stack = tc_stk![];
+        let result = typecheck(program, &mut gas, None, &mut stack, false)
+            .expect("deep IF typechecks");
+        // Avoid the recursive Drop on the deep Instruction tree.
+        std::mem::forget(result);
+        std::mem::forget(stack);
+    }
+
+    /// Typechecks a 100k deep right leaning pair value at the matching
+    /// pair type. Ignored for the same reason as the parse test: the
+    /// resulting `Type`/`TypedValue` tree overflows on Drop.
+    #[test]
+    #[ignore]
+    fn deeply_nested_pair_value_typechecks() {
+        const DEPTH: usize = 100_000;
+        let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+
+        // Build the type: pair(int, pair(int, pair(int, ..., int))).
+        let int_app: Micheline<'_> = Micheline::App(Prim::int, &[], NO_ANNS);
+        let mut ty_node: Micheline<'_> = int_app.clone();
+        for _ in 0..DEPTH {
+            let pair_args = arena.alloc_extend([int_app.clone(), ty_node]);
+            ty_node = Micheline::App(Prim::pair, pair_args, NO_ANNS);
+        }
+        let mut gas = Gas::new(u32::MAX);
+        let parsed_ty = parse_ty(&mut gas, &ty_node).expect("deep pair type parses");
+
+        // Build the value: pair(0, pair(0, pair(0, ..., 0))).
+        let zero: Micheline<'_> = Micheline::Int(0.into());
+        let mut v_node: Micheline<'_> = zero.clone();
+        for _ in 0..DEPTH {
+            let pair_args = arena.alloc_extend([zero.clone(), v_node]);
+            v_node = Micheline::App(Prim::Pair, pair_args, NO_ANNS);
+        }
+        let mut ctx = Ctx::default();
+        ctx.gas = Gas::new(u32::MAX);
+        let _ = typecheck_value(&v_node, &mut ctx, &parsed_ty)
+            .expect("deep pair value typechecks");
+        // The resulting Type and TypedValue overflow on their own Drop;
+        // covered by a follow up that converts those to iterative.
+    }
 
     /// hack to simplify syntax in tests
     fn typecheck_instruction<'a>(
@@ -8314,6 +10000,275 @@ mod typecheck_tests {
             ),
             Err(TcError::UnexpectedImplicitAccountType(Type::Int))
         );
+    }
+
+    /// Helper: builds and typechecks a `PUSH (lambda unit unit) {<inner>}
+    /// ; DROP` body of the given depth on the current thread. Each layer
+    /// keeps its body's stack at `[unit]` so the lambda's `out_ty = unit`
+    /// unifies. Returns the typecheck result; the caller is responsible
+    /// for asserting the expected shape. Drops are skipped via
+    /// `mem::forget` so the still-recursive `Type` / `Instruction`
+    /// `Drop` (gated on MR4) does not overflow on scope exit.
+    ///
+    /// The kernel call path uses `Micheline::decode_raw` (the iterative
+    /// byte-decoder), so building via the arena rather than the source
+    /// parser mirrors the actual kernel exposure surface.
+    #[cfg(test)]
+    fn typecheck_nested_push_lambda<'a>(
+        arena: &'a typed_arena::Arena<Micheline<'a>>,
+        depth: usize,
+    ) -> Result<(), TcError> {
+        let unit_ty = Micheline::App(Prim::unit, &[], NO_ANNS);
+        let lambda_ty = Micheline::App(
+            Prim::lambda,
+            arena.alloc_extend([unit_ty.clone(), unit_ty.clone()]),
+            NO_ANNS,
+        );
+        let drop_instr = Micheline::App(Prim::DROP, &[], NO_ANNS);
+        let mut current_body: &[Micheline<'_>] = &[];
+        for _ in 0..depth {
+            let lambda_value = Micheline::Seq(current_body);
+            let push = Micheline::App(
+                Prim::PUSH,
+                arena.alloc_extend([lambda_ty.clone(), lambda_value]),
+                NO_ANNS,
+            );
+            current_body = arena.alloc_extend([push, drop_instr.clone()]);
+        }
+        let mut gas = Gas::new(u32::MAX);
+        let stk = &mut tc_stk![];
+        let result = typecheck(current_body, &mut gas, None, stk, false);
+        std::mem::forget(std::mem::replace(stk, tc_stk![]));
+        match result {
+            Ok(body) => {
+                std::mem::forget(body);
+                Ok(())
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Below-limit case: a single PUSH-lambda value typechecks cleanly
+    /// with the depth guard installed; the guard increments to 1 and
+    /// decrements back to 0 on scope exit, leaving the counter clean
+    /// for the next test.
+    #[test]
+    fn push_lambda_literal_below_l1_depth_limit() {
+        let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+        typecheck_nested_push_lambda(&arena, 1)
+            .expect("below the L1 depth cap, typecheck must succeed");
+        LAMBDA_TYPECHECK_DEPTH.with(|d| {
+            assert_eq!(d.get(), 0, "depth counter must return to 0 after Ok");
+        });
+    }
+
+    /// L1-parity guard at the recursion limit. Mirrors
+    /// `script_ir_translator.ml:571` (`stack_depth > 10000` →
+    /// `Typechecking_too_many_recursive_calls`). Pre-load the counter
+    /// to `MAX_LAMBDA_TYPECHECK_DEPTH` so the next entry trips the
+    /// guard — verifies the check fires *without* needing to recurse
+    /// 10000 times (which would overflow any test thread's stack on
+    /// debug builds at ~160 KB/layer).
+    #[test]
+    fn push_lambda_literal_at_l1_depth_limit_returns_clean_error() {
+        // Pre-load past the L1-parity threshold: L1 rejects on
+        // `stack_depth > 10000`, MIR rejects on `cur > 10000` after
+        // increment. Pre-loading to 10001 makes the next `enter()`
+        // trip exactly as L1 would on stack_depth=10001.
+        LAMBDA_TYPECHECK_DEPTH.with(|d| d.set(MAX_LAMBDA_TYPECHECK_DEPTH + 1));
+        // Hand-construct a single PUSH-lambda value and typecheck it.
+        // The very first DepthGuard::enter() must trip on the
+        // pre-loaded counter and return a clean Err.
+        let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+        let result = typecheck_nested_push_lambda(&arena, 1);
+        // Restore the counter immediately so a leak doesn't bias the
+        // next test (the guard's Drop already decremented from its
+        // failed enter() — but defensive reset is cheap).
+        LAMBDA_TYPECHECK_DEPTH.with(|d| d.set(0));
+        match result {
+            Err(TcError::TypecheckingTooManyRecursiveCalls) => {}
+            other => panic!(
+                "expected TypecheckingTooManyRecursiveCalls at L1 limit; got {other:?}",
+            ),
+        }
+    }
+
+    /// The RAII guard restores the counter on both Ok and Err paths.
+    /// Pre-load to a sentinel `K`, exercise each path, verify the
+    /// counter ends back at `K`. Covers the Drop-on-`?` propagation
+    /// contract that the guard's purpose hinges on.
+    #[test]
+    fn lambda_typecheck_depth_guard_balances_on_ok_and_err() {
+        const K: u16 = 7;
+        let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+
+        // Ok path: counter starts at K, increments to K+1 during typecheck,
+        // Drop fires on Ok scope exit, ends at K.
+        LAMBDA_TYPECHECK_DEPTH.with(|d| d.set(K));
+        typecheck_nested_push_lambda(&arena, 1).expect("Ok path");
+        LAMBDA_TYPECHECK_DEPTH.with(|d| {
+            assert_eq!(d.get(), K, "guard must restore counter on Ok");
+        });
+
+        // Err path: pre-load above the cap; enter() returns Err *before*
+        // constructing the guard, so Drop never runs for the failed
+        // entry. The counter therefore stays at the pre-loaded value.
+        LAMBDA_TYPECHECK_DEPTH.with(|d| d.set(MAX_LAMBDA_TYPECHECK_DEPTH + 1));
+        let err = typecheck_nested_push_lambda(&arena, 1).unwrap_err();
+        assert!(
+            matches!(err, TcError::TypecheckingTooManyRecursiveCalls),
+            "Err path must return TypecheckingTooManyRecursiveCalls; got {err:?}",
+        );
+        LAMBDA_TYPECHECK_DEPTH.with(|d| {
+            assert_eq!(
+                d.get(),
+                MAX_LAMBDA_TYPECHECK_DEPTH + 1,
+                "counter must be unchanged after Err — Drop must not fire on a failed enter()",
+            );
+            // Restore so subsequent tests aren't biased by the residual.
+            d.set(0);
+        });
+    }
+
+    // Regression: pre-fix, nested LAMBDAs grew the Rust call stack by one
+    // frame per nesting level (`typecheck_instruction_step` → `typecheck_lambda`
+    // → `typecheck` recursion). With the OpenLambda/AfterLambda worklist
+    // refactor, depth is bounded by gas/heap only. Each body is
+    // `LAMBDA unit unit { inner } ; DROP` so the body's residual stack
+    // ends at `[unit]` and unifies with `out_ty = unit`. Run on a 1 MiB
+    // worker thread matching the kernel budget; `mem::forget` skips the
+    // recursive Drop on `Instruction`/`Type` (gated on MR4).
+    #[test]
+    fn deeply_nested_lambda_typechecks_without_stack_overflow() {
+        use std::thread;
+        const DEPTH: usize = 8_000;
+        thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+                let unit_ty = Micheline::App(Prim::unit, &[], NO_ANNS);
+                let drop_instr = Micheline::App(Prim::DROP, &[], NO_ANNS);
+                // Innermost body is just empty (stack stays [unit]).
+                let mut current: &[Micheline<'_>] = &[];
+                for _ in 0..DEPTH {
+                    let lambda = Micheline::App(
+                        Prim::LAMBDA,
+                        arena.alloc_extend([
+                            unit_ty.clone(),
+                            unit_ty.clone(),
+                            Micheline::Seq(current),
+                        ]),
+                        NO_ANNS,
+                    );
+                    // Wrap: `LAMBDA unit unit { current } ; DROP` keeps
+                    // the body's stack at [unit] for the surrounding
+                    // lambda's out_ty unification.
+                    current = arena.alloc_extend([lambda, drop_instr.clone()]);
+                }
+                let mut gas = Gas::new(u32::MAX);
+                let stk = &mut tc_stk![];
+                let result = typecheck(current, &mut gas, None, stk, false);
+                std::mem::forget(std::mem::replace(stk, tc_stk![]));
+                let body = result.expect("deep lambda nesting must typecheck");
+                std::mem::forget(body);
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
+    }
+
+    #[test]
+    fn map_key_comparable_check_fires_before_value_parsing() {
+        // Single-arg `pair int` is a valid Micheline but rejected by
+        // parse_ty (pair needs at least 2 type args). With the bug, the
+        // value's parse_ty error surfaces first; with the fix, the key's
+        // `Comparable` failure (list isn't comparable) surfaces first,
+        // matching the recursive code.
+        let err = parse_ty(&mut Gas::default(), &parse("map (list unit) (pair int)").unwrap())
+            .expect_err("must reject");
+        match err {
+            TcError::InvalidTypeProperty(TypeProperty::Comparable, t) => {
+                assert_eq!(t, Type::new_list(Type::Unit),
+                    "must surface the key Comparable error, not the value error");
+            }
+            other => panic!(
+                "expected InvalidTypeProperty(Comparable, list unit); got {other:?}",
+            ),
+        }
+    }
+
+    #[test]
+    fn big_map_value_check_fires_after_value_parsing() {
+        // big_map is fine on `int -> nat`, but `big_map int big_map int nat`
+        // must reject the value as not-BigMapValue. The check fires after
+        // the value is parsed — same as the recursive order.
+        let err = parse_ty(
+            &mut Gas::default(),
+            &parse("big_map int (big_map int nat)").unwrap(),
+        )
+        .expect_err("nested big_map must reject");
+        match err {
+            TcError::InvalidTypeProperty(TypeProperty::BigMapValue, _) => {}
+            other => panic!("expected BigMapValue rejection; got {other:?}"),
+        }
+    }
+
+    // Locks in the wording of `InvalidValueForType` when a legacy-ticket
+    // value (the 3-tuple form) is malformed. The recursive code wrapped
+    // the synthetic pair typecheck in a match whose `_ =>` arm remapped
+    // any failure to `InvalidValueForType(value, ticket_ty)`. The new
+    // worklist must do the same via the recursive `typecheck_value` call
+    // with an explicit Err remap.
+    #[test]
+    fn invalid_value_for_type_legacy_ticket_malformed() {
+        let mut ctx = Ctx::default();
+        // A string value against `ticket int`: the synthetic pair-typecheck
+        // fails on the outer Pair, and the error must be remapped to
+        // reference the ticket type, not the synthetic pair type.
+        let result = typecheck_value(
+            &parse("\"not_a_pair\"").unwrap(),
+            &mut ctx,
+            &Type::new_ticket(Type::Int),
+        );
+        match result {
+            Err(TcError::InvalidValueForType(_, t)) => {
+                assert_eq!(t, Type::new_ticket(Type::Int),
+                    "ticket Err must reference the ticket type, not the synthetic pair");
+            }
+            other => panic!("expected InvalidValueForType(_, ticket int), got {other:?}"),
+        }
+    }
+
+    // Locks in the wording of `InvalidValueForType` when typechecking an
+    // over-long Pair literal against a shorter Pair type. The new iterative
+    // worklist hand-formats the synthetic-pair tail; this test guards that
+    // the format stays byte-identical with `format!("{:?}", App(Pair, vs,
+    // NO_ANNS))`, which is what the recursive code emitted.
+    #[test]
+    fn invalid_value_for_type_n_ary_pair_tail_wording() {
+        let mut ctx = Ctx::default();
+        let result = typecheck_value(
+            &parse("Pair 1 2 3").unwrap(),
+            &mut ctx,
+            &Type::new_pair(Type::Int, Type::Int),
+        );
+        // Three values for a 2-tuple: the third value (3) hits the
+        // VisitPairTail fallback against the inner Type::Int.
+        let msg = match result {
+            Err(TcError::InvalidValueForType(s, _)) => s,
+            other => panic!("expected InvalidValueForType, got {other:?}"),
+        };
+        // Format must match what `format!("{:?}", App(Pair, [Int(2), Int(3)], NO_ANNS))`
+        // produces under the auto-derived Debug — same as the recursive code.
+        let expected = format!(
+            "{:?}",
+            Micheline::App(
+                Prim::Pair,
+                &[Micheline::Int(2.into()), Micheline::Int(3.into())],
+                NO_ANNS,
+            ),
+        );
+        assert_eq!(msg, expected, "n-ary pair tail wording diverged");
     }
 
     #[test]
