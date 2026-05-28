@@ -1,0 +1,6 @@
+# UNPACK mutez on the canonical multi-byte encoding of 12345 must
+# succeed. Control case for the trailing-zero rejection in
+# unpack_mutez_01.
+code { UNPACK mutez } ;
+input { Stack_elt bytes 0x0500b9c001 } ;
+output { Stack_elt (option mutez) (Some 12345) }

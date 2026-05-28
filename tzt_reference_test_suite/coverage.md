@@ -1060,6 +1060,22 @@ Among tests on values serialization:
 - [unpack_string_01.tzt](unpack_string_01.tzt)
 - [unpack_string_02.tzt](unpack_string_02.tzt)
 - [unpack_string_03.tzt](unpack_string_03.tzt)
+- [unpack_int_00.tzt](unpack_int_00.tzt)
+- [unpack_int_01.tzt](unpack_int_01.tzt)
+- [unpack_int_02.tzt](unpack_int_02.tzt)
+- [unpack_int_03.tzt](unpack_int_03.tzt)
+- [unpack_int_04.tzt](unpack_int_04.tzt)
+- [unpack_nat_00.tzt](unpack_nat_00.tzt)
+- [unpack_nat_01.tzt](unpack_nat_01.tzt)
+- [unpack_nat_02.tzt](unpack_nat_02.tzt)
+- [unpack_mutez_00.tzt](unpack_mutez_00.tzt)
+- [unpack_mutez_01.tzt](unpack_mutez_01.tzt)
+- [unpack_timestamp_00.tzt](unpack_timestamp_00.tzt)
+- [unpack_timestamp_01.tzt](unpack_timestamp_01.tzt)
+
+The `unpack_*_*` tests cover standalone `UNPACK` on canonical and
+non-canonical zarith encodings for `int`, `nat`, `mutez`, and
+`timestamp`; the `packunpack_*` tests cover roundtrips through `PACK`.
 
 ### `UNPAIR`
 

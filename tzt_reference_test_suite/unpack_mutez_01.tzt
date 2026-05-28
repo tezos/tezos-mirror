@@ -1,0 +1,6 @@
+# Non-canonical zarith for mutez: the canonical encoding of 12345
+# with a spurious trailing 0x00 group. mutez decodes through the same
+# zarith path as int, so it must also be rejected.
+code { UNPACK mutez } ;
+input { Stack_elt bytes 0x0500b9c08100 } ;
+output { Stack_elt (option mutez) None }
