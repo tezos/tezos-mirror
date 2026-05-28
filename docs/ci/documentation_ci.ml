@@ -240,6 +240,14 @@ let job_publish =
     ~environment:Gitlab_ci.Types.{name = "documentation"; action = Some Access}
     ~script:
       [
+        (* Assert that all variables scoped to the [documentation]
+           environment are actually injected. Without this guard,
+           [doc_publish.sh] skips early on non-master branches and an
+           empty value would be silently written into the SSH key files. *)
+        {|test -n "${CI_PK_GITLAB_DOC}" || { echo "CI_PK_GITLAB_DOC is empty"; exit 1; }|};
+        {|test -n "${CI_KH}" || { echo "CI_KH is empty"; exit 1; }|};
+        {|test -n "${AWS_ACCESS_KEY_ID}" || { echo "AWS_ACCESS_KEY_ID is empty"; exit 1; }|};
+        {|test -n "${AWS_SECRET_ACCESS_KEY}" || { echo "AWS_SECRET_ACCESS_KEY is empty"; exit 1; }|};
         "eval $(opam env)";
         ". $HOME/.venv/bin/activate";
         {|echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519|};
