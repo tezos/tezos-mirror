@@ -465,8 +465,8 @@ enum StepResult<'a> {
 /// Rc so its CodeRef::Owned can outlive the parent frame. Used when the
 /// parent block is Rc owned and a borrowed slice would not have a valid
 /// lifetime across worklist iterations.
-fn body_to_owned<'a>(body: &Vec<Instruction<'a>>) -> Rc<[Instruction<'a>]> {
-    body.clone().into_boxed_slice().into()
+fn body_to_owned<'a>(body: &[Instruction<'a>]) -> Rc<[Instruction<'a>]> {
+    body.to_vec().into_boxed_slice().into()
 }
 
 /// Iterative driver: walks every nested block from one explicit worklist
