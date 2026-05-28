@@ -132,6 +132,21 @@ pub enum RuntimeId {
     Ethereum = 1,
 }
 
+/// Canonical form of a native address for alias derivation and for
+/// storing as the `Native` representation in classification records.
+///
+/// Ethereum hex is case-insensitive on the wire, so two callers that
+/// pass `0xABC...` and `0xabc...` must derive the same alias; lowercase
+/// is the canonical form. Tezos base58check is case-sensitive (`tz1ABC`
+/// and `tz1abc` are different addresses, typically with one invalid),
+/// so the input is passed through unchanged.
+pub fn canonicalize_native_address(runtime: RuntimeId, addr: &str) -> String {
+    match runtime {
+        RuntimeId::Ethereum => addr.to_lowercase(),
+        RuntimeId::Tezos => addr.to_string(),
+    }
+}
+
 /// Payload carried by the alias variant of Origin.
 ///
 /// The address bytes hold the UTF-8 form of the address string (hex
