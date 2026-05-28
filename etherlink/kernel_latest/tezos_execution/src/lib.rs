@@ -207,6 +207,11 @@ pub(crate) fn consume_storage_read_milligas(
     operation_gas.cast_and_consume_milligas(cost)
 }
 
+/// Counters are often being read and updated (code size, paid bytes, etc.). When
+/// charging gas for these operations, we use an upper-bound of their size.
+#[allow(dead_code)]
+const COUNTER_SIZE: u64 = 32;
+
 fn reveal<Host, C: Context>(
     tc_ctx: &mut TcCtx<'_, Host, C>,
     source_account: &C::ImplicitAccountType,
