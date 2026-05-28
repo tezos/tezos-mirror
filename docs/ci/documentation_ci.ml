@@ -237,6 +237,7 @@ let job_publish =
     ~needs:[(Artifacts, job_build_all `full)]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
+    ~environment:Gitlab_ci.Types.{name = "documentation"; action = Some Access}
     ~script:
       [
         "eval $(opam env)";
