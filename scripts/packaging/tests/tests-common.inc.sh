@@ -37,6 +37,8 @@ run_package_manager_with_retries() {
   shift
   output_analysis_func="$1"
   shift
+  refresh_metadata_cmd="$1"
+  shift
 
   # Maximum retries
   max_retries=10
@@ -71,6 +73,13 @@ run_package_manager_with_retries() {
       echo "$output"
       echo "-----------"
       sleep "$delay"
+      # Refresh package metadata before retrying to handle stale index
+      if [ -n "$refresh_metadata_cmd" ]; then
+        set +e
+        echo "Refreshing package metadata..."
+        $refresh_metadata_cmd
+        set -e
+      fi
       # Exponential backoff (doubling the delay)
       delay=$((delay * 3))
     else
@@ -86,18 +95,21 @@ run_package_manager_with_retries() {
 }
 
 apt_get_with_retries() {
-  run_package_manager_with_retries apt-get apt_get_analysis_errors "$@"
+  run_package_manager_with_retries /usr/bin/apt-get apt_get_analysis_errors \
+    "/usr/bin/apt-get update" "$@"
 }
 
-# Replace apt-get with the new function
-alias apt-get="apt_get_with_retries"
+# Wrapper function for apt-get with retry logic. Call apt_get instead of
+# apt-get directly. Uses a function (not an alias) so that it works in
+# non-interactive shells (bash/sh scripts).
+apt_get() { apt_get_with_retries "$@"; }
 
 dnf_with_retries() {
-  run_package_manager_with_retries dnf dnf_analysis_errors "$@"
+  run_package_manager_with_retries /usr/bin/dnf dnf_analysis_errors "" "$@"
 }
 
-# Replace dnf with the new function
-alias dnf="dnf_with_retries"
+# Wrapper function for dnf with retry logic.
+dnf_retry() { dnf_with_retries "$@"; }
 
 get_node_version() {
   url="http://localhost:8732/version"

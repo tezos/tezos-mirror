@@ -7,14 +7,14 @@ REPOOLD="https://packages.nomadic-labs.com"
 DISTRO=$1
 RELEASE=$2
 
-# include apt-get function with retry
+# include apt_get function with retry
 . scripts/packaging/tests/tests-common.inc.sh
 
 # For the upgrade script in the CI, we do not want debconf to ask questions
 export DEBIAN_FRONTEND=noninteractive
 
-apt-get update
-apt-get install -y sudo gpg curl apt-utils debconf-utils procps jq
+apt_get update
+apt_get install -y sudo gpg curl apt-utils debconf-utils procps jq
 
 # [preseed debconf]
 echo "debconf debconf/frontend select Noninteractive" | sudo debconf-set-selections
@@ -23,7 +23,7 @@ echo "debconf debconf/frontend select Noninteractive" | sudo debconf-set-selecti
 sudo curl "$REPOOLD/$DISTRO/octez.asc" | sudo gpg --dearmor -o /etc/apt/keyrings/octez.gpg
 repository="deb [signed-by=/etc/apt/keyrings/octez.gpg] $REPOOLD/$DISTRO $RELEASE main"
 echo "$repository" | sudo tee /etc/apt/sources.list.d/octez-current.list
-apt-get update
+apt_get update
 
 # [ preeseed octez ]
 # preseed octez-node for debconf. Notice we set purge_warning to yes,
@@ -45,7 +45,7 @@ sudo debconf-set-selections preseed.cfg
 sudo debconf-get-selections | grep octez
 
 # [install octez]
-apt-get install -y octez-baker
+apt_get install -y octez-baker
 
 sudo su tezos -c "octez-node config init --rpc-addr 127.0.0.1:8732"
 sudo systemctl start octez-node
@@ -68,7 +68,7 @@ done < <(dpkg -l "${packages[@]}" | awk '$1 == "ii" { print $2, $3 }')
 sudo curl "$REPO/$DISTRO/octez.asc" | sudo gpg --dearmor -o /etc/apt/keyrings/octez-dev.gpg
 repository="deb [signed-by=/etc/apt/keyrings/octez-dev.gpg] $REPO/$DISTRO $RELEASE main"
 echo "$repository" | sudo tee /etc/apt/sources.list.d/octez-next.list
-apt-get update
+apt_get update
 
 mapfile -t before_upgrade < <(
   systemctl list-unit-files --type=service |
@@ -80,7 +80,7 @@ systemctl list-unit-files --type=service | grep "octez"
 
 # [upgrade octez]
 sudo rm -f /usr/sbin/policy-rc.d
-apt-get upgrade -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -y octez-node octez-dal-node octez-baker
+apt_get upgrade -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -y octez-node octez-dal-node octez-baker
 
 sudo systemctl start octez-node
 sudo systemctl start octez-dal-node
