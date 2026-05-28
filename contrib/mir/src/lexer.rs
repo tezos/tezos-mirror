@@ -328,6 +328,16 @@ fn lex_bytes(lex: &mut Lexer) -> Result<Vec<u8>, LexerError> {
 
 fn lex_annotation<'a>(lex: &mut Lexer<'a>) -> Result<Annotation<'a>, LexerError> {
     let lex_slice = lex.slice();
+    // L1's text parser rejects annotation tokens longer than 255 bytes
+    // (Micheline_parser.check_annot / max_annot_length in
+    // src/lib_micheline/micheline_parser.ml). Match it so MIR does not accept
+    // source that L1 would reject.
+    if lex_slice.len() > 255 {
+        return Err(LexerError::OversizedAnnotation {
+            annotation: lex_slice.to_string(),
+            length: lex_slice.len(),
+        });
+    }
     ann_from_str(lex_slice)
 }
 
@@ -393,5 +403,25 @@ mod tests {
         assert_parse("0x", Ok([]));
         assert_parse::<0>("0x1", Err("invalid hex sequence: Odd number of digits"));
         assert_parse::<0>("0xzz", Err("unknown primitive: zz"));
+    }
+
+    #[test]
+    fn oversized_annotation() {
+        // L1's text parser caps annotation tokens (sigil included) at 255 bytes
+        // (Micheline_parser.check_annot); MIR must reject longer ones too.
+        let ann_255 = format!("@{}", "a".repeat(254)); // 255-byte token
+        assert!(matches!(
+            Tok::lexer(&ann_255).next().unwrap(),
+            Ok(Tok::Annotation(_))
+        ));
+
+        let ann_256 = format!("@{}", "a".repeat(255)); // 256-byte token
+        assert_eq!(
+            Tok::lexer(&ann_256).next().unwrap(),
+            Err(LexerError::OversizedAnnotation {
+                annotation: ann_256.clone(),
+                length: 256,
+            })
+        );
     }
 }

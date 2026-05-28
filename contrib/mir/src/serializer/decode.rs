@@ -58,6 +58,9 @@ pub enum DecodeError {
     /// Failed to deserialize an annotation.
     #[error("could not decode annotation")]
     BadAnnotation,
+    /// An annotation exceeds L1's 255-byte limit.
+    #[error("annotation exceeds 255 bytes (was {0})")]
+    OversizedAnnotation(usize),
 }
 
 impl<'a> Micheline<'a> {
@@ -437,6 +440,13 @@ fn decode_bytes(bytes: &mut BytesIt) -> Result<Micheline<'static>, DecodeError> 
 }
 
 fn validate_ann(bytes: &[u8]) -> Result<Annotation<'static>, DecodeError> {
+    // L1's binary Micheline decoder rejects annotations longer than 255 bytes
+    // (see src/lib_micheline/micheline_encoding.ml). MIR must do the same so a
+    // blob L1 rejects does not decode here (e.g. UNPACK must return None).
+    if bytes.len() > 255 {
+        return Err(DecodeError::OversizedAnnotation(bytes.len()));
+    }
+
     // @%|@%%|%@|@|:|%|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*
     macro_rules! alpha_num {
       () => {
@@ -725,6 +735,40 @@ mod test {
         fn bad_annotations() {
             check_err("0x045b00000002257f", DecodeError::BadAnnotation);
             check_err("0x045b000000026161", DecodeError::BadAnnotation);
+        }
+
+        #[test]
+        fn oversized_annotation() {
+            // L1 caps annotation tokens (sigil included) at 255 bytes; MIR must
+            // match on the binary decode path so UNPACK of an oversized blob
+            // yields None. Build the packed bytes for `(true @aa...)` whose
+            // annotation token is `len` bytes long.
+            fn true_with_ann(len: usize) -> Vec<u8> {
+                let mut bool = Micheline::from(true);
+                bool.annotate(
+                    Annotation::Variable("a".repeat(len - 1).into()),
+                    &mut Gas::default(),
+                )
+                .unwrap();
+                bool.encode(&mut Gas::default()).unwrap().unwrap()
+            }
+
+            // 255-byte token: accepted, matching L1.
+            {
+                let arena = Arena::new();
+                assert!(matches!(
+                    Micheline::decode_raw(&arena, &true_with_ann(255), &mut Gas::default()),
+                    Ok(Ok(_))
+                ));
+            }
+            // 256-byte token: rejected, matching L1 (UNPACK -> None).
+            {
+                let arena = Arena::new();
+                assert_eq!(
+                    Micheline::decode_raw(&arena, &true_with_ann(256), &mut Gas::default()),
+                    Ok(Err(DecodeError::OversizedAnnotation(256)))
+                );
+            }
         }
     }
 }

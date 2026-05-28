@@ -7214,6 +7214,59 @@ mod interpreter_tests {
     }
 
     #[test]
+    fn unpack_oversized_annotation() {
+        // Regression for L2-1376: UNPACK of a packed lambda
+        // `{ DROP ; PUSH @<ann> int 1 }`. L1 caps annotation tokens (sigil
+        // included) at 255 bytes, so the 256-byte case must decode to None
+        // (matching L1), while 255 still yields Some. The PACK bytes are built
+        // directly, since the text parser now rejects oversized annotations.
+        fn packed_lambda(ann_len: usize) -> Vec<u8> {
+            use crate::parser::test_helpers::parse;
+            let mut gas = Gas::default();
+            let mut lambda = parse("Lambda_rec { DROP ; DROP ; PUSH int 1 }").unwrap();
+            lambda
+                .annotate(
+                    Annotation::Variable("a".repeat(ann_len - 1).into()),
+                    &mut gas,
+                )
+                .unwrap();
+            lambda.encode_for_pack(&mut gas).unwrap().unwrap()
+        }
+
+        // 255-byte annotation token: decodes and typechecks -> Some.
+        let mut stack = stk![V::Bytes(packed_lambda(255))];
+        let ctx = &mut Ctx::default();
+        assert_eq!(
+            interpret_one(
+                &Unpack(Type::new_lambda(Type::Unit, Type::Int)),
+                ctx,
+                &mut stack
+            ),
+            Ok(())
+        );
+        let top = stack
+            .pop()
+            .expect("UNPACK must leave a result on the stack");
+        assert!(
+            matches!(&*top, V::Option(Some(_))),
+            "255-byte annotation should unpack to Some, got {top:?}"
+        );
+
+        // 256-byte annotation token: decode rejects the annotation -> None.
+        let mut stack = stk![V::Bytes(packed_lambda(256))];
+        let ctx = &mut Ctx::default();
+        assert_eq!(
+            interpret_one(
+                &Unpack(Type::new_lambda(Type::Unit, Type::Int)),
+                ctx,
+                &mut stack
+            ),
+            Ok(())
+        );
+        assert_eq!(stack, stk![V::new_option(None)]);
+    }
+
+    #[test]
     fn create_contract() {
         use crate::parser::test_helpers::parse;
 
