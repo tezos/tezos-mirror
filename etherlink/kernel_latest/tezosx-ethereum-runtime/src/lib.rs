@@ -486,6 +486,26 @@ where
     };
     journal.evm.inner.log(crac_log);
 
+    // `tx.origin` returns the inbound CRAC originator
+    // (`X-Tezos-Source`) instead of `TxEnv.caller`, via a custom
+    // `ORIGIN` opcode handler (see `etherlink_origin` in
+    // `revm/src/lib.rs`). `TxEnv.caller` — and therefore `msg.sender`,
+    // REVM's pre-execution nonce bump, and the value deduction — stays
+    // on the immediate caller (`X-Tezos-Sender`) exactly as it did
+    // before L2-1363, so the EOA-only guard is restored without any of
+    // the side effects of overloading `TxEnv.caller`. An originator of
+    // `None` falls back to the standard `TxEnv.caller` →
+    // `tx.origin == msg.sender` semantics (a direct EOA call). See
+    // L2-1363 / L2-1441.
+    //
+    // The originator is per-call: save the outer frame's value and
+    // restore it on return (same shape as `crac_chain_depth` above).
+    // Otherwise, in a nested EVM → Michelson → EVM scenario, the
+    // inner serve would reset the outer frame's originator and the
+    // outer EVM's post-bounce `ORIGIN` would fall back to
+    // `TxEnv.caller`, observably flipping `tx.origin` mid-frame.
+    let saved_cross_runtime_originator = journal.evm.cross_runtime_originator();
+    journal.evm.set_cross_runtime_originator(hdrs.source);
     let outcome = run_transaction(
         host,
         registry,
@@ -513,9 +533,12 @@ where
             credit: Some((hdrs.sender, hdrs.amount)),
         },
     );
-    // Restore the outer frame's per-call depth now that the inner
-    // execution is done (see the save above).
+    // Restore the outer frame's per-call depth and originator now that
+    // the inner execution is done (see the saves above).
     journal.evm.set_crac_chain_depth(saved_crac_chain_depth);
+    journal
+        .evm
+        .set_cross_runtime_originator(saved_cross_runtime_originator);
     let outcome =
         outcome.map_err(|e| classify_evm_run_error("EVM execution failed", e))?;
 
@@ -590,6 +613,14 @@ where
 
     // Intentionally no `CracReceived` log on the static path.
 
+    // Same custom-`ORIGIN` mechanism as the state-mutating path: the
+    // inbound originator drives the `ORIGIN` opcode (see
+    // `etherlink_origin` in `revm/src/lib.rs`) while `TxEnv.caller`
+    // stays the immediate caller. Save/restore around the inner
+    // execution mirrors [`execute_call`]; see its comment for the
+    // nested-frame rationale. See L2-1363 / L2-1441.
+    let saved_cross_runtime_originator = journal.evm.cross_runtime_originator();
+    journal.evm.set_cross_runtime_originator(hdrs.source);
     let outcome = run_transaction(
         host,
         registry,
@@ -612,9 +643,12 @@ where
         true,
         TransactionOrigin::CrossRuntimeStatic,
     );
-    // Restore the outer frame's per-call depth now that the inner
-    // execution is done (see the save above).
+    // Restore the outer frame's per-call depth and originator (see
+    // [`execute_call`] for the symmetric handling).
     journal.evm.set_crac_chain_depth(saved_crac_chain_depth);
+    journal
+        .evm
+        .set_cross_runtime_originator(saved_cross_runtime_originator);
     let outcome =
         outcome.map_err(|e| classify_evm_run_error("EVM static execution failed", e))?;
 
@@ -1155,6 +1189,72 @@ mod tests {
         );
     }
 
+    /// Sibling of [`test_serve_post_restores_crac_chain_depth`] for
+    /// the originator. Without the save/restore, a nested
+    /// `EVM → Michelson → EVM` would clear the outer frame's
+    /// originator on the inner serve's return and the outer EVM's
+    /// post-bounce `ORIGIN` would silently fall back to
+    /// `TxEnv.caller`, flipping `tx.origin` mid-frame.
+    #[test]
+    fn test_serve_post_restores_cross_runtime_originator() {
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let registry = UnimplementedRegistry;
+        let sender = Address::from_slice(&[0x11; 20]);
+        let destination = Address::from_slice(&[0x22; 20]);
+        let outer_originator = Address::from_slice(&[0x33; 20]);
+
+        let mut journal = TezosXJournal::default();
+        journal
+            .evm
+            .set_cross_runtime_originator(Some(outer_originator));
+
+        let request = serve_request_with_depth(
+            http::Method::POST,
+            &sender,
+            &destination,
+            INBOUND_DEPTH,
+        );
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        assert_eq!(resp.status(), http::StatusCode::OK);
+
+        assert_eq!(
+            journal.evm.cross_runtime_originator(),
+            Some(outer_originator),
+            "POST serve() must restore the outer frame's cross_runtime_originator on return"
+        );
+    }
+
+    #[test]
+    fn test_serve_get_restores_cross_runtime_originator() {
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let registry = UnimplementedRegistry;
+        let sender = Address::from_slice(&[0x11; 20]);
+        let destination = Address::from_slice(&[0x22; 20]);
+        let outer_originator = Address::from_slice(&[0x33; 20]);
+
+        let mut journal = TezosXJournal::default();
+        journal
+            .evm
+            .set_cross_runtime_originator(Some(outer_originator));
+
+        let request = serve_request_with_depth(
+            http::Method::GET,
+            &sender,
+            &destination,
+            INBOUND_DEPTH,
+        );
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        assert_eq!(resp.status(), http::StatusCode::OK);
+
+        assert_eq!(
+            journal.evm.cross_runtime_originator(),
+            Some(outer_originator),
+            "GET serve() must restore the outer frame's cross_runtime_originator on return"
+        );
+    }
+
     #[test]
     fn test_serve_preserves_revm_call_depth_control() {
         // Control / sibling: `revm_call_depth` is written only by the
@@ -1613,6 +1713,231 @@ mod tests {
         let mut journal = TezosXJournal::default();
         let resp = runtime.serve(&registry, &mut host, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
+    }
+
+    // ── L2-1363: inbound-CRAC tx.origin / msg.sender split ───────────
+
+    /// Build a POST `serve()` request that carries an explicit
+    /// `X-Tezos-Source` (the originator) distinct from `X-Tezos-Sender`
+    /// (the immediate caller) — the inbound-CRAC shape that triggers the
+    /// L2-1363 origin/sender split.
+    fn build_serve_request_with_source(
+        sender: &Address,
+        source: &Address,
+        destination: &Address,
+        amount: &str,
+        body: Vec<u8>,
+    ) -> http::Request<Vec<u8>> {
+        let url = format!(
+            "http://ethereum/{}",
+            alloy_primitives::hex::encode(destination.0 .0)
+        );
+        http::Request::builder()
+            .method(http::Method::POST)
+            .uri(&url)
+            .header(
+                tezosx_interfaces::X_TEZOS_SENDER,
+                format!("0x{}", alloy_primitives::hex::encode(sender.0 .0)),
+            )
+            .header(
+                tezosx_interfaces::X_TEZOS_SOURCE,
+                format!("0x{}", alloy_primitives::hex::encode(source.0 .0)),
+            )
+            .header(tezosx_interfaces::X_TEZOS_AMOUNT, amount)
+            .header(tezosx_interfaces::X_TEZOS_GAS_LIMIT, u64::MAX.to_string())
+            .header(tezosx_interfaces::X_TEZOS_TIMESTAMP, "1")
+            .header(tezosx_interfaces::X_TEZOS_BLOCK_NUMBER, "1")
+            .body(body)
+            .unwrap()
+    }
+
+    /// Contract that records `ORIGIN` at storage slot 0 and `CALLER` at
+    /// slot 1, so the test can read back what the EVM exposed:
+    ///   ORIGIN PUSH1 0x00 SSTORE  CALLER PUSH1 0x01 SSTORE
+    const ORIGIN_CALLER_RECORDER: &str = "3260005533600155";
+
+    /// On an inbound CRAC where the originator (`X-Tezos-Source`) is not
+    /// the immediate caller (`X-Tezos-Sender`), `tx.origin` is the
+    /// originator and `msg.sender` is the immediate caller — they
+    /// differ, as on native Ethereum when an EOA calls through a
+    /// contract is impossible but the runtime boundary makes it so
+    /// (L2-1363). Reverting the fix makes both equal `sender` and fails
+    /// the slot-0 assertion.
+    #[test]
+    fn inbound_crac_origin_is_source_sender_is_caller() {
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let block_constants = BlockConstants::test_block_with_no_fees();
+        let registry = UnimplementedRegistry;
+
+        let sender = Address::from_slice(&[0x11; 20]); // immediate caller (a contract alias)
+        let source = Address::from_slice(&[0x22; 20]); // true originator (an EOA alias)
+        let contract = Address::from_slice(&[0x33; 20]);
+        deploy_at(
+            &mut host,
+            &contract,
+            Bytes::from_hex(ORIGIN_CALLER_RECORDER).unwrap(),
+        );
+
+        let mut journal = TezosXJournal::default();
+        let request =
+            build_serve_request_with_source(&sender, &source, &contract, "0", vec![]);
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        commit_evm_journal_from_external(
+            &mut host,
+            &registry,
+            &block_constants,
+            &mut journal,
+        )
+        .unwrap();
+
+        let stored_origin = read_slot(&mut host, &contract, revm::primitives::U256::ZERO);
+        let stored_caller =
+            read_slot(&mut host, &contract, revm::primitives::U256::from(1));
+        assert_eq!(
+            stored_origin,
+            revm::primitives::U256::from_be_slice(source.as_slice()),
+            "tx.origin must be the originator (X-Tezos-Source), not the immediate caller"
+        );
+        assert_eq!(
+            stored_caller,
+            revm::primitives::U256::from_be_slice(sender.as_slice()),
+            "msg.sender must stay the immediate caller (X-Tezos-Sender)"
+        );
+    }
+
+    /// When the originator *is* the immediate caller (the common
+    /// direct-EOA case, where the gateway sets `X-Tezos-Source ==
+    /// X-Tezos-Sender`), `tx.origin == msg.sender` — the pre-L2-1363
+    /// behavior is preserved.
+    #[test]
+    fn inbound_crac_origin_equals_caller_when_source_is_sender() {
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let block_constants = BlockConstants::test_block_with_no_fees();
+        let registry = UnimplementedRegistry;
+
+        let eoa = Address::from_slice(&[0x44; 20]);
+        let contract = Address::from_slice(&[0x55; 20]);
+        deploy_at(
+            &mut host,
+            &contract,
+            Bytes::from_hex(ORIGIN_CALLER_RECORDER).unwrap(),
+        );
+
+        let mut journal = TezosXJournal::default();
+        let request = build_serve_request_with_source(&eoa, &eoa, &contract, "0", vec![]);
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        commit_evm_journal_from_external(
+            &mut host,
+            &registry,
+            &block_constants,
+            &mut journal,
+        )
+        .unwrap();
+
+        let stored_origin = read_slot(&mut host, &contract, revm::primitives::U256::ZERO);
+        let stored_caller =
+            read_slot(&mut host, &contract, revm::primitives::U256::from(1));
+        let eoa_word = revm::primitives::U256::from_be_slice(eoa.as_slice());
+        assert_eq!(stored_origin, eoa_word);
+        assert_eq!(stored_caller, eoa_word);
+    }
+
+    /// `require(tx.origin == msg.sender)`: revert when they differ,
+    /// else STOP.
+    ///   ORIGIN CALLER EQ PUSH1 0x0b JUMPI PUSH1 0 PUSH1 0 REVERT
+    ///   JUMPDEST STOP
+    const EOA_ONLY_GUARD: &str = "323314600b5760006000fd5b00";
+
+    /// The EOA-only guard now holds across the runtime boundary: an
+    /// inbound CRAC whose immediate caller is a contract (`source !=
+    /// sender`) is rejected (the guard reverts → catchable 400). This is
+    /// the H-0094 bypass: before L2-1363 it returned 200 (`passed=1`).
+    #[test]
+    fn inbound_crac_eoa_only_guard_blocks_contract_caller() {
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let registry = UnimplementedRegistry;
+
+        let sender = Address::from_slice(&[0x11; 20]);
+        let source = Address::from_slice(&[0x22; 20]);
+        let guard = Address::from_slice(&[0x33; 20]);
+        deploy_at(&mut host, &guard, Bytes::from_hex(EOA_ONLY_GUARD).unwrap());
+
+        let mut journal = TezosXJournal::default();
+        let request =
+            build_serve_request_with_source(&sender, &source, &guard, "0", vec![]);
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        assert_eq!(
+            resp.status(),
+            http::StatusCode::BAD_REQUEST,
+            "EOA-only guard must reject a contract caller (tx.origin != msg.sender)"
+        );
+    }
+
+    /// Control: the same guard lets a genuine direct-EOA call through
+    /// (`source == sender` → `tx.origin == msg.sender`).
+    #[test]
+    fn inbound_crac_eoa_only_guard_allows_eoa() {
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let registry = UnimplementedRegistry;
+
+        let eoa = Address::from_slice(&[0x44; 20]);
+        let guard = Address::from_slice(&[0x55; 20]);
+        deploy_at(&mut host, &guard, Bytes::from_hex(EOA_ONLY_GUARD).unwrap());
+
+        let mut journal = TezosXJournal::default();
+        let request = build_serve_request_with_source(&eoa, &eoa, &guard, "0", vec![]);
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        assert_eq!(resp.status(), http::StatusCode::OK);
+    }
+
+    /// Sanity check: the inbound-CRAC originator (`X-Tezos-Source`)
+    /// drives the `ORIGIN` opcode via the kernel's custom handler, not
+    /// `TxEnv.caller`, so REVM's pre-execution nonce bump stays on the
+    /// immediate caller (the sender alias) and never touches the
+    /// originator's on-chain nonce — even when the originator is the
+    /// outer-tx signing EOA on an `EVM -> Michelson -> EVM` round-trip.
+    /// Asserts the persisted nonce of `source` stays at `0` after the
+    /// inbound CRAC; a future regression that re-overloads
+    /// `TxEnv.caller` would make this test read `1` instead.
+    #[test]
+    fn inbound_crac_does_not_leak_origin_nonce_bump() {
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let block_constants = BlockConstants::test_block_with_no_fees();
+        let registry = UnimplementedRegistry;
+
+        let sender = Address::from_slice(&[0x11; 20]);
+        // Outer-tx originator (EOA) — its on-chain nonce must not drift.
+        let source = Address::from_slice(&[0x22; 20]);
+        let contract = Address::from_slice(&[0x33; 20]);
+        // Target with a single STOP — trivial inner call.
+        deploy_at(&mut host, &contract, Bytes::from_hex("00").unwrap());
+
+        let mut journal = TezosXJournal::default();
+        let request =
+            build_serve_request_with_source(&sender, &source, &contract, "0", vec![]);
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        commit_evm_journal_from_external(
+            &mut host,
+            &registry,
+            &block_constants,
+            &mut journal,
+        )
+        .unwrap();
+
+        let source_account = StorageAccount::from_address(&source).unwrap();
+        let info = source_account.info(&mut host).unwrap();
+        assert_eq!(
+            info.nonce, 0,
+            "inbound CRAC must not leak its pre-execution nonce bump onto the originator"
+        );
     }
 
     // ── L2-1259: HTTP method dispatch and GET-static path ────────────

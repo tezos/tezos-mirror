@@ -239,6 +239,69 @@ where
     }
 }
 
+/// EVM opcode for `ORIGIN` (0x32). Stable across all hardforks since
+/// Frontier; named here so the override site reads as code, not magic.
+const ORIGIN_OPCODE: u8 = 0x32;
+
+/// Static gas cost of the `ORIGIN` opcode (2, the same `GAS_BASE` REVM
+/// uses for the stock handler — see `revm-interpreter` `instructions::ORIGIN`).
+const ORIGIN_STATIC_GAS: u64 = 2;
+
+/// Custom `ORIGIN` opcode handler: when an inbound CRAC carries an
+/// originator (`X-Tezos-Source`, exposed via
+/// [`crate::journal::CrossRuntimeCall::cross_runtime_originator`]), push
+/// that address as `tx.origin`; otherwise fall back to `TxEnv.caller`
+/// (the standard EVM `ORIGIN` semantics).
+///
+/// This is how `tx.origin` carries the real outer-tx originator across
+/// an `EVM <-> Michelson` boundary while `TxEnv.caller` keeps its usual
+/// REVM meaning (the immediate caller's alias — so `msg.sender`, the
+/// pre-execution nonce bump and the value deduction all stay on the
+/// alias, exactly as they did before L2-1363). See L2-1441 for the
+/// design rationale that replaces the earlier `TxEnv.caller`-overload
+/// approach.
+fn etherlink_origin<'a, Host, R>(
+    context: revm::interpreter::InstructionContext<
+        '_,
+        EVMInnerContext<'a, Host, R>,
+        EthInterpreter,
+    >,
+) where
+    Host: StorageV1,
+    R: Registry,
+{
+    use crate::journal::CrossRuntimeCall;
+    use revm::interpreter::Host as InterpHost;
+    let cross = context.host.journal().cross_runtime_originator();
+    let value = match cross {
+        Some(o) => o,
+        None => InterpHost::caller(context.host),
+    };
+    if !context.interpreter.stack.push(value.into_word().into()) {
+        context.interpreter.halt_overflow();
+    }
+}
+
+/// Install [`etherlink_origin`] in `evm.instruction` as the handler for
+/// `ORIGIN`. Call once per `Evm` construction (see
+/// [`build_evm_inspector_context`] / [`build_evm_context`]). Uses
+/// [`EvmInspection`] as the type alias for the etherlink-shaped `Evm`;
+/// the non-inspector [`EvmContext`] is just `EvmInspection` with
+/// `INSP = ()`, so the same function covers both call sites.
+fn install_etherlink_origin<'a, Host, R, INSP>(evm: &mut EvmInspection<'a, Host, INSP, R>)
+where
+    Host: StorageV1,
+    R: Registry,
+{
+    evm.instruction.insert_instruction(
+        ORIGIN_OPCODE,
+        revm::interpreter::Instruction::new(
+            etherlink_origin::<Host, R>,
+            ORIGIN_STATIC_GAS,
+        ),
+    );
+}
+
 #[instrument(skip_all)]
 #[allow(clippy::too_many_arguments)]
 fn build_evm_inspector_context<
@@ -283,8 +346,11 @@ where
         local: LocalContext::default(),
         error: Ok(()),
     };
-    ctx.build_mainnet_with_inspector(inspector)
-        .with_precompiles(precompiles)
+    let mut evm = ctx
+        .build_mainnet_with_inspector(inspector)
+        .with_precompiles(precompiles);
+    install_etherlink_origin(&mut evm);
+    evm
 }
 
 #[instrument(skip_all)]
@@ -325,7 +391,9 @@ where
         local: LocalContext::default(),
         error: Ok(()),
     };
-    ctx.build_mainnet().with_precompiles(precompiles)
+    let mut evm = ctx.build_mainnet().with_precompiles(precompiles);
+    install_etherlink_origin(&mut evm);
+    evm
 }
 
 /// Run the EVM transaction. Routes through [`EtherlinkHandler`]

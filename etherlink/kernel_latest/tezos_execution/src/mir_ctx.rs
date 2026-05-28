@@ -63,6 +63,14 @@ pub struct OperationCtx<'operation, A: TezosImplicitAccount> {
     /// Raw bytes of the source account's public key (from validation).
     pub source_public_key: &'operation [u8],
     pub crac_chain_depth: u32,
+    /// Alias of the originator of the inbound CRAC being serviced — the
+    /// `alias(E_0)` KT1 carried in `X-Tezos-Source` — or `None` for a
+    /// top-level Michelson transaction. The gateway re-injects it
+    /// (translated) as the outbound `X-Tezos-Source`, so `tx.origin`
+    /// stays invariant across an `EVM -> Michelson -> EVM` round-trip
+    /// instead of collapsing onto this runtime's null operation source
+    /// (L2-1363).
+    pub crac_origin: Option<ContractKt1Hash>,
 }
 
 pub struct ExecCtx {
@@ -570,6 +578,10 @@ pub trait HasSourcePublicKey {
 
 pub trait HasCracChainDepth {
     fn crac_chain_depth(&self) -> u32;
+
+    /// Alias of the inbound CRAC originator, if this execution is
+    /// servicing one. See [`OperationCtx::crac_origin`].
+    fn crac_origin(&self) -> Option<ContractKt1Hash>;
 }
 
 /// Read the runtime classification record for an address.
@@ -701,6 +713,10 @@ impl<Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> HasCracChainDe
 {
     fn crac_chain_depth(&self) -> u32 {
         self.operation_ctx.crac_chain_depth
+    }
+
+    fn crac_origin(&self) -> Option<ContractKt1Hash> {
+        self.operation_ctx.crac_origin.clone()
     }
 }
 
@@ -1613,6 +1629,7 @@ pub mod tests {
             chain_id: &chain_id,
             source_public_key: &source_public_key,
             crac_chain_depth: 0,
+            crac_origin: None,
         };
 
         let exec_ctx = ExecCtx {
@@ -2151,6 +2168,7 @@ pub mod tests {
             chain_id: &chain_id,
             source_public_key: &source_public_key,
             crac_chain_depth: 0,
+            crac_origin: None,
         };
 
         let exec_ctx = ExecCtx {
@@ -2243,6 +2261,7 @@ pub(crate) mod mock {
         pub operation_counter: u128,
         pub context: crate::context::TezlinkContext,
         pub crac_chain_depth: u32,
+        pub crac_origin: Option<ContractKt1Hash>,
     }
 
     impl<'h, 'j, 'r, Host: StorageV1, R: tezosx_interfaces::Registry>
@@ -2272,6 +2291,7 @@ pub(crate) mod mock {
                 },
                 context: crate::context::TezlinkContext::init_context(),
                 crac_chain_depth: 0,
+                crac_origin: None,
             }
         }
     }
@@ -2281,6 +2301,10 @@ pub(crate) mod mock {
     {
         fn crac_chain_depth(&self) -> u32 {
             self.crac_chain_depth
+        }
+
+        fn crac_origin(&self) -> Option<ContractKt1Hash> {
+            self.crac_origin.clone()
         }
     }
 

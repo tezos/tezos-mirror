@@ -656,6 +656,14 @@ pub trait CrossRuntimeCall {
     fn set_original_source(&mut self, source: OriginalSource);
 
     fn original_source(&self) -> Option<&OriginalSource>;
+
+    /// Originator of the inbound CRAC being serviced (the
+    /// `X-Tezos-Source` alias). Read by the kernel's custom `ORIGIN`
+    /// opcode so `tx.origin` carries the real outer-tx originator while
+    /// `TxEnv.caller` (and thus `msg.sender`, the nonce bump, the value
+    /// deduction) keeps its standard REVM meaning. `None` outside an
+    /// inbound CRAC; the opcode then falls back to `TxEnv.caller`.
+    fn cross_runtime_originator(&self) -> Option<Address>;
 }
 
 impl<'a, Host, R: Registry> CrossRuntimeCall for Journal<'a, Host, R>
@@ -805,6 +813,10 @@ where
 
     fn original_source(&self) -> Option<&OriginalSource> {
         self.journal.evm.original_source()
+    }
+
+    fn cross_runtime_originator(&self) -> Option<Address> {
+        self.journal.evm.cross_runtime_originator()
     }
 }
 

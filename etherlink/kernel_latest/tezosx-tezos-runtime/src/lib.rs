@@ -721,6 +721,11 @@ where
         chain_id,
         source_public_key: &[],
         crac_chain_depth: hdrs.crac_depth,
+        // Retain the inbound CRAC originator so the gateway can forward
+        // it (translated) as the outbound source, keeping `tx.origin`
+        // invariant across runtime hops (L2-1363). `None` for a
+        // top-level Michelson tx (non-KT1 `X-Tezos-Source`).
+        crac_origin: hdrs.crac_origin_contract.clone(),
     };
     let parser = mir::parser::Parser::new();
 

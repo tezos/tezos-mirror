@@ -795,7 +795,19 @@ where
         })?;
     let source_public_key = ctx.source_public_key().to_vec();
     let sender = ctx.sender();
-    let source = AddressHash::from(ctx.source());
+    // Propagate the originator end-to-end so `tx.origin` stays invariant
+    // across runtime hops. When this execution services an inbound CRAC,
+    // forward the carried originator alias (`alias(E_0)`); otherwise (a
+    // top-level Michelson tx) fall back to the operation source. The
+    // originator alias resolves back through `RoutingDecision::RoundTrip`
+    // to the real address on the target side, so an
+    // `EVM -> Michelson -> EVM` round-trip preserves the EOA origin
+    // instead of collapsing onto this runtime's null source (L2-1363).
+    // Mirrors the EVM side's `origin = hdrs.source.unwrap_or(hdrs.sender)`.
+    let source = match ctx.crac_origin() {
+        Some(origin_alias) => AddressHash::Kt1(origin_alias),
+        None => AddressHash::from(ctx.source()),
+    };
     let amount_mutez: u64 = ctx
         .amount()
         .try_into()
@@ -1637,6 +1649,56 @@ mod tests {
         assert_eq!(
             serve_calls[0].headers().get(X_TEZOS_AMOUNT).unwrap(),
             "0.0005"
+        );
+    }
+
+    /// L2-1363: when servicing an inbound CRAC, the gateway forwards the
+    /// carried originator alias (`crac_origin`) as the outbound source —
+    /// not this runtime's null operation source — so `tx.origin` stays
+    /// invariant across an `EVM -> Michelson -> EVM` round-trip. Here the
+    /// mock has no classification record, so the originator resolves
+    /// `Native` and we assert the source-side `ensure_alias` call carries
+    /// the originator KT1's own address (rather than `MockCtx::source()`,
+    /// the null `tz1KqTp...`). In production that originator alias is an
+    /// EVM alias and resolves back to the EOA via
+    /// `RoutingDecision::RoundTrip` (see
+    /// `routing_returns_round_trip_for_matching_alias` and the
+    /// TezosX-context classification tests). Reverting the fix forwards
+    /// the null operation source, failing the assertion.
+    #[test]
+    fn test_dispatch_crac_call_forwards_crac_origin_as_source() {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+
+        // Immediate caller (sender), distinct from the originator.
+        let sender = AddressHash::Kt1(ContractKt1Hash::from([0xAA; 20]));
+        // Originator alias carried on the inbound CRAC (`alias(E_0)`).
+        let crac_origin_kt1 = ContractKt1Hash::from([0x42; 20]);
+
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, sender, 0);
+        ctx.crac_origin = Some(crac_origin_kt1.clone());
+
+        let dest = "0x1234567890123456789012345678901234567890";
+        dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap()).unwrap();
+
+        let expected_source = AddressHash::Kt1(crac_origin_kt1.clone()).to_base58_check();
+        let native_addrs: Vec<String> = registry
+            .ensure_alias_calls
+            .borrow()
+            .iter()
+            .map(|(info, _)| String::from_utf8(info.native_address.clone()).unwrap())
+            .collect();
+        assert!(
+            native_addrs.contains(&expected_source),
+            "source alias must be derived from crac_origin {expected_source}, got {native_addrs:?}"
+        );
+        assert!(
+            !native_addrs.iter().any(|a| a.starts_with("tz1KqTp")),
+            "the null operation source must not be forwarded when crac_origin is set: {native_addrs:?}"
         );
     }
 

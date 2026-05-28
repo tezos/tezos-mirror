@@ -10,9 +10,25 @@
   behind. Previously a failed init left a half-materialized account that
   a later call would bless without re-running initialization,
   permanently bricking the alias (uninitialized forwarder). (!21978)
+- On an inbound cross-runtime call (a Michelson contract calling an EVM
+  contract), the EVM `ORIGIN` opcode (`tx.origin`) now returns the
+  transaction originator (`X-Tezos-Source`) instead of the immediate
+  caller, while `msg.sender` keeps returning the immediate caller
+  (`X-Tezos-Sender`). Previously both returned the immediate caller, so
+  the Ethereum `require(tx.origin == msg.sender)` EOA-only guard was
+  silently bypassed by routing a call through the Michelson runtime.
+  When the originator is the immediate caller (a direct EOA call),
+  `tx.origin == msg.sender` as before. (!21981)
 
 ### Michelson Runtime
 
+- When the Michelson runtime services an inbound cross-runtime call, the
+  gateway now forwards the call's originator (the alias carried in
+  `X-Tezos-Source`) as the outbound `X-Tezos-Source`, instead of this
+  runtime's null operation source. This keeps `tx.origin` invariant
+  across an `EVM -> Michelson -> EVM` round-trip — it resolves back to
+  the originating EOA — rather than collapsing every originator onto a
+  single `alias(null)`. (!21981)
 - Aliases originated as part of a native atomic calls are now surfaced via
   dedicated receipts. (!21904)
 - MIR: harden the Michelson runtime — internal aborts now surface as
