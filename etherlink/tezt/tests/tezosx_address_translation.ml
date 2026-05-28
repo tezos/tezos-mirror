@@ -12,12 +12,20 @@
                  make octez-node octez-client octez-smart-rollup-node octez-evm-node
    Invocation:   dune exec etherlink/tezt/tests/main.exe -- --file tezosx_address_translation.ml
 
-   Happy-path tests for the EVM precompile selectors at `0xff...07`:
+   Tests for the `originOf` and `resolveAddress` address-translation APIs
+   from both call-sites:
 
+   - EVM precompile:
        `originOf(string addr, uint8 sourceRuntime) → (uint8 kind, uint8
         homeRuntime, string nativeAddress)`
        `resolveAddress(string addr, uint8 sourceRuntime, uint8 targetRuntime)
         → (bool classified, uint8 res, string translated)`
+
+   - Michelson synthetic views on the TezosX Gateway:
+       `VIEW "originOf"` input `pair string nat`, return `or unit (or nat
+        (pair nat string))`
+       `VIEW "resolveAddress"` input `pair string (pair nat nat)`, return
+        `option (pair nat string)`
 
    Runtime IDs on the wire: 0 = Tezos, 1 = Ethereum.
 *)
@@ -29,10 +37,19 @@ open Rpc.Syntax
 (** EVM precompile address for cross-runtime gateway calls. *)
 let evm_gateway_address = "0xff00000000000000000000000000000000000007"
 
+let runtime_tags = List.map Tezosx_runtime.tag
+
 (* Wire encoding for runtime IDs. *)
 let runtime_id_tezos = "0"
 
 let runtime_id_ethereum = "1"
+
+(** 4-byte selector for the Solidity custom error `InvalidRuntimeId(uint8)`.
+    Computed as keccak256("InvalidRuntimeId(uint8)")[0..4] = 0xe85c2efe.
+    Source: `sol!` macro expansion in
+    etherlink/kernel_latest/revm/src/precompiles/runtime_gateway.rs,
+    validated by the `invalid_runtime_id_payload_shape` unit test (line ~1551). *)
+let invalid_runtime_id_selector = "e85c2efe"
 
 (* ── EVM eth_call helpers ─────────────────────────────────────────────── *)
 
@@ -78,6 +95,18 @@ let eth_call_gateway_ok ~sequencer ~calldata =
   (* Drop the "0x" prefix. *)
   return (String.sub hex 2 (String.length hex - 2))
 
+(** [eth_call_gateway_err ~sequencer ~calldata] issues an [eth_call] and
+    returns the JSON error object.  Fails if the call succeeds. *)
+let eth_call_gateway_err ~sequencer ~calldata =
+  let* response = eth_call_gateway ~sequencer ~calldata in
+  let err = JSON.(response |-> "error") in
+  match JSON.unannotate err with
+  | `Null ->
+      Test.fail
+        "eth_call to gateway succeeded but a revert was expected (result: %s)"
+        (JSON.encode (Evm_node.extract_result response))
+  | _ -> return err
+
 (** [word_at hex pos] extracts the 32-byte ABI word at zero-based [pos] from
     [hex] (without the "0x" prefix) as a lowercase hex string. *)
 let word_at hex pos = String.sub hex (pos * 64) 64
@@ -101,6 +130,70 @@ let string_from hex offset_word_pos =
     let data_start = (len_pos + 1) * 64 in
     Hex.to_bytes (`Hex (String.sub hex data_start (length * 2)))
     |> Bytes.to_string
+
+(* ── Michelson contract helpers ───────────────────────────────────────── *)
+
+let tezlink_foreign_endpoint sequencer =
+  let r = Evm_node.rpc_endpoint_record sequencer in
+  {r with path = "/tezlink"}
+
+let tezlink_endpoint sequencer =
+  Client.Foreign_endpoint (tezlink_foreign_endpoint sequencer)
+
+let tezlink_client sequencer =
+  Client.init ~endpoint:(tezlink_endpoint sequencer) ()
+
+let contract_prg script_name =
+  Michelson_script.find script_name Michelson_contracts.tezlink_protocol
+  |> Michelson_script.path
+
+(** Originate a Michelson contract via the tezlink client and produce a block
+    on demand. Returns the originated KT1 address. *)
+let originate_contract ~tez_client ~sequencer ~src ~alias ~script_name
+    ~init_storage_data () =
+  let* kt1 =
+    Client.originate_contract
+      ~alias
+      ~amount:Tez.zero
+      ~src:src.Account.public_key_hash
+      ~burn_cap:Tez.one
+      ~init:init_storage_data
+      ~prg:(contract_prg script_name)
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block sequencer in
+  return kt1
+
+(** Call a Michelson contract via the tezlink client and produce a block on
+    demand. *)
+let call_contract ~tez_client ~sequencer ~src ~dest ~arg_data () =
+  let* () =
+    Client.transfer
+      ~amount:Tez.zero
+      ~fee:Tez.one
+      ~giver:src.Account.alias
+      ~receiver:dest
+      ~arg:arg_data
+      ~burn_cap:Tez.one
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block sequencer in
+  unit
+
+(** [check_contract_storage ~sequencer ~tez_client kt1 expected] reads the
+    contract's storage via the typed tezlink RPC and asserts it matches the
+    expected Micheline JSON. *)
+let check_contract_storage ~sequencer ~tez_client kt1 expected =
+  let* storage =
+    Client.RPC.call ~endpoint:(tezlink_endpoint sequencer) tez_client
+    @@ RPC.get_chain_block_context_contract_storage ~id:kt1 ()
+  in
+  let expected_json = JSON.annotate ~origin:"check_contract_storage" expected in
+  Check.(
+    (storage = expected_json)
+      json
+      ~error_msg:"Expected contract storage %R but got %L") ;
+  unit
 
 (* ── EVM contract deployment helper ──────────────────────────────────── *)
 
@@ -133,7 +226,7 @@ let deploy_minimal_contract ~sequencer ~sender ~nonce () =
       Test.fail "Minimal contract deployment transaction failed"
   | _ -> Test.fail "No receipt or no contract address for minimal deployment tx"
 
-(* ── EVM precompile tests (sandbox) ──────────────────────────────────── *)
+(* ── EVM precompile tests — classification paths (commit 1) ───────────── *)
 
 (** Back-stop edge: [originOf] of an EVM address with deployed bytecode returns
     kind=1 (Native) via the EVM code-presence back-stop, without an explicit
@@ -248,76 +341,133 @@ let test_evm_resolve_address_same_source_tezos () =
       ~error_msg:"Expected translated = input addr, got %L") ;
   unit
 
-(** [originOf] of an EVM contract with bytecode (code_hash != KECCAK_EMPTY)
-    returns Native via the code-presence back-stop.  Then [resolveAddress]
-    with sourceRuntime=Ethereum, targetRuntime=Tezos returns a Derived alias.
-    Both reads execute under the EVM call-site's own runtime — this exercises
-    the same-source (back-stop derivation) path. *)
-let test_evm_backstop_derive_same_source () =
+(** Unknown: [originOf] of an EVM address with no /origin record and
+    nonce = 0 returns kind=0 (Unknown). *)
+let test_evm_origin_of_unknown_address () =
   Test_helpers.register_sandbox
     ~__FILE__
     ~kernel:Latest
-    ~title:"originOf + resolveAddress: EVM back-stop derive (same-source path)"
+    ~title:"originOf: unknown EVM address returns Unknown"
+    ~tags:["tezosx"; "address_translation"; "origin_of"; "unknown"; "evm"]
+  @@ fun sandbox ->
+  let addr = "0x1111111111111111111111111111111111111111" in
+  let* calldata =
+    Cast.calldata ~args:[addr; runtime_id_ethereum] "originOf(string,uint8)"
+  in
+  let* hex = eth_call_gateway_ok ~sequencer:sandbox ~calldata in
+  let kind = uint_at hex 0 in
+  Check.(
+    (kind = 0)
+      int
+      ~error_msg:
+        "Expected kind=0 (Unknown) for unregistered EVM address, got %L") ;
+  unit
+
+(** edge: [resolveAddress] of an unclassified (no nonce, no /origin)
+    EVM address returns classified=false. *)
+let test_evm_resolve_address_unknown_source () =
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~kernel:Latest
+    ~title:"resolveAddress: unknown source EVM address returns unclassified"
+    ~tags:["tezosx"; "address_translation"; "resolve_address"; "unknown"; "evm"]
+  @@ fun sandbox ->
+  let addr = "0x3333333333333333333333333333333333333333" in
+  let* calldata =
+    Cast.calldata
+      ~args:[addr; runtime_id_ethereum; runtime_id_tezos]
+      "resolveAddress(string,uint8,uint8)"
+  in
+  let* hex = eth_call_gateway_ok ~sequencer:sandbox ~calldata in
+  let classified = bool_at hex 0 in
+  Check.is_false
+    ~__LOC__
+    classified
+    ~error_msg:"Expected classified=false for unknown EVM source address" ;
+  unit
+
+(** [originOf] of a deployed EVM contract queried with sourceRuntime=Tezos
+    returns kind=0 (Unknown).  This proves [source_runtime] actually routes
+    to the Tezos runtime: the Tezos runtime fails to parse the [0x]-hex
+    string as base58check and returns Unknown.  If [source_runtime] were
+    ignored (defaulting to Ethereum), the code-presence back-stop would
+    classify the deployed contract as Native (kind=1), so kind=0 is the
+    discriminating assertion. *)
+let test_evm_origin_of_cross_source_evm_as_tezos () =
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~kernel:Latest
+    ~title:
+      "originOf: deployed EVM contract queried as Tezos source returns Unknown"
     ~tags:
       [
         "tezosx";
         "address_translation";
         "origin_of";
-        "resolve_address";
-        "backstop";
-        "derive";
+        "cross_source";
+        "tezos";
         "evm";
-        "alias";
       ]
   @@ fun sandbox ->
-  (* Deploy a minimal contract — gives it a non-empty code_hash so the back-stop
-     classifies it as Native. *)
-  let deployer = Eth_account.bootstrap_accounts.(1) in
+  let deployer = Eth_account.bootstrap_accounts.(2) in
   let* contract_addr =
     deploy_minimal_contract ~sequencer:sandbox ~sender:deployer ~nonce:0 ()
   in
-
-  (* originOf(contract_addr, Ethereum) → Native, homeRuntime=Ethereum *)
-  let* origin_calldata =
+  let* calldata =
     Cast.calldata
-      ~args:[contract_addr; runtime_id_ethereum]
+      ~args:[contract_addr; runtime_id_tezos]
       "originOf(string,uint8)"
   in
-  let* origin_hex =
-    eth_call_gateway_ok ~sequencer:sandbox ~calldata:origin_calldata
-  in
-  let kind = uint_at origin_hex 0 in
-  let home_runtime = uint_at origin_hex 1 in
+  let* hex = eth_call_gateway_ok ~sequencer:sandbox ~calldata in
+  let kind = uint_at hex 0 in
   Check.(
-    (kind = 1) int ~error_msg:"Expected kind=1 (Native) from back-stop, got %L") ;
-  Check.(
-    (home_runtime = 1)
+    (kind = 0)
       int
-      ~error_msg:"Expected homeRuntime=1 (Ethereum), got %L") ;
+      ~error_msg:
+        "Expected kind=0 (Unknown) for deployed EVM contract queried as Tezos \
+         source, got %L") ;
+  unit
 
-  (* resolveAddress(contract_addr, Ethereum, Tezos) → classified=true, res=1
-     (Derived).  The derived KT1 depends on the deployed address, which is
-     deterministic but not known here, so we check only the classification. *)
-  let* resolve_calldata =
+(** [resolveAddress] with source=Tezos, target=Ethereum, and a valid
+    EVM-format address returns classified=false.  Source≠target, so no
+    same-source short-circuit applies.  The Tezos runtime fails to parse
+    the [0x]-hex string as base58check → Unknown → classified=false.
+    This discriminates cross-source routing: if [source_runtime] were
+    ignored (treated as Ethereum), source==target would trigger the
+    same-source short-circuit and the valid EVM address would return
+    classified=true (Recorded).  So classified=false only holds if
+    source routing is correct. *)
+let test_evm_resolve_address_cross_source_tezos_to_eth () =
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~kernel:Latest
+    ~title:
+      "resolveAddress: cross-source Tezos→Ethereum from EVM returns \
+       unclassified"
+    ~tags:
+      [
+        "tezosx";
+        "address_translation";
+        "resolve_address";
+        "cross_source";
+        "tezos";
+        "evm";
+      ]
+  @@ fun sandbox ->
+  let addr = "0x1111111111111111111111111111111111111111" in
+  let* calldata =
     Cast.calldata
-      ~args:[contract_addr; runtime_id_ethereum; runtime_id_tezos]
+      ~args:[addr; runtime_id_tezos; runtime_id_ethereum]
       "resolveAddress(string,uint8,uint8)"
   in
-  let* resolve_hex =
-    eth_call_gateway_ok ~sequencer:sandbox ~calldata:resolve_calldata
-  in
-  let classified = bool_at resolve_hex 0 in
-  let res = uint_at resolve_hex 1 in
-  let translated = string_from resolve_hex 2 in
-  Check.is_true
+  let* hex = eth_call_gateway_ok ~sequencer:sandbox ~calldata in
+  let classified = bool_at hex 0 in
+  Check.is_false
     ~__LOC__
     classified
-    ~error_msg:"Expected classified=true for native EVM contract" ;
-  Check.(
-    (res = 1)
-      int
-      ~error_msg:"Expected res=1 (Derived) for EVM contract to Tezos, got %L") ;
-  Log.info "EVM contract %s → Tezos alias %s (Derived)" contract_addr translated ;
+    ~error_msg:
+      "Expected classified=false for EVM-format address with source=Tezos \
+       (cross-source routing returns Unknown)" ;
   unit
 
 (* ── Registration ─────────────────────────────────────────────────────── *)
@@ -326,4 +476,7 @@ let () =
   test_evm_origin_of_code_backstop () ;
   test_evm_resolve_address_same_source_ethereum () ;
   test_evm_resolve_address_same_source_tezos () ;
-  test_evm_backstop_derive_same_source ()
+  test_evm_origin_of_unknown_address () ;
+  test_evm_resolve_address_unknown_source () ;
+  test_evm_origin_of_cross_source_evm_as_tezos () ;
+  test_evm_resolve_address_cross_source_tezos_to_eth ()
