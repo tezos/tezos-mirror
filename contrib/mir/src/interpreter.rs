@@ -506,7 +506,11 @@ fn interpret<'a, 'b>(
     }
 
     // Restore the caller's stack from the bottom of the stack of stacks.
-    *stack = stacks.pop().ok_or(InterpretError::InternalError(
+    // On the error path the driver may have left EXEC/View sub-stacks above
+    // it; `pop()` would hand the caller an inner sub-stack, so take the
+    // bottom (the caller's own) explicitly. On success there is exactly one
+    // entry, so this is equivalent to `pop()`.
+    *stack = stacks.into_iter().next().ok_or(InterpretError::InternalError(
         InterpretInvariant::UnreachableState,
     ))?;
     outcome
@@ -3048,6 +3052,38 @@ mod interpreter_tests {
             gas_seq, gas_block,
             "a top-level Seq must not charge an extra INTERPRET_RET vs the same block"
         );
+    }
+
+    /// Regression (error-unwind): when an error fires inside an EXEC/View
+    /// sub-computation the driver returns before the pending `AfterExec`
+    /// frame can pop the sub-stack, so several `IStack`s remain. `interpret`
+    /// must hand the caller back its own (bottom) stack, not an inner
+    /// sub-stack. Here an identical FAILWITH leaves the caller's stack
+    /// untouched both at top level (a) and when reached from inside EXEC (b).
+    #[test]
+    fn error_inside_exec_preserves_caller_stack() {
+        let marker = V::int(42);
+
+        // (a) Top-level FAILWITH: the caller's bottom stack is preserved.
+        let mut top = stk![marker.clone(), V::int(7)];
+        let r1 = interpret(&[Failwith(Type::Int)], &mut Ctx::default(), &mut top);
+        assert!(matches!(r1, Err(InterpretError::FailedWith(..))));
+        assert_eq!(top, stk![marker.clone()]);
+
+        // (b) Same FAILWITH reached from inside an EXEC sub-computation: the
+        // caller's bottom stack (just `marker`, after EXEC consumed the
+        // lambda and its argument) is restored, not the inner sub-stack.
+        let mut nested = stk![
+            marker.clone(),
+            V::Lambda(Closure::Lambda(Lambda::Lambda {
+                micheline_code: Micheline::Seq(&[]),
+                code: vec![Failwith(Type::Int)].into(),
+            })),
+            V::int(7)
+        ];
+        let r2 = interpret(&[Exec], &mut Ctx::default(), &mut nested);
+        assert!(matches!(r2, Err(InterpretError::FailedWith(..))));
+        assert_eq!(nested, stk![marker]);
     }
 
     mod sub {
