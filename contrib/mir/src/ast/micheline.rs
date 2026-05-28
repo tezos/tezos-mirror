@@ -84,7 +84,6 @@ impl<'a> Micheline<'a> {
         Ok(Self::Bytes(s))
     }
 
-
     /// Construct a primitive application with zero arguments.
     pub fn prim0(prim: Prim, gas: &mut Gas) -> Result<Self, OutOfGas> {
         gas.consume(unparsing_cost::NODE)?;
