@@ -822,7 +822,11 @@ impl<'a> TypedValue<'a> {
 /// not yet drained by any production site, so they still recurse on the
 /// default destructor. Closing that gap — wiring this in at the release sites
 /// or giving `TypedValue` an iterative `Drop` — is tracked in Linear L2-1446.
-pub fn drain_deep_typed_value(v: &mut TypedValue<'_>) {
+///
+/// `pub(crate)`: the sentinel `replace` it performs assumes the caller is
+/// about to drop `v`, so it must not be exposed to callers that might hold the
+/// value aliased.
+pub(crate) fn drain_deep_typed_value(v: &mut TypedValue<'_>) {
     drain_iteratively(v, extract_tv_children);
 }
 
