@@ -764,6 +764,21 @@ where
                 result
             };
 
+            // Charge gas for the two durable writes performed by `set_storage`:
+            // the actual storage and its size. Also charge the used bytes update
+            // in `update_storage_space` and the three reads (code_size,
+            // storage_size and used_bytes).
+            consume_storage_write_milligas(
+                tc_ctx.operation_gas,
+                1,
+                new_storage.len() as u64,
+            )
+            .map_err(TransferError::OutOfGas)?;
+            consume_storage_write_milligas(tc_ctx.operation_gas, 2, COUNTER_SIZE)
+                .map_err(TransferError::OutOfGas)?;
+            consume_storage_read_milligas(tc_ctx.operation_gas, 3, COUNTER_SIZE)
+                .map_err(TransferError::OutOfGas)?;
+
             dest_account
                 .set_storage(tc_ctx.host, &new_storage)
                 .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
