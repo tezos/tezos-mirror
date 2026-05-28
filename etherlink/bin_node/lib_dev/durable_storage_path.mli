@@ -81,7 +81,7 @@ val michelson_ledger_root : path
     ([/tez/world_state/tez_blocks]). *)
 val tezosx_tezos_blocks_root : path
 
-val root_of_chain_family : _ L2_types.chain_family -> path
+val block_root_of_chain_family : _ L2_types.chain_family -> path
 
 val reboot_counter : string
 

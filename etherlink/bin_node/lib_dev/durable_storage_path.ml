@@ -156,7 +156,8 @@ let michelson_ledger_root = "/tez/tez_accounts/tezosx"
 (** TezosX: Tezos blocks live in the Michelson world-state keyspace. *)
 let tezosx_tezos_blocks_root = TEZ.World_state.make "/tez_blocks"
 
-let root_of_chain_family (type f) (chain_family : f L2_types.chain_family) =
+let block_root_of_chain_family (type f) (chain_family : f L2_types.chain_family)
+    =
   match chain_family with
   | L2_types.EVM -> etherlink_root
   (* TezosX and standalone Tezlink both store Michelson block data at
