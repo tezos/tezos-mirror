@@ -14,6 +14,8 @@ type path = string
 
 let reboot_counter = "/readonly/kernel/env/reboot_counter"
 
+let world_state = "/world_state"
+
 module BASE = struct
   let root = "/base"
 
@@ -26,21 +28,27 @@ module EVM = struct
   let make s = root ^ s
 
   module World_state = struct
-    let world_state = "/world_state"
+    let make s = root ^ world_state ^ s
+  end
 
-    let make s = make (world_state ^ s)
+  module Eth_accounts = struct
+    let accounts_path = "/eth_accounts"
+
+    let make s = root ^ accounts_path ^ s
   end
 end
 
 module TEZ = struct
   let root = "/tez"
 
-  let make s = root ^ s
-
   module World_state = struct
-    let world_state = "/world_state"
+    let make s = root ^ world_state ^ s
+  end
 
-    let make s = make (world_state ^ s)
+  module Tez_accounts = struct
+    let accounts_path = "/tez_accounts"
+
+    let make s = root ^ accounts_path ^ s
   end
 end
 
@@ -52,12 +60,6 @@ let evm_node_flag ~storage_version =
   if Storage_version.ipc_paths_moved_to_base ~storage_version then
     evm_node_flag_base
   else evm_node_flag_legacy
-
-module EVM_ETH_ACCOUNTS = struct
-  let root = "/evm/eth_accounts"
-
-  let make s = root ^ s
-end
 
 module Single_tx = struct
   let input_tx_base = BASE.make "/instant_confirmation/input_tx"
@@ -105,12 +107,12 @@ let etherlink_root = EVM.World_state.make ""
 
 let etherlink_safe_root = "/tmp" ^ etherlink_root
 
-let michelson_contracts_index = "/tez/tez_accounts/contracts/index"
+let michelson_contracts_index = TEZ.Tez_accounts.make "/contracts/index"
 
 (** [/tez/tez_accounts/big_map] — root of the Michelson big_map subtree
     that the kernel ([etherlink/kernel_latest/tezos_execution/src/context.rs])
     writes under the Tezlink context root. *)
-let tezos_big_map_root = TEZ.make "/tez_accounts/big_map"
+let tezos_big_map_root = TEZ.Tez_accounts.make "/big_map"
 
 (** [/kernel/boot.wasm] — path of the kernel's WASM blob, the entry
     point [Pvm.Kernel] runs. Writable by the EVM node only for
@@ -151,7 +153,7 @@ let tezos_big_map_key_type id = tezos_big_map_dir id ^ "/key_type"
 
 let tezos_big_map_value_type id = tezos_big_map_dir id ^ "/value_type"
 
-let michelson_ledger_root = "/tez/tez_accounts/tezosx"
+let michelson_ledger_root = TEZ.Tez_accounts.make "/tezosx"
 
 (** TezosX: Tezos blocks live in the Michelson world-state keyspace. *)
 let tezosx_tezos_blocks_root = TEZ.World_state.make "/tez_blocks"
@@ -263,7 +265,7 @@ let maximum_allowed_ticks ~storage_version =
 module Accounts = struct
   let accounts_root ~storage_version =
     if Storage_version.evm_accounts_isolated ~storage_version then
-      EVM_ETH_ACCOUNTS.root
+      EVM.Eth_accounts.make ""
     else EVM.World_state.make "/eth_accounts"
 
   let info_path = "/info"
@@ -346,7 +348,7 @@ end
 module Code = struct
   let codes ~storage_version =
     if Storage_version.evm_accounts_isolated ~storage_version then
-      EVM_ETH_ACCOUNTS.make "/eth_codes"
+      EVM.Eth_accounts.make "/eth_codes"
     else EVM.World_state.make "/eth_codes"
 
   let code_storage ~storage_version (Hash (Hex hash)) =
