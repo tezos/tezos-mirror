@@ -1,9 +1,5 @@
 #!/bin/sh
 
-# The following is needed to allow using "sudo apt-get" below, even though apt-get is
-# defined as an alias in library scripts/packaging/tests/tests-common.inc.sh
-# shellcheck disable=SC2033
-
 distribution=$1
 release=$2
 
@@ -58,8 +54,8 @@ set -e
 set -x
 
 if [ "$RELEASETYPE" = "Master" ]; then
-  apt-get update
-  apt-get install -y sudo
+  apt_get update
+  apt_get install -y sudo
 
   # [add repository]
   sudo apt-get install -y gpg curl
@@ -70,11 +66,11 @@ if [ "$RELEASETYPE" = "Master" ]; then
   sudo apt-get update
   # [end add repository]
 else
-  apt-get update
-  apt-get install -y sudo gpg curl
+  apt_get update
+  apt_get install -y sudo gpg curl
   curl -s "https://$bucket.storage.googleapis.com/$distribution/octez.asc" |
     sudo gpg --dearmor -o /etc/apt/keyrings/octez.gpg
   REPO="deb [signed-by=/etc/apt/keyrings/octez.gpg] https://$bucket.storage.googleapis.com/$distribution $release main"
   echo "$REPO" | sudo tee /etc/apt/sources.list.d/octez.list
-  apt-get update
+  apt_get update
 fi
