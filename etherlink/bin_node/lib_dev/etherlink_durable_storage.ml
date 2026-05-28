@@ -8,8 +8,6 @@
 open Durable_storage
 open Ethereum_types
 
-let root = Durable_storage_path.etherlink_root
-
 let post_v41_unsupported_function ~__FUNCTION__ =
   Invalid_argument (__FUNCTION__ ^ " is not supported for storage version >= 41")
 
@@ -236,13 +234,10 @@ let block_by_hash ?known_storage_version state ~full_transaction_object
     raise (post_v41_unsupported_function ~__FUNCTION__)
   else
     let* block_opt =
-      inspect_durable_and_decode_opt
-        state
-        (Durable_storage_path.Block.by_hash ~root block_hash)
-        Ethereum_types.block_from_rlp
+      Durable_storage.read_opt (Evm_legacy_block_by_hash block_hash) state
     in
     match block_opt with
-    | None -> raise @@ Invalid_block_structure "Couldn't decode bytes"
+    | None -> raise @@ Block_not_found "No block found at the requested path"
     | Some block -> populate_tx_objects state ~full_transaction_object block
 
 let current_block ?known_storage_version state ~full_transaction_object =
@@ -253,18 +248,11 @@ let current_block ?known_storage_version state ~full_transaction_object =
     | None -> Durable_storage.storage_version state
   in
   if not (Storage_version.legacy_storage_compatible ~storage_version) then
-    let* block_opt =
-      inspect_durable_and_decode_opt
-        state
-        (Durable_storage_path.Block.current_block ~root)
-        Ethereum_types.block_from_rlp
-    in
+    let* block_opt = Durable_storage.read_opt Evm_legacy_current_block state in
     let block =
       match block_opt with
       | Some block -> block
-      | None ->
-          raise
-          @@ Invalid_block_structure "Couldn't decode bytes of current block"
+      | None -> raise @@ Block_not_found "No current block found"
     in
     if full_transaction_object then
       let* transaction_objects =
@@ -310,13 +298,11 @@ let blocks_by_number state ~full_transaction_object ~number =
     | None -> failwith "Block %a not found" Z.pp_print level
     | Some block_hash -> (
         let* block_opt =
-          inspect_durable_and_decode_opt
-            state
-            (Durable_storage_path.Block.by_hash ~root block_hash)
-            Ethereum_types.block_from_rlp
+          Durable_storage.read_opt (Evm_legacy_block_by_hash block_hash) state
         in
         match block_opt with
-        | None -> raise @@ Invalid_block_structure "Couldn't decode bytes"
+        | None ->
+            raise @@ Block_not_found "No block found at the requested path"
         | Some block -> populate_tx_objects state ~full_transaction_object block
         )
 
@@ -356,7 +342,7 @@ let base_fee_per_gas_opt state =
       let* block = current_block state ~full_transaction_object:false in
       return block.baseFeePerGas)
     (function
-      | Durable_storage.Invalid_block_structure _ -> return_none
+      | Durable_storage.Block_not_found _ -> return_none
       | exn -> Lwt.reraise exn)
 
 let base_fee_per_gas state =

@@ -111,7 +111,7 @@ module Types = struct
       Lwt.catch
         (fun () -> Etherlink_durable_storage.base_fee_per_gas state)
         (function
-          | Durable_storage.Invalid_block_structure _ ->
+          | Durable_storage.Block_not_found _ ->
               (* Placeholder value for observer starting from genesis.
                  It will be updated after the first block *)
               return (Qty Z.zero)

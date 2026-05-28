@@ -160,6 +160,13 @@ type ('a, 'cap) path =
   | Evm_legacy_account_code_hash :
       Ethereum_types.address
       -> (Ethereum_types.hash, ro) path
+  | Evm_legacy_block_by_hash :
+      Ethereum_types.block_hash
+      -> ( Ethereum_types.legacy_transaction_object Ethereum_types.block,
+           ro )
+         path
+  | Evm_legacy_current_block :
+      (Ethereum_types.legacy_transaction_object Ethereum_types.block, ro) path
   | Evm_code_by_hash : Ethereum_types.hash -> (Ethereum_types.hex, rw) path
   | Evm_account_storage :
       Durable_storage_path.Accounts.fixed_address
@@ -206,6 +213,9 @@ type ('a, 'cap) path =
   | Tezlink_block_by_hash :
       Ethereum_types.block_hash
       -> (L2_types.Tezos_block.t, ro) path
+  | Tezlink_block_hash_by_number :
+      Durable_storage_path.Block.number
+      -> (Ethereum_types.block_hash, ro) path
   | Blueprint_current_generation : (Ethereum_types.quantity, ro) path
   | Kernel_boot_wasm : (bytes, rw) path
   | Kernel_verbosity : (string, rw) path
@@ -480,6 +490,23 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
              (Durable_storage_path.Block.current_block
                 ~root:Durable_storage_path.tezosx_tezos_blocks_root)
            ~chain_family:Michelson)
+  | Evm_legacy_block_by_hash block_hash ->
+      static_ro
+        {
+          path =
+            Durable_storage_path.Block.by_hash
+              ~root:Durable_storage_path.etherlink_root
+              block_hash;
+          decode = infallible_decode Ethereum_types.block_from_rlp;
+        }
+  | Evm_legacy_current_block ->
+      static_ro
+        {
+          path =
+            Durable_storage_path.Block.current_block
+              ~root:Durable_storage_path.etherlink_root;
+          decode = infallible_decode Ethereum_types.block_from_rlp;
+        }
   | Current_receipts ->
       static_ro
         {
@@ -735,6 +762,16 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
               block_hash;
           decode = infallible_decode L2_types.Tezos_block.block_from_kernel;
         }
+  | Tezlink_block_hash_by_number number ->
+      versioned_ro (fun ~storage_version ->
+          {
+            path =
+              Durable_storage_path.Indexes.block_by_number
+                ~storage_version
+                ~root:Durable_storage_path.tezosx_tezos_blocks_root
+                number;
+            decode = infallible_decode Ethereum_types.decode_block_hash;
+          })
   | Blueprint_current_generation ->
       versioned_ro (fun ~storage_version ->
           {
@@ -878,66 +915,7 @@ let list_runtimes state =
   in
   List.filter_map_ep check_runtime Tezosx.known_runtimes
 
-exception Invalid_block_structure of string
-
-let inspect_durable_and_decode_opt state path decode =
-  let open Lwt_result_syntax in
-  let* bytes = read_opt (Raw_path path) state in
-  match bytes with
-  | Some bytes -> return_some (decode bytes)
-  | None -> return_none
-
-let inspect_durable_and_decode_default ~default state path decode =
-  let open Lwt_result_syntax in
-  let* res_opt = inspect_durable_and_decode_opt state path decode in
-  match res_opt with Some res -> return res | None -> return default
-
-let inspect_durable_and_decode state path decode =
-  let open Lwt_result_syntax in
-  let* res_opt = inspect_durable_and_decode_opt state path decode in
-  match res_opt with
-  | Some res -> return res
-  | None -> failwith "No value found under %s" path
-
-let l2_minimum_base_fee_per_gas state chain_id =
-  let open Lwt_result_syntax in
-  let* sv = storage_version state in
-  inspect_durable_and_decode
-    state
-    (Durable_storage_path.Chain_configuration.minimum_base_fee_per_gas
-       ~storage_version:sv
-       chain_id)
-    Helpers.decode_z_le
-
-let l2_da_fee_per_byte state chain_id =
-  let open Lwt_result_syntax in
-  let* sv = storage_version state in
-  inspect_durable_and_decode
-    state
-    (Durable_storage_path.Chain_configuration.da_fee_per_byte
-       ~storage_version:sv
-       chain_id)
-    Helpers.decode_z_le
-
-let l2_maximum_gas_per_transaction state chain_id =
-  let open Lwt_result_syntax in
-  let* sv = storage_version state in
-  inspect_durable_and_decode
-    state
-    (Durable_storage_path.Chain_configuration.maximum_gas_per_transaction
-       ~storage_version:sv
-       chain_id)
-    Helpers.decode_z_le
-
-let world_state state chain_id =
-  let open Lwt_result_syntax in
-  let* sv = storage_version state in
-  inspect_durable_and_decode
-    state
-    (Durable_storage_path.Chain_configuration.world_state
-       ~storage_version:sv
-       chain_id)
-    Bytes.to_string
+exception Block_not_found of string
 
 type dir =
   | Raw_dir of string

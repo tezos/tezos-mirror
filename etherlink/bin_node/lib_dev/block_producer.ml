@@ -385,7 +385,7 @@ let init_validation_state (head_info : Evm_context.head) =
    Using optional values for [minimum_base_fee_per_gas] and [base_fee_per_gas]
    is a temporary work around. In the context of Tezlink, no EVM block
    exists yet so reading these values from the block header raises
-   [Invalid_block_structure]. Once the kernel writes an initial EVM block for
+   [Block_not_found]. Once the kernel writes an initial EVM block for
    all chain families, this fallback can be removed. *)
   let evm_config =
     Validation_types.
