@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 
-# include apt-get function with retry
+# include package manager functions with retry
 . scripts/packaging/tests/tests-common.inc.sh
 
 set -eu
@@ -22,22 +22,22 @@ while [ "$(systemctl is-system-running)" = "offline" ]; do
 done
 
 # Update and install the config-manager plugin
-dnf -y update
-dnf -y install dnf-plugins-core
+dnf_retry -y update
+dnf_retry -y install dnf-plugins-core
 
 # Add the repository
-dnf -y config-manager --add-repo "$REPO/$DISTRO/dists/$RELEASE"
+dnf_retry -y config-manager --add-repo "$REPO/$DISTRO/dists/$RELEASE"
 if [ "$DISTRO" = "rockylinux" ]; then
-  dnf -y config-manager --set-enabled devel
+  dnf_retry -y config-manager --set-enabled devel
 fi
-dnf -y update
+dnf_retry -y update
 
 # Install public key
 rpm --import "$REPO/$DISTRO/octez.asc"
 
-dnf -y install sudo procps util-linux
+dnf_retry -y install sudo procps util-linux
 
-dnf -y install \
+dnf_retry -y install \
   octez-client \
   octez-node \
   octez-dal-node \
@@ -50,7 +50,7 @@ octez-dal-node --version
 octez-baker --version
 octez-smart-rollup-node --version
 
-dnf -y remove octez-node \
+dnf_retry -y remove octez-node \
   octez-client \
   octez-baker \
   octez-dal-node \
