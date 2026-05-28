@@ -863,6 +863,33 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<TypedValue
                 push_rc(v, stack);
             }
         }
+        TV::Lambda(closure) => {
+            // Walk the `Closure::Apply` spine iteratively so the
+            // `Box<Closure>` chain (a deep `APPLY` chain) does not recurse on
+            // drop, pushing each captured `arg_val` (a possibly-deep value)
+            // onto the worklist. The final `Closure::Lambda` drops trivially:
+            // its `Type` fields and `Rc<[Instruction]>` code have their own
+            // iterative `Drop`.
+            let dummy = Closure::Lambda(Lambda::Lambda {
+                micheline_code: Micheline::Seq(&[]),
+                code: Vec::new().into(),
+            });
+            let mut cur = replace(closure, dummy);
+            while let Closure::Apply {
+                arg_val,
+                closure: inner,
+                ..
+            } = cur
+            {
+                stack.push(*arg_val);
+                cur = *inner;
+            }
+        }
+        TV::Ticket(t) => {
+            // Move the ticket payload out so it is drained via the worklist
+            // rather than recursing through the default `TypedValue` destructor.
+            stack.push(replace(&mut t.content, TV::Unit));
+        }
         _ => {}
     }
 }
@@ -1421,5 +1448,69 @@ mod test_untypers {
         // should be triggered during traversal, not only after.
         let result = outer_list.into_micheline_optimized_legacy(&arena, &mut gas);
         assert_eq!(result, Err(OutOfGas));
+    }
+}
+
+#[cfg(test)]
+mod drop_safety {
+    //! Regression tests for the iterative `Drop`/drain on deeply nested
+    //! values. Each builds a structure deep enough to overflow a recursive
+    //! destructor and runs on a 1 MiB worker thread (the WASM kernel stack
+    //! budget); completion of the thread is the assertion.
+    use super::*;
+
+    const DEPTH: usize = 100_000;
+
+    fn on_kernel_stack(f: impl FnOnce() + Send + 'static) {
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(f)
+            .unwrap()
+            .join()
+            .expect("worker thread completes without stack overflow");
+    }
+
+    #[test]
+    fn drain_deep_lambda_apply_spine() {
+        // A deep `APPLY` chain nests `Closure::Apply { closure: Box<Closure> }`;
+        // the `Box<Closure>` spine must be drained iteratively, not recurse.
+        on_kernel_stack(|| {
+            let mut closure = Closure::Lambda(Lambda::Lambda {
+                micheline_code: Micheline::Seq(&[]),
+                code: Vec::new().into(),
+            });
+            for _ in 0..DEPTH {
+                closure = Closure::Apply {
+                    arg_ty: Type::Unit,
+                    arg_val: Box::new(TypedValue::Unit),
+                    closure: Box::new(closure),
+                };
+            }
+            let mut tv = TypedValue::Lambda(closure);
+            drain_deep_typed_value(&mut tv);
+        });
+    }
+
+    #[test]
+    fn drain_deep_ticket_content() {
+        // The ticket payload (`content: TypedValue`) must be drained, not left
+        // to recurse through the default destructor.
+        on_kernel_stack(|| {
+            let mut content = TypedValue::Unit;
+            for _ in 0..DEPTH {
+                content = TypedValue::new_pair(TypedValue::Unit, content);
+            }
+            let ticket = Ticket {
+                ticketer: AddressHash::from_base58_check(
+                    "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye",
+                )
+                .unwrap(),
+                content_type: Type::Unit,
+                content,
+                amount: 1u32.into(),
+            };
+            let mut tv = TypedValue::new_ticket(ticket);
+            drain_deep_typed_value(&mut tv);
+        });
     }
 }
