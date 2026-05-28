@@ -4553,14 +4553,24 @@ fn visit_value<'a, 'b>(
         (T::Timestamp, V::String(n)) => {
             ctx.gas()
                 .consume(gas::tc_cost::timestamp_decoding(n.len())?)?;
-            if let Ok(int_value) = n.parse::<i64>() {
-                results.push(TV::Timestamp(int_value.into()));
+            // Match L1's `Script_timestamp.of_string`
+            // (src/proto_alpha/lib_protocol/script_timestamp.ml): try RFC3339
+            // first, then fall back to arbitrary-precision integer parsing via
+            // Zarith's `Z.of_string` grammar (`tezos_data_encoding`'s `Zarith`
+            // `FromStr`, which mirrors `Z.of_string` byte-for-byte).
+            if let Ok(dt) = DateTime::parse_from_rfc3339(n) {
+                // Chrono represents a leap second (e.g. `:60`) by keeping the
+                // POSIX timestamp at `:59` and storing nanoseconds in the
+                // `[1_000_000_000, 2_000_000_000)` range. L1's Ptime, on the
+                // other hand, folds a leap second into the following POSIX
+                // second. Realign with Ptime so the same RFC3339 string
+                // decodes to the same epoch second on both sides.
+                let leap_offset = i64::from(dt.timestamp_subsec_nanos() >= 1_000_000_000);
+                results.push(TV::Timestamp(BigInt::from(dt.timestamp() + leap_offset)));
+            } else if let Ok(z) = n.parse::<tezos_data_encoding::types::Zarith>() {
+                results.push(TV::Timestamp(z.0));
             } else {
-                let dt = DateTime::parse_from_rfc3339(n);
-                match dt {
-                    Ok(dt) => results.push(TV::Timestamp(dt.timestamp().into())),
-                    Err(_) => return Err(invalid()),
-                }
+                return Err(invalid());
             }
         }
         (
@@ -10668,6 +10678,88 @@ mod typecheck_tests {
                 "String(\"3.5\")".to_string(),
                 Type::Timestamp
             ))
+        );
+    }
+
+    /// L2-1375: `PUSH timestamp "<bigint>"` where `<bigint>` exceeds the
+    /// `i64` range must be accepted (matching L1's `Z.of_string` fallback in
+    /// `Script_timestamp.of_string`).
+    #[test]
+    fn timestamp_value_string_bigint() {
+        // ~10x i64::MAX — the exact case from the L2-1375 reproduction.
+        let big = "99999999999999999999";
+        let expected = BigInt::parse_bytes(big.as_bytes(), 10).unwrap();
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse(&format!("PUSH timestamp \"{big}\"")).unwrap(),
+                &mut Gas::default(),
+                stk
+            ),
+            Ok(Push(Rc::new(TypedValue::Timestamp(expected.clone()))))
+        );
+
+        // Sibling control: same numeric literal as a `Micheline` int — already
+        // accepted on master — must still decode to the same value.
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse(&format!("PUSH timestamp {big}")).unwrap(),
+                &mut Gas::default(),
+                stk
+            ),
+            Ok(Push(Rc::new(TypedValue::Timestamp(expected))))
+        );
+
+        // Negative big-int string is also accepted by `Z.of_string`.
+        let neg = "-99999999999999999999";
+        let neg_expected = BigInt::parse_bytes(neg.as_bytes(), 10).unwrap();
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse(&format!("PUSH timestamp \"{neg}\"")).unwrap(),
+                &mut Gas::default(),
+                stk
+            ),
+            Ok(Push(Rc::new(TypedValue::Timestamp(neg_expected))))
+        );
+    }
+
+    /// L2-1375: an RFC3339 leap-second string (`...T00:00:60Z`) must decode to
+    /// the same epoch second as L1 (Ptime folds the leap second into the
+    /// following POSIX second; on master MIR was returning the prior second).
+    #[test]
+    fn timestamp_value_string_leap_second() {
+        // L1 (Ptime) maps `1970-01-01T00:00:60Z` to epoch second 60.
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("PUSH timestamp \"1970-01-01T00:00:60Z\"").unwrap(),
+                &mut Gas::default(),
+                stk
+            ),
+            Ok(Push(Rc::new(TypedValue::timestamp(60))))
+        );
+
+        // Sibling control: `:00` and `:59` must keep the obvious values.
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("PUSH timestamp \"1970-01-01T00:00:00Z\"").unwrap(),
+                &mut Gas::default(),
+                stk
+            ),
+            Ok(Push(Rc::new(TypedValue::timestamp(0))))
+        );
+
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("PUSH timestamp \"1970-01-01T00:00:59Z\"").unwrap(),
+                &mut Gas::default(),
+                stk
+            ),
+            Ok(Push(Rc::new(TypedValue::timestamp(59))))
         );
     }
 
