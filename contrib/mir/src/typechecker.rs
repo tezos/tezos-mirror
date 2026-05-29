@@ -1262,17 +1262,23 @@ enum StepResult<'a, 'b> {
     OpenSeq {
         body: &'b [Micheline<'a>],
     },
-    /// LAMBDA / LAMBDA_REC instruction: route the body through the outer
-    /// worklist driver so nested LAMBDAs do not grow the Rust call stack
-    /// one frame per nesting level. The body runs on a fresh `[in_ty]`
-    /// stack (or `[self_ty, in_ty]` for LAMBDA_REC) with
-    /// `self_entrypoints = None` and `in_view = false`.
+    /// LAMBDA / LAMBDA_REC instruction, or a `PUSH (lambda T1 T2) <body>`
+    /// value: route the body through the outer worklist driver so nested
+    /// LAMBDAs do not grow the Rust call stack one frame per nesting level.
+    /// The body runs on a fresh `[in_ty]` stack (or `[self_ty, in_ty]` for
+    /// the recursive form) with `self_entrypoints = None` and `in_view =
+    /// false`. When `for_push == true`, the AfterLambda finalizer wraps the
+    /// resulting lambda in `Instruction::Push(TypedValue::Lambda(...))` and
+    /// the outer stack receives the lambda type at finalize time; otherwise
+    /// it emits `Instruction::Lambda(...)` and the outer stack must already
+    /// carry the lambda type (set at instruction-step time).
     OpenLambda {
         body: &'b [Micheline<'a>],
         in_ty: Type,
         out_ty: Type,
         recursive: bool,
         micheline_code: Micheline<'a>,
+        for_push: bool,
     },
     /// MAP block on a List / Option / Map. The body runs on a clone of the
     /// outer stack plus `inner_ty` pushed on top (the element / pair type).
@@ -1362,6 +1368,14 @@ enum TcIFrame<'a, 'b> {
         saved_outer_stack: FailingTypeStack,
         saved_self_entrypoints: Option<&'b Entrypoints>,
         saved_in_view: bool,
+        /// `true` when the lambda came from a `PUSH (lambda …) <body>` value:
+        /// finalize as `Instruction::Push(Rc::new(TypedValue::Lambda(...)))`
+        /// and push the lambda type onto the (restored) outer stack. `false`
+        /// for the bare `LAMBDA`/`LAMBDA_REC` instruction, where the type was
+        /// already pushed onto the outer stack at step time. Tracks
+        /// `LAMBDA_TYPECHECK_DEPTH` so its decrement on finalize matches the
+        /// increment at PUSH-step time (L1-parity for the PUSH path).
+        for_push: bool,
     },
     /// Finalize a `MAP` block. Pops the body's instructions, pops the
     /// inner-result type off the body's stack, restores the outer stack,
@@ -1582,6 +1596,7 @@ fn typecheck<'a, 'b>(
                         out_ty,
                         recursive,
                         micheline_code,
+                        for_push,
                     } => {
                         // Save outer state.
                         let saved_self_entrypoints = cur_self_entrypoints;
@@ -1609,6 +1624,7 @@ fn typecheck<'a, 'b>(
                             saved_outer_stack,
                             saved_self_entrypoints,
                             saved_in_view,
+                            for_push,
                         });
                         block_results.push(Vec::new());
                         frames.push(TcIFrame::NextInstr { block: body, idx: 0 });
@@ -1803,6 +1819,7 @@ fn typecheck<'a, 'b>(
                 saved_outer_stack,
                 saved_self_entrypoints,
                 saved_in_view,
+                for_push,
             } => {
                 let body_instrs = block_results.pop().ok_or(TcError::InternalError(
                     TcInvariant::EmptyResultStack { expected: "lambda body" },
@@ -1816,12 +1833,18 @@ fn typecheck<'a, 'b>(
                 cur_self_entrypoints = saved_self_entrypoints;
                 cur_in_view = saved_in_view;
                 let code = Rc::from(body_instrs);
+                if for_push {
+                    // PUSH path: balance the LAMBDA_TYPECHECK_DEPTH increment
+                    // applied at PUSH step time. Mirrors the RAII guard's Drop
+                    // in `typecheck_value`'s Lambda arm (non-PUSH paths).
+                    LAMBDA_TYPECHECK_DEPTH.with(|d| d.set(d.get().saturating_sub(1)));
+                }
                 let lam = if recursive {
                     Lambda::LambdaRec {
                         micheline_code,
                         code,
-                        in_ty,
-                        out_ty,
+                        in_ty: in_ty.clone(),
+                        out_ty: out_ty.clone(),
                     }
                 } else {
                     Lambda::Lambda {
@@ -1829,12 +1852,27 @@ fn typecheck<'a, 'b>(
                         code,
                     }
                 };
-                block_results
-                    .last_mut()
-                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack {
+                let parent_results = block_results.last_mut().ok_or(TcError::InternalError(
+                    TcInvariant::EmptyResultStack {
                         expected: "lambda parent",
-                    }))?
-                    .push(Instruction::Lambda(lam));
+                    },
+                ))?;
+                if for_push {
+                    // PUSH-lambda value path: push the lambda type onto the
+                    // (restored) outer stack — the regular PUSH step path
+                    // does this immediately, but here it has to wait until
+                    // the body has been typechecked because the outer stack
+                    // was swapped out for the body's fresh `[in_ty]`. Then
+                    // emit `Push(Lambda(...))` as the typechecked instruction.
+                    opt_stack
+                        .access_mut(TcError::FailNotInTail)?
+                        .push(Type::new_lambda(in_ty, out_ty));
+                    parent_results.push(Instruction::Push(Rc::new(TypedValue::Lambda(
+                        Closure::Lambda(lam),
+                    ))));
+                } else {
+                    parent_results.push(Instruction::Lambda(lam));
+                }
             }
             TcIFrame::AfterMapBlock {
                 kind,
@@ -2748,11 +2786,55 @@ fn typecheck_instruction_step<'a, 'b>(
         (App(PUSH, [t, v], _), ..) => {
             let t = parse_ty(gas, t)?;
             t.ensure_prop(gas, TypeProperty::Pushable)?;
-            // contracts and big maps are not pushable so it's OK to typecheck values using default
-            let mut ctx = crate::context::PushableTypecheckingContext { gas };
-            let v = typecheck_value(v, &mut ctx, &t)?;
-            stack.push(t);
-            I::Push(Rc::new(v))
+            // PUSH-of-lambda is routed through the OpenLambda/AfterLambda
+            // worklist so a chain of nested `PUSH (lambda T1 T2) { PUSH
+            // (lambda …) { … } ; DROP }` does not grow the Rust call stack
+            // one frame per nesting level (L2-1431 revalidation,
+            // francois.thire 2026-05-29 — the L1-parity depth guard caps at
+            // 10 000 but the kernel's ~1 MiB Rust stack overflows around
+            // depth 100). Other pushable types fall through to the existing
+            // synchronous `typecheck_value`, which is bounded by its own
+            // TvFrame worklist — no Rust-stack growth on deep Pair/Or/etc.
+            match (&t, v) {
+                (T::Lambda(tys), raw @ (Seq(instrs) | App(Prim::Lambda_rec, [Seq(instrs)], _))) => {
+                    let (in_ty, out_ty) = tys.as_ref();
+                    // Mirror `typecheck_value`'s value-level Lambda arm: bump
+                    // the L1-parity depth counter so the PUSH path stays
+                    // within the same 10 000-deep envelope as the non-PUSH
+                    // value paths. AfterLambda decrements on finalize; an
+                    // Err propagation here means the increment is leaked,
+                    // matching the non-PUSH path's RAII Drop-on-?-skipped
+                    // semantics (`enter()` returns Err *before* the guard is
+                    // constructed, so Drop never runs).
+                    LAMBDA_TYPECHECK_DEPTH.with(|d| -> Result<(), TcError> {
+                        let cur = d.get();
+                        if cur > MAX_LAMBDA_TYPECHECK_DEPTH {
+                            return Err(TcError::TypecheckingTooManyRecursiveCalls);
+                        }
+                        d.set(cur + 1);
+                        Ok(())
+                    })?;
+                    let recursive = matches!(raw, App(Prim::Lambda_rec, ..));
+                    let micheline_code = Micheline::Seq(instrs);
+                    let in_ty = in_ty.clone();
+                    let out_ty = out_ty.clone();
+                    return Ok(StepResult::OpenLambda {
+                        body: instrs,
+                        in_ty,
+                        out_ty,
+                        recursive,
+                        micheline_code,
+                        for_push: true,
+                    });
+                }
+                _ => {
+                    // contracts and big maps are not pushable so it's OK to typecheck values using default
+                    let mut ctx = crate::context::PushableTypecheckingContext { gas };
+                    let v = typecheck_value(v, &mut ctx, &t)?;
+                    stack.push(t);
+                    I::Push(Rc::new(v))
+                }
+            }
         }
         (App(PUSH, expect_args!(2), _), _) => unexpected_micheline!(),
 
@@ -3272,6 +3354,7 @@ fn typecheck_instruction_step<'a, 'b>(
                 out_ty,
                 recursive: matches!(prim, LAMBDA_REC),
                 micheline_code,
+                for_push: false,
             });
         }
         (App(LAMBDA | LAMBDA_REC, expect_args!(3 last_seq), _), _) => unexpected_micheline!(),
@@ -10282,6 +10365,42 @@ mod typecheck_tests {
             // Restore so subsequent tests aren't biased by the residual.
             d.set(0);
         });
+    }
+
+    // Regression for L2-1431 revalidation (francois.thire 2026-05-29). The
+    // sibling `deeply_nested_lambda_typechecks_without_stack_overflow` test
+    // below covers the *instruction-level* `LAMBDA T1 T2 { … }`, which has
+    // been iterative since !21983. The *value-level* `PUSH (lambda T1 T2)
+    // <body>` path went through `typecheck_value`'s Lambda arm →
+    // `typecheck_lambda` → `typecheck` → step → PUSH → `typecheck_value`,
+    // adding one round-trip of Rust frames per nesting layer. On the
+    // kernel's ~1 MiB Rust stack a depth-100 chain reliably aborted with
+    // `thread '<unknown>' has overflowed its stack` (gas/operation-size
+    // would admit far more), far below the L1-parity 10 000 depth cap. With
+    // PUSH-lambda routed through OpenLambda/AfterLambda the body becomes a
+    // worklist frame, so depth is bounded by gas/heap only. `mem::forget`
+    // skips the still-recursive `Type`/`Instruction` Drop, gated on !21985.
+    #[test]
+    fn deeply_nested_push_lambda_value_typechecks_without_stack_overflow() {
+        use std::thread;
+        const DEPTH: usize = 5_000;
+        thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+                typecheck_nested_push_lambda(&arena, DEPTH)
+                    .expect("PUSH-lambda chain must typecheck iteratively");
+                LAMBDA_TYPECHECK_DEPTH.with(|d| {
+                    assert_eq!(
+                        d.get(),
+                        0,
+                        "depth counter must return to 0 after the iterative PUSH-lambda chain",
+                    );
+                });
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
     }
 
     // Regression: pre-fix, nested LAMBDAs grew the Rust call stack by one
