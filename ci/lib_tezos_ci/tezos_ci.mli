@@ -544,19 +544,22 @@ end
 module Images_external : sig
   val nix : Image.t
 
-  val docker : Image.t
-
   val datadog_ci : Image.t
 
   val hadolint : Image.t
 
   val semgrep_agent : Image.t
+
+  (** Upstream Docker image from Docker Hub, used as the builder image
+      for the [alpine-docker-ci] base image (e.g. ["docker:28.5.1"]).
+      Pinned by SHA digest. *)
+  val upstream_docker : Image.t
 end
 
 module Images : sig
   val nix : Image.t
 
-  val docker : Image.t
+  val upstream_docker : Image.t
 
   val datadog_ci : Image.t
 

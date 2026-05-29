@@ -1399,10 +1399,10 @@ module Images_external = struct
       ~image_path:
         "nixos/nix:2.34.6@sha256:e2fe74e96e965653c7b8f16ac64d1e56581c63c84d7fa07fb0692fd055cd06b0"
 
-  (* Official Docker image from Docker Hub, used to bootstrap the
-     [alpine-docker-ci] base image. Pinned with SHA256 digest for
-     immutability. *)
-  let docker =
+  (* Upstream Docker image from Docker Hub, used as the builder image
+     for the [alpine-docker-ci] base image job in [base_images.ml].
+     Version and digest are defined alongside [dind_digest] above. *)
+  let upstream_docker =
     Image.mk_external ~image_path:(sf "docker:%s@%s" docker_version dind_digest)
 
   (* Image used in initial pipeline job that sends to Datadog useful

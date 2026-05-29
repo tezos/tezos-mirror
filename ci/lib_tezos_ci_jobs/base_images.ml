@@ -411,15 +411,14 @@ let jobs ?start_job ?(changeset = false) () =
       ~changes:(Changeset.make (Files.debian_homebrew @ Files.debian_base))
       "images/base-images/Dockerfile.debian-homebrew"
   in
-  (* this base image is different from the others as we initialize the
-     docker-ci image starting from scratch. It is the only job using
-     Images_external.docker . All other jobs will use
-     Images.Base_images.alpine_docker_ci as default.
+  (* This base image differs from the others in its build process: it is
+     bootstrapped directly from the upstream Docker Hub [docker:<version>]
+     image (declared in {!Images_external.upstream_docker}) rather than from
+     another internal base image (e.g. [debian:<release>]).
+     The resulting image includes the Docker daemon, gcloud CLI, hadolint
+     and regctl — it is the standard Docker-in-Docker image for CI jobs.
      The changeset is also different to ensure this image is always up-to-date *)
   let job_docker_ci_based_images =
-    (* use docker/docker image to bootstrap docker-ci base images. This is
-       the upstream image for this image *)
-    (* See also the comment on [let version] in [docker.ml]. *)
     let docker_version = Images.Base_images.docker_version in
     let variables =
       [
@@ -446,7 +445,7 @@ let jobs ?start_job ?(changeset = false) () =
          else [job_rule ~when_:On_success ()])
       ~tag:Gcp_very_high_cpu
       ~__POS__
-      ~image:Images_external.docker
+      ~image:Images.upstream_docker
       ~variables
       ~services:[{name = Images.Base_images.dind_service}]
       ~stage:Stages.build
