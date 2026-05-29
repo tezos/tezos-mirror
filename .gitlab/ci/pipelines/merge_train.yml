@@ -5067,7 +5067,7 @@ tezt-riscv-slow-sequential:
     TEZT_VARIANT: -riscv-slow-sequential
     TESTS: riscv_slow_sequential
     TEZT_RETRY: "1"
-    TEZT_PARALLEL: "1"
+    TEZT_PARALLEL: "2"
     TEZT_NO_NPX: "true"
   artifacts:
     expire_in: 7 days

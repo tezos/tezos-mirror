@@ -105,6 +105,7 @@ let job_tezt_riscv_slow_sequential =
     ~description:"Run Tezt tests tagged as riscv_slow_sequential."
     ~test_selection:(Tezt_core.TSL_AST.Has_tag "riscv_slow_sequential")
     ~test_timeout:No_timeout
+    ~parallel_tests:2
     ~retry_jobs:2
 
 let job_tezt_slow =
