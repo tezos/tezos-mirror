@@ -84,6 +84,16 @@
   cleanly at the operation level (catchable revert) once the cap is
   reached, leaving the block intact. (!21972)
 - Error that can be user triggered now maps now doesn't block abort. (!21918)
+- A failed inbound cross-runtime call now always records its failed CRAC
+  receipt in the Michelson block, even when the caller's leftover gas is
+  too low to encode the synthetic CRAC-ID event. The kernel now sponsors
+  that event's encoding against a dedicated gas counter instead of
+  charging it to the caller, so a gas-tight failed CRAC can no longer be
+  returned as a catchable failure to the EVM caller while silently
+  dropping its receipt (which left indexers and call-graph
+  reconstruction blind to the attempted call); by the same token, a
+  successful CRAC can no longer be downgraded to an out-of-gas error by
+  this receipt bookkeeping. (!22028)
 - EVM pre-execution validation failures (revm `validate()` errors such as a
   forwarded gas limit below the intrinsic cost) on the cross-runtime call
   and static-call path now surface as a catchable `400` instead of a

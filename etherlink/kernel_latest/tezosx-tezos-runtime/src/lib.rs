@@ -205,7 +205,6 @@ fn build_crac_receipt(
     internal_receipts: Vec<InternalOperationSum>,
     crac_id: Option<&str>,
     base_nonce: u16,
-    gas: &mut Gas,
 ) -> Result<AppliedOperation, TezosXRuntimeError> {
     // Combine, in execution order:
     //   [CRAC event, ...pre_transfer_internals, alias(E_1)→target, ...further internal ops]
@@ -226,13 +225,20 @@ fn build_crac_receipt(
         use mir::{
             ast::annotations::NO_ANNS, ast::micheline::Micheline, ast::Entrypoint, lexer,
         };
-        // Synthetic kernel-emitted CRAC event. The internal-op
-        // `EventSuccess.consumed_milligas` is hardcoded to 0 (RFC),
-        // but the top-level receipt's `consumed_milligas` (computed
-        // from the caller's gas counter post-call) does include this
-        // encode cost, charging the user for the kernel bookkeeping.
+        // Synthetic kernel-emitted CRAC event. The event is
+        // *sponsored*: it is Micheline-encoded against a dedicated
+        // kernel-owned gas counter (`Gas::default()` — the standard L1
+        // per-operation cap, the idiom for non-user-billed kernel
+        // bookkeeping) rather than the caller's remaining budget. The
+        // encoded payload is tiny and bounded, so against this counter
+        // the encode can never run out of gas: the event always lands
+        // in the receipt. The internal-op `EventSuccess.consumed_milligas`
+        // is hardcoded to 0 (RFC); the top-level receipt's
+        // `consumed_milligas` no longer includes this encode cost — the
+        // kernel absorbs it instead of charging the user (L2-1464).
+        let mut sponsored_event_gas = Gas::default();
         let ty = Micheline::App(lexer::Prim::string, &[], NO_ANNS)
-            .encode(gas)
+            .encode(&mut sponsored_event_gas)
             .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
             .map_err(|e| {
                 TezosXRuntimeError::Custom(format!(
@@ -240,7 +246,7 @@ fn build_crac_receipt(
                 ))
             })?;
         let payload = Micheline::from(id.to_string())
-            .encode(gas)
+            .encode(&mut sponsored_event_gas)
             .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
             .map_err(|e| {
                 TezosXRuntimeError::Custom(format!(
@@ -352,7 +358,6 @@ fn build_failed_crac_receipt(
     internal_receipts: Vec<InternalOperationSum>,
     crac_id: Option<&str>,
     base_nonce: u16,
-    gas: &mut Gas,
 ) -> Result<AppliedOperation, TezosXRuntimeError> {
     // Per RFC, the CRAC event is always first, even on failure.
     // Since the downstream transfer failed, the event is backtracked
@@ -368,13 +373,17 @@ fn build_failed_crac_receipt(
             ast::annotations::NO_ANNS, ast::micheline::Micheline, ast::Entrypoint, lexer,
         };
         // Synthetic kernel-emitted CRAC event (backtracked variant for
-        // failed CRAC receipt). The internal-op `EventSuccess`'s
-        // `consumed_milligas` is hardcoded to 0 inside the
-        // `BacktrackedResult` (RFC), but the top-level receipt's
-        // `consumed_milligas` (computed from the caller's gas counter
-        // post-call) does include this encode cost.
+        // failed CRAC receipt). Like the success-path builder, the event
+        // is *sponsored*: encoded against a dedicated kernel-owned gas
+        // counter (`Gas::default()`) rather than the caller's remaining
+        // budget. This is the crux of L2-1464: a gas-tight failed CRAC
+        // must still record its failed receipt for indexers, so crafting
+        // the event must never depend on (and never exhaust) the caller's
+        // leftover gas. The internal-op `EventSuccess`'s `consumed_milligas`
+        // stays 0 inside the `BacktrackedResult` (RFC).
+        let mut sponsored_event_gas = Gas::default();
         let ty = Micheline::App(lexer::Prim::string, &[], NO_ANNS)
-            .encode(gas)
+            .encode(&mut sponsored_event_gas)
             .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
             .map_err(|e| {
                 TezosXRuntimeError::Custom(format!(
@@ -382,7 +391,7 @@ fn build_failed_crac_receipt(
                 ))
             })?;
         let payload = Micheline::from(id.to_string())
-            .encode(gas)
+            .encode(&mut sponsored_event_gas)
             .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
             .map_err(|e| {
                 TezosXRuntimeError::Custom(format!(
@@ -855,9 +864,12 @@ where
                 // Only emitted for operation-level failures; BlockAbort aborts
                 // the whole block, so no per-operation receipt is produced.
                 //
-                // Receipt builder runs BEFORE the consumed_milligas
-                // finalisation below so the cost of its Micheline encodes
-                // is charged against the user's gas counter.
+                // The builder sponsors its own synthetic-event encoding
+                // (see `build_failed_crac_receipt`), so it does NOT draw on
+                // the caller's leftover gas and cannot fail with OutOfGas —
+                // a gas-tight failed CRAC still records its receipt here
+                // (L2-1464). The `Err` arm below therefore only covers the
+                // (practically unreachable) serialization/signature paths.
                 if let (Some(kt1), CracError::Operation(te)) =
                     (hdrs.crac_origin_contract.as_ref(), error)
                 {
@@ -874,7 +886,6 @@ where
                         internal_receipts,
                         crac_id_for_event.as_deref(),
                         base_nonce,
-                        &mut gas.remaining,
                     ) {
                         Ok(receipt) => {
                             journal.michelson.push_failed_crac_receipt(receipt);
@@ -912,10 +923,11 @@ where
     // source_contract = alias(E_0) from X-Tezos-Source (top-level destination)
     // hdrs.sender    = alias(E_1) from X-Tezos-Sender (internal sender)
     //
-    // Receipt builder runs BEFORE the consumed_milligas finalisation
-    // below so the cost of its Micheline encodes is charged against
-    // the user's gas counter and reflected in the top-level
-    // consumed_milligas the caller observes.
+    // The builder sponsors its own synthetic-event encoding (against a
+    // dedicated kernel-owned gas counter), so it neither charges the
+    // caller for the kernel bookkeeping nor can it downgrade a
+    // successful CRAC to an OutOfGas error when the caller's leftover
+    // budget is tight (L2-1464).
     let transfer = if is_crac {
         let source_contract = Contract::Originated(
             hdrs.crac_origin_contract
@@ -943,7 +955,6 @@ where
             result.internal_receipts,
             crac_id_for_event.as_deref(),
             base_nonce,
-            &mut gas.remaining,
         )?;
         journal.michelson.push_pending_crac_receipt(receipt);
         TransferSuccess::default()
@@ -1948,7 +1959,6 @@ mod tests {
             vec![],
             Some(crac_id),
             0,
-            &mut Gas::default(),
         )
         .expect("build_crac_receipt should succeed");
 
@@ -2070,7 +2080,6 @@ mod tests {
             vec![],
             None, // no CRAC-ID in this variant test
             0,
-            &mut Gas::default(),
         )
         .expect("build_crac_receipt should succeed");
 
@@ -2167,7 +2176,6 @@ mod tests {
             vec![],
             Some("1-0"),
             0,
-            &mut Gas::default(),
         )
         .expect("build_failed_crac_receipt should succeed");
 
@@ -2248,6 +2256,126 @@ mod tests {
         assert_eq!(
             journal.michelson.take_dispatch_result(),
             Ok(Some(b"TOP-SECRET".to_vec()))
+        );
+    }
+
+    /// Regression test for L2-1464: a gas-tight failed CRAC must still
+    /// record its failed receipt for indexers / call-graph
+    /// reconstruction.
+    ///
+    /// Drives a real inbound EVM→Michelson CRAC (origin runtime =
+    /// Ethereum, so the kernel emits the synthetic CRAC-ID event — the
+    /// gas-charged step the bug hinged on) whose transfer targets a
+    /// never-originated KT1. The transfer fails with the catchable
+    /// operation-level error `ContractDoesNotExist`, and the gas limit
+    /// is set below what encoding the synthetic CRAC event would cost.
+    ///
+    /// Before the fix, `build_failed_crac_receipt` encoded that event
+    /// against the caller's (now near-empty) gas counter, hit
+    /// `OutOfGas`, and the receipt was logged-and-dropped — leaving
+    /// `failed_crac_receipts` empty while still returning a catchable
+    /// `BadRequest` to the EVM caller. With the event encoding now
+    /// sponsored against a dedicated kernel-owned counter, the receipt
+    /// is built regardless of the caller's leftover gas, so it survives.
+    /// Reverting the sponsoring fix makes this test fail (receipt count
+    /// drops to 0).
+    #[test]
+    fn gas_tight_failed_crac_still_records_failed_receipt() {
+        use crate::headers::{
+            X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_ID, X_TEZOS_GAS_LIMIT,
+            X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
+        };
+        use tezos_crypto_rs::hash::OperationHash;
+        use tezosx_journal::CracId;
+
+        // alias(E_0): EVM tx originator alias — top-level CRAC source.
+        const SOURCE_KT1: &str = "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT";
+        // alias(E_1): immediate EVM caller alias — internal-op sender.
+        const SENDER_KT1: &str = "KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2";
+        // Never originated in this host → ContractDoesNotExist on transfer.
+        const MISSING_DEST_KT1: &str = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw";
+
+        let mut host = MockKernelHost::default();
+        let runtime = test_runtime();
+        let registry = NotWiredRegistry;
+
+        // Ethereum-origin CRAC (origin_runtime != Tezos) so the kernel
+        // emits the synthetic CRAC-ID event. The CRAC-Id header must
+        // match the journal's id for `verify_crac_id` to pass.
+        let crac_id = CracId::new(u8::from(RuntimeId::Ethereum), 0);
+        let crac_id_str = crac_id.to_string();
+        let mut journal = TezosXJournal::new(crac_id, OperationHash::default());
+
+        // Non-empty body holding an encoded Unit: skips the empty-body
+        // Unit fallback (which would itself draw on the tight gas) and
+        // decodes cheaply, so essentially the whole budget is still
+        // available for the would-be event encode after the transfer
+        // fails.
+        let body = mir::ast::micheline::Micheline::from(())
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+
+        // Enough milligas to decode the Unit body and reach the
+        // (storage-read-only, uncharged) destination-existence guard,
+        // but below the cost of Micheline-encoding the synthetic CRAC
+        // event — the window in which the unfixed builder ran out of gas
+        // and dropped the receipt (the L2-1464 repro found the boundary
+        // around 230 milligas).
+        let request = http::Request::builder()
+            .method(http::Method::POST)
+            .uri(format!("http://tezos/{MISSING_DEST_KT1}"))
+            .header(X_TEZOS_AMOUNT, "0")
+            .header(X_TEZOS_GAS_LIMIT, "150")
+            .header(X_TEZOS_TIMESTAMP, "1000000")
+            .header(X_TEZOS_BLOCK_NUMBER, "1")
+            .header(X_TEZOS_SENDER, SENDER_KT1)
+            .header(X_TEZOS_SOURCE, SOURCE_KT1)
+            .header(X_TEZOS_CRAC_ID, crac_id_str.as_str())
+            .body(body)
+            .unwrap();
+
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+
+        // The EVM caller still observes a catchable failure ...
+        assert_eq!(
+            resp.status(),
+            StatusCode::BAD_REQUEST,
+            "operation-level CRAC failure must stay a catchable 4xx, got {:?} ({})",
+            resp.status(),
+            String::from_utf8_lossy(resp.body())
+        );
+
+        // ... and crucially the failed CRAC receipt is preserved despite
+        // the gas-tight builder (the property L2-1464 fixes).
+        assert_eq!(
+            journal.michelson.failed_crac_receipts.len(),
+            1,
+            "gas-tight failed CRAC must still record its failed receipt"
+        );
+
+        // The receipt is a Failed top-level whose first internal op is
+        // the synthetic CRAC-ID event — i.e. the very thing whose
+        // encoding was previously dropping the whole receipt.
+        let (_seq, receipt) = &journal.michelson.failed_crac_receipts[0];
+        let OperationDataAndMetadata::OperationWithMetadata(batch) =
+            &receipt.op_and_receipt;
+        let op = &batch.operations[0];
+        let OperationResultSum::Transfer(ref result) = op.receipt else {
+            panic!("expected Transfer receipt");
+        };
+        assert!(
+            matches!(result.result, ContentResult::Failed(_)),
+            "top-level result must be Failed"
+        );
+        let InternalOperationSum::Event(ref event) = result.internal_operation_results[0]
+        else {
+            panic!("expected synthetic CRAC event as first internal op");
+        };
+        assert_eq!(
+            event.content.tag.as_ref().map(|e| e.as_str()),
+            Some("crac"),
+            "first internal op must be the synthetic CRAC-ID event"
         );
     }
 
