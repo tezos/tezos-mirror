@@ -45,10 +45,7 @@ let runtime_id_tezos = "0"
 let runtime_id_ethereum = "1"
 
 (** 4-byte selector for the Solidity custom error `InvalidRuntimeId(uint8)`.
-    Computed as keccak256("InvalidRuntimeId(uint8)")[0..4] = 0xe85c2efe.
-    Source: `sol!` macro expansion in
-    etherlink/kernel_latest/revm/src/precompiles/runtime_gateway.rs,
-    validated by the `invalid_runtime_id_payload_shape` unit test (line ~1551). *)
+    Computed as keccak256("InvalidRuntimeId(uint8)")[0..4] = 0x6b95e955. *)
 let invalid_runtime_id_selector = "6b95e955"
 
 (* ── EVM eth_call helpers ─────────────────────────────────────────────── *)
@@ -901,7 +898,7 @@ let test_evm_resolve_address_invalid_runtime_id () =
       ~error_msg:"Expected received=0x02 in revert data last byte, got 0x%L") ;
   unit
 
-(** B1: [originOf] with a non-base58 string and sourceRuntime=Tezos.
+(** [originOf] with a non-base58 string and sourceRuntime=Tezos.
     The Tezos runtime's [read_origin] silently returns Unknown for malformed
     addresses (no base58 parse → Classification::Unknown, no charge).
     The precompile therefore returns kind=0 (Unknown) — no revert. *)
@@ -932,7 +929,7 @@ let test_evm_origin_of_malformed_tezos_address () =
       ~error_msg:"Expected kind=0 (Unknown) for malformed Tezos address, got %L") ;
   unit
 
-(** B2: [originOf] with a non-hex-prefixed / too-short string and
+(** [originOf] with a non-hex-prefixed / too-short string and
     sourceRuntime=Ethereum.
     The Ethereum runtime's [read_origin] silently returns Unknown for malformed
     addresses (Address::from_hex fails → Classification::Unknown, no charge).
@@ -968,6 +965,91 @@ let test_evm_origin_of_malformed_ethereum_address () =
       int
       ~error_msg:
         "Expected kind=0 (Unknown) for malformed Ethereum address, got %L") ;
+  unit
+
+(** [resolveAddress] with a non-base58 string and sourceRuntime=Tezos,
+    targetRuntime=Ethereum returns classified=false (no revert).  The Tezos
+    runtime's [read_origin] parse fails → Unknown → classified=false.
+    Reverting is reserved for an out-of-range runtime id (InvalidRuntimeId). *)
+let test_evm_resolve_address_malformed_tezos_address () =
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~kernel:Latest
+    ~title:
+      "resolveAddress: malformed Tezos address returns unclassified (no revert)"
+    ~tags:
+      [
+        "tezosx";
+        "address_translation";
+        "resolve_address";
+        "malformed";
+        "tezos";
+        "evm";
+      ]
+  @@ fun sandbox ->
+  let addr = "not_a_valid_tezos_address" in
+  let* calldata =
+    Cast.calldata
+      ~args:[addr; runtime_id_tezos; runtime_id_ethereum]
+      "resolveAddress(string,uint8,uint8)"
+  in
+  let* hex = eth_call_gateway_ok ~sequencer:sandbox ~calldata in
+  (* The Tezos runtime's read_origin parse fails → Unknown → classified=false.
+     No revert (revert is reserved for invalid runtime id). *)
+  Check.is_false
+    ~__LOC__
+    (bool_at hex 0)
+    ~error_msg:
+      "Expected classified=false for malformed Tezos address in \
+       resolveAddress, no revert" ;
+  unit
+
+(** [resolveAddress] with a valid source runtime ID but an invalid target
+    runtime ID (2) reverts with the ABI-encoded [InvalidRuntimeId] custom
+    error.  This exercises the target-runtime validation branch that
+    source-only invalid-runtime tests miss. *)
+let test_evm_resolve_address_invalid_target_runtime () =
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~kernel:Latest
+    ~title:"resolveAddress: invalid target runtime ID reverts"
+    ~tags:
+      [
+        "tezosx";
+        "address_translation";
+        "resolve_address";
+        "invalid_runtime";
+        "evm";
+        "revert";
+      ]
+  @@ fun sandbox ->
+  let addr = "0x1111111111111111111111111111111111111111" in
+  (* source = Ethereum (valid = 1), target = 2 (invalid). *)
+  let* calldata =
+    Cast.calldata
+      ~args:[addr; runtime_id_ethereum; "2"]
+      "resolveAddress(string,uint8,uint8)"
+  in
+  let* err = eth_call_gateway_err ~sequencer:sandbox ~calldata in
+  let message = JSON.(err |-> "message" |> as_string) in
+  Check.(
+    (message =~ rex "execution reverted")
+      ~error_msg:"Expected revert for invalid target runtimeId, got: %L") ;
+  (* ABI-encoded InvalidRuntimeId(uint8 received):
+     - bytes  0..3  : selector keccak256("InvalidRuntimeId(uint8)")[0..4] = 0x6b95e955
+     - bytes  4..35 : received (uint8 2), zero-padded to 32 bytes → last byte = 0x02 *)
+  let data = JSON.(err |-> "data" |> as_string) in
+  let data_hex = String.sub data 2 (String.length data - 2) in
+  let selector = String.sub data_hex 0 8 in
+  let last_byte = String.sub data_hex (String.length data_hex - 2) 2 in
+  Check.(
+    (selector = invalid_runtime_id_selector)
+      string
+      ~error_msg:"Expected InvalidRuntimeId selector 0x6b95e955, got 0x%L") ;
+  Check.(
+    (last_byte = "02")
+      string
+      ~error_msg:"Expected received=0x02 in revert data last byte, got 0x%L") ;
   unit
 
 (* ── Michelson VIEW tests — classification paths (commit 4) ──────────── *)
@@ -1847,14 +1929,19 @@ let () =
   test_evm_resolve_address_invalid_runtime_id () ;
   test_evm_origin_of_malformed_tezos_address () ;
   test_evm_origin_of_malformed_ethereum_address () ;
+  test_evm_resolve_address_malformed_tezos_address () ;
+  test_evm_resolve_address_invalid_target_runtime () ;
+  (* commit 4 — Michelson classification paths *)
   test_michelson_origin_of_unknown () ;
   test_michelson_origin_of_evm_native_cross_source () ;
   test_michelson_resolve_address_unknown () ;
   test_michelson_resolve_address_same_source () ;
   test_michelson_resolve_address_same_source_ethereum () ;
   test_michelson_resolve_address_cross_source_ethereum () ;
+  (* commit 5 — Michelson post-CRAC Recorded/Alias *)
   test_michelson_origin_of_alias_after_crac () ;
   test_michelson_resolve_address_recorded_after_crac () ;
+  (* commit 6 — Michelson error paths *)
   test_michelson_origin_of_invalid_runtime_id () ;
   test_michelson_resolve_address_invalid_runtime_id () ;
   test_michelson_origin_of_malformed_address ()
