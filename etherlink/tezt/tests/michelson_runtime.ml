@@ -5296,6 +5296,16 @@ let test_deep_type_in_invalid_arg_error =
       "kernel trapped on stack overflow while formatting a TcError that \
        carries a deep type (Debug for Type is recursive); see \
        etherlink/kernel_latest/tezos/src/operation_result.rs:218" ;
+  (* Positive check: the rejection must actually be the deep-type typecheck
+     error, i.e. the formatted error carries the deep parameter type
+     ([Pair(Int, Pair(Int, ...))] via the iterative [Debug] for [Type]). This
+     guards against the test passing vacuously if the transfer ever fails
+     earlier, before the deep-type formatting path is reached. *)
+  if not (stderr =~ rex "Pair\\(Int") then
+    Test.fail
+      ~__LOC__
+      "expected the rejection to carry the deep parameter type \
+       (Pair(Int, ...)); the deep-Type Debug formatting path was not exercised" ;
   let*@ _ = produce_block sequencer in
   unit
 
