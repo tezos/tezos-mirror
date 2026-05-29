@@ -1,0 +1,29 @@
+parameter (pair (string %addr) (pair (nat %source_runtime) (nat %target_runtime))) ;
+storage (option (pair nat string)) ;
+# L2-1324: on-chain Michelson contract exercising the `resolveAddress`
+# synthetic view on the TezosX gateway.  The entrypoint forwards
+# `(addr, (source_runtime, target_runtime))` as a
+# `pair string (pair nat nat)` to `VIEW "resolveAddress"` and stashes
+# the result in storage.
+#
+# `resolveAddress` return type: `option (pair nat string)`
+#   None               -> Unknown / unclassified source
+#   Some (Pair nat str) -> classified; nat 0=Recorded, 1=Derived; str is
+#                          the translated address in target_runtime
+code
+  { UNPAIR ;
+    # parameter : storage
+    PUSH address "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw" ;
+    SWAP ;
+    # parameter : gateway : storage
+    VIEW "resolveAddress" (option (pair nat string)) ;
+    # option (option (pair nat string)) : storage
+    # Unwrap outer option (None means view dispatch failed — should not
+    # happen; FAILWITH so test failures are visible).
+    IF_NONE
+      { PUSH string "resolveAddress view dispatch failed" ; FAILWITH }
+      { } ;
+    # option (pair nat string) : storage
+    SWAP ; DROP ;
+    NIL operation ; PAIR
+  } ;

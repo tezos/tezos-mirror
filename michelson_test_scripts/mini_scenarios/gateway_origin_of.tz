@@ -1,0 +1,28 @@
+parameter (pair (string %addr) (nat %source_runtime)) ;
+storage (or unit (or nat (pair nat string))) ;
+# L2-1324: on-chain Michelson contract exercising the `originOf`
+# synthetic view on the TezosX gateway.  The entrypoint forwards
+# `(addr, source_runtime)` as a `pair string nat` to
+# `VIEW "originOf"` and stashes the result in storage.
+#
+# `originOf` return type: `or unit (or nat (pair nat string))`
+#   Left Unit              -> Unknown (no origin record)
+#   Right (Left nat)       -> Native (nat encodes the home runtime)
+#   Right (Right pair)     -> Alias  (nat = home runtime, string = native addr)
+#
+# Storage initial value: Left Unit (Unknown).
+code
+  { UNPAIR ;
+    # parameter : storage
+    PUSH address "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw" ;
+    SWAP ;
+    # parameter : gateway : storage
+    VIEW "originOf" (or unit (or nat (pair nat string))) ;
+    # option (or unit ...) : storage
+    IF_NONE
+      { PUSH string "originOf view dispatch failed" ; FAILWITH }
+      { } ;
+    # (or unit ...) : storage
+    SWAP ; DROP ;
+    NIL operation ; PAIR
+  } ;

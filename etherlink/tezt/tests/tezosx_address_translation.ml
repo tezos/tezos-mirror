@@ -917,6 +917,407 @@ let test_evm_origin_of_malformed_ethereum_address () =
         "Expected kind=0 (Unknown) for malformed Ethereum address, got %L") ;
   unit
 
+(* ── Michelson VIEW tests — classification paths (commit 4) ──────────── *)
+
+(** [originOf] via Michelson VIEW on an unknown Tezos address.
+    Calls the [gateway_origin_of.tz] helper contract.
+    Expects storage = Left Unit (Unknown). *)
+let test_michelson_origin_of_unknown () =
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~kernel:Latest
+    ~uses_client:true
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+    ~title:"Michelson VIEW originOf: unknown Tezos address → Left Unit"
+    ~tags:
+      (["tezosx"; "address_translation"]
+      @ runtime_tags [Tezos]
+      @ ["origin_of"; "unknown"; "michelson"; "view"])
+  @@ fun sequencer ->
+  let* tez_client = tezlink_client sequencer in
+  let source = Constant.bootstrap1 in
+  (* Step 1: Originate the gateway_origin_of.tz caller contract.
+     Initial storage = Right (Left 1) (a sentinel value distinct from the
+     expected result Left Unit).  Starting from a sentinel ≠ Left Unit ensures
+     that reaching Left Unit proves the VIEW actually ran and returned Unknown,
+     rather than the call failing and leaving the initial value unchanged. *)
+  let* kt1_address =
+    originate_contract
+      ~tez_client
+      ~sequencer
+      ~src:source
+      ~alias:"origin_of_unknown"
+      ~script_name:["mini_scenarios"; "gateway_origin_of"]
+      ~init_storage_data:"Right (Left 1)"
+      ()
+  in
+  (* Step 2: Call with an unknown Tezos address and sourceRuntime=0 (Tezos). *)
+  let unknown_addr = Constant.bootstrap5.public_key_hash in
+  let* () =
+    call_contract
+      ~tez_client
+      ~sequencer
+      ~src:source
+      ~dest:kt1_address
+      ~arg_data:(sf {|Pair "%s" %s|} unknown_addr runtime_id_tezos)
+      ()
+  in
+  (* Step 3: Storage must be Left Unit (Unknown — no /origin record).
+     The storage changed from Right (Left 1) to Left Unit, proving the VIEW
+     ran and returned Unknown rather than failing. *)
+  check_contract_storage
+    ~sequencer
+    ~tez_client
+    kt1_address
+    (* Micheline JSON for `Left Unit`:
+       {"prim":"Left","args":[{"prim":"Unit"}]} *)
+    (`O [("prim", `String "Left"); ("args", `A [`O [("prim", `String "Unit")]])])
+
+(** [originOf] via Michelson VIEW: EVM contract with bytecode (code_hash !=
+    KECCAK_EMPTY) is classified as Native via the cross-source code-presence
+    back-stop (sourceRuntime=1=Ethereum read from the Michelson call-site). *)
+let test_michelson_origin_of_evm_native_cross_source () =
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~kernel:Latest
+    ~uses_client:true
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+    ~title:
+      "Michelson VIEW originOf: EVM contract with bytecode → Right (Left 1) \
+       via back-stop"
+    ~tags:
+      (["tezosx"; "address_translation"]
+      @ runtime_tags [Tezos]
+      @ ["origin_of"; "native"; "evm"; "michelson"; "view"; "backstop"])
+  @@ fun sequencer ->
+  let* tez_client = tezlink_client sequencer in
+  let source = Constant.bootstrap1 in
+  (* Step 1: Deploy a minimal EVM contract.  Its non-empty code_hash causes the
+     back-stop to classify it as Native when queried from the Michelson side. *)
+  let deployer = Eth_account.bootstrap_accounts.(0) in
+  let* evm_contract_addr =
+    deploy_minimal_contract ~sequencer ~sender:deployer ~nonce:0 ()
+  in
+  (* Step 2: Originate the caller contract. *)
+  let* kt1_address =
+    originate_contract
+      ~tez_client
+      ~sequencer
+      ~src:source
+      ~alias:"origin_of_evm_native"
+      ~script_name:["mini_scenarios"; "gateway_origin_of"]
+      ~init_storage_data:"Left Unit"
+      ()
+  in
+  (* Step 3: Call with sourceRuntime=1 (Ethereum) and the EVM contract address. *)
+  let* () =
+    call_contract
+      ~tez_client
+      ~sequencer
+      ~src:source
+      ~dest:kt1_address
+      ~arg_data:(sf {|Pair "%s" %s|} evm_contract_addr runtime_id_ethereum)
+      ()
+  in
+  (* Step 4: Storage must be Right (Left 1) — Native, homeRuntime=1=Ethereum. *)
+  check_contract_storage
+    ~sequencer
+    ~tez_client
+    kt1_address
+    (* `Right (Left 1)`:
+       {"prim":"Right","args":[{"prim":"Left","args":[{"int":"1"}]}]} *)
+    (`O
+       [
+         ("prim", `String "Right");
+         ( "args",
+           `A
+             [
+               `O
+                 [
+                   ("prim", `String "Left");
+                   ("args", `A [`O [("int", `String "1")]]);
+                 ];
+             ] );
+       ])
+
+(** [resolveAddress] via Michelson VIEW: unknown Tezos address → None. *)
+let test_michelson_resolve_address_unknown () =
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~kernel:Latest
+    ~uses_client:true
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+    ~title:"Michelson VIEW resolveAddress: unknown Tezos address → None"
+    ~tags:
+      (["tezosx"; "address_translation"]
+      @ runtime_tags [Tezos]
+      @ ["resolve_address"; "unknown"; "michelson"; "view"])
+  @@ fun sequencer ->
+  let* tez_client = tezlink_client sequencer in
+  let source = Constant.bootstrap1 in
+  (* Step 1: Originate the gateway_resolve_address.tz caller contract.
+     Initial storage = Some (Pair 1 "sentinel") — a sentinel value distinct
+     from the expected result None.  Starting from a sentinel ≠ None ensures
+     that reaching None proves the VIEW actually ran and returned None (Unknown),
+     rather than the call failing and leaving the initial value unchanged. *)
+  let* kt1_address =
+    originate_contract
+      ~tez_client
+      ~sequencer
+      ~src:source
+      ~alias:"resolve_unknown"
+      ~script_name:["mini_scenarios"; "gateway_resolve_address"]
+      ~init_storage_data:{|Some (Pair 1 "sentinel")|}
+      ()
+  in
+  (* Step 2: Call with an unknown Tezos address, source=Tezos, target=Ethereum.
+     No /origin record → result is None. *)
+  let unknown_addr = Constant.bootstrap3.public_key_hash in
+  let* () =
+    call_contract
+      ~tez_client
+      ~sequencer
+      ~src:source
+      ~dest:kt1_address
+      ~arg_data:
+        (sf
+           {|Pair "%s" (Pair %s %s)|}
+           unknown_addr
+           runtime_id_tezos
+           runtime_id_ethereum)
+      ()
+  in
+  (* Step 3: Storage must be None.  The storage changed from Some (Pair 1
+     "sentinel") to None, proving the VIEW ran and returned None (Unknown)
+     rather than failing. *)
+  check_contract_storage
+    ~sequencer
+    ~tez_client
+    kt1_address
+    (* Micheline JSON for `None`: {"prim":"None"} *)
+    (`O [("prim", `String "None")])
+
+(** Same-source short-circuit via Michelson VIEW: [resolveAddress] with
+    sourceRuntime = targetRuntime = Tezos and a valid tz1 address returns
+    Some (0, addr) — Recorded, no /origin storage read. *)
+let test_michelson_resolve_address_same_source () =
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~kernel:Latest
+    ~uses_client:true
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+    ~title:
+      "Michelson VIEW resolveAddress: same-source Tezos address → Some \
+       (Recorded, addr)"
+    ~tags:
+      (["tezosx"; "address_translation"]
+      @ runtime_tags [Tezos]
+      @ ["resolve_address"; "same_source"; "tezos"; "michelson"; "view"])
+  @@ fun sequencer ->
+  let* tez_client = tezlink_client sequencer in
+  let source = Constant.bootstrap1 in
+  (* Step 1: Originate the caller contract. *)
+  let* kt1_address =
+    originate_contract
+      ~tez_client
+      ~sequencer
+      ~src:source
+      ~alias:"resolve_same_source"
+      ~script_name:["mini_scenarios"; "gateway_resolve_address"]
+      ~init_storage_data:"None"
+      ()
+  in
+  (* Step 2: Call with addr = bootstrap2 and source = target = Tezos. *)
+  let addr = Constant.bootstrap2.public_key_hash in
+  let* () =
+    call_contract
+      ~tez_client
+      ~sequencer
+      ~src:source
+      ~dest:kt1_address
+      ~arg_data:
+        (sf {|Pair "%s" (Pair %s %s)|} addr runtime_id_tezos runtime_id_tezos)
+      ()
+  in
+  (* Step 3: Storage must be Some (Pair 0 addr) — Recorded. *)
+  check_contract_storage
+    ~sequencer
+    ~tez_client
+    kt1_address
+    (* `Some (Pair 0 addr)`:
+       {"prim":"Some","args":[{"prim":"Pair","args":[{"int":"0"},
+         {"string":"<addr>"}]}]} *)
+    (`O
+       [
+         ("prim", `String "Some");
+         ( "args",
+           `A
+             [
+               `O
+                 [
+                   ("prim", `String "Pair");
+                   ( "args",
+                     `A
+                       [
+                         `O [("int", `String "0")]; `O [("string", `String addr)];
+                       ] );
+                 ];
+             ] );
+       ])
+
+(** Same-source short-circuit via Michelson VIEW: [resolveAddress] with
+    sourceRuntime = targetRuntime = Ethereum and a valid EVM address returns
+    Some (Pair 0 addr) — Recorded, no /origin storage read. *)
+let test_michelson_resolve_address_same_source_ethereum () =
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~kernel:Latest
+    ~uses_client:true
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+    ~title:
+      "Michelson VIEW resolveAddress: same-source Ethereum address → Some \
+       (Recorded, addr)"
+    ~tags:
+      (["tezosx"; "address_translation"]
+      @ runtime_tags [Tezos]
+      @ ["resolve_address"; "same_source"; "ethereum"; "michelson"; "view"])
+  @@ fun sequencer ->
+  let* tez_client = tezlink_client sequencer in
+  let source = Constant.bootstrap1 in
+  (* Step 1: Originate the gateway_resolve_address.tz caller contract. *)
+  let* kt1_address =
+    originate_contract
+      ~tez_client
+      ~sequencer
+      ~src:source
+      ~alias:"resolve_same_source_eth"
+      ~script_name:["mini_scenarios"; "gateway_resolve_address"]
+      ~init_storage_data:"None"
+      ()
+  in
+  (* Step 2: Call with a valid EVM address and source = target = Ethereum. *)
+  let addr = "0x1111111111111111111111111111111111111111" in
+  let* () =
+    call_contract
+      ~tez_client
+      ~sequencer
+      ~src:source
+      ~dest:kt1_address
+      ~arg_data:
+        (sf
+           {|Pair "%s" (Pair %s %s)|}
+           addr
+           runtime_id_ethereum
+           runtime_id_ethereum)
+      ()
+  in
+  (* Step 3: Storage must be Some (Pair 0 addr) — Recorded (same-source
+     short-circuit, no /origin read).  The dispatcher echoes addr verbatim. *)
+  check_contract_storage
+    ~sequencer
+    ~tez_client
+    kt1_address
+    (`O
+       [
+         ("prim", `String "Some");
+         ( "args",
+           `A
+             [
+               `O
+                 [
+                   ("prim", `String "Pair");
+                   ( "args",
+                     `A
+                       [
+                         `O [("int", `String "0")]; `O [("string", `String addr)];
+                       ] );
+                 ];
+             ] );
+       ])
+
+(** Michelson cross-source: [resolveAddress] with source=Ethereum (cross-source
+    from the Michelson call-site) via Michelson VIEW.  The EVM contract has
+    bytecode (code_hash != KECCAK_EMPTY), so the back-stop fires; the result
+    should be Some (Pair 1 derived_kt1) — Derived. *)
+let test_michelson_resolve_address_cross_source_ethereum () =
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~kernel:Latest
+    ~uses_client:true
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+    ~title:
+      "Michelson VIEW resolveAddress: cross-source Ethereum→Tezos returns Some \
+       (Derived)"
+    ~tags:
+      (["tezosx"; "address_translation"]
+      @ runtime_tags [Tezos]
+      @ ["resolve_address"; "cross_source"; "ethereum"; "michelson"; "view"])
+  @@ fun sequencer ->
+  let* tez_client = tezlink_client sequencer in
+  let source = Constant.bootstrap1 in
+  (* Step 1: Deploy a minimal EVM contract — code_hash != KECCAK_EMPTY, so the
+     back-stop fires for Ethereum source. *)
+  let deployer = Eth_account.bootstrap_accounts.(1) in
+  let* evm_contract_addr =
+    deploy_minimal_contract ~sequencer ~sender:deployer ~nonce:0 ()
+  in
+  (* Step 2: Originate the gateway_resolve_address.tz caller contract. *)
+  let* kt1_address =
+    originate_contract
+      ~tez_client
+      ~sequencer
+      ~src:source
+      ~alias:"resolve_cross_source_eth"
+      ~script_name:["mini_scenarios"; "gateway_resolve_address"]
+      ~init_storage_data:"None"
+      ()
+  in
+  (* Step 3: Call with source=Ethereum (cross-source) and target=Tezos.
+     The EVM code-presence back-stop fires → Native → Derived alias. *)
+  let* () =
+    call_contract
+      ~tez_client
+      ~sequencer
+      ~src:source
+      ~dest:kt1_address
+      ~arg_data:
+        (sf
+           {|Pair "%s" (Pair %s %s)|}
+           evm_contract_addr
+           runtime_id_ethereum
+           runtime_id_tezos)
+      ()
+  in
+  (* Step 4: Storage must be Some (Pair 1 <derived_kt1>) — Derived.
+     The derived KT1 depends on [evm_contract_addr] which is set at deployment
+     time.  We check only the classification (res=1, Derived) and that a KT1
+     address was produced, without hard-coding the exact hash. *)
+  let* storage =
+    Client.RPC.call ~endpoint:(tezlink_endpoint sequencer) tez_client
+    @@ RPC.get_chain_block_context_contract_storage ~id:kt1_address ()
+  in
+  (* Expected shape: Some (Pair 1 <kt1_string>).
+     In Micheline JSON: {"prim":"Some","args":[{"prim":"Pair",
+       "args":[{"int":"1"},{"string":"KT1..."}]}]} *)
+  let pair_node = JSON.(storage |-> "args" |> as_list |> List.hd) in
+  let args = JSON.(pair_node |-> "args" |> as_list) in
+  let res = JSON.(List.nth args 0 |-> "int" |> as_string) in
+  let kt1_str = JSON.(List.nth args 1 |-> "string" |> as_string) in
+  Check.(
+    (res = "1") string ~error_msg:"Expected res=1 (Derived) in storage, got %L") ;
+  Check.(
+    (String.length kt1_str > 0)
+      int
+      ~error_msg:"Expected a non-empty KT1 address in storage") ;
+  Log.info "EVM contract %s → Derived KT1 %s" evm_contract_addr kt1_str ;
+  unit
+
 (* ── Registration ─────────────────────────────────────────────────────── *)
 
 let () =
@@ -933,4 +1334,10 @@ let () =
   test_evm_origin_of_invalid_runtime_id () ;
   test_evm_resolve_address_invalid_runtime_id () ;
   test_evm_origin_of_malformed_tezos_address () ;
-  test_evm_origin_of_malformed_ethereum_address ()
+  test_evm_origin_of_malformed_ethereum_address () ;
+  test_michelson_origin_of_unknown () ;
+  test_michelson_origin_of_evm_native_cross_source () ;
+  test_michelson_resolve_address_unknown () ;
+  test_michelson_resolve_address_same_source () ;
+  test_michelson_resolve_address_same_source_ethereum () ;
+  test_michelson_resolve_address_cross_source_ethereum ()
