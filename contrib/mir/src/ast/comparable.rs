@@ -15,65 +15,89 @@ use super::TypedValue;
 #[allow(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd for TypedValue<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        use super::Or as OrEnum;
+        use std::cmp::Ordering::Equal;
         use TypedValue::*;
-        match (self, other) {
-            (Int(a), Int(b)) => a.partial_cmp(b),
-            (Int(..), _) => None,
 
-            (Nat(a), Nat(b)) => a.partial_cmp(b),
-            (Nat(..), _) => None,
-
-            (Mutez(a), Mutez(b)) => a.partial_cmp(b),
-            (Mutez(..), _) => None,
-
-            (Bool(a), Bool(b)) => a.partial_cmp(b),
-            (Bool(..), _) => None,
-
-            (String(a), String(b)) => a.partial_cmp(b),
-            (String(..), _) => None,
-
-            (Unit, Unit) => Some(std::cmp::Ordering::Equal),
-            (Unit, _) => None,
-
-            (Pair(l1, l2), Pair(r1, r2)) => (l1, l2).partial_cmp(&(r1, r2)),
-            (Pair(..), _) => None,
-
-            (Option(x), Option(y)) => x.as_deref().partial_cmp(&y.as_deref()),
-            (Option(..), _) => None,
-
-            (Or(x), Or(y)) => x.partial_cmp(y),
-            (Or(..), _) => None,
-
-            (Address(l), Address(r)) => l.partial_cmp(r),
-            (Address(..), _) => None,
-
-            (ChainId(l), ChainId(r)) => l.partial_cmp(r),
-            (ChainId(..), _) => None,
-
-            (Bytes(l), Bytes(r)) => l.partial_cmp(r),
-            (Bytes(..), _) => None,
-
-            (Key(l), Key(r)) => l.partial_cmp(r),
-            (Key(..), _) => None,
-
-            (Signature(l), Signature(r)) => l.partial_cmp(r),
-            (Signature(..), _) => None,
-
-            (KeyHash(l), KeyHash(r)) => l.partial_cmp(r),
-            (KeyHash(..), _) => None,
-
-            (Timestamp(a), Timestamp(b)) => a.partial_cmp(b),
-            (Timestamp(..), _) => None,
-
-            // non-comparable types
-            (
-                List(..) | Set(..) | Map(..) | BigMap(..) | Contract(..) | Operation(_)
-                | Ticket(..) | Lambda(..),
-                _,
-            ) => None,
-            #[cfg(feature = "bls")]
-            (Bls12381Fr(..) | Bls12381G1(..) | Bls12381G2(..), _) => None,
+        // Compare two leaf primitives, propagating `None` (incomparable) by
+        // returning from the whole comparison -- exactly as the recursive
+        // lexicographic version did when a sub-comparison yielded `None`.
+        macro_rules! leaf {
+            ($a:expr, $b:expr) => {
+                match $a.partial_cmp($b) {
+                    Some(o) => o,
+                    None => return None,
+                }
+            };
         }
+
+        // Explicit LIFO worklist of sub-value pairs still to compare. For a
+        // compound value the children are pushed so the left sibling is popped
+        // (compared) first, reproducing the recursive lexicographic order: the
+        // first non-`Equal` (or `None`) result wins and short-circuits. This
+        // avoids recursing on deep `pair`/`option`/`or` values, which would
+        // overflow the kernel's ~1 MiB Rust stack. Consensus-critical: the
+        // ordering must stay byte-exact with L1, since it backs `BTreeSet` /
+        // `BTreeMap` key ordering (set/map construction, membership, updates).
+        // See L2-1449.
+        let mut stack: Vec<(&TypedValue, &TypedValue)> = vec![(self, other)];
+        while let Some((a, b)) = stack.pop() {
+            let ord = match (a, b) {
+                (Int(x), Int(y)) => leaf!(x, y),
+                (Nat(x), Nat(y)) => leaf!(x, y),
+                (Mutez(x), Mutez(y)) => leaf!(x, y),
+                (Bool(x), Bool(y)) => leaf!(x, y),
+                (String(x), String(y)) => leaf!(x, y),
+                (Unit, Unit) => Equal,
+                (Address(x), Address(y)) => leaf!(x, y),
+                (ChainId(x), ChainId(y)) => leaf!(x, y),
+                (Bytes(x), Bytes(y)) => leaf!(x, y),
+                (Key(x), Key(y)) => leaf!(x, y),
+                (Signature(x), Signature(y)) => leaf!(x, y),
+                (KeyHash(x), KeyHash(y)) => leaf!(x, y),
+                (Timestamp(x), Timestamp(y)) => leaf!(x, y),
+
+                (Pair(l1, l2), Pair(r1, r2)) => {
+                    // Push the right child first so the left child is compared
+                    // first (lexicographic order).
+                    stack.push((l2.as_ref(), r2.as_ref()));
+                    stack.push((l1.as_ref(), r1.as_ref()));
+                    Equal
+                }
+
+                (Option(x), Option(y)) => match (x.as_deref(), y.as_deref()) {
+                    (None, None) => Equal,
+                    (None, Some(_)) => std::cmp::Ordering::Less,
+                    (Some(_), None) => std::cmp::Ordering::Greater,
+                    (Some(xa), Some(yb)) => {
+                        stack.push((xa, yb));
+                        Equal
+                    }
+                },
+
+                (Or(x), Or(y)) => match (x, y) {
+                    (OrEnum::Left(la), OrEnum::Left(ra)) => {
+                        stack.push((la.as_ref(), ra.as_ref()));
+                        Equal
+                    }
+                    (OrEnum::Right(la), OrEnum::Right(ra)) => {
+                        stack.push((la.as_ref(), ra.as_ref()));
+                        Equal
+                    }
+                    (OrEnum::Left(_), OrEnum::Right(_)) => std::cmp::Ordering::Less,
+                    (OrEnum::Right(_), OrEnum::Left(_)) => std::cmp::Ordering::Greater,
+                },
+
+                // Mismatched types and non-comparable types are incomparable,
+                // exactly as the per-variant `(X(..), _) => None` arms and the
+                // `List | Set | Map | ... ` group did before.
+                _ => return None,
+            };
+            if ord != Equal {
+                return Some(ord);
+            }
+        }
+        Some(Equal)
     }
 }
 
@@ -224,6 +248,73 @@ mod tests {
         use TypedValue as V;
         use TypedValue::*;
         let _ = Bool(true).cmp(&V::int(5)); //panics
+    }
+
+    /// Regression for L2-1449: the previous recursive `partial_cmp`/`cmp`
+    /// overflowed the kernel's ~1 MiB Rust stack on a deep `pair`. Build
+    /// right-comb pairs that agree on every left element and differ only at the
+    /// deepest leaf, so the comparison must walk the full depth.
+    #[test]
+    fn deep_pair_cmp_does_not_overflow() {
+        use std::cmp::Ordering;
+        const DEPTH: usize = 100_000;
+        let deep = |leaf: TypedValue<'static>| {
+            let mut v = leaf;
+            for _ in 0..DEPTH {
+                v = TypedValue::new_pair(TypedValue::int(0), v);
+            }
+            v
+        };
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(move || {
+                let a = deep(TypedValue::int(0));
+                let b = deep(TypedValue::int(1));
+                assert_eq!(a.partial_cmp(&b), Some(Ordering::Less));
+                assert_eq!(b.partial_cmp(&a), Some(Ordering::Greater));
+                assert_eq!(a.partial_cmp(&a), Some(Ordering::Equal));
+                assert_eq!(a.cmp(&b), Ordering::Less);
+                // `TypedValue` has no iterative `Drop` yet (L2-1446); skip the
+                // recursive destructor on these deep values.
+                std::mem::forget(a);
+                std::mem::forget(b);
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
+    }
+
+    /// Deep comparable values are used as `BTreeSet`/`BTreeMap` keys; insertion
+    /// and lookup call `Ord::cmp`, which must not overflow (L2-1449).
+    #[test]
+    fn deep_set_key_does_not_overflow() {
+        const DEPTH: usize = 100_000;
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let deep = |leaf: TypedValue<'static>| {
+                    let mut v = leaf;
+                    for _ in 0..DEPTH {
+                        v = TypedValue::new_pair(TypedValue::int(0), v);
+                    }
+                    v
+                };
+                let mut set = std::collections::BTreeSet::new();
+                set.insert(deep(TypedValue::int(0)));
+                set.insert(deep(TypedValue::int(1)));
+                let probe = deep(TypedValue::int(1));
+                assert!(set.contains(&probe));
+                assert_eq!(set.len(), 2);
+                // Move the keys out and forget them so their recursive
+                // destructor does not run on scope exit (L2-1446).
+                std::mem::forget(probe);
+                for k in std::mem::take(&mut set) {
+                    std::mem::forget(k);
+                }
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
     }
 }
 
