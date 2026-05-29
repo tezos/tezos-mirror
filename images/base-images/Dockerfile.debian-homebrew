@@ -9,7 +9,7 @@ COPY scripts/packaging/homebrew_install.sh /tmp
 RUN apt-get update && \
     apt-get install -y \
     curl autoconf cmake g++ libev-dev libffi-dev libgmp-dev git \
-    libprotobuf-dev libsqlite3-dev protobuf-compiler libhidapi-dev \
+    libprotobuf-dev libsqlite3-dev libzstd-dev protobuf-compiler libhidapi-dev \
     pkg-config zlib1g-dev libpq-dev cargo && \
   touch /.dockerenv && \
   /tmp/homebrew_install.sh && \
