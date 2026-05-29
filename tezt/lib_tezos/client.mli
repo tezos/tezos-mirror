@@ -1300,6 +1300,7 @@ val originate_contract :
   ?endpoint:endpoint ->
   ?wait:string ->
   ?init:string ->
+  ?fee_cap:Tez.t ->
   ?burn_cap:Tez.t ->
   ?gas_limit:int ->
   ?dry_run:bool ->
@@ -1319,6 +1320,7 @@ val spawn_originate_contract :
   ?endpoint:endpoint ->
   ?wait:string ->
   ?init:string ->
+  ?fee_cap:Tez.t ->
   ?burn_cap:Tez.t ->
   ?gas_limit:int ->
   ?dry_run:bool ->
