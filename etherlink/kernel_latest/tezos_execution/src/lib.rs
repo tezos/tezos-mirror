@@ -161,6 +161,57 @@ pub mod mir_ctx;
 mod storage_fees;
 mod validate;
 
+/// Cost of a single durable-store write of `payload_bytes`, in
+/// milligas. Public counterpart of [`consume_storage_write_milligas`]
+/// for callers outside `tezos_execution` that maintain their own gas
+/// counter.
+pub fn storage_write_cost_milligas(count: u64, payload_bytes: u64) -> u64 {
+    gas::STORAGE_WRITE_BASE_MILLIGAS
+        .saturating_mul(count)
+        .saturating_add(
+            gas::STORAGE_WRITE_PER_BYTE_MILLIGAS.saturating_mul(payload_bytes),
+        )
+}
+
+/// Charge gas for a sequence of `count` durable-store writes whose
+/// combined payload is `payload_bytes`.
+#[allow(dead_code)]
+pub(crate) fn consume_storage_write_milligas(
+    operation_gas: &mut TezlinkOperationGas,
+    count: u64,
+    payload_bytes: u64,
+) -> Result<(), mir::gas::OutOfGas> {
+    let cost = storage_write_cost_milligas(count, payload_bytes);
+    operation_gas.cast_and_consume_milligas(cost)
+}
+
+/// Cost of a single durable-store read of `payload_bytes`, in
+/// milligas. Public counterpart of [`consume_storage_read_milligas`]
+/// for callers outside `tezos_execution` that maintain their own gas
+/// counter.
+pub fn storage_read_cost_milligas(count: u64, payload_bytes: u64) -> u64 {
+    gas::STORAGE_READ_BASE_MILLIGAS
+        .saturating_mul(count)
+        .saturating_add(gas::STORAGE_READ_PER_BYTE_MILLIGAS.saturating_mul(payload_bytes))
+}
+
+/// Charge gas for a sequence of `count` durable-store reads whose
+/// combined payload is `payload_bytes`.
+#[allow(dead_code)]
+pub(crate) fn consume_storage_read_milligas(
+    operation_gas: &mut TezlinkOperationGas,
+    count: u64,
+    payload_bytes: u64,
+) -> Result<(), mir::gas::OutOfGas> {
+    let cost = storage_read_cost_milligas(count, payload_bytes);
+    operation_gas.cast_and_consume_milligas(cost)
+}
+
+/// Counters are often being read and updated (code size, paid bytes, etc.). When
+/// charging gas for these operations, we use an upper-bound of their size.
+#[allow(dead_code)]
+const COUNTER_SIZE: u64 = 32;
+
 fn reveal<Host, C: Context>(
     tc_ctx: &mut TcCtx<'_, Host, C>,
     source_account: &C::ImplicitAccountType,
