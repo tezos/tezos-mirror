@@ -22,6 +22,12 @@
 
 ### Michelson Runtime
 
+- The `monitor/heads/main` RPC now honors the `protocol` and
+  `next_protocol` query filters and emits the current head immediately as
+  the first element of the stream, matching the L1 `monitor_heads`
+  behavior. Previously the filters were ignored (clients could receive
+  heads they had filtered out) and the current head was never sent on
+  subscription, blocking wait-for-head flows until the next block. (!22023)
 - When the Michelson runtime services an inbound cross-runtime call, the
   gateway now forwards the call's originator (the alias carried in
   `X-Tezos-Source`) as the outbound `X-Tezos-Source`, instead of this
