@@ -214,7 +214,14 @@ impl<'a> ContractScript<'a> {
 
         let tc_val = TypedValue::new_pair(wrapped_parameter, storage);
         let mut stack = stk![tc_val];
-        self.code.interpret(ctx, arena, &mut stack)?;
+        if let Err(e) = self.code.interpret(ctx, arena, &mut stack) {
+            // On error the interpreter hands back the (restored) caller stack,
+            // which may hold a deep runtime-built value; drain it iteratively
+            // before it is dropped so its recursive `Rc<TypedValue>` destructor
+            // does not overflow the kernel's ~1 MiB Rust stack (L2-1446).
+            drain_value_stack(&mut stack);
+            return Err(e.into());
+        }
 
         use TypedValue as V;
 
@@ -519,14 +526,22 @@ fn interpret<'a, 'b>(
         restore_pending_view_context(ctx, &frames);
     }
 
-    // Restore the caller's stack from the bottom of the stack of stacks.
-    // On the error path the driver may have left EXEC/View sub-stacks above
-    // it; `pop()` would hand the caller an inner sub-stack, so take the
-    // bottom (the caller's own) explicitly. On success there is exactly one
-    // entry, so this is equivalent to `pop()`.
-    *stack = stacks.into_iter().next().ok_or(InterpretError::InternalError(
+    // Restore the caller's stack from the bottom of the stack of stacks, and
+    // drain any EXEC/View sub-stacks left above it on the error path before
+    // they are dropped. `pop()` would hand the caller an inner sub-stack, so
+    // take the bottom (the caller's own) explicitly. A leftover sub-stack may
+    // hold a deep runtime-built value (e.g. a LOOP-built PAIR comb); draining
+    // it iteratively keeps the recursive `Rc<TypedValue>` destructor from
+    // overflowing the kernel's ~1 MiB Rust stack (L2-1446). On success there is
+    // exactly one entry, so the drain loop is a no-op.
+    let mut stacks = stacks.into_iter();
+    let bottom = stacks.next().ok_or(InterpretError::InternalError(
         InterpretInvariant::UnreachableState,
     ))?;
+    for mut sub in stacks {
+        drain_value_stack(&mut sub);
+    }
+    *stack = bottom;
     outcome
 }
 
@@ -555,6 +570,21 @@ fn restore_pending_view_context<'a>(
             *saved_amount,
             *saved_balance,
         );
+    }
+}
+
+/// Drain every value left on a value stack iteratively before it is dropped,
+/// so a deep runtime-built value (e.g. a `LOOP`-built `PAIR` comb) does not
+/// overflow the kernel's ~1 MiB Rust stack via the recursive `Rc<TypedValue>`
+/// destructor. Uniquely-owned values are flattened with
+/// [`crate::ast::drain_deep_typed_value`]; shared values are left to their
+/// other owners -- only their `Rc` refcount is decremented, which does not
+/// recurse. L2-1446.
+fn drain_value_stack(stack: &mut IStack<'_>) {
+    while let Some(rc) = stack.pop() {
+        if let Ok(mut v) = Rc::try_unwrap(rc) {
+            crate::ast::drain_deep_typed_value(&mut v);
+        }
     }
 }
 
@@ -3145,6 +3175,32 @@ mod interpreter_tests {
         let r2 = interpret(&[Exec], &mut Ctx::default(), &mut nested);
         assert!(matches!(r2, Err(InterpretError::FailedWith(..))));
         assert_eq!(nested, stk![marker]);
+    }
+
+    /// L2-1446: a deep runtime-built value (e.g. a `LOOP`/`PAIR`-built comb)
+    /// left on a value stack at interpreter teardown must be flattened
+    /// iteratively, not recursed through the `Rc<TypedValue>` destructor. This
+    /// exercises `drain_value_stack`, which the driver (for EXEC/View
+    /// sub-stacks) and `ContractScript::interpret` (for the caller stack) call
+    /// on their error paths. Runs on a 1 MiB worker thread matching the kernel
+    /// budget; without the iterative drain it overflows.
+    #[test]
+    fn drain_deep_value_stack_does_not_overflow() {
+        const DEPTH: usize = 100_000;
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let mut deep = V::int(0);
+                for _ in 0..DEPTH {
+                    deep = V::new_pair(V::int(0), deep);
+                }
+                let mut stack = stk![deep];
+                drain_value_stack(&mut stack);
+                assert!(stack.pop().is_none());
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
     }
 
     /// Zero-copy bodies: a control-flow body borrowed from the (arena-lived)
