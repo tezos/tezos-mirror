@@ -349,16 +349,17 @@ impl<'a> Instruction<'a> {
 /// so the worklist can keep them alive across iterations. `'a` is the
 /// arena lifetime; `'b` is the borrow lifetime of the caller's input
 /// slice and may be shorter than `'a`.
+#[derive(Clone)]
 enum CodeRef<'a, 'b> {
     Borrowed(&'b [Instruction<'a>]),
     Owned(Rc<[Instruction<'a>]>),
 }
 
 impl<'a, 'b> CodeRef<'a, 'b> {
-    fn as_slice(&self) -> &[Instruction<'a>] {
+    fn len(&self) -> usize {
         match self {
-            CodeRef::Borrowed(s) => s,
-            CodeRef::Owned(rc) => rc.as_ref(),
+            CodeRef::Borrowed(s) => s.len(),
+            CodeRef::Owned(rc) => rc.len(),
         }
     }
 }
@@ -376,31 +377,31 @@ enum InterpFrame<'a, 'b> {
         opt_height: Option<u16>,
     },
     LoopBody {
-        body: Rc<[Instruction<'a>]>,
+        body: CodeRef<'a, 'b>,
     },
     LoopLeftBody {
-        body: Rc<[Instruction<'a>]>,
+        body: CodeRef<'a, 'b>,
     },
     IterList {
-        body: Rc<[Instruction<'a>]>,
+        body: CodeRef<'a, 'b>,
         remaining: std::vec::IntoIter<Rc<TypedValue<'a>>>,
     },
     IterSet {
-        body: Rc<[Instruction<'a>]>,
+        body: CodeRef<'a, 'b>,
         remaining: std::collections::btree_set::IntoIter<Rc<TypedValue<'a>>>,
     },
     IterMap {
-        body: Rc<[Instruction<'a>]>,
+        body: CodeRef<'a, 'b>,
         remaining: std::collections::btree_map::IntoIter<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
     },
     MapListAccum {
-        body: Rc<[Instruction<'a>]>,
+        body: CodeRef<'a, 'b>,
         remaining: std::vec::IntoIter<Rc<TypedValue<'a>>>,
         acc: Vec<Rc<TypedValue<'a>>>,
     },
     MapOptionAfter,
     MapMapAccum {
-        body: Rc<[Instruction<'a>]>,
+        body: CodeRef<'a, 'b>,
         remaining: std::vec::IntoIter<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)>,
         acc: BTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
         current_key: Option<Rc<TypedValue<'a>>>,
@@ -418,37 +419,39 @@ enum InterpFrame<'a, 'b> {
 
 /// What a per instruction step yields. Non recursive arms produce Done;
 /// control flow arms produce Open variants that the driver expands.
-/// All bodies are owned via `Rc<[Instruction<'a>]>` so the step result
-/// has no borrow lifetime, only the arena lifetime.
-enum StepResult<'a> {
+/// Nested control-flow bodies are carried as [CodeRef]: borrowed straight
+/// from the (arena-lived) AST when the parent block is itself borrowed, and
+/// only cloned into a fresh `Rc` when the parent is `Owned` (a runtime
+/// lambda/view body). EXEC/View bodies are always `Rc` (runtime values).
+enum StepResult<'a, 'b> {
     Done,
-    OpenBlock(Rc<[Instruction<'a>]>),
+    OpenBlock(CodeRef<'a, 'b>),
     OpenDip {
-        body: Rc<[Instruction<'a>]>,
+        body: CodeRef<'a, 'b>,
         protected: crate::stack::Stack<Rc<TypedValue<'a>>>,
         opt_height: Option<u16>,
     },
-    OpenLoop(Rc<[Instruction<'a>]>),
-    OpenLoopLeft(Rc<[Instruction<'a>]>),
+    OpenLoop(CodeRef<'a, 'b>),
+    OpenLoopLeft(CodeRef<'a, 'b>),
     OpenIterList {
-        body: Rc<[Instruction<'a>]>,
+        body: CodeRef<'a, 'b>,
         iter: std::vec::IntoIter<Rc<TypedValue<'a>>>,
     },
     OpenIterSet {
-        body: Rc<[Instruction<'a>]>,
+        body: CodeRef<'a, 'b>,
         iter: std::collections::btree_set::IntoIter<Rc<TypedValue<'a>>>,
     },
     OpenIterMap {
-        body: Rc<[Instruction<'a>]>,
+        body: CodeRef<'a, 'b>,
         iter: std::collections::btree_map::IntoIter<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
     },
     OpenMapList {
-        body: Rc<[Instruction<'a>]>,
+        body: CodeRef<'a, 'b>,
         iter: std::vec::IntoIter<Rc<TypedValue<'a>>>,
     },
-    OpenMapOption(Rc<[Instruction<'a>]>),
+    OpenMapOption(CodeRef<'a, 'b>),
     OpenMapMap {
-        body: Rc<[Instruction<'a>]>,
+        body: CodeRef<'a, 'b>,
         iter: std::vec::IntoIter<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)>,
         first_key: Rc<TypedValue<'a>>,
     },
@@ -469,11 +472,22 @@ enum StepResult<'a> {
     },
 }
 
+// Counts `body_to_owned` calls so tests can assert that an AST-borrowed
+// program clones zero nested bodies. Per-thread; tests reset it at entry.
+#[cfg(test)]
+thread_local! {
+    static BODY_CLONES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 /// Clone a nested body (Vec inside an Instruction variant) into a fresh
-/// Rc so its CodeRef::Owned can outlive the parent frame. Used when the
-/// parent block is Rc owned and a borrowed slice would not have a valid
-/// lifetime across worklist iterations.
+/// Rc so its CodeRef::Owned can outlive the parent frame. Only used when
+/// the parent block is `Rc` owned (a runtime lambda/view body), where a
+/// borrowed slice would not have a valid lifetime across worklist
+/// iterations; bodies borrowed from the (arena-lived) AST are kept as
+/// `CodeRef::Borrowed` and never reach here.
 fn body_to_owned<'a>(body: &[Instruction<'a>]) -> Rc<[Instruction<'a>]> {
+    #[cfg(test)]
+    BODY_CLONES.with(|c| c.set(c.get() + 1));
     body.to_vec().into_boxed_slice().into()
 }
 
@@ -573,20 +587,46 @@ fn run_interp_driver<'a, 'b>(
     while let Some(frame) = frames.pop() {
         match frame {
             InterpFrame::NextInstr { block, idx } => {
-                let slice = block.as_slice();
-                if idx >= slice.len() {
+                if idx >= block.len() {
                     ctx.gas().consume(interpret_cost::INTERPRET_RET)?;
                     continue;
                 }
-                let instr = &slice[idx];
-                // Re-push the parent NextInstr (with its block moved back
-                // by value) before any nested frames so it lands below them.
-                let parent_idx = idx + 1;
-                let step = interpret_step(instr, ctx, arena, active_stack_mut(stacks)?, &block)?;
-                frames.push(InterpFrame::NextInstr {
-                    block,
-                    idx: parent_idx,
-                });
+                // A nested control-flow body inherits its parent's kind: a
+                // body borrowed from the AST stays borrowed (zero-copy); a
+                // body in an owned `Rc` (a runtime lambda/view body) must be
+                // cloned, because a borrow into the `Rc` cannot outlive this
+                // frame once it is re-pushed below. Only the per-instruction
+                // borrow lifetime and the body-materialization closure differ
+                // between the two arms; the gas charge above and `handle_step`
+                // below are shared. The parent NextInstr is re-pushed before
+                // any nested frames so it lands below them.
+                let step = match block {
+                    CodeRef::Borrowed(s) => {
+                        let step = interpret_step(
+                            &s[idx],
+                            ctx,
+                            arena,
+                            active_stack_mut(stacks)?,
+                            CodeRef::Borrowed,
+                        )?;
+                        frames.push(InterpFrame::NextInstr {
+                            block: CodeRef::Borrowed(s),
+                            idx: idx + 1,
+                        });
+                        step
+                    }
+                    CodeRef::Owned(rc) => {
+                        let step =
+                            interpret_step(&rc[idx], ctx, arena, active_stack_mut(stacks)?, |b| {
+                                CodeRef::Owned(body_to_owned(b))
+                            })?;
+                        frames.push(InterpFrame::NextInstr {
+                            block: CodeRef::Owned(rc),
+                            idx: idx + 1,
+                        });
+                        step
+                    }
+                };
                 handle_step(step, ctx, stacks, frames)?;
             }
             InterpFrame::AfterDip {
@@ -614,10 +654,10 @@ fn run_interp_driver<'a, 'b>(
                 };
                 if cond {
                     frames.push(InterpFrame::LoopBody {
-                        body: Rc::clone(&body),
+                        body: body.clone(),
                     });
                     frames.push(InterpFrame::NextInstr {
-                        block: CodeRef::Owned(body),
+                        block: body,
                         idx: 0,
                     });
                 } else {
@@ -641,10 +681,10 @@ fn run_interp_driver<'a, 'b>(
                     Or::Left(x) => {
                         stk.push(x);
                         frames.push(InterpFrame::LoopLeftBody {
-                            body: Rc::clone(&body),
+                            body: body.clone(),
                         });
                         frames.push(InterpFrame::NextInstr {
-                            block: CodeRef::Owned(body),
+                            block: body,
                             idx: 0,
                         });
                     }
@@ -662,11 +702,11 @@ fn run_interp_driver<'a, 'b>(
                     ctx.gas().consume(interpret_cost::PUSH)?;
                     active_stack_mut(stacks)?.push(elem);
                     frames.push(InterpFrame::IterList {
-                        body: Rc::clone(&body),
+                        body: body.clone(),
                         remaining,
                     });
                     frames.push(InterpFrame::NextInstr {
-                        block: CodeRef::Owned(body),
+                        block: body,
                         idx: 0,
                     });
                 }
@@ -679,11 +719,11 @@ fn run_interp_driver<'a, 'b>(
                     ctx.gas().consume(interpret_cost::PUSH)?;
                     active_stack_mut(stacks)?.push(elem);
                     frames.push(InterpFrame::IterSet {
-                        body: Rc::clone(&body),
+                        body: body.clone(),
                         remaining,
                     });
                     frames.push(InterpFrame::NextInstr {
-                        block: CodeRef::Owned(body),
+                        block: body,
                         idx: 0,
                     });
                 }
@@ -696,11 +736,11 @@ fn run_interp_driver<'a, 'b>(
                     ctx.gas().consume(interpret_cost::PUSH)?;
                     active_stack_mut(stacks)?.push(TypedValue::Pair(k, v));
                     frames.push(InterpFrame::IterMap {
-                        body: Rc::clone(&body),
+                        body: body.clone(),
                         remaining,
                     });
                     frames.push(InterpFrame::NextInstr {
-                        block: CodeRef::Owned(body),
+                        block: body,
                         idx: 0,
                     });
                 }
@@ -718,12 +758,12 @@ fn run_interp_driver<'a, 'b>(
                     ctx.gas().consume(interpret_cost::PUSH)?;
                     stk.push(elem);
                     frames.push(InterpFrame::MapListAccum {
-                        body: Rc::clone(&body),
+                        body: body.clone(),
                         remaining,
                         acc,
                     });
                     frames.push(InterpFrame::NextInstr {
-                        block: CodeRef::Owned(body),
+                        block: body,
                         idx: 0,
                     });
                 } else {
@@ -753,13 +793,13 @@ fn run_interp_driver<'a, 'b>(
                     ctx.gas().consume(interpret_cost::PUSH)?;
                     stk.push(TypedValue::Pair(k.clone(), v));
                     frames.push(InterpFrame::MapMapAccum {
-                        body: Rc::clone(&body),
+                        body: body.clone(),
                         remaining,
                         acc,
                         current_key: Some(k),
                     });
                     frames.push(InterpFrame::NextInstr {
-                        block: CodeRef::Owned(body),
+                        block: body,
                         idx: 0,
                     });
                 } else {
@@ -798,7 +838,7 @@ fn run_interp_driver<'a, 'b>(
 }
 
 fn handle_step<'a, 'b>(
-    step: StepResult<'a>,
+    step: StepResult<'a, 'b>,
     ctx: &mut impl CtxTrait<'a>,
     stacks: &mut Vec<IStack<'a>>,
     frames: &mut Vec<InterpFrame<'a, 'b>>,
@@ -807,7 +847,7 @@ fn handle_step<'a, 'b>(
         StepResult::Done => {}
         StepResult::OpenBlock(body) => {
             frames.push(InterpFrame::NextInstr {
-                block: CodeRef::Owned(body),
+                block: body,
                 idx: 0,
             });
         }
@@ -821,7 +861,7 @@ fn handle_step<'a, 'b>(
                 opt_height,
             });
             frames.push(InterpFrame::NextInstr {
-                block: CodeRef::Owned(body),
+                block: body,
                 idx: 0,
             });
         }
@@ -853,19 +893,19 @@ fn handle_step<'a, 'b>(
             // First element was already pushed by interpret_step; run the
             // body and then collect from MapListAccum.
             frames.push(InterpFrame::MapListAccum {
-                body: Rc::clone(&body),
+                body: body.clone(),
                 remaining: iter,
                 acc: Vec::new(),
             });
             frames.push(InterpFrame::NextInstr {
-                block: CodeRef::Owned(body),
+                block: body,
                 idx: 0,
             });
         }
         StepResult::OpenMapOption(body) => {
             frames.push(InterpFrame::MapOptionAfter);
             frames.push(InterpFrame::NextInstr {
-                block: CodeRef::Owned(body),
+                block: body,
                 idx: 0,
             });
         }
@@ -875,13 +915,13 @@ fn handle_step<'a, 'b>(
             first_key,
         } => {
             frames.push(InterpFrame::MapMapAccum {
-                body: Rc::clone(&body),
+                body: body.clone(),
                 remaining: iter,
                 acc: BTreeMap::new(),
                 current_key: Some(first_key),
             });
             frames.push(InterpFrame::NextInstr {
-                block: CodeRef::Owned(body),
+                block: body,
                 idx: 0,
             });
         }
@@ -926,13 +966,18 @@ fn handle_step<'a, 'b>(
 /// instructions return an `Open` variant carrying the body and any state
 /// the driver needs; everything else delegates to `interpret_one` for
 /// the side effects on the active stack.
-fn interpret_step<'a, 'b>(
-    i: &'b Instruction<'a>,
+fn interpret_step<'a, 'b, 'c>(
+    i: &'c Instruction<'a>,
     ctx: &mut impl CtxTrait<'a>,
     arena: &'a Arena<Micheline<'a>>,
     stack: &mut IStack<'a>,
-    _parent: &CodeRef<'a, 'b>,
-) -> Result<StepResult<'a>, InterpretError<'a>> {
+    // Materializes a nested control-flow body into a [CodeRef]. The driver
+    // passes `CodeRef::Borrowed` when this instruction comes from a borrowed
+    // (arena-lived) block — keeping nested bodies zero-copy — and a cloning
+    // closure when it comes from an owned `Rc` block (see the `NextInstr`
+    // arm of `run_interp_driver`).
+    mk_body: impl Fn(&'c [Instruction<'a>]) -> CodeRef<'a, 'b>,
+) -> Result<StepResult<'a, 'b>, InterpretError<'a>> {
     use Instruction as I;
     use TypedValue as V;
 
@@ -957,13 +1002,13 @@ fn interpret_step<'a, 'b>(
     }
 
     match i {
-        I::Seq(body) => Ok(StepResult::OpenBlock(body_to_owned(body))),
+        I::Seq(body) => Ok(StepResult::OpenBlock(mk_body(body))),
         I::Dip(opt_height, body) => {
             ctx.gas().consume(interpret_cost::dip(*opt_height)?)?;
             let protected_height: u16 = opt_height.unwrap_or(1);
             let protected = stack.split_off(protected_height as usize);
             Ok(StepResult::OpenDip {
-                body: body_to_owned(body),
+                body: mk_body(body),
                 protected,
                 opt_height: *opt_height,
             })
@@ -971,7 +1016,7 @@ fn interpret_step<'a, 'b>(
         I::If(t, f) => {
             ctx.gas().consume(interpret_cost::IF)?;
             let body = if pop_v!(V::Bool) { t } else { f };
-            Ok(StepResult::OpenBlock(body_to_owned(body)))
+            Ok(StepResult::OpenBlock(mk_body(body)))
         }
         I::IfNone(when_none, when_some) => {
             ctx.gas().consume(interpret_cost::IF_NONE)?;
@@ -982,7 +1027,7 @@ fn interpret_step<'a, 'b>(
                 }
                 None => when_none,
             };
-            Ok(StepResult::OpenBlock(body_to_owned(body)))
+            Ok(StepResult::OpenBlock(mk_body(body)))
         }
         I::IfCons(when_cons, when_nil) => {
             ctx.gas().consume(interpret_cost::IF_CONS)?;
@@ -1006,7 +1051,7 @@ fn interpret_step<'a, 'b>(
                     when_nil
                 }
             };
-            Ok(StepResult::OpenBlock(body_to_owned(body)))
+            Ok(StepResult::OpenBlock(mk_body(body)))
         }
         I::IfLeft(when_left, when_right) => {
             ctx.gas().consume(interpret_cost::IF_LEFT)?;
@@ -1021,15 +1066,15 @@ fn interpret_step<'a, 'b>(
                     when_right
                 }
             };
-            Ok(StepResult::OpenBlock(body_to_owned(body)))
+            Ok(StepResult::OpenBlock(mk_body(body)))
         }
         I::Loop(body) => {
             ctx.gas().consume(interpret_cost::LOOP_ENTER)?;
-            Ok(StepResult::OpenLoop(body_to_owned(body)))
+            Ok(StepResult::OpenLoop(mk_body(body)))
         }
         I::LoopLeft(body) => {
             ctx.gas().consume(interpret_cost::LOOP_LEFT_ENTER)?;
-            Ok(StepResult::OpenLoopLeft(body_to_owned(body)))
+            Ok(StepResult::OpenLoopLeft(mk_body(body)))
         }
         I::Iter(overload, body) => {
             ctx.gas().consume(interpret_cost::ITER)?;
@@ -1037,21 +1082,21 @@ fn interpret_step<'a, 'b>(
                 overloads::Iter::List => {
                     let lst = pop_v!(V::List);
                     Ok(StepResult::OpenIterList {
-                        body: body_to_owned(body),
+                        body: mk_body(body),
                         iter: Vec::from(lst).into_iter(),
                     })
                 }
                 overloads::Iter::Set => {
                     let set = pop_v!(V::Set);
                     Ok(StepResult::OpenIterSet {
-                        body: body_to_owned(body),
+                        body: mk_body(body),
                         iter: set.into_iter(),
                     })
                 }
                 overloads::Iter::Map => {
                     let map = pop_v!(V::Map);
                     Ok(StepResult::OpenIterMap {
-                        body: body_to_owned(body),
+                        body: mk_body(body),
                         iter: map.into_iter(),
                     })
                 }
@@ -1066,7 +1111,7 @@ fn interpret_step<'a, 'b>(
                     ctx.gas().consume(interpret_cost::PUSH)?;
                     stack.push(first);
                     Ok(StepResult::OpenMapList {
-                        body: body_to_owned(body),
+                        body: mk_body(body),
                         iter,
                     })
                 } else {
@@ -1081,7 +1126,7 @@ fn interpret_step<'a, 'b>(
                     Some(elem) => {
                         ctx.gas().consume(interpret_cost::PUSH)?;
                         stack.push(elem);
-                        Ok(StepResult::OpenMapOption(body_to_owned(body)))
+                        Ok(StepResult::OpenMapOption(mk_body(body)))
                     }
                     None => {
                         stack.push(V::new_option(None));
@@ -1099,7 +1144,7 @@ fn interpret_step<'a, 'b>(
                     ctx.gas().consume(interpret_cost::PUSH)?;
                     stack.push(TypedValue::Pair(k.clone(), v));
                     Ok(StepResult::OpenMapMap {
-                        body: body_to_owned(body),
+                        body: mk_body(body),
                         iter,
                         first_key: k,
                     })
@@ -3084,6 +3129,100 @@ mod interpreter_tests {
         let r2 = interpret(&[Exec], &mut Ctx::default(), &mut nested);
         assert!(matches!(r2, Err(InterpretError::FailedWith(..))));
         assert_eq!(nested, stk![marker]);
+    }
+
+    /// Zero-copy bodies: a control-flow body borrowed from the (arena-lived)
+    /// AST is never deep-cloned by the driver, even across loop iterations.
+    /// Before this optimization, `body_to_owned` ran once per opened nested
+    /// block — so an ITER body containing a nested IF cloned the IF branch on
+    /// every iteration. Now AST-borrowed bodies stay `CodeRef::Borrowed`, and
+    /// `body_to_owned` runs only for runtime `Rc` bodies (EXEC/View). The
+    /// `BODY_CLONES` counter (cfg(test)) asserts both directions.
+    #[test]
+    fn ast_borrowed_bodies_are_not_cloned() {
+        use crate::parser::test_helpers::parse;
+
+        let clones = || BODY_CLONES.with(|c| c.get());
+        let reset = || BODY_CLONES.with(|c| c.set(0));
+
+        // (a) An ITER over a 3-element list whose body holds a nested IF: all
+        // bodies are borrowed straight from the AST, so zero clones happen,
+        // including across the three iterations.
+        let iter_prog = parse(
+            "{ NIL int ; PUSH int 3 ; CONS ; PUSH int 2 ; CONS ; PUSH int 1 ; CONS ; \
+               ITER { DROP ; PUSH bool True ; IF {} {} } }",
+        )
+        .unwrap()
+        .typecheck_instruction(&mut Gas::default(), None, &[])
+        .unwrap();
+        let arena = Arena::new();
+        let mut stack: IStack = Stack::new();
+        reset();
+        iter_prog
+            .interpret(&mut Ctx::default(), &arena, &mut stack)
+            .unwrap();
+        assert_eq!(clones(), 0, "AST-borrowed bodies must not be cloned");
+
+        // (b) The same nested IF inside a LAMBDA body run via EXEC: the lambda
+        // code is a runtime `Rc`, so its nested control-flow IS cloned. This
+        // guards against the counter being trivially zero.
+        let exec_prog = parse(
+            "{ LAMBDA int int { PUSH bool True ; IF {} {} } ; PUSH int 5 ; EXEC ; DROP }",
+        )
+        .unwrap()
+        .typecheck_instruction(&mut Gas::default(), None, &[])
+        .unwrap();
+        let arena2 = Arena::new();
+        let mut stack2: IStack = Stack::new();
+        reset();
+        exec_prog
+            .interpret(&mut Ctx::default(), &arena2, &mut stack2)
+            .unwrap();
+        assert!(
+            clones() > 0,
+            "a nested body inside an owned (EXEC) lambda is still cloned"
+        );
+    }
+
+    /// Residual scope of the optimization (L2-1442): a loop *inside an EXEC'd
+    /// lambda* runs on an owned `Rc` body, so its nested control-flow is still
+    /// deep-cloned once per iteration — a borrow into the lambda `Rc` cannot
+    /// outlive the worklist frame. This pins that boundary: two extra ITER
+    /// iterations inside the lambda add exactly two nested-IF clones, whereas
+    /// the AST-borrowed case (above) is always zero regardless of iterations.
+    #[test]
+    fn owned_lambda_loop_clones_scale_per_iteration() {
+        use crate::parser::test_helpers::parse;
+
+        let run = |prog_src: &str| -> usize {
+            let prog = parse(prog_src)
+                .unwrap()
+                .typecheck_instruction(&mut Gas::default(), None, &[])
+                .unwrap();
+            let arena = Arena::new();
+            let mut stack: IStack = Stack::new();
+            BODY_CLONES.with(|c| c.set(0));
+            prog.interpret(&mut Ctx::default(), &arena, &mut stack)
+                .unwrap();
+            BODY_CLONES.with(|c| c.get())
+        };
+
+        // The lambda iterates its input list, running a nested IF per element.
+        let lam = "LAMBDA (list int) unit { ITER { DROP ; PUSH bool True ; IF {} {} } ; UNIT }";
+        let c2 = run(&format!(
+            "{{ {lam} ; NIL int ; PUSH int 2 ; CONS ; PUSH int 1 ; CONS ; EXEC ; DROP }}"
+        ));
+        let c4 = run(&format!(
+            "{{ {lam} ; NIL int ; PUSH int 4 ; CONS ; PUSH int 3 ; CONS ; \
+                PUSH int 2 ; CONS ; PUSH int 1 ; CONS ; EXEC ; DROP }}"
+        ));
+
+        assert!(c2 > 0, "owned lambda body clones nested control-flow");
+        assert_eq!(
+            c4 - c2,
+            2,
+            "each extra ITER iteration inside the owned lambda adds one nested-IF clone"
+        );
     }
 
     mod sub {
