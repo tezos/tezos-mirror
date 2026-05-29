@@ -8,6 +8,13 @@
 
 ### RPCs changes
 
+- Fix transaction objects of delayed transactions returned by the RPCs (e.g.
+  `eth_getBlockByNumber` with full objects, `eth_getTransactionByHash`): typed
+  delayed transactions (EIP-2930/1559/7702) are now reconstructed with their
+  `type` field and proper fields instead of being returned as bare legacy
+  objects (no `type`, `v` equal to the raw y_parity `0x0`/`0x1`), which broke
+  strict Ethereum deserializers. (!22027)
+
 - Fix `eth_getLogs`: each returned log now carries the `blockNumber` of the
   block that actually emitted it. Over a range spanning more than one block,
   every log was previously stamped with the request's `fromBlock` (the

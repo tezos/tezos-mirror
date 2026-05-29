@@ -1472,6 +1472,101 @@ let test_delayed_transfer_is_included =
   in
   unit
 
+let test_delayed_typed_transaction_is_reconstructed =
+  register_all
+    ~__FILE__
+    ~da_fee:arb_da_fee_for_delayed_inbox
+    ~tags:["evm"; "sequencer"; "delayed_inbox"; "reconstruct"; "eip1559"]
+    ~title:"Delayed EIP-1559 transaction is reconstructed with its type"
+    ~time_between_blocks:Nothing
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  (* Craft an EIP-1559 (type [0x2]) transfer and submit it through the delayed
+     inbox. The raw transaction of a delayed transaction is *not* part of the
+     sequencer blueprint payload, so the EVM node must reconstruct its type from
+     the separately stored raw delayed transaction. Without that reconstruction,
+     the transaction object is returned as a bare legacy object: no [type] field
+     and [v] equal to the raw y_parity ([0x0]/[0x1]), which is rejected by strict
+     Ethereum deserializers. *)
+  let* raw_transfer =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~legacy:false
+      ~value:(Wei.of_eth_int 1)
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  let* tx_hash =
+    send_raw_transaction_to_delayed_inbox
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      raw_transfer
+  in
+  let* () =
+    wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+  let tx_hash = "0x" ^ tx_hash in
+  let check_typed ~rpc tx_object =
+    Check.(
+      (JSON.(tx_object |-> "type" |> as_string_opt) = Some "0x2")
+        (option string))
+      ~error_msg:(rpc ^ ": expected delayed transaction type %R, got %L") ;
+    (* EIP-1559 typed transactions legitimately carry [v = 0x0]/[0x1], but they
+       must be tagged with their [type]; the EIP-1559 fields must be present. *)
+    Check.(
+      (JSON.(tx_object |-> "maxFeePerGas" |> as_string_opt) <> None)
+        (option string))
+      ~error_msg:(rpc ^ ": expected a maxFeePerGas field on the EIP-1559 tx")
+  in
+  (* [eth_getTransactionByHash] exercises the [find_object] read path. *)
+  let* tx_object =
+    let* json =
+      Evm_node.(
+        jsonrpc
+          sequencer
+          {
+            method_ = "eth_getTransactionByHash";
+            parameters = `A [`String tx_hash];
+          })
+    in
+    return (Evm_node.extract_result json)
+  in
+  check_typed ~rpc:"eth_getTransactionByHash" tx_object ;
+  (* [eth_getBlockByNumber] with full transaction objects exercises the
+     [block_with_objects] read path. *)
+  let block_number = JSON.(tx_object |-> "blockNumber" |> as_string) in
+  let* block =
+    let* json =
+      Evm_node.(
+        jsonrpc
+          sequencer
+          {
+            method_ = "eth_getBlockByNumber";
+            parameters = `A [`String block_number; `Bool true];
+          })
+    in
+    return (Evm_node.extract_result json)
+  in
+  let tx_object_in_block =
+    JSON.(block |-> "transactions" |> as_list)
+    |> List.find (fun tx -> JSON.(tx |-> "hash" |> as_string) = tx_hash)
+  in
+  check_typed ~rpc:"eth_getBlockByNumber" tx_object_in_block ;
+  unit
+
 let test_largest_delayed_transfer_is_included =
   register_all
     ~__FILE__
@@ -16216,6 +16311,7 @@ let () =
   test_get_block_by_number_block_param protocols ;
   test_extended_block_param protocols ;
   test_delayed_transfer_is_included protocols ;
+  test_delayed_typed_transaction_is_reconstructed protocols ;
   test_delayed_deposit_is_included protocols ;
   test_empty_deposit_info_does_not_block_valid_deposits protocols ;
   test_delayed_fa_deposit_is_included protocols ;

@@ -146,32 +146,34 @@ val block_from_legacy :
   Ethereum_types.legacy_transaction_object Ethereum_types.block ->
   t Ethereum_types.block
 
-(** [reconstruct blueprint_payload obj] reconstructs the full transaction object
-    from the raw transaction of [obj] stored in [blueprint_payload].
+(** [reconstruct blueprint obj] reconstructs the full transaction object from
+    the raw transaction of [obj] found in [blueprint]. The raw transaction is
+    looked up both in the blueprint payload (sequencer transactions) and in
+    [blueprint.delayed_transactions] (delayed EVM transactions, whose raw
+    transaction is not part of the payload).
 
-    Fails if [blueprint_payload] is inconsistent (does not contain the raw
-    transaction, is corrupted, etc.). *)
+    Fails if [blueprint] is inconsistent (does not contain the raw transaction,
+    is corrupted, etc.). *)
 val reconstruct :
-  Blueprint_types.payload ->
+  Blueprint_types.with_events ->
   Ethereum_types.legacy_transaction_object ->
   t tzresult
 
-(** [reconstruct_block blueprint_payload block] folds over the transactions of
-    [block] to reconstruct them (see {!reconstruct}). *)
+(** [reconstruct_block blueprint block] folds over the transactions of [block]
+    to reconstruct them (see {!reconstruct}). *)
 val reconstruct_block :
-  Blueprint_types.payload ->
+  Blueprint_types.with_events ->
   Ethereum_types.legacy_transaction_object Ethereum_types.block ->
   t Ethereum_types.block tzresult
 
-(** [rereconstruct blueprint_payload obj] can be used to retry to reconstruct
-    [obj] using [blueprint_payload], exactly as {!reconstruct} would, in case
-    [obj] was created with {!from_store_transaction_object}.
+(** [rereconstruct blueprint obj] can be used to retry to reconstruct [obj]
+    using [blueprint], exactly as {!reconstruct} would, in case [obj] was
+    created with {!from_store_transaction_object}.
 
-    - [rereconstruct blueprint_payload (reconstruct blueprint_payload obj)]
-      is a no-op.
-    - [rereconstruct blueprint_payload (from_store_transaction_object obj)]
-      is equivalent to [reconstruct blueprint_payload obj] *)
-val rereconstruct : Blueprint_types.payload -> t -> t tzresult
+    - [rereconstruct blueprint (reconstruct blueprint obj)] is a no-op.
+    - [rereconstruct blueprint (from_store_transaction_object obj)] is
+      equivalent to [reconstruct blueprint obj] *)
+val rereconstruct : Blueprint_types.with_events -> t -> t tzresult
 
 (** [rereconstruct_block] can be used to retry to reconstruct a block, exactly
     as {!reconstruct_block} would, in case [block] was created with
@@ -179,6 +181,6 @@ val rereconstruct : Blueprint_types.payload -> t -> t tzresult
 
     See {!rereconstruct}. *)
 val rereconstruct_block :
-  Blueprint_types.payload ->
+  Blueprint_types.with_events ->
   t Ethereum_types.block ->
   t Ethereum_types.block tzresult
