@@ -1508,7 +1508,7 @@ module Nds_aux = struct
   let registry_resize ~nds ~diff =
     let open Lwt_result_syntax in
     let*! res =
-      let*? size = map_nds (Nds.size nds) in
+      let size = Nds.size nds in
       let new_size = Int64.add size diff in
       if
         Int64.compare new_size 0L < 0

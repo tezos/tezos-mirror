@@ -138,3 +138,14 @@ let () =
     Data_encoding.(obj1 (req "error" verification_argument_error_encoding))
     (function Verification_argument_error e -> Some e | _ -> None)
     (fun e -> Verification_argument_error e)
+
+exception Verification_failed of verification_error
+
+let () =
+  Printexc.register_printer (function
+    | Verification_failed e ->
+        Some
+          (Format.sprintf
+             "Verification_failed: %s"
+             (string_of_verification_error e))
+    | _ -> None)
