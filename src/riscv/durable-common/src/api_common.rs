@@ -8,177 +8,222 @@
 use bytes::Bytes;
 use octez_riscv_api_common::OcamlFallible;
 use octez_riscv_api_common::bytes::BytesWrapper;
-use octez_riscv_api_common::move_semantics::MutableState;
-use octez_riscv_api_common::safe_pointer::SafePointer;
+use octez_riscv_data::components::vector::VectorMode;
 use octez_riscv_data::foldable::Foldable;
 use octez_riscv_data::hash::Hash;
 use octez_riscv_data::hash::HashFold;
-use octez_riscv_data::mode::Normal;
+use octez_riscv_data::mode::Mode;
+use octez_riscv_durable_storage::database::DatabaseMode;
 use octez_riscv_durable_storage::errors as ds_errors;
-use octez_riscv_durable_storage::key::Key;
+use octez_riscv_durable_storage::errors::OperationalError;
 use octez_riscv_durable_storage::registry as ds_registry;
+use octez_riscv_durable_storage::registry::Registry;
+use octez_riscv_durable_storage::registry::RegistryMode;
 use octez_riscv_durable_storage::storage::KeyValueStore;
+use trait_set::trait_set;
 
 use crate::BytesParam;
 use crate::KeyParam;
 use crate::SplitDsResult;
 use crate::map_fallible;
-use crate::registry::RegistryState;
 use crate::split_ds_errors;
 
-/// Type alias for a mutable registry state backed by a generic key-value store.
-pub type DsRegistry<KV, G> = MutableState<RegistryState<KV, G, Normal>>;
+trait_set! {
+    /// [`KeyValueStore`] that can be used in a background thread
+    pub trait BackgroundKeyValueStore = KeyValueStore + Send + Sync + 'static;
+}
+
+/// Trait allowing specialised implementations for the `MutableState<...<Registry>>` pattern by each mode.
+///
+/// This mirrors directly the API used by normal mode - with application directly within the current thread,
+/// while allowing these functions to be issued to a background thread for Prove and Verify in future.
+pub trait RegistryApply<KV: KeyValueStore, M: Mode> {
+    /// Apply a mutable operation over the contained registry. If the mutable state is 'borrowed', this
+    /// will result in the underlying state being cloned, which may fail.
+    fn apply<F, R>(&self, fun: F) -> Result<R, OperationalError>
+    where
+        F: FnOnce(&mut Registry<KV, M>) -> R,
+        R: Send + 'static,
+        KV::Repo: Clone;
+
+    /// Apply a readonly operation over the contained registry.
+    fn apply_ro<F, R>(&self, fun: F) -> Result<R, OperationalError>
+    where
+        F: FnOnce(&Registry<KV, M>) -> R,
+        R: Send + 'static;
+}
+
+/// Construct a new Key, returning the correct error variant
+/// of [`SplitDsResult`].
+///
+/// Use this rather than [`Key::try_from`]. Accidentally using the try operator (`?`) with
+/// `Key::try_from` leads to invalid keys raising an Ocaml exception, rather than returning
+/// the expected [`InvalidArgumentError`] error as part of the Ocaml result.
+///
+/// [`Key::try_from`]: octez_riscv_durable_storage::key::Key
+/// [`InvalidArgumentError`]: ds_errors::InvalidArgumentError
+macro_rules! key_from {
+    ($key_param:expr, $err:ty) => {{
+        use octez_riscv_durable_storage::key::Key;
+
+        match Key::try_from($key_param) {
+            Ok(key) => key,
+            Err(err) => return Ok(Err(<$err>::from(err))),
+        }
+    }};
+}
 
 /// Compute the hash of the registry state.
 #[inline(always)]
-pub fn registry_hash<KV, G>(state: SafePointer<DsRegistry<KV, G>>) -> BytesWrapper<Hash>
+pub fn registry_hash<KV, M>(state: &impl RegistryApply<KV, M>) -> OcamlFallible<BytesWrapper<Hash>>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
+    KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
-    DsRegistry<KV, G>: Sync,
+    M: Mode,
+    ds_registry::Registry<KV, M>: Foldable<HashFold>,
 {
-    let hash = state.apply_ro(|registry| registry.fold(HashFold));
+    let hash = state.apply_ro(move |registry| registry.fold(HashFold))?;
 
-    BytesWrapper::from(hash)
+    Ok(BytesWrapper::from(hash))
 }
 
 /// Return the number of databases in the registry.
 #[inline(always)]
-pub fn registry_size<KV, G>(state: SafePointer<DsRegistry<KV, G>>) -> OcamlFallible<u64>
+pub fn registry_size<KV, M>(state: &impl RegistryApply<KV, M>) -> OcamlFallible<u64>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
-    KV::Repo: Clone + Send + Sync,
-    DsRegistry<KV, G>: Sync,
+    KV: BackgroundKeyValueStore,
+    KV::Repo: Send + Sync,
+    M: VectorMode + 'static,
 {
-    let size: usize = state.apply_ro(ds_registry::Registry::len);
+    let size: usize = state.apply_ro(ds_registry::Registry::len)?;
 
     Ok(u64::try_from(size)?)
 }
 
 /// Resize the registry to the given number of databases.
 #[inline(always)]
-pub fn registry_resize<KV, G, Err>(
-    state: SafePointer<DsRegistry<KV, G>>,
+pub fn registry_resize<KV, Err, M>(
+    state: &impl RegistryApply<KV, M>,
     size: u64,
 ) -> SplitDsResult<(), Err>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
+    KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
-    DsRegistry<KV, G>: Sync,
     Err: From<ds_errors::InvalidArgumentError>,
+    M: RegistryMode + VectorMode,
 {
     let size = usize::try_from(size)?;
-    let res = state.apply(|registry| registry.resize_tick(size))?;
+    let res = state.apply(move |registry| registry.resize_tick(size))?;
 
     split_ds_errors(res)
 }
 
 /// Copy the database at `src_index` to `dst_index`.
 #[inline(always)]
-pub fn registry_copy<KV, G, Err>(
-    state: SafePointer<DsRegistry<KV, G>>,
+pub fn registry_copy<KV, Err, M>(
+    state: &impl RegistryApply<KV, M>,
     src_index: u64,
     dst_index: u64,
 ) -> SplitDsResult<(), Err>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
+    KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
-    DsRegistry<KV, G>: Sync,
     Err: From<ds_errors::InvalidArgumentError>,
+    M: RegistryMode + VectorMode,
 {
     let src_index = usize::try_from(src_index)?;
     let dst_index = usize::try_from(dst_index)?;
 
-    let res = state.apply(|registry| registry.copy_database(src_index, dst_index))?;
+    let res = state.apply(move |registry| registry.copy_database(src_index, dst_index))?;
 
     split_ds_errors(res)
 }
 
 /// Move the database at `src_index` to `dst_index`.
 #[inline(always)]
-pub fn registry_move<KV, G, Err>(
-    state: SafePointer<DsRegistry<KV, G>>,
+pub fn registry_move<KV, Err, M>(
+    state: &impl RegistryApply<KV, M>,
     src_index: u64,
     dst_index: u64,
 ) -> SplitDsResult<(), Err>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
+    KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
-    DsRegistry<KV, G>: Sync,
     Err: From<ds_errors::InvalidArgumentError>,
+    M: RegistryMode + VectorMode,
 {
     let src_index = usize::try_from(src_index)?;
     let dst_index = usize::try_from(dst_index)?;
 
-    let res = state.apply(|registry| registry.move_database(src_index, dst_index))?;
+    let res = state.apply(move |registry| registry.move_database(src_index, dst_index))?;
 
     split_ds_errors(res)
 }
 
 /// Clear all entries from the database at `db_index`.
 #[inline(always)]
-pub fn registry_clear<KV, G, Err>(
-    state: SafePointer<DsRegistry<KV, G>>,
+pub fn registry_clear<KV, Err, M>(
+    state: &impl RegistryApply<KV, M>,
     db_index: u64,
 ) -> SplitDsResult<(), Err>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
+    KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
-    DsRegistry<KV, G>: Sync,
     Err: From<ds_errors::InvalidArgumentError>,
+    M: RegistryMode + VectorMode,
 {
     let db_index = usize::try_from(db_index)?;
 
-    let res = state.apply(|registry| registry.clear_database(db_index))?;
+    let res = state.apply(move |registry| registry.clear_database(db_index))?;
 
     split_ds_errors(res)
 }
 
 /// Check whether `key` exists in the database at `db_index`.
 #[inline(always)]
-pub fn database_exists<KV, G, Err>(
-    state: SafePointer<DsRegistry<KV, G>>,
+pub fn database_exists<KV, Err, M>(
+    state: &impl RegistryApply<KV, M>,
     db_index: u64,
     key: KeyParam,
 ) -> SplitDsResult<bool, Err>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
-    KV::Repo: Clone + Send + Sync,
-    DsRegistry<KV, G>: Sync,
+    KV: BackgroundKeyValueStore,
+    KV::Repo: Send + Sync,
     Err: From<ds_errors::InvalidArgumentError>,
+    M: VectorMode + DatabaseMode,
 {
     let db_index = usize::try_from(db_index)?;
+    let key = key_from!(key, Err);
 
-    let res = state.apply_ro(|registry| {
-        let key = Key::try_from(key)?;
+    let res = state.apply_ro(move |registry| {
         let db = registry.database(db_index)?;
 
         db.exists(&key)
-    });
+    })?;
 
     split_ds_errors(res)
 }
 
 /// Set the value for `key` in the database at `db_index`.
 #[inline(always)]
-pub fn database_set<KV, G, Err>(
-    state: SafePointer<DsRegistry<KV, G>>,
+pub fn database_set<KV, Err, M>(
+    state: &impl RegistryApply<KV, M>,
     db_index: u64,
     key: KeyParam,
     value: BytesParam,
 ) -> SplitDsResult<(), Err>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
+    KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
-    DsRegistry<KV, G>: Sync,
     Err: From<ds_errors::InvalidArgumentError>,
+    M: VectorMode + DatabaseMode,
 {
     let db_index = usize::try_from(db_index)?;
+    let key = key_from!(key, Err);
+    let data = Bytes::from(value);
 
-    let res = state.apply(|registry| {
-        let key = Key::try_from(key)?;
+    let res = state.apply(move |registry| {
         let db = registry.database_mut(db_index)?;
-        let data = Bytes::from(value);
 
         db.set(key, data)
     })?;
@@ -190,26 +235,26 @@ where
 ///
 /// Returns the new total length of the value.
 #[inline(always)]
-pub fn database_write<KV, G, Err>(
-    state: SafePointer<DsRegistry<KV, G>>,
+pub fn database_write<KV, Err, M>(
+    state: &impl RegistryApply<KV, M>,
     db_index: u64,
     key: KeyParam,
     offset: u64,
     value: BytesParam,
 ) -> SplitDsResult<u64, Err>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
+    KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
-    DsRegistry<KV, G>: Sync,
     Err: From<ds_errors::InvalidArgumentError>,
+    M: VectorMode + DatabaseMode,
 {
     let db_index = usize::try_from(db_index)?;
     let offset = usize::try_from(offset)?;
+    let key = key_from!(key, Err);
+    let data = Bytes::from(value);
 
-    let res = state.apply(|registry| {
-        let key = Key::try_from(key)?;
+    let res = state.apply(move |registry| {
         let db = registry.database_mut(db_index)?;
-        let data = Bytes::from(value);
 
         db.write(key, offset, data)
     })?;
@@ -220,64 +265,65 @@ where
 
 /// Read `len` bytes starting at `offset` from `key`'s value in the database at `db_index`.
 #[inline(always)]
-pub fn database_read<KV, G, Err>(
-    state: SafePointer<DsRegistry<KV, G>>,
+pub fn database_read<KV, Err, M>(
+    state: &impl RegistryApply<KV, M>,
     db_index: u64,
     key: KeyParam,
     offset: u64,
     len: u64,
 ) -> SplitDsResult<BytesWrapper<Vec<u8>>, Err>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
-    KV::Repo: Clone + Send + Sync,
-    DsRegistry<KV, G>: Sync,
+    KV: BackgroundKeyValueStore,
+    KV::Repo: Send + Sync,
     Err: From<ds_errors::InvalidArgumentError>,
+    M: VectorMode + DatabaseMode,
 {
     let db_index = usize::try_from(db_index)?;
     let offset = usize::try_from(offset)?;
     let len = usize::try_from(len)?;
+    let key = key_from!(key, Err);
 
     // TODO (RV-933): use `read_bytes` to prevent large allocations
     let mut read = vec![0; len];
 
-    let res = state.apply_ro(|registry| {
-        let key = Key::try_from(key)?;
+    let res = state.apply_ro(move |registry| {
         let db = registry.database(db_index)?;
 
         // Pass a mutable slice to avoid Vec::BufMut which appends
         // instead of writing in-place.
         db.read(&key, offset, read.as_mut_slice())
-    });
+            .map(|read_bytes| {
+                read.truncate(read_bytes);
+                BytesWrapper::from(read)
+            })
+    })?;
 
-    let res = split_ds_errors(res)?.map(|read_bytes| {
-        read.truncate(read_bytes);
-        BytesWrapper::from(read)
-    });
+    let res = split_ds_errors(res)?;
 
     Ok(res)
 }
 
 /// Return the byte length of `key`'s value in the database at `db_index`.
 #[inline(always)]
-pub fn value_length<KV, G, Err>(
-    state: SafePointer<DsRegistry<KV, G>>,
+pub fn value_length<KV, Err, M>(
+    state: &impl RegistryApply<KV, M>,
     db_index: u64,
     key: KeyParam,
 ) -> SplitDsResult<u64, Err>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
-    KV::Repo: Clone + Send + Sync,
-    DsRegistry<KV, G>: Sync,
+    KV: BackgroundKeyValueStore,
+    KV::Repo: Send + Sync,
     Err: From<ds_errors::InvalidArgumentError>,
+    M: VectorMode + DatabaseMode,
 {
     let db_index = usize::try_from(db_index)?;
+    let key = key_from!(key, Err);
 
-    let res = state.apply_ro(|registry| {
-        let key = Key::try_from(key)?;
+    let res = state.apply_ro(move |registry| {
         let db = registry.database(db_index)?;
 
         db.value_length(&key)
-    });
+    })?;
 
     let res = split_ds_errors(res)?;
     map_fallible(res, u64::try_from)
@@ -285,21 +331,21 @@ where
 
 /// Delete `key` from the database at `db_index`.
 #[inline(always)]
-pub fn database_delete<KV, G, Err>(
-    state: SafePointer<DsRegistry<KV, G>>,
+pub fn database_delete<KV, Err, M>(
+    state: &impl RegistryApply<KV, M>,
     db_index: u64,
     key: KeyParam,
 ) -> SplitDsResult<(), Err>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
+    KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
-    DsRegistry<KV, G>: Sync,
     Err: From<ds_errors::InvalidArgumentError>,
+    M: VectorMode + DatabaseMode,
 {
     let db_index = usize::try_from(db_index)?;
+    let key = key_from!(key, Err);
 
-    let res = state.apply(|registry| {
-        let key = Key::try_from(key)?;
+    let res = state.apply(move |registry| {
         let db = registry.database_mut(db_index)?;
 
         Ok(db.delete(key)?)
@@ -310,23 +356,23 @@ where
 
 /// Compute the Merkle hash of the database at `db_index`.
 #[inline(always)]
-pub fn database_hash<KV, G, Err>(
-    state: SafePointer<DsRegistry<KV, G>>,
+pub fn database_hash<KV, Err, M>(
+    state: &impl RegistryApply<KV, M>,
     db_index: u64,
 ) -> SplitDsResult<BytesWrapper<Hash>, Err>
 where
-    KV: KeyValueStore + Send + Sync + 'static,
-    KV::Repo: Clone + Send + Sync,
-    DsRegistry<KV, G>: Sync,
+    KV: BackgroundKeyValueStore,
+    KV::Repo: Send + Sync,
     Err: From<ds_errors::InvalidArgumentError>,
+    M: VectorMode + DatabaseMode,
 {
     let db_index = usize::try_from(db_index)?;
 
-    let res = state.apply_ro(|registry| {
+    let res = state.apply_ro(move |registry| {
         let db = registry.database(db_index)?;
 
         Ok(db.hash()?)
-    });
+    })?;
 
     let res = split_ds_errors(res)?.map(BytesWrapper::from);
     Ok(res)

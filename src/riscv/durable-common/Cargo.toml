@@ -12,3 +12,4 @@ ocaml.workspace = true
 octez-riscv-api-common.workspace = true
 octez-riscv-data.workspace = true
 octez-riscv-durable-storage.workspace = true
+trait-set.workspace = true
