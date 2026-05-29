@@ -197,6 +197,41 @@ mod tests {
             .expect("worker thread completes");
     }
 
+    /// L2-1436: the iterative `Closure::Debug` must not overflow on a deep
+    /// `Closure::Apply` spine (an APPLY chain is ~7400-deep reachable within
+    /// one operation's gas budget). Builds N nested `Apply` and formats on a
+    /// 1 MiB worker thread; a regression to recursive walking would overflow.
+    /// `Closure` has no iterative `Drop` yet (its `Box<Closure>` spine recurses
+    /// on drop — tracked in L2-1446), so the deep value is `mem::forget`-ed to
+    /// avoid the recursive destructor.
+    #[test]
+    fn deeply_nested_closure_apply_debug_format() {
+        use crate::ast::{Micheline, Type};
+        const DEPTH: usize = 100_000;
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let mut c = super::Closure::Lambda(super::Lambda::Lambda {
+                    micheline_code: Micheline::Seq(&[]),
+                    code: Vec::new().into(),
+                });
+                for _ in 0..DEPTH {
+                    c = super::Closure::Apply {
+                        arg_ty: Type::Unit,
+                        arg_val: Box::new(TypedValue::Unit),
+                        closure: Box::new(c),
+                    };
+                }
+                let tv = TypedValue::Lambda(c);
+                let s = format!("{tv:?}");
+                assert!(s.contains("Apply {") && s.len() > DEPTH);
+                std::mem::forget(tv);
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
+    }
+
     #[test]
     fn apply_micheline() {
         let parser = Parser::new();

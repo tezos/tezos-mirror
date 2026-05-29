@@ -766,6 +766,12 @@ pub enum TypedValue<'a> {
 /// MIR type graph). Recursive variants (`Pair`, `Or`, `Option`, `List`,
 /// `Set`, `Map`, `Lambda`, `Ticket`) emit a clean form like
 /// `Pair(<l>, <r>)` driven by a `Vec<Frame>` worklist.
+///
+/// The output intentionally diverges from the derived `Debug`: the
+/// `PairBox` / `SingleBox` / `MichelsonList` indirection wrappers are
+/// elided (they are implementation detail), and `Map` prints `k -> v`
+/// rather than the `BTreeMap`-derived `k: v`. This Debug appears only in
+/// error messages; no consumer parses it.
 impl<'a> std::fmt::Debug for TypedValue<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         enum Frame<'b, 'a: 'b> {
