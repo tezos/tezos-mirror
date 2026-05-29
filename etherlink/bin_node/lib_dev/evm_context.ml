@@ -1749,11 +1749,22 @@ module State = struct
 
       let* payload in
 
+      let blueprint_with_events =
+        Blueprint_types.
+          {
+            delayed_transactions;
+            kernel_upgrade;
+            sequencer_upgrade;
+            blueprint =
+              {number = ctxt.session.next_blueprint_number; timestamp; payload};
+          }
+      in
+
       let* current_block =
         match current_block with
         | Eth block ->
             let*? current_block =
-              Transaction_object.reconstruct_block payload block
+              Transaction_object.reconstruct_block blueprint_with_events block
             in
             return (L2_types.Eth current_block)
         | Tez block -> return (L2_types.Tez block)
@@ -1769,13 +1780,7 @@ module State = struct
           evm_state
           context
           current_block
-          {
-            delayed_transactions;
-            kernel_upgrade;
-            sequencer_upgrade;
-            blueprint =
-              {number = ctxt.session.next_blueprint_number; timestamp; payload};
-          }
+          blueprint_with_events
       in
       return
         ( current_block,

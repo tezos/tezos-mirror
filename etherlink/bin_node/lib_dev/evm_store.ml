@@ -1709,10 +1709,10 @@ module Transactions = struct
     in
     match legacy_object with
     | Some ({blockNumber = Some number; _} as obj) -> (
-        let* blueprint = Blueprints.find store number in
+        let* blueprint = Blueprints.find_with_events store number in
         match blueprint with
         | Some blueprint ->
-            let*? obj = Transaction_object.reconstruct blueprint.payload obj in
+            let*? obj = Transaction_object.reconstruct blueprint obj in
             return_some obj
         | None ->
             return_some (Transaction_object.from_store_transaction_object obj))
@@ -1821,11 +1821,10 @@ module Blocks = struct
         rows
     in
     let block = {block with transactions = TxFull objects_} in
-    let* blueprint = Blueprints.find store block.number in
+    let* blueprint = Blueprints.find_with_events store block.number in
     let*? res =
       match blueprint with
-      | Some blueprint ->
-          Transaction_object.reconstruct_block blueprint.payload block
+      | Some blueprint -> Transaction_object.reconstruct_block blueprint block
       | None -> Ok (Transaction_object.block_from_legacy block)
     in
     return res

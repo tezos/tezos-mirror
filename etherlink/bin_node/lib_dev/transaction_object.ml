@@ -1022,8 +1022,10 @@ let reconstruct_from_transactions_list transactions
   let open Result_syntax in
   match List.assoc ~equal:( = ) obj.hash transactions with
   | Some None | None ->
-      (* It is a delayed transaction, there is nothing we can do except
-         returning the potentially incorrect transaction object *)
+      (* The raw transaction is unavailable: either it is a non-EVM delayed
+         transaction (deposit, FA deposit, Tezos operation), which cannot be
+         reconstructed, or its payload is missing. We return the potentially
+         incorrect transaction object as stored. *)
       return (from_store_transaction_object obj)
   | Some (Some (Broadcast.Evm raw_txn)) ->
       (* We have the original transaction, let's try to reconstruct the
@@ -1034,27 +1036,57 @@ let reconstruct_from_transactions_list transactions
       (* Reconstructing a Tezos operation does not make sense. *)
       error_with "Tezos operations cannot be reconstructed"
 
-let reconstruct payload (obj : legacy_transaction_object) =
+(** [transactions_of_blueprint bwe] returns the association list mapping every
+    transaction hash of the blueprint to its raw transaction (when available).
+
+    The blueprint payload only contains the raw transactions injected by the
+    sequencer; for delayed transactions it merely references their hash. We
+    therefore complete the list with the raw transactions of the delayed EVM
+    transactions, which are carried by [bwe.delayed_transactions]. These entries
+    are placed first so that they shadow the [(hash, None)] entries the payload
+    holds for the same delayed transactions. Non-EVM delayed transactions
+    (deposits, FA deposits, Tezos operations) have no raw EVM transaction to
+    reconstruct and are left out. *)
+let transactions_of_blueprint (bwe : Blueprint_types.with_events) =
   let open Result_syntax in
-  let* transactions = Blueprint_decoder.transactions payload in
+  let Blueprint_types.{blueprint; delayed_transactions; _} = bwe in
+  let* payload_transactions =
+    Blueprint_decoder.transactions blueprint.payload
+  in
+  let delayed_transactions =
+    List.filter_map
+      (fun (delayed : Evm_events.Delayed_transaction.t) ->
+        match delayed.kind with
+        | Evm_events.Delayed_transaction.EthereumTransaction ->
+            Some
+              ( Ethereum_types.hash_raw_tx delayed.raw,
+                Some (Broadcast.Evm delayed.raw) )
+        | Deposit | Fa_deposit | TezosOperation -> None)
+      delayed_transactions
+  in
+  return (delayed_transactions @ payload_transactions)
+
+let reconstruct bwe (obj : legacy_transaction_object) =
+  let open Result_syntax in
+  let* transactions = transactions_of_blueprint bwe in
   reconstruct_from_transactions_list transactions obj
 
-let reconstruct_block payload block =
+let reconstruct_block bwe block =
   let open Result_syntax in
-  let* transactions = Blueprint_decoder.transactions payload in
+  let* transactions = transactions_of_blueprint bwe in
   match block.transactions with
   | TxHash h -> return {block with transactions = TxHash h}
   | TxFull l ->
       let* l = List.map_e (reconstruct_from_transactions_list transactions) l in
       return {block with transactions = TxFull l}
 
-let rereconstruct payload = function
-  | Kernel obj -> reconstruct payload obj
+let rereconstruct bwe = function
+  | Kernel obj -> reconstruct bwe obj
   | other -> Ok other
 
-let rereconstruct_block payload block =
+let rereconstruct_block bwe block =
   let open Result_syntax in
-  let* transactions = Blueprint_decoder.transactions payload in
+  let* transactions = transactions_of_blueprint bwe in
   match block.transactions with
   | TxHash h -> return {block with transactions = TxHash h}
   | TxFull l ->
