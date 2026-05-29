@@ -402,8 +402,7 @@ enum InterpFrame<'a, 'b> {
     MapOptionAfter,
     MapMapAccum {
         body: CodeRef<'a, 'b>,
-        remaining:
-            std::collections::btree_map::IntoIter<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+        remaining: std::collections::btree_map::IntoIter<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
         acc: BTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
         current_key: Option<Rc<TypedValue<'a>>>,
     },
@@ -2497,10 +2496,8 @@ fn interpret_one<'a>(
             ctx.gas().consume(interpret_cost::PACK)?;
             let v = pop!();
             let arena = Arena::new();
-            // In the Tezos implementation they also charge gas for the pass
-            // that strips locations. We don't have it.
             let mich = v.into_micheline_optimized_legacy(&arena, ctx.gas())?;
-            let encoded = mich.encode_for_pack(ctx.gas())??;
+            let encoded = mich.encode_for_pack()??;
             stack.push(V::Bytes(encoded));
         }
         I::Unpack(ty) => {
@@ -6007,6 +6004,22 @@ mod interpreter_tests {
     }
 
     #[test]
+    fn pack_charges_serialization_once() {
+        // Regression for the PACK ~2x overcharge: PACK bills only the
+        // unparsing pass (~10 mg/byte for a string), not unparsing +
+        // serialization (~20 mg/byte). Comparing two payloads isolates the
+        // per-byte slope from the fixed node/instruction overhead.
+        fn pack_gas(len: usize) -> u32 {
+            let mut ctx = Ctx::default();
+            let mut stack = stk![V::String("a".repeat(len))];
+            interpret_one(&Pack, &mut ctx, &mut stack).unwrap();
+            Ctx::default().gas.milligas().unwrap() - ctx.gas().milligas().unwrap()
+        }
+        let (n1, n2) = (100usize, 1100usize);
+        assert_eq!(pack_gas(n2) - pack_gas(n1), 10 * (n2 - n1) as u32);
+    }
+
+    #[test]
     fn self_instr() {
         let mut stk = Stack::new();
         let ctx = &mut Ctx::default();
@@ -8235,7 +8248,7 @@ mod interpreter_tests {
                     &mut gas,
                 )
                 .unwrap();
-            lambda.encode_for_pack(&mut gas).unwrap().unwrap()
+            lambda.encode_for_pack().unwrap().unwrap()
         }
 
         // 255-byte annotation token: decodes and typechecks -> Some.

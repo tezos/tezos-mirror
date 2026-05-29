@@ -34,10 +34,7 @@ mod test_typed_encode {
         let mut gas = Gas::default();
         let micheline = v.into_micheline_optimized_legacy(&arena, &mut gas).unwrap();
         assert_eq!(
-            &micheline
-                .encode_for_pack(&mut Gas::default())
-                .unwrap()
-                .unwrap(),
+            &micheline.encode_for_pack().unwrap().unwrap(),
             bytes,
         );
         assert_eq!(

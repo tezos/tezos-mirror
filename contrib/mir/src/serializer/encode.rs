@@ -251,9 +251,20 @@ impl Micheline<'_> {
         self.encode_starting_with(&[], gas)
     }
 
-    /// Serialize a value like PACK does. Same gas semantics as [`Self::encode`].
-    pub fn encode_for_pack(&self, gas: &mut Gas) -> Result<Result<Vec<u8>, BinError>, OutOfGas> {
-        self.encode_starting_with(&[0x05], gas)
+    /// Serialize a value like PACK does, **without** charging serialization
+    /// gas.
+    ///
+    /// L1's PACK charges only the unparsing cost (the value → Micheline
+    /// conversion, mirrored here by `into_micheline_optimized_legacy`); its
+    /// serialization step (`pack_node`) is gas-unaccounted. Charging
+    /// `micheline_encoding` here too — as [`Self::encode`] does for the
+    /// storage path — would double-count and overcharge PACK roughly 2x.
+    /// Since no gas is consumed, this takes no [`Gas`] argument; the outer
+    /// `Result` is kept for signature symmetry with [`Self::encode`] (it is
+    /// always `Ok`).
+    pub fn encode_for_pack(&self) -> Result<Result<Vec<u8>, BinError>, OutOfGas> {
+        let mut out = vec![0x05u8];
+        Ok(encode_micheline(self, &mut out).map(|()| out))
     }
 
     /// Like [`Self::encode`], but allows specifying a prefix, useful for
@@ -485,7 +496,7 @@ mod test_encoding {
         #[test]
         fn encode_for_pack_returns_nested_ok() {
             let bytes = Micheline::Int(0.into())
-                .encode_for_pack(&mut Gas::default())
+                .encode_for_pack()
                 .expect("no OOG with unmetered")
                 .expect("no BinError for Int");
             assert_eq!(bytes.first(), Some(&0x05));
