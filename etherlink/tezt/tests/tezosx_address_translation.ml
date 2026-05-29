@@ -1318,6 +1318,233 @@ let test_michelson_resolve_address_cross_source_ethereum () =
   Log.info "EVM contract %s → Derived KT1 %s" evm_contract_addr kt1_str ;
   unit
 
+(* ── Michelson VIEW tests — post-CRAC Recorded/Alias (commit 5) ─── *)
+
+(** [originOf] via Michelson VIEW after a CRAC transfer materialises the
+    alias.  The CRAC-classified KT1 is expected to be an Alias of the EVM
+    sender: storage = Right (Right (Pair 1 <evm_sender_lowercase>)). *)
+let test_michelson_origin_of_alias_after_crac () =
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~kernel:Latest
+    ~uses_client:true
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+    ~title:
+      "Michelson VIEW originOf: CRAC-classified KT1 → Right (Right (Pair 1 \
+       evm_sender))"
+    ~tags:
+      (["tezosx"; "address_translation"]
+      @ runtime_tags [Tezos]
+      @ ["origin_of"; "alias"; "crac"; "michelson"; "view"])
+  @@ fun sequencer ->
+  let* tez_client = tezlink_client sequencer in
+  let source = Constant.bootstrap1 in
+  (* Step 1: Originate a dummy sender.tz as the CRAC target.  Its [unit]
+     parameter accepts the gateway's empty payload; a [string]-parameter
+     contract would reject the empty call and revert the CRAC. *)
+  let* kt1_target =
+    originate_contract
+      ~tez_client
+      ~sequencer
+      ~src:source
+      ~alias:"crac_target"
+      ~script_name:["opcodes"; "sender"]
+      ~init_storage_data:(sf {|"%s"|} Constant.bootstrap1.public_key_hash)
+      ()
+  in
+  (* Step 2: Send a CRAC from EVM to the Michelson contract.  This writes
+     the sender's Tezos alias into /origin on both sides. *)
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:sender.Eth_account.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas:3_000_000
+      ~gas_price:1_000_000_000
+      ~value:Wei.zero
+      ~address:evm_gateway_address
+      ~signature:"callMichelson(string,string,bytes)"
+      ~arguments:[kt1_target; ""; "0x"]
+      ()
+  in
+  let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
+  let*@ _block = Rpc.produce_block sequencer in
+  let*@ receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
+  (match receipt with
+  | Some r ->
+      Check.(
+        (r.status = true) bool ~error_msg:"CRAC transaction should succeed")
+  | None -> Test.fail "No receipt for CRAC transaction") ;
+  (* Step 3: Resolve the sender's Tezos alias via the RPC. *)
+  let* alias_result =
+    Rpc.Tezosx.tez_getEthereumTezosAddress sender.address sequencer
+  in
+  let kt1_alias = Result.get_ok alias_result in
+  Log.info "Sender %s → Tezos alias %s" sender.address kt1_alias ;
+  (* Step 4: Originate the gateway_origin_of.tz caller contract. *)
+  let* kt1_caller =
+    originate_contract
+      ~tez_client
+      ~sequencer
+      ~src:source
+      ~alias:"origin_of_caller"
+      ~script_name:["mini_scenarios"; "gateway_origin_of"]
+      ~init_storage_data:"Left Unit"
+      ()
+  in
+  (* Step 5: Call with kt1_alias and sourceRuntime=0 (Tezos). *)
+  let* () =
+    call_contract
+      ~tez_client
+      ~sequencer
+      ~src:source
+      ~dest:kt1_caller
+      ~arg_data:(sf {|Pair "%s" %s|} kt1_alias runtime_id_tezos)
+      ()
+  in
+  (* Step 6: Storage must be Right (Right (Pair 1 <evm_sender_lowercase>)).
+     The CRAC wrote an Alias record: homeRuntime=1 (Ethereum),
+     nativeAddress = the EVM sender address (lowercased by the kernel). *)
+  let* storage =
+    Client.RPC.call ~endpoint:(tezlink_endpoint sequencer) tez_client
+    @@ RPC.get_chain_block_context_contract_storage ~id:kt1_caller ()
+  in
+  (* Expected shape: Right (Right (Pair 1 <evm_sender_lowercase>)).
+     Micheline JSON:
+     {"prim":"Right","args":[{"prim":"Right","args":[{"prim":"Pair",
+       "args":[{"int":"1"},{"string":"0x..."}]}]}]} *)
+  let outer_args = JSON.(storage |-> "args" |> as_list) in
+  let inner = List.hd outer_args in
+  let inner_args = JSON.(inner |-> "args" |> as_list) in
+  let pair_node = List.hd inner_args in
+  let pair_args = JSON.(pair_node |-> "args" |> as_list) in
+  let home_runtime = JSON.(List.nth pair_args 0 |-> "int" |> as_string) in
+  let native_addr = JSON.(List.nth pair_args 1 |-> "string" |> as_string) in
+  Check.(
+    (home_runtime = "1")
+      string
+      ~error_msg:"Expected homeRuntime=1 (Ethereum) in Alias storage, got %L") ;
+  Check.(
+    (String.lowercase_ascii native_addr = String.lowercase_ascii sender.address)
+      string
+      ~error_msg:"Expected nativeAddress = EVM sender in Alias storage, got %L") ;
+  unit
+
+(** [resolveAddress] via Michelson VIEW after a CRAC transfer returns
+    Some (Pair 0 kt1_alias) — Recorded, not Derived. *)
+let test_michelson_resolve_address_recorded_after_crac () =
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~kernel:Latest
+    ~uses_client:true
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+    ~title:
+      "Michelson VIEW resolveAddress: post-CRAC EVM sender → Some (Recorded, \
+       kt1_alias)"
+    ~tags:
+      (["tezosx"; "address_translation"]
+      @ runtime_tags [Tezos]
+      @ ["resolve_address"; "recorded"; "crac"; "michelson"; "view"])
+  @@ fun sequencer ->
+  let* tez_client = tezlink_client sequencer in
+  let source = Constant.bootstrap1 in
+  (* Step 1: Originate a dummy sender.tz as the CRAC target.  Its [unit]
+     parameter accepts the gateway's empty payload; a [string]-parameter
+     contract would reject the empty call and revert the CRAC. *)
+  let* kt1_target =
+    originate_contract
+      ~tez_client
+      ~sequencer
+      ~src:source
+      ~alias:"crac_target"
+      ~script_name:["opcodes"; "sender"]
+      ~init_storage_data:(sf {|"%s"|} Constant.bootstrap1.public_key_hash)
+      ()
+  in
+  (* Step 2: Send a CRAC from EVM to the Michelson contract. *)
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:sender.Eth_account.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas:3_000_000
+      ~gas_price:1_000_000_000
+      ~value:Wei.zero
+      ~address:evm_gateway_address
+      ~signature:"callMichelson(string,string,bytes)"
+      ~arguments:[kt1_target; ""; "0x"]
+      ()
+  in
+  let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
+  let*@ _block = Rpc.produce_block sequencer in
+  let*@ receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
+  (match receipt with
+  | Some r ->
+      Check.(
+        (r.status = true) bool ~error_msg:"CRAC transaction should succeed")
+  | None -> Test.fail "No receipt for CRAC transaction") ;
+  (* Step 3: Resolve the sender's Tezos alias via the RPC. *)
+  let* alias_result =
+    Rpc.Tezosx.tez_getEthereumTezosAddress sender.address sequencer
+  in
+  let kt1_alias = Result.get_ok alias_result in
+  Log.info "Sender %s → Tezos alias %s" sender.address kt1_alias ;
+  (* Step 4: Originate the gateway_resolve_address.tz caller contract. *)
+  let* kt1_caller =
+    originate_contract
+      ~tez_client
+      ~sequencer
+      ~src:source
+      ~alias:"resolve_caller"
+      ~script_name:["mini_scenarios"; "gateway_resolve_address"]
+      ~init_storage_data:"None"
+      ()
+  in
+  (* Step 5: Call with evm_sender, sourceRuntime=Ethereum, targetRuntime=Tezos. *)
+  let* () =
+    call_contract
+      ~tez_client
+      ~sequencer
+      ~src:source
+      ~dest:kt1_caller
+      ~arg_data:
+        (sf
+           {|Pair "%s" (Pair %s %s)|}
+           sender.address
+           runtime_id_ethereum
+           runtime_id_tezos)
+      ()
+  in
+  (* Step 6: Storage must be Some (Pair 0 kt1_alias) — res=0 (Recorded).
+     The CRAC wrote the /origin entry so the translation is Recorded rather
+     than Derived.  The kt1_alias string must match the RPC result. *)
+  check_contract_storage
+    ~sequencer
+    ~tez_client
+    kt1_caller
+    (`O
+       [
+         ("prim", `String "Some");
+         ( "args",
+           `A
+             [
+               `O
+                 [
+                   ("prim", `String "Pair");
+                   ( "args",
+                     `A
+                       [
+                         `O [("int", `String "0")];
+                         `O [("string", `String kt1_alias)];
+                       ] );
+                 ];
+             ] );
+       ])
+
 (* ── Registration ─────────────────────────────────────────────────────── *)
 
 let () =
@@ -1340,4 +1567,6 @@ let () =
   test_michelson_resolve_address_unknown () ;
   test_michelson_resolve_address_same_source () ;
   test_michelson_resolve_address_same_source_ethereum () ;
-  test_michelson_resolve_address_cross_source_ethereum ()
+  test_michelson_resolve_address_cross_source_ethereum () ;
+  test_michelson_origin_of_alias_after_crac () ;
+  test_michelson_resolve_address_recorded_after_crac ()
