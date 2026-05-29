@@ -402,7 +402,8 @@ enum InterpFrame<'a, 'b> {
     MapOptionAfter,
     MapMapAccum {
         body: CodeRef<'a, 'b>,
-        remaining: std::vec::IntoIter<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)>,
+        remaining:
+            std::collections::btree_map::IntoIter<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
         acc: BTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
         current_key: Option<Rc<TypedValue<'a>>>,
     },
@@ -452,7 +453,7 @@ enum StepResult<'a, 'b> {
     OpenMapOption(CodeRef<'a, 'b>),
     OpenMapMap {
         body: CodeRef<'a, 'b>,
-        iter: std::vec::IntoIter<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)>,
+        iter: std::collections::btree_map::IntoIter<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
         first_key: Rc<TypedValue<'a>>,
     },
     /// EXEC: enter a lambda body on a fresh sub stack containing args.
@@ -1137,9 +1138,10 @@ fn interpret_step<'a, 'b, 'c>(
             overloads::Map::Map => {
                 ctx.gas().consume(interpret_cost::MAP_MAP)?;
                 let map = pop_v!(V::Map);
-                let entries: Vec<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)> =
-                    map.into_iter().collect();
-                let mut iter = entries.into_iter();
+                // Iterate the map's entries directly: unlike L1, which folds the
+                // map into a list first, MIR walks the `BTreeMap` in place, so
+                // there is no O(n) materialisation step to charge for.
+                let mut iter = map.into_iter();
                 if let Some((k, v)) = iter.next() {
                     ctx.gas().consume(interpret_cost::PUSH)?;
                     stack.push(TypedValue::Pair(k.clone(), v));
