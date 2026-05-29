@@ -524,6 +524,12 @@ fn interpret<'a, 'b>(
     // `restore_pending_view_context`.
     if outcome.is_err() {
         restore_pending_view_context(ctx, &frames);
+        // A pending control-flow frame may itself hold a deep runtime-built
+        // value (a `DIP`-protected comb, or the not-yet-consumed elements /
+        // accumulator of an `ITER`/`MAP` over a deep collection). Drain those
+        // before `frames` is dropped, for the same reason the sub-stacks below
+        // are drained. On success `frames` is empty, so this never runs.
+        drain_value_frames(frames);
     }
 
     // Restore the caller's stack from the bottom of the stack of stacks, and
@@ -582,6 +588,64 @@ fn restore_pending_view_context<'a>(
 /// recurse. L2-1446.
 fn drain_value_stack(stack: &mut IStack<'_>) {
     while let Some(rc) = stack.pop() {
+        if let Ok(mut v) = Rc::try_unwrap(rc) {
+            crate::ast::drain_deep_typed_value(&mut v);
+        }
+    }
+}
+
+/// Drain every `Rc<TypedValue>` still held by the control-flow worklist before
+/// the frames are dropped, mirroring [`drain_value_stack`]. On the error-unwind
+/// path a frame may carry a deep runtime-built value -- a `DIP`-protected comb,
+/// or the not-yet-consumed elements / accumulator of an `ITER`/`MAP` over a
+/// deep collection -- whose recursive `Rc<TypedValue>` destructor would
+/// overflow the kernel's ~1 MiB Rust stack. Control-only frames (`NextInstr`,
+/// `LoopBody`, `AfterExec`, `AfterView`, ...) hold no values and are skipped.
+/// L2-1446.
+fn drain_value_frames(frames: Vec<InterpFrame<'_, '_>>) {
+    let mut pending: Vec<Rc<TypedValue<'_>>> = Vec::new();
+    for frame in frames {
+        match frame {
+            InterpFrame::AfterDip { protected, .. } => pending.extend(protected),
+            InterpFrame::IterList { remaining, .. } => pending.extend(remaining),
+            InterpFrame::IterSet { remaining, .. } => pending.extend(remaining),
+            InterpFrame::IterMap { remaining, .. } => {
+                for (k, v) in remaining {
+                    pending.push(k);
+                    pending.push(v);
+                }
+            }
+            InterpFrame::MapListAccum {
+                remaining, acc, ..
+            } => {
+                pending.extend(remaining);
+                pending.extend(acc);
+            }
+            InterpFrame::MapMapAccum {
+                remaining,
+                acc,
+                current_key,
+                ..
+            } => {
+                for (k, v) in remaining {
+                    pending.push(k);
+                    pending.push(v);
+                }
+                for (k, v) in acc {
+                    pending.push(k);
+                    pending.push(v);
+                }
+                pending.extend(current_key);
+            }
+            InterpFrame::NextInstr { .. }
+            | InterpFrame::LoopBody { .. }
+            | InterpFrame::LoopLeftBody { .. }
+            | InterpFrame::MapOptionAfter
+            | InterpFrame::AfterExec
+            | InterpFrame::AfterView { .. } => {}
+        }
+    }
+    for rc in pending {
         if let Ok(mut v) = Rc::try_unwrap(rc) {
             crate::ast::drain_deep_typed_value(&mut v);
         }
@@ -3197,6 +3261,63 @@ mod interpreter_tests {
                 let mut stack = stk![deep];
                 drain_value_stack(&mut stack);
                 assert!(stack.pop().is_none());
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
+    }
+
+    /// Companion to [`drain_deep_value_stack_does_not_overflow`] for the
+    /// control-flow worklist: every `InterpFrame` variant that owns runtime
+    /// values is given a deep one, then `drain_value_frames` must flatten them
+    /// all without the recursive `Rc<TypedValue>` destructor overflowing the
+    /// ~1 MiB worker stack. This is the value carried on the error-unwind path
+    /// by a `DIP`-protected comb or an in-flight `ITER`/`MAP` (L2-1446).
+    #[test]
+    fn drain_deep_value_frames_does_not_overflow() {
+        const DEPTH: usize = 100_000;
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let deep = || {
+                    let mut d = V::int(0);
+                    for _ in 0..DEPTH {
+                        d = V::new_pair(V::int(0), d);
+                    }
+                    Rc::new(d)
+                };
+                let empty: &[Instruction] = &[];
+                let body = || CodeRef::Borrowed(empty);
+                let frames: Vec<InterpFrame> = vec![
+                    InterpFrame::AfterDip {
+                        protected: stk![(*deep()).clone()],
+                        opt_height: None,
+                    },
+                    InterpFrame::IterList {
+                        body: body(),
+                        remaining: vec![deep()].into_iter(),
+                    },
+                    InterpFrame::IterSet {
+                        body: body(),
+                        remaining: BTreeSet::from([deep()]).into_iter(),
+                    },
+                    InterpFrame::IterMap {
+                        body: body(),
+                        remaining: BTreeMap::from([(Rc::new(V::int(0)), deep())]).into_iter(),
+                    },
+                    InterpFrame::MapListAccum {
+                        body: body(),
+                        remaining: vec![deep()].into_iter(),
+                        acc: vec![deep()],
+                    },
+                    InterpFrame::MapMapAccum {
+                        body: body(),
+                        remaining: BTreeMap::from([(Rc::new(V::int(0)), deep())]).into_iter(),
+                        acc: BTreeMap::from([(Rc::new(V::int(0)), deep())]),
+                        current_key: Some(deep()),
+                    },
+                ];
+                drain_value_frames(frames);
             })
             .unwrap()
             .join()
