@@ -338,7 +338,6 @@ pub mod interpret_cost {
     use checked::Checked;
     use num_bigint::{BigInt, BigUint};
     use num_traits::Zero;
-    use std::rc::Rc;
     use tezos_crypto_rs::public_key::PublicKey;
     use tezos_crypto_rs::CryptoError;
     use thiserror::Error;
@@ -666,105 +665,107 @@ pub mod interpret_cost {
             let v = Checked::from(std::cmp::min(s1, s2));
             Ok((35 + (v >> 6) + (v >> 7)).as_gas_cost()?)
         };
-        let cmp_pair = |l1: &Rc<TypedValue>,
-                        l2: &Rc<TypedValue>,
-                        r1: &Rc<TypedValue>,
-                        r2: &Rc<TypedValue>|
-         -> Result<u32, CompareError> {
-            let c = Checked::from(10u32);
-            Ok(
-                (c + compare(l1.as_ref(), r1.as_ref())? + compare(l2.as_ref(), r2.as_ref())?)
-                    .as_gas_cost()?,
-            )
-        };
-        let cmp_option = Checked::from(10u32);
         const ADDRESS_SIZE: u64 = 20 + 31; // hash size + max entrypoint size
         const CMP_CHAIN_ID: u32 = 30;
         const CMP_KEY: u32 = 92; // hard-coded in the protocol
         const CMP_SIGNATURE: u32 = 92; // hard-coded in the protocol
-        let cmp_or = Checked::from(10u32);
-        Ok(match (v1, v2) {
-            (V::Nat(l), V::Nat(r)) => cmp_bytes(l.byte_size(), r.byte_size())?,
-            (V::Nat(_), _) => return Err(CompareError::Incomparable),
+        const CMP_NODE: u32 = 10; // per Pair / Option / Or node
 
-            (V::Int(l), V::Int(r)) => cmp_bytes(l.byte_size(), r.byte_size())?,
-            (V::Int(_), _) => return Err(CompareError::Incomparable),
+        // The COMPARE cost is an order-independent sum of per-node costs, so an
+        // explicit-stack walk with a single accumulator is bit-identical to the
+        // previous recursive sum while no longer recursing on deep
+        // `pair`/`option`/`or` values -- which would overflow the kernel's ~1 MiB
+        // Rust stack here, *before* any gas is charged, where gas can never gate
+        // it. See L2-1449.
+        let mut total = Checked::from(0u32);
+        let mut stack: Vec<(&TypedValue, &TypedValue)> = vec![(v1, v2)];
+        while let Some((v1, v2)) = stack.pop() {
+            let node: u32 = match (v1, v2) {
+                (V::Nat(l), V::Nat(r)) => cmp_bytes(l.byte_size(), r.byte_size())?,
+                (V::Nat(_), _) => return Err(CompareError::Incomparable),
 
-            (V::Timestamp(l), V::Timestamp(r)) => cmp_bytes(l.byte_size(), r.byte_size())?,
-            (V::Timestamp(_), _) => return Err(CompareError::Incomparable),
+                (V::Int(l), V::Int(r)) => cmp_bytes(l.byte_size(), r.byte_size())?,
+                (V::Int(_), _) => return Err(CompareError::Incomparable),
 
-            (V::Bool(_), V::Bool(_)) => cmp_bytes(1, 1)?,
-            (V::Bool(_), _) => return Err(CompareError::Incomparable),
+                (V::Timestamp(l), V::Timestamp(r)) => cmp_bytes(l.byte_size(), r.byte_size())?,
+                (V::Timestamp(_), _) => return Err(CompareError::Incomparable),
 
-            (V::Mutez(_), V::Mutez(_)) => cmp_bytes(8, 8)?,
-            (V::Mutez(_), _) => return Err(CompareError::Incomparable),
+                (V::Bool(_), V::Bool(_)) => cmp_bytes(1, 1)?,
+                (V::Bool(_), _) => return Err(CompareError::Incomparable),
 
-            (V::String(l), V::String(r)) => cmp_bytes(l.len() as u64, r.len() as u64)?,
-            (V::String(_), _) => return Err(CompareError::Incomparable),
+                (V::Mutez(_), V::Mutez(_)) => cmp_bytes(8, 8)?,
+                (V::Mutez(_), _) => return Err(CompareError::Incomparable),
 
-            (V::Unit, V::Unit) => 10,
-            (V::Unit, _) => return Err(CompareError::Incomparable),
+                (V::String(l), V::String(r)) => cmp_bytes(l.len() as u64, r.len() as u64)?,
+                (V::String(_), _) => return Err(CompareError::Incomparable),
 
-            (V::Pair(l1, l2), V::Pair(r1, r2)) => cmp_pair(l1, l2, r1, r2)?,
-            (V::Pair(..), _) => return Err(CompareError::Incomparable),
+                (V::Unit, V::Unit) => CMP_NODE,
+                (V::Unit, _) => return Err(CompareError::Incomparable),
 
-            (V::Option(l), V::Option(r)) => {
-                let cost = match (l, r) {
-                    (None, None) => cmp_option,
-                    (None, Some(_)) => cmp_option,
-                    (Some(_), None) => cmp_option,
-                    (Some(l), Some(r)) => cmp_option + compare(l.as_ref(), r.as_ref())?,
-                };
-                cost.as_gas_cost()?
-            }
-            (V::Option(_), _) => return Err(CompareError::Incomparable),
+                (V::Pair(l1, l2), V::Pair(r1, r2)) => {
+                    stack.push((l1.as_ref(), r1.as_ref()));
+                    stack.push((l2.as_ref(), r2.as_ref()));
+                    CMP_NODE
+                }
+                (V::Pair(..), _) => return Err(CompareError::Incomparable),
 
-            (V::Address(..), V::Address(..)) => cmp_bytes(ADDRESS_SIZE, ADDRESS_SIZE)?,
-            (V::Address(_), _) => return Err(CompareError::Incomparable),
+                (V::Option(l), V::Option(r)) => {
+                    if let (Some(l), Some(r)) = (l, r) {
+                        stack.push((l.as_ref(), r.as_ref()));
+                    }
+                    CMP_NODE
+                }
+                (V::Option(_), _) => return Err(CompareError::Incomparable),
 
-            (V::ChainId(..), V::ChainId(..)) => CMP_CHAIN_ID,
-            (V::ChainId(_), _) => return Err(CompareError::Incomparable),
+                (V::Address(..), V::Address(..)) => cmp_bytes(ADDRESS_SIZE, ADDRESS_SIZE)?,
+                (V::Address(_), _) => return Err(CompareError::Incomparable),
 
-            (V::Bytes(l), V::Bytes(r)) => cmp_bytes(l.len() as u64, r.len() as u64)?,
-            (V::Bytes(_), _) => return Err(CompareError::Incomparable),
+                (V::ChainId(..), V::ChainId(..)) => CMP_CHAIN_ID,
+                (V::ChainId(_), _) => return Err(CompareError::Incomparable),
 
-            (V::Key(_), V::Key(_)) => CMP_KEY,
-            (V::Key(_), _) => return Err(CompareError::Incomparable),
+                (V::Bytes(l), V::Bytes(r)) => cmp_bytes(l.len() as u64, r.len() as u64)?,
+                (V::Bytes(_), _) => return Err(CompareError::Incomparable),
 
-            (V::Signature(_), V::Signature(_)) => CMP_SIGNATURE,
-            (V::Signature(_), _) => return Err(CompareError::Incomparable),
+                (V::Key(_), V::Key(_)) => CMP_KEY,
+                (V::Key(_), _) => return Err(CompareError::Incomparable),
 
-            (V::KeyHash(_), V::KeyHash(_)) => cmp_bytes(20u64, 20u64)?,
-            (V::KeyHash(_), _) => return Err(CompareError::Incomparable),
+                (V::Signature(_), V::Signature(_)) => CMP_SIGNATURE,
+                (V::Signature(_), _) => return Err(CompareError::Incomparable),
 
-            (V::Or(l), V::Or(r)) => {
-                let cost = match (l, r) {
-                    (Or::Left(x), Or::Left(y)) => cmp_or + compare(x.as_ref(), y.as_ref())?,
-                    (Or::Right(x), Or::Right(y)) => cmp_or + compare(x.as_ref(), y.as_ref())?,
-                    (Or::Left(_), Or::Right(_)) => cmp_or,
-                    (Or::Right(_), Or::Left(_)) => cmp_or,
-                };
-                cost.as_gas_cost()?
-            }
-            (V::Or(..), _) => return Err(CompareError::Incomparable),
+                (V::KeyHash(_), V::KeyHash(_)) => cmp_bytes(20u64, 20u64)?,
+                (V::KeyHash(_), _) => return Err(CompareError::Incomparable),
 
-            #[cfg(feature = "bls")]
-            (V::Bls12381Fr(_) | V::Bls12381G1(_) | V::Bls12381G2(_), _) => {
-                return Err(CompareError::Incomparable)
-            }
+                (V::Or(l), V::Or(r)) => {
+                    match (l, r) {
+                        (Or::Left(x), Or::Left(y)) | (Or::Right(x), Or::Right(y)) => {
+                            stack.push((x.as_ref(), y.as_ref()))
+                        }
+                        (Or::Left(_), Or::Right(_)) | (Or::Right(_), Or::Left(_)) => {}
+                    }
+                    CMP_NODE
+                }
+                (V::Or(..), _) => return Err(CompareError::Incomparable),
 
-            (
-                V::List(..)
-                | V::Set(..)
-                | V::Map(..)
-                | V::BigMap(..)
-                | V::Contract(_)
-                | V::Operation(_)
-                | V::Ticket(_)
-                | V::Lambda(_),
-                _,
-            ) => return Err(CompareError::Incomparable),
-        })
+                #[cfg(feature = "bls")]
+                (V::Bls12381Fr(_) | V::Bls12381G1(_) | V::Bls12381G2(_), _) => {
+                    return Err(CompareError::Incomparable)
+                }
+
+                (
+                    V::List(..)
+                    | V::Set(..)
+                    | V::Map(..)
+                    | V::BigMap(..)
+                    | V::Contract(_)
+                    | V::Operation(_)
+                    | V::Ticket(_)
+                    | V::Lambda(_),
+                    _,
+                ) => return Err(CompareError::Incomparable),
+            };
+            total = total + node;
+        }
+        Ok(total.as_gas_cost()?)
     }
 
     /// Cost charged for computing total entries size (needed for the subsequent
@@ -1144,6 +1145,40 @@ mod test {
         for n in [usize::MAX, usize::MAX / 2, usize::MAX / 4] {
             assert_eq!(super::tc_cost::ty_eq(n, n), Err(CostOverflow));
         }
+    }
+
+    /// Regression for L2-1449: `interpret_cost::compare` recursed on `pair`
+    /// (before any gas was charged) and overflowed the kernel's ~1 MiB Rust
+    /// stack on a deep comparable value, where gas could never gate it. The
+    /// cost is an order-independent sum, so the iterative walk yields the same
+    /// total without recursing.
+    #[test]
+    fn compare_cost_deep_pair_does_not_overflow() {
+        use crate::ast::TypedValue as V;
+        const DEPTH: usize = 100_000;
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let deep = || {
+                    let mut v = V::int(0);
+                    for _ in 0..DEPTH {
+                        v = V::new_pair(V::int(0), v);
+                    }
+                    v
+                };
+                let a = deep();
+                let b = deep();
+                let cost = interpret_cost::compare(&a, &b).expect("comparable");
+                // 10 per pair node (DEPTH nodes) plus the per-leaf costs; mainly
+                // we assert the walk completed without overflowing.
+                assert!(cost >= 10 * DEPTH as u32);
+                // `TypedValue` has no iterative Drop yet (L2-1446).
+                std::mem::forget(a);
+                std::mem::forget(b);
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
     }
 
     #[test]
