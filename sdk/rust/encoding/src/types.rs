@@ -108,6 +108,121 @@ impl From<Narith> for Zarith {
 
 has_encoding!(Zarith, ZARITH_ENCODING, { Encoding::Z });
 
+/// Error returned by [`Zarith::from_str`] when a string is not a valid
+/// integer literal under OCaml Zarith's `Z.of_string` grammar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParseZarithError;
+
+impl std::fmt::Display for ParseZarithError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("invalid Zarith integer literal")
+    }
+}
+
+impl std::error::Error for ParseZarithError {}
+
+impl FromStr for Zarith {
+    type Err = ParseZarithError;
+
+    /// Parse an arbitrary-precision integer with the exact syntactic rules of
+    /// OCaml Zarith's `Z.of_string`.
+    ///
+    /// This is a faithful port of Zarith's C parser `ml_z_of_substring_base`
+    /// (`caml_z.c`, called with base 0); the Rust ecosystem has no binding to
+    /// the OCaml Zarith runtime, so the grammar is reproduced byte-for-byte.
+    /// The order of the steps matters for exact parity:
+    ///
+    ///   1. an optional `-` (sets the sign) **followed by** an optional `+` —
+    ///      two independent checks, so `-+42` is `-42`, but `+-42`, `++42` and
+    ///      `--42` are rejected (only the very first `-` and first `+` are
+    ///      consumed);
+    ///   2. an optional radix prefix `0x`/`0X`, `0o`/`0O`, `0b`/`0B`
+    ///      (default 10);
+    ///   3. a leading `_` at the start of the digit body is rejected;
+    ///   4. each remaining byte must be `_` (ignored, a digit separator) or a
+    ///      digit valid in the radix — anything else (including a stray sign)
+    ///      is rejected.
+    ///
+    /// Mirroring Zarith, a body that reduces to no digits parses to `0`: this
+    /// includes `"+"`, `"-"`, `"0x"`, the empty string, and e.g. `"0_"`.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use num_bigint::Sign;
+        let bytes = s.as_bytes();
+        let n = bytes.len();
+        let mut i = 0;
+
+        // Step 1: optional `-` then optional `+` (Zarith's two independent
+        // `if`s).
+        let mut sign = Sign::Plus;
+        if i < n && bytes[i] == b'-' {
+            sign = Sign::Minus;
+            i += 1;
+        }
+        if i < n && bytes[i] == b'+' {
+            i += 1;
+        }
+
+        // Step 2: optional radix prefix. A lone `0` not followed by
+        // `o`/`x`/`b` is left in place as an ordinary (leading-zero) digit,
+        // matching Zarith's `d--` rollback.
+        let mut radix = 10u32;
+        if i < n && bytes[i] == b'0' && i + 1 < n {
+            match bytes[i + 1] {
+                b'o' | b'O' => {
+                    radix = 8;
+                    i += 2;
+                }
+                b'x' | b'X' => {
+                    radix = 16;
+                    i += 2;
+                }
+                b'b' | b'B' => {
+                    radix = 2;
+                    i += 2;
+                }
+                _ => {}
+            }
+        }
+
+        // Step 3: Zarith rejects a leading underscore at the start of the body.
+        if i < n && bytes[i] == b'_' {
+            return Err(ParseZarithError);
+        }
+
+        // Step 4: validate every remaining byte against the radix, dropping the
+        // interior `_` separators. A stray sign or out-of-range digit is
+        // rejected here, exactly as Zarith's per-character `invalid_argument`
+        // check.
+        let mut cleaned = String::with_capacity(n - i);
+        for &b in &bytes[i..] {
+            if b == b'_' {
+                continue;
+            }
+            let digit = match b {
+                b'0'..=b'9' => u32::from(b - b'0'),
+                b'a'..=b'f' => u32::from(b - b'a') + 10,
+                b'A'..=b'F' => u32::from(b - b'A') + 10,
+                _ => return Err(ParseZarithError),
+            };
+            if digit >= radix {
+                return Err(ParseZarithError);
+            }
+            cleaned.push(char::from(b));
+        }
+
+        // Empty digit body parses to 0 in Zarith (e.g. `Z.of_string "+"`,
+        // `"0x"`, `""`, `"0_"`).
+        if cleaned.is_empty() {
+            return Ok(Zarith(num_bigint::BigInt::from(0)));
+        }
+        // `cleaned` now holds only digits valid in `radix`, so `parse_bytes`
+        // succeeds; the error arm is defensive.
+        let magnitude =
+            num_bigint::BigUint::parse_bytes(cleaned.as_bytes(), radix).ok_or(ParseZarithError)?;
+        Ok(Zarith(num_bigint::BigInt::from_biguint(sign, magnitude)))
+    }
+}
+
 /// Mutez number
 #[derive(Clone, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub struct Narith(pub num_bigint::BigUint);
@@ -572,5 +687,68 @@ mod tests {
         let json = serde_json::json!("deadbeef");
         let bytes: Bytes = serde_json::from_value(json).unwrap();
         assert_eq!(bytes, Bytes(vec![0xde, 0xad, 0xbe, 0xef]));
+    }
+
+    /// [`Zarith`]'s `FromStr` must match OCaml Zarith's `Z.of_string`
+    /// byte-for-byte. Each case is annotated with the corresponding
+    /// `Z.of_string` result (verified against the OCaml library).
+    #[test]
+    fn zarith_from_str_mirrors_zarith() {
+        fn ok(s: &str, v: i64) {
+            assert_eq!(s.parse::<Zarith>(), Ok(Zarith(v.into())), "input {s:?}");
+        }
+        fn err(s: &str) {
+            assert_eq!(s.parse::<Zarith>(), Err(ParseZarithError), "input {s:?}");
+        }
+
+        // Plain decimal, with optional sign.
+        ok("0", 0);
+        ok("42", 42);
+        ok("-42", -42);
+        ok("+42", 42);
+
+        // Radix prefixes (both cases).
+        ok("0xff", 255);
+        ok("0XFF", 255);
+        ok("0o17", 15);
+        ok("0b1010", 10);
+        ok("-0x10", -16);
+
+        // Interior underscores are digit separators; a leading one is invalid.
+        ok("1_000_000", 1_000_000);
+        ok("0_0_1", 1);
+        err("0x_ff"); // leading `_` after prefix
+        err("_42"); // leading `_`
+
+        // Sign and/or prefix with no digit body parse to 0.
+        ok("+", 0);
+        ok("-", 0);
+        ok("0x", 0);
+        ok("", 0);
+        ok("0_", 0);
+
+        // Sign sequencing: optional `-` then optional `+`.
+        ok("-+42", -42);
+        ok("-+0x10", -16);
+        ok("-+", 0);
+        err("++42");
+        err("+-42");
+        err("--42");
+        // A `+`/`-` inside the digit body (after the prefix) is an invalid
+        // digit.
+        err("0x+10");
+        err("+-0x10");
+
+        // Truly invalid inputs.
+        err("3.5");
+        err("ABCD");
+        err("0xZ");
+        err("_");
+
+        // Big value past i64 round-trips through the magnitude path.
+        assert_eq!(
+            "99999999999999999999".parse::<Zarith>().map(|z| z.0),
+            num_bigint::BigInt::parse_bytes(b"99999999999999999999", 10).ok_or(ParseZarithError)
+        );
     }
 }
