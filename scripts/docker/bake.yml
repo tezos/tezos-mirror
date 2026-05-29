@@ -1,43 +1,162 @@
 services:
+  config-set:
+    container_name: config-set
+    image: tezos/tezos-bare:latest
+    environment:
+      - HISTORY_MODE=${HISTORY_MODE:-rolling}
+      - NETWORK_URL=${NETWORK_URL:-https://teztnets.com/${NETWORK:-shadownet}}
+      - TEZOS_NODE_DIR=/var/run/tezos/node/data
+    command: >-
+      /bin/sh -c \
+      "if [ ! -f $$TEZOS_NODE_DIR/config.json ]; then \
+      octez-node config init \
+      --network $$NETWORK_URL \
+      --history-mode $$HISTORY_MODE \
+      --rpc-addr [::]:8732 --allow-all-rpc [::]:8732; \
+      fi"
+    volumes:
+      - ./node_data:/var/run/tezos/node
+
+  snapshot-downloader:
+    container_name: snapshot-downloader
+    image: tezos/tezos-bare:latest
+    environment:
+      - HISTORY_MODE=${HISTORY_MODE:-rolling}
+      - NETWORK=${NETWORK:-shadownet}
+      - NETWORK_URL=${NETWORK_URL:-https://teztnets.com/$$NETWORK}
+      - TEZOS_NODE_DIR=/var/run/tezos/node/data
+    command:  >-
+      /bin/sh -c 'if ${IMPORT_SNAPSHOT:-true}; then
+      if [ $$HISTORY_MODE = "archive" ]; then SNAPSHOT_MODE="full"; fi;
+      export SNAPSHOT_NAME=${SNAPSHOT_NAME:-$${NETWORK}.$${SNAPSHOT_MODE:-$$HISTORY_MODE}};
+      export SNAPSHOT_URL=${SNAPSHOT_URL:-https://snapshots.tzinit.org/$${NETWORK}/$${SNAPSHOT_MODE:-$$HISTORY_MODE}};
+      if [[ ! -f $$TEZOS_NODE_DIR/daily_logs/daily-$$(date +%Y%m%d).log ]] || ${FORCE_IMPORT_SNAPSHOT:-${FORCE_DOWNLOAD_SNAPSHOT:-false}}; then
+      if [[ ! -f $$SNAPSHOT_URL ]] || ${FORCE_DOWNLOAD_SNAPSHOT:-false}; then wget -O $$SNAPSHOT_NAME $$SNAPSHOT_URL; fi;
+      octez-node snapshot import --force  $$(if ! ${CHECK_SNAPSHOT:-false}; then echo -n --no-check; fi) $$SNAPSHOT_NAME;
+      fi;
+      fi'
+    depends_on:
+      config-set:
+        condition: service_completed_successfully
+    volumes:
+      - ./node_data:/var/run/tezos/node
+
   node:
     container_name: octez-node-box
     image: tezos/tezos-bare:latest
     hostname: octez-node
-    command: octez-node run --data-dir /var/run/tezos/node/data
+    environment:
+      - TEZOS_NODE_DIR=/var/run/tezos/node/data
+    command: octez-node run ${TEZOS_NODE_OPTIONS:-}
     ports:
       - 9732:9732
       - 8732:8732
     volumes:
       - ./node_data:/var/run/tezos/node
-      - ./client_data:/var/run/tezos/client
+    depends_on:
+      snapshot-downloader:
+        condition: service_completed_successfully
     restart: on-failure
+
+  bootstrap-checker:
+    container_name: bootstrap-checker
+    image: tezos/tezos-bare:latest
+    command: octez-client --endpoint http://octez-node:8732 bootstrapped
+    depends_on:
+      node:
+        condition: service_started
+    restart: on-failure
+    attach: false
+
+  manual-config:
+    container_name: manual-config
+    image: tezos/tezos-bare:latest
+    stdin_open: true
+    tty: true
+    environment:
+      - TEZOS_CLIENT_DIR=/var/run/tezos/client/data
+      - TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=yes
+    command: sh -c "octez-client --endpoint http://node:8732 config update; /bin/sh"
+    volumes:
+      - ./client_data:/var/run/tezos/client
+    depends_on:
+      bootstrap-checker:
+        condition: service_completed_successfully
+
+  baker-config-checker:
+    container_name: baker_config_checker
+    image: tezos/tezos-bare:latest
+    environment:
+      - TEZOS_CLIENT_DIR=/var/run/tezos/client/data
+      - TEZOS_DAL_DIR=/var/run/tezos/dal
+      - TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=yes
+      - SIGNING_SECRET_KEY=${CONSENSUS_SECRET_KEY:-${BAKER_SECRET_KEY:-NO_SIGNING_KEY}}
+    command: >-
+      /bin/sh -c
+      'octez-client --endpoint http://node:8732 config update
+      && octez-client config show
+      && export BAKER_ADDRESS=${BAKER_ADDRESS:-$$(octez-client show address baker | grep Hash | sed -e "s/^.* //")}
+      && octez-dal-node config init --data-dir $$TEZOS_DAL_DIR/data --endpoint http://node:8732 --attester-profile=$$BAKER_ADDRESS
+      && export STAKED_BALANCE=$$(octez-client rpc get /chains/main/blocks/head/context/contracts/$$BAKER_ADDRESS/staked_balance | tr -d "\042" | sed -e "s/^null$/0/")
+      && if [ "$${STAKED_BALANCE}" -eq 0 ]; then echo "Your baker $$BAKER_ADDRESS has no staked tez, you should use octez-client stake for it" && exit 3; fi
+      && if [ ! "$${SIGNING_SECRET_KEY}" =     "NO_SIGNING_KEY" ]; then octez-client import secret key signing-key "$${SIGNING_SECRET_KEY}" --force; fi
+      && if [[ ! ${COMPANION_SECRET_KEY:-false} = false ]]; then octez-client import secret key companion-key ${COMPANION_SECRET_KEY:-ASSERT_FALSE} --force; fi'
+    volumes:
+      - ./client_data:/var/run/tezos/client
+      - ./dal_data:/var/run/tezos/dal
+    depends_on:
+      bootstrap-checker:
+        condition: service_completed_successfully
 
   dal-node:
     container_name: octez-dal-box
     image: tezos/tezos-bare:latest
     hostname: octez-dal
-    command: octez-dal-node run --endpoint http://node:8732 --attester-profile=$BAKER_ADDRESS
+    environment:
+      - TEZOS_DAL_DIR=/var/run/tezos/dal
+    command: /bin/sh -c 'octez-dal-node run --data-dir $$TEZOS_DAL_DIR/data'
+    ports:
+      - 10732:10732
+      - 11732:11732
     volumes:
-      - ./client_data:/var/run/tezos/client
-      - ./node_data:/var/run/tezos/node
+      - ./dal_data:/var/run/tezos/dal
+    depends_on:
+      baker-config-checker:
+         condition: service_completed_successfully
     restart: on-failure
 
   baker:
     container_name: octez-baker-box
     image: tezos/tezos-bare:latest
     hostname: octez-baker
-    command: octez-baker --base-dir /var/run/tezos/node/data --endpoint http://node:8732 run with local node /var/run/tezos/node/data --liquidity-baking-toggle-vote $LIQUIDITY_BAKING_VOTE --dal-node http://dal-node:10732
+    environment:
+      - TEZOS_CLIENT_DIR=/var/run/tezos/client/data
+      - TEZOS_NODE_DIR=/var/run/tezos/node/data
+      - TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=yes
+    command: >-
+      /bin/sh -c
+      "octez-baker --endpoint http://node:8732
+      run with local node $$TEZOS_NODE_DIR
+      --liquidity-baking-toggle-vote ${LIQUIDITY_BAKING_VOTE:-pass}
+      --dal-node http://dal-node:10732
+      ${SIGNING_KEY:-$$(octez-client list known addresses | grep -q '^signing-key:' && echo signing-key || echo ${BAKER_ADDRESS:-baker})}
+      ${COMPANION_KEY:-$$(octez-client list known addresses | grep -q '^companion-key:' && echo companion-key || true)}"
     volumes:
       - ./client_data:/var/run/tezos/client
       - ./node_data:/var/run/tezos/node
+    depends_on:
+      baker-config-checker:
+         condition: service_completed_successfully
     restart: on-failure
 
   accuser:
     container_name: octez-accuser-box
     image: tezos/tezos-bare:latest
     hostname: octez-accuser
-    command: octez-accuser --base-dir /var/run/tezos/node/data --endpoint http://node:8732 run
+    command: octez-accuser --endpoint http://node:8732 run
     volumes:
       - ./client_data:/var/run/tezos/client
-      - ./node_data:/var/run/tezos/node
+    depends_on:
+      bootstrap-checker:
+        condition: service_completed_successfully
     restart: on-failure
