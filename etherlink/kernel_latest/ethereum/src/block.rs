@@ -73,6 +73,7 @@ impl BlockFees {
 ///
 /// This data does not change for the duration of the block. All values are
 /// updated when the block is finalized and may change for the next block.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BlockConstants {
     /// The number of the current block
     pub number: U256,
@@ -127,6 +128,23 @@ impl BlockConstants {
     #[inline(always)]
     pub const fn blob_base_fee(&self) -> U256 {
         self.block_fees.blob_base_fee
+    }
+
+    /// A placeholder block, for contexts that must construct a
+    /// [`BlockConstants`] (e.g. a cross-runtime journal) outside of block
+    /// production — traces and unit tests. Production block-producing
+    /// paths always pass the live block instead. The gas limit is
+    /// `u64::MAX` so a CRAC serviced against this placeholder is never
+    /// rejected by the block-gas-limit preflight (the real block always
+    /// keeps its limit above the per-transaction cap).
+    pub fn dummy() -> Self {
+        Self::first_block(
+            U256::zero(),
+            U256::zero(),
+            BlockFees::new(U256::zero(), U256::zero(), U256::zero()),
+            u64::MAX,
+            H160::zero(),
+        )
     }
 }
 

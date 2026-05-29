@@ -3583,6 +3583,7 @@ dependencies = [
  "tezos-smart-rollup-mock",
  "tezos_crypto_rs",
  "tezos_data_encoding",
+ "tezos_ethereum_latest",
  "tezos_tezlink_latest",
  "tezosx-types",
  "thiserror 1.0.69",

@@ -316,8 +316,11 @@ where
         eth_chain_id.low_u64(),
         block_in_progress.number.low_u64(),
     );
-    let mut trace_journal =
-        tezosx_journal::TezosXJournal::new(trace_crac_id, trace_operation_hash);
+    let mut trace_journal = tezosx_journal::TezosXJournal::new(
+        trace_crac_id,
+        trace_operation_hash,
+        tezos_ethereum::block::BlockConstants::dummy(),
+    );
     let execution_result = match transaction {
         chains::TezosXTransaction::Tezos(operation) => {
             let enable_gas_refund = evm_config

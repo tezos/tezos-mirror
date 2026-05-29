@@ -1326,6 +1326,7 @@ impl TezosRuntime {
 #[cfg(all(test, feature = "testing"))]
 mod tests {
     use tezos_crypto_rs::hash::HashTrait;
+    use tezos_ethereum::block::BlockConstants;
 
     use super::*;
     use tezos_tezlink::operation_result::OperationKind;
@@ -2304,7 +2305,11 @@ mod tests {
         // match the journal's id for `verify_crac_id` to pass.
         let crac_id = CracId::new(u8::from(RuntimeId::Ethereum), 0);
         let crac_id_str = crac_id.to_string();
-        let mut journal = TezosXJournal::new(crac_id, OperationHash::default());
+        let mut journal = TezosXJournal::new(
+            crac_id,
+            OperationHash::default(),
+            BlockConstants::dummy(),
+        );
 
         // Non-empty body holding an encoded Unit: skips the empty-body
         // Unit fallback (which would itself draw on the tight gas) and

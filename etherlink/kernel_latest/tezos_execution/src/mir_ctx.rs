@@ -1783,6 +1783,7 @@ pub mod tests {
         let mut journal = tezosx_journal::TezosXJournal::new(
             tezosx_journal::CracId::new(1, 0),
             tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
         );
         let registry = tezosx_interfaces::testing::UnimplementedRegistry;
         let mut ctx = Ctx {
@@ -2336,6 +2337,7 @@ pub mod tests {
         let mut journal = tezosx_journal::TezosXJournal::new(
             tezosx_journal::CracId::new(1, 0),
             tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
         );
         // The synthetic-view dispatcher under test short-circuits on
         // `Type::Unit` before any registry call, so unwiring all

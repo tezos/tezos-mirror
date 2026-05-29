@@ -27,7 +27,7 @@ use revm_etherlink::{
     },
     EvmRunError, ExecutionOutcome, GasData, TransactionOrigin,
 };
-use tezos_ethereum::block::{BlockConstants, BlockFees};
+use tezos_ethereum::block::BlockConstants;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::{
     AliasInfo, Classification, CrossRuntimeContext, Origin, Registry, RuntimeInterface,
@@ -54,26 +54,24 @@ impl EthereumRuntime {
         Self { chain_id }
     }
 
+    /// Build the `BlockConstants` an inbound CRAC executes against. The
+    /// block-level observables (`BASEFEE`, `GASLIMIT` — the block gas
+    /// limit, *not* the forwarded call gas — `BLOBBASEFEE`, `PREVRANDAO`,
+    /// coinbase, number, timestamp) are inherited from the originating
+    /// runtime's block, which the cross-runtime journal carries from its
+    /// creation; only `chain_id` is overridden with this runtime's own
+    /// identifier. `_host`/`_context` are no longer consulted now that the
+    /// block flows through the journal, but stay in the signature to keep
+    /// the alias-materialization call path untouched.
     fn create_block_constants(
         &self,
-        host: &impl StorageV1,
-        context: &CrossRuntimeContext,
+        _host: &impl StorageV1,
+        journal: &TezosXJournal,
+        _context: &CrossRuntimeContext,
     ) -> BlockConstants {
-        let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
-
         BlockConstants {
-            number: context.block_number,
-            coinbase,
-            timestamp: context.timestamp,
-            gas_limit: context.gas_limit,
-            block_fees: BlockFees::new(
-                primitive_types::U256::zero(),
-                primitive_types::U256::zero(),
-                primitive_types::U256::zero(),
-            ),
             chain_id: self.chain_id,
-            tezos_experimental_features: true,
-            prevrandao: None,
+            ..journal.evm.outer_block().clone()
         }
     }
 
@@ -140,7 +138,7 @@ impl EthereumRuntime {
 
         // Set up block constants for EVM execution
         let evm_version = read_evm_version(host);
-        let block_constants = self.create_block_constants(host, context);
+        let block_constants = self.create_block_constants(host, journal, context);
 
         // Use the caller's remaining gas so it controls the budget. The
         // `effective_gas_price` is 0, so REVM's pre-flight balance check on the
@@ -199,18 +197,6 @@ impl EthereumRuntime {
                 format!("init_tezosx_alias halted: {reason:?}"),
             )),
         }
-    }
-}
-
-/// Read the sequencer pool address (coinbase) from storage.
-fn read_sequencer_pool_address(host: &impl StorageV1) -> Option<primitive_types::H160> {
-    use tezos_smart_rollup_host::path::RefPath;
-    const SEQUENCER_POOL_PATH: RefPath =
-        RefPath::assert_from(b"/evm/sequencer_pool_address");
-    let mut bytes = [0u8; 20];
-    match host.store_read_slice(&SEQUENCER_POOL_PATH, 0, bytes.as_mut_slice()) {
-        Ok(20) => Some(bytes.into()),
-        _ => None,
     }
 }
 
@@ -469,7 +455,7 @@ where
     };
 
     let evm_version = read_evm_version(host);
-    let block_constants = runtime.create_block_constants(host, &context);
+    let block_constants = runtime.create_block_constants(host, journal, &context);
     let gas_data = GasData::new(hdrs.gas_limit, 0, hdrs.gas_limit);
     let crac_log = Log {
         address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
@@ -608,7 +594,7 @@ where
     };
 
     let evm_version = read_evm_version(host);
-    let block_constants = runtime.create_block_constants(host, &context);
+    let block_constants = runtime.create_block_constants(host, journal, &context);
     let gas_data = GasData::new(hdrs.gas_limit, 0, hdrs.gas_limit);
 
     // Intentionally no `CracReceived` log on the static path.
@@ -892,11 +878,17 @@ mod tests {
     use crate::EthereumRuntime;
 
     /// Build an HTTP request for the Ethereum runtime's `serve()` method.
+    /// `block` is the block the CRAC is served against — its gas limit is
+    /// forwarded as `X-Tezos-Gas-Limit`, so the synthetic transaction
+    /// never claims more gas than the served block grants (mirroring
+    /// production, where the forwarded gas is bounded by the caller's
+    /// budget). Pass the same block the journal carries.
     fn build_serve_request(
         sender: &Address,
         destination: &Address,
         amount: &str,
         body: Vec<u8>,
+        block: &BlockConstants,
     ) -> http::Request<Vec<u8>> {
         // POST is the explicit method for state-mutating cross-runtime
         // entrypoint calls. The HTTP default is GET, which since L2-1259
@@ -916,7 +908,10 @@ mod tests {
                 format!("0x{}", alloy_primitives::hex::encode(sender.0 .0)),
             )
             .header(tezosx_interfaces::X_TEZOS_AMOUNT, amount)
-            .header(tezosx_interfaces::X_TEZOS_GAS_LIMIT, u64::MAX.to_string())
+            .header(
+                tezosx_interfaces::X_TEZOS_GAS_LIMIT,
+                block.gas_limit.to_string(),
+            )
             .header(tezosx_interfaces::X_TEZOS_TIMESTAMP, "1")
             .header(tezosx_interfaces::X_TEZOS_BLOCK_NUMBER, "1")
             .body(body)
@@ -938,7 +933,13 @@ mod tests {
         let five_tez_wei = revm::primitives::U256::from(5_000_000_000_000_000_000u128);
 
         let mut journal = TezosXJournal::default();
-        let request = build_serve_request(&sender, &destination, "5", vec![]);
+        let request = build_serve_request(
+            &sender,
+            &destination,
+            "5",
+            vec![],
+            journal.evm.outer_block(),
+        );
         let resp = runtime.serve(&registry, &mut host, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
         commit_evm_journal_from_external(
@@ -989,7 +990,13 @@ mod tests {
         CodeStorage::add(&mut host, &bytecode_raw, Some(code_hash)).unwrap();
 
         let mut journal = TezosXJournal::default();
-        let request = build_serve_request(&sender, &contract, "0", vec![]);
+        let request = build_serve_request(
+            &sender,
+            &contract,
+            "0",
+            vec![],
+            journal.evm.outer_block(),
+        );
         let resp = runtime.serve(&registry, &mut host, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
         commit_evm_journal_from_external(
@@ -1044,7 +1051,13 @@ mod tests {
         CodeStorage::add(&mut host, &bytecode_raw, Some(code_hash)).unwrap();
 
         let mut journal = TezosXJournal::default();
-        let request = build_serve_request(&sender, &contract, "42", vec![]);
+        let request = build_serve_request(
+            &sender,
+            &contract,
+            "42",
+            vec![],
+            journal.evm.outer_block(),
+        );
         let resp = runtime.serve(&registry, &mut host, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
         commit_evm_journal_from_external(
@@ -1593,7 +1606,13 @@ mod tests {
         let destination = Address::from_slice(&[0x22; 20]);
 
         let mut journal = TezosXJournal::default();
-        let request = build_serve_request(&sender, &destination, "0", vec![]);
+        let request = build_serve_request(
+            &sender,
+            &destination,
+            "0",
+            vec![],
+            journal.evm.outer_block(),
+        );
         let resp = runtime.serve(&registry, &mut host, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
         commit_evm_journal_from_external(
@@ -1625,7 +1644,13 @@ mod tests {
         let half_tez_wei = revm::primitives::U256::from(500_000_000_000_000_000u64);
 
         let mut journal = TezosXJournal::default();
-        let request = build_serve_request(&sender, &destination, "0.5", vec![]);
+        let request = build_serve_request(
+            &sender,
+            &destination,
+            "0.5",
+            vec![],
+            journal.evm.outer_block(),
+        );
         let resp = runtime.serve(&registry, &mut host, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
         commit_evm_journal_from_external(
@@ -2018,7 +2043,13 @@ mod tests {
         deploy_at(&mut host, &contract, Bytes::from_hex("6042600155").unwrap());
 
         let mut journal = TezosXJournal::default();
-        let request = build_serve_request(&sender, &contract, "0", vec![]);
+        let request = build_serve_request(
+            &sender,
+            &contract,
+            "0",
+            vec![],
+            journal.evm.outer_block(),
+        );
         let resp = runtime.serve(&registry, &mut host, &mut journal, request);
         assert_eq!(
             resp.status(),
@@ -2532,5 +2563,109 @@ mod tests {
                 "a half-init alias must remain re-materializable, not bricked"
             );
         }
+    }
+
+    // ── CRAC block-observable opcodes (L2-1417) ─────────────────────────
+
+    /// Deploy a probe that runs four block-observable opcodes and stores
+    /// each result: `BASEFEE`→slot 0, `GASLIMIT`→slot 1, `GASPRICE`→slot
+    /// 2, `PREVRANDAO`→slot 3. Each is `<OPCODE> PUSH1 <slot> SSTORE`.
+    fn deploy_observables_probe(host: &mut MockKernelHost, address: &Address) {
+        // 48=BASEFEE 45=GASLIMIT 3a=GASPRICE 44=PREVRANDAO,
+        // 60 xx=PUSH1 slot, 55=SSTORE.
+        let bytecode_raw = Bytes::from_hex("0x48600055456001553a60025544600355").unwrap();
+        deploy_at(host, address, bytecode_raw);
+    }
+
+    /// An inbound CRAC must expose the originating block's observables to
+    /// EVM bytecode — `BASEFEE`, `GASLIMIT` (the block gas limit),
+    /// `PREVRANDAO`, and `GASPRICE` — rather than the zeroed placeholders
+    /// of the synthesized block. The block is carried on the journal and
+    /// inherited by `create_block_constants`; `GASPRICE` resolves to the
+    /// block basefee, since Etherlink ignores priority fees and every
+    /// transaction's effective price is exactly `base_fee_per_gas`.
+    #[test]
+    fn test_serve_block_observables_reflect_outer_block() {
+        use tezos_ethereum::block::{BlockConstants, BlockFees};
+
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let registry = UnimplementedRegistry;
+
+        let live_basefee: u64 = 2_000_000_000; // 2 Gwei
+        let block_gas_limit: u64 = 42_000_000;
+        let prevrandao: u64 = 0xDEAD_BEEF;
+
+        let outer = BlockConstants {
+            block_fees: BlockFees::new(
+                primitive_types::U256::from(live_basefee),
+                primitive_types::U256::from(live_basefee),
+                primitive_types::U256::zero(),
+            ),
+            gas_limit: block_gas_limit,
+            prevrandao: Some(primitive_types::H256::from_low_u64_be(prevrandao)),
+            ..BlockConstants::test_block_with_no_fees()
+        };
+
+        let sender = Address::from_slice(&[0x11; 20]);
+        let contract = Address::from_slice(&[0xBB; 20]);
+        deploy_observables_probe(&mut host, &contract);
+
+        let mut journal = TezosXJournal::new(
+            tezosx_journal::CracId::new(0, 0),
+            Default::default(),
+            outer,
+        );
+
+        // Serve against the journal's own block so the forwarded gas
+        // matches the served block's limit.
+        let request = build_serve_request(
+            &sender,
+            &contract,
+            "0",
+            vec![],
+            journal.evm.outer_block(),
+        );
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        // A successful serve also proves the basefee preflight gate is
+        // opened: the CRAC runs at `gas_price = 0`, which stock EIP-1559
+        // validation would reject against the live basefee.
+        assert_eq!(
+            resp.status(),
+            http::StatusCode::OK,
+            "CRAC serve() must succeed: {:?}",
+            String::from_utf8_lossy(resp.body())
+        );
+
+        let commit_block = BlockConstants::test_block_with_no_fees();
+        commit_evm_journal_from_external(
+            &mut host,
+            &registry,
+            &commit_block,
+            &mut journal,
+        )
+        .unwrap();
+
+        let u256 = revm::primitives::U256::from;
+        assert_eq!(
+            read_slot(&mut host, &contract, u256(0u64)),
+            u256(live_basefee),
+            "BASEFEE must reflect the live block basefee"
+        );
+        assert_eq!(
+            read_slot(&mut host, &contract, u256(1u64)),
+            u256(block_gas_limit),
+            "GASLIMIT must reflect the block gas limit, not the forwarded call gas"
+        );
+        assert_eq!(
+            read_slot(&mut host, &contract, u256(2u64)),
+            u256(live_basefee),
+            "GASPRICE must reflect the live basefee, not the cross-runtime TxEnv's 0"
+        );
+        assert_eq!(
+            read_slot(&mut host, &contract, u256(3u64)),
+            u256(prevrandao),
+            "PREVRANDAO must reflect the block's value, not the default 0"
+        );
     }
 }

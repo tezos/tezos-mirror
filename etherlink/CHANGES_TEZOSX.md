@@ -26,6 +26,18 @@
   alias. Previously these selectors recaptured the source from the
   immediate sender, so a Michelson -> EVM frame forwarded the wrong
   identity to the read-only call. (!22033)
+- Inbound Michelson-to-EVM calls (CRAC) now expose the live block
+  observables to EVM bytecode instead of zero/placeholder values:
+  `BASEFEE`, `GASLIMIT` (the block gas limit), `BLOBBASEFEE`,
+  `PREVRANDAO`, and `GASPRICE`. The originating runtime's block
+  environment is carried on the cross-runtime journal from its creation
+  and inherited when servicing the call; `GASPRICE` is exposed through a
+  custom opcode that returns the block basefee (Etherlink ignores
+  priority fees, so every transaction's effective price is exactly the
+  basefee). EVM-side fee accounting is unchanged: CRAC transactions
+  still carry `gas_price = 0` for the caller debit and basefee burn, and
+  the EIP-1559 basefee preflight is disabled for cross-runtime origins so
+  the live basefee doesn't reject the `gas_price = 0` call. (!22022)
 
 ### Michelson Runtime
 

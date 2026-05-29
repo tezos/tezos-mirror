@@ -500,7 +500,17 @@ impl Evaluation {
         // still keeps KT1s distinct within one simulation, so internal
         // consistency holds; clients must not treat a simulated KT1 as
         // authoritative.
-        let mut journal = TezosXJournal::default();
+        //
+        // Seed the journal with the simulation block (`constants`) — same
+        // as the applied path seeds the real block — so a CRAC dispatched
+        // during the simulated call observes the live block environment
+        // (`BASEFEE`, `GASLIMIT`, ...) instead of the placeholder
+        // `BlockConstants::dummy()` a `TezosXJournal::default()` would
+        // carry, keeping `eth_call`/`estimateGas` consistent with
+        // execution. The zero crac-id / operation-hash seed above is
+        // preserved.
+        let mut journal =
+            TezosXJournal::new(Default::default(), Default::default(), constants.clone());
         let sim_result = match revm_run_transaction(
             host,
             registry,

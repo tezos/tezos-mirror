@@ -7186,6 +7186,7 @@ mod tests {
         let mut journal = TezosXJournal::new(
             tezosx_journal::CracId::new(1, 0),
             tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
         );
         let processed = validate_and_apply_operation(
             &mut host,
@@ -7490,6 +7491,7 @@ mod tests {
         let mut journal = TezosXJournal::new(
             tezosx_journal::CracId::new(1, 0),
             tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
         );
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
@@ -7580,6 +7582,7 @@ mod tests {
         let mut journal = TezosXJournal::new(
             tezosx_journal::CracId::new(1, 0),
             tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
         );
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
