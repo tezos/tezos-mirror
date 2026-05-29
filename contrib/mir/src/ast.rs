@@ -774,42 +774,51 @@ impl<'a> std::fmt::Debug for TypedValue<'a> {
             // Iterate over a Map's (key, value) pairs without recursing
             // into the BTreeMap's auto Debug (which would walk values
             // recursively).
+            // The `bool` is `first`: whether the next entry is the first in
+            // the container, so the ", " separator is emitted *before* every
+            // non-first entry (no trailing comma).
             MapEntries(
                 std::collections::btree_map::Iter<'b, Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+                bool,
             ),
-            SetEntries(std::collections::btree_set::Iter<'b, Rc<TypedValue<'a>>>),
-            ListEntries(crate::ast::michelson_list::Iter<'b, Rc<TypedValue<'a>>>),
+            SetEntries(std::collections::btree_set::Iter<'b, Rc<TypedValue<'a>>>, bool),
+            ListEntries(crate::ast::michelson_list::Iter<'b, Rc<TypedValue<'a>>>, bool),
         }
         use TypedValue as TV;
         let mut stack: Vec<Frame> = vec![Frame::Visit(self)];
         while let Some(frame) = stack.pop() {
             match frame {
                 Frame::Str(s) => f.write_str(s)?,
-                Frame::MapEntries(mut it) => {
+                Frame::MapEntries(mut it, first) => {
                     if let Some((k, v)) = it.next() {
-                        // Re-push the iterator first so further entries
-                        // are emitted after the current key/value pair.
-                        stack.push(Frame::MapEntries(it));
-                        // Separator before non-first entry handled by the
-                        // surrounding token (see Map arm below).
-                        stack.push(Frame::Str(", "));
+                        // Re-push the iterator so further entries follow this
+                        // key/value pair; emit ", " before this pair unless it
+                        // is the first (so there is no trailing comma).
+                        stack.push(Frame::MapEntries(it, false));
                         stack.push(Frame::Visit(v.as_ref()));
                         stack.push(Frame::Str(" -> "));
                         stack.push(Frame::Visit(k.as_ref()));
+                        if !first {
+                            stack.push(Frame::Str(", "));
+                        }
                     }
                 }
-                Frame::SetEntries(mut it) => {
+                Frame::SetEntries(mut it, first) => {
                     if let Some(e) = it.next() {
-                        stack.push(Frame::SetEntries(it));
-                        stack.push(Frame::Str(", "));
+                        stack.push(Frame::SetEntries(it, false));
                         stack.push(Frame::Visit(e.as_ref()));
+                        if !first {
+                            stack.push(Frame::Str(", "));
+                        }
                     }
                 }
-                Frame::ListEntries(mut it) => {
+                Frame::ListEntries(mut it, first) => {
                     if let Some(e) = it.next() {
-                        stack.push(Frame::ListEntries(it));
-                        stack.push(Frame::Str(", "));
+                        stack.push(Frame::ListEntries(it, false));
                         stack.push(Frame::Visit(e.as_ref()));
+                        if !first {
+                            stack.push(Frame::Str(", "));
+                        }
                     }
                 }
                 Frame::Visit(v) => match v {
@@ -887,17 +896,17 @@ impl<'a> std::fmt::Debug for TypedValue<'a> {
                     TV::List(lst) => {
                         f.write_str("List([")?;
                         stack.push(Frame::Str("])"));
-                        stack.push(Frame::ListEntries(lst.iter()));
+                        stack.push(Frame::ListEntries(lst.iter(), true));
                     }
                     TV::Set(set) => {
                         f.write_str("Set({")?;
                         stack.push(Frame::Str("})"));
-                        stack.push(Frame::SetEntries(set.iter()));
+                        stack.push(Frame::SetEntries(set.iter(), true));
                     }
                     TV::Map(map) => {
                         f.write_str("Map({")?;
                         stack.push(Frame::Str("})"));
-                        stack.push(Frame::MapEntries(map.iter()));
+                        stack.push(Frame::MapEntries(map.iter(), true));
                     }
                 },
             }

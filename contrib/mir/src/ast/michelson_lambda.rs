@@ -82,7 +82,30 @@ impl<'a> std::fmt::Debug for Closure<'a> {
             match cur {
                 Closure::Lambda(lam) => {
                     f.write_str("Lambda(")?;
-                    write!(f, "{:?}", lam)?;
+                    // Do not recurse into the typechecked `code: Rc<[Instruction]>`,
+                    // whose derived `Debug` is still recursive and would overflow
+                    // on a deeply nested body. The raw `micheline_code` (iterative
+                    // `Micheline` Debug) already shows the body; `code` is its
+                    // typechecked twin, redundant here, so it is elided as `..`.
+                    // `Instruction` `Debug` is reachable only through this field.
+                    // L2-1436.
+                    match lam {
+                        Lambda::Lambda { micheline_code, .. } => {
+                            write!(f, "Lambda {{ micheline_code: {micheline_code:?}, code: .. }}")?;
+                        }
+                        Lambda::LambdaRec {
+                            in_ty,
+                            out_ty,
+                            micheline_code,
+                            ..
+                        } => {
+                            write!(
+                                f,
+                                "LambdaRec {{ in_ty: {in_ty:?}, out_ty: {out_ty:?}, \
+                                 micheline_code: {micheline_code:?}, code: .. }}"
+                            )?;
+                        }
+                    }
                     f.write_str(")")?;
                     break;
                 }
@@ -143,6 +166,36 @@ mod tests {
         parser::Parser,
         stack::Stack,
     };
+
+    /// L2-1436: a lambda value with a deeply nested body must not overflow when
+    /// formatted (reachable via `FAILWITH` -> `InterpretError::FailedWith`,
+    /// which the kernel turns into a string outside gas). `micheline_code` goes
+    /// through the iterative `Micheline` Debug; the typechecked `code` (whose
+    /// derived `Instruction` Debug is still recursive) is elided as `code: ..`.
+    #[test]
+    fn deep_lambda_debug_does_not_overflow() {
+        use crate::ast::Micheline;
+        const DEPTH: usize = 100_000;
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let arena: Arena<Micheline<'_>> = Arena::new();
+                let mut m = Micheline::Seq(&[]);
+                for _ in 0..DEPTH {
+                    m = Micheline::Seq(std::slice::from_ref(arena.alloc(m)));
+                }
+                let lam = super::Lambda::Lambda {
+                    micheline_code: m,
+                    code: Vec::new().into(),
+                };
+                let tv = TypedValue::Lambda(super::Closure::Lambda(lam));
+                let s = format!("{tv:?}");
+                assert!(s.contains("code: .."));
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
+    }
 
     #[test]
     fn apply_micheline() {
