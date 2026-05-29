@@ -316,6 +316,52 @@ mod tests {
             .join()
             .expect("worker thread completes");
     }
+
+    /// Companion to `deep_pair_cmp_does_not_overflow` (L2-1449): the other two
+    /// compound comparable constructors, `option` and `or`, also recursed in
+    /// the previous `partial_cmp`. Compare two deep chains that differ only at
+    /// the deepest leaf, so the worklist must walk the full depth (None < Some
+    /// / inner `Left` ordering) without overflowing.
+    #[test]
+    fn deep_option_or_cmp_does_not_overflow() {
+        use std::cmp::Ordering;
+        const DEPTH: usize = 100_000;
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                // option: Some(Some(... Some(leaf)))
+                let deep_opt = |leaf: TypedValue<'static>| {
+                    let mut v = leaf;
+                    for _ in 0..DEPTH {
+                        v = TypedValue::new_option(Some(v));
+                    }
+                    v
+                };
+                let a = deep_opt(TypedValue::int(0));
+                let b = deep_opt(TypedValue::int(1));
+                assert_eq!(a.partial_cmp(&b), Some(Ordering::Less));
+                assert_eq!(b.partial_cmp(&a), Some(Ordering::Greater));
+                std::mem::forget(a);
+                std::mem::forget(b);
+
+                // or: Left(Left(... Left(leaf)))
+                let deep_or = |leaf: TypedValue<'static>| {
+                    let mut v = leaf;
+                    for _ in 0..DEPTH {
+                        v = TypedValue::new_or(crate::ast::Or::Left(v));
+                    }
+                    v
+                };
+                let c = deep_or(TypedValue::int(0));
+                let d = deep_or(TypedValue::int(1));
+                assert_eq!(c.partial_cmp(&d), Some(Ordering::Less));
+                std::mem::forget(c);
+                std::mem::forget(d);
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
+    }
 }
 
 /*
