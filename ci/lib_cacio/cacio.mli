@@ -215,6 +215,7 @@ module type COMPONENT_API = sig
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
     ?parallel:Gitlab_ci.Types.parallel ->
+    ?environment:Gitlab_ci.Types.environment ->
     ?variables:Gitlab_ci.Types.variables ->
     ?artifacts:Gitlab_ci.Types.artifacts ->
     ?cache:Gitlab_ci.Types.cache list ->
