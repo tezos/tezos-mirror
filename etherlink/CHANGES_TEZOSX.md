@@ -87,6 +87,12 @@
   `int`/`nat`/`mutez`/`timestamp` values terminated by a `0x00` group
   (e.g. `0x0500b9c08100`, `0x05008100`) — returning `None` to match
   Tezos L1. Canonical encodings are unaffected. (!21992)
+- MIR: `LSR bytes` no longer traps with `Overflow` when the shift
+  count does not fit in `usize` (e.g. `2^64` on a 64-bit host). Any
+  count at or beyond the operand's bit width now shifts the bytes
+  out completely and returns empty bytes, matching L1's
+  `Script_bytes.bytes_lsr`. Shift counts that fit in `usize` and are
+  below the operand's bit width are unaffected. (!22011)
 
 ### Native Atomic Composability
 
