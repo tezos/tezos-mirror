@@ -4832,9 +4832,10 @@ mod typecheck_tests {
     use Instruction::*;
     use Option::None;
 
-    /// Parses a 100k deep right leaning `pair` type without overflowing
-    /// the Rust call stack. The deep result is leaked via `mem::forget`
-    /// because the recursive `Drop` on `Type` is converted in a follow up.
+    /// Parses a 100k deep right leaning `pair` type without overflowing the
+    /// Rust call stack, then drops it at end of scope -- exercising the
+    /// iterative `Drop for Type` this MR adds. Both the parse and the drop
+    /// would overflow at this depth with a recursive implementation.
     #[test]
     fn deeply_nested_pair_parses() {
         const DEPTH: usize = 100_000;
@@ -4847,9 +4848,9 @@ mod typecheck_tests {
         }
         let mut gas = Gas::new(u32::MAX);
         let parsed = parse_ty(&mut gas, &current).expect("deep pair parses");
-        let is_pair = matches!(parsed, Type::Pair(_));
-        std::mem::forget(parsed);
-        assert!(is_pair, "expected outer Type::Pair");
+        assert!(matches!(parsed, Type::Pair(_)), "expected outer Type::Pair");
+        // `parsed` (a 100k-deep Type) drops here through the iterative
+        // `Drop for Type`; a recursive destructor would overflow.
     }
 
     /// Typechecks a 100k deep nested IF, demonstrating that both the
