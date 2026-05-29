@@ -165,8 +165,14 @@ let originate_contract ~tez_client ~sequencer ~src ~alias ~script_name
   return kt1
 
 (** Call a Michelson contract via the tezlink client and produce a block on
-    demand. *)
-let call_contract ~tez_client ~sequencer ~src ~dest ~arg_data () =
+    demand.  When [force] is set the operation is injected even if client-side
+    simulation reports a failure, so a call whose Michelson view [FAILWITH]s is
+    still included in the block as a failed manager operation (matching the
+    delayed-inbox semantics the originated-failure tests rely on).  Forcing
+    skips simulation, so explicit [gas_limit] and [storage_limit] are then
+    required. *)
+let call_contract ~tez_client ~sequencer ~src ~dest ~arg_data ?force ?gas_limit
+    ?storage_limit () =
   let* () =
     Client.transfer
       ~amount:Tez.zero
@@ -175,6 +181,9 @@ let call_contract ~tez_client ~sequencer ~src ~dest ~arg_data () =
       ~receiver:dest
       ~arg:arg_data
       ~burn_cap:Tez.one
+      ?force
+      ?gas_limit
+      ?storage_limit
       tez_client
   in
   let*@ _ = Rpc.produce_block sequencer in
@@ -193,6 +202,50 @@ let check_contract_storage ~sequencer ~tez_client kt1 expected =
     (storage = expected_json)
       json
       ~error_msg:"Expected contract storage %R but got %L") ;
+  unit
+
+(** [check_michelson_op_failed_with ~sequencer ~tez_client expected_rex] reads
+    the head block's first manager operation via the typed tezlink RPC, asserts
+    the operation failed, and asserts one of its error messages matches the
+    regexp [expected_rex].  Confirms a Michelson call rolled back for the
+    expected reason rather than silently doing nothing — a strictly stronger
+    signal than "storage unchanged", which any failure (gas, wrong view, …)
+    would also produce.
+
+    A [FAILWITH] surfaces in the tezlink receipt as an error whose
+    [error_message] embeds the failed-with Michelson value, so the match is on
+    [error_message] rather than a structured [with] payload.  The operation was
+    just included by {!call_contract}'s [produce_block], so it is the head
+    block's first manager operation. *)
+let check_michelson_op_failed_with ~sequencer ~tez_client expected_rex =
+  let* op =
+    Client.RPC.call ~endpoint:(tezlink_endpoint sequencer) tez_client
+    @@ RPC.get_chain_block_operations_validation_pass
+         ~validation_pass:3
+         ~operation_offset:0
+         ()
+  in
+  let op_result =
+    JSON.(op |-> "contents" |=> 0 |-> "metadata" |-> "operation_result")
+  in
+  let status = JSON.(op_result |-> "status" |> as_string) in
+  Check.(
+    (status = "failed")
+      string
+      ~error_msg:"Expected Michelson call to fail (status %R) but got %L") ;
+  let error_messages =
+    JSON.(op_result |-> "errors" |> as_list)
+    |> List.filter_map (fun err ->
+           JSON.(err |-> "error_message" |> as_string_opt))
+  in
+  Check.is_true
+    ~__LOC__
+    (List.exists (fun msg -> msg =~ rex expected_rex) error_messages)
+    ~error_msg:
+      (sf
+         "Expected an error message matching %S among [%s]"
+         expected_rex
+         (String.concat "; " error_messages)) ;
   unit
 
 (* ── EVM contract deployment helper ──────────────────────────────────── *)
@@ -1545,6 +1598,238 @@ let test_michelson_resolve_address_recorded_after_crac () =
              ] );
        ])
 
+(* ── Michelson VIEW tests — error paths (commit 6) ────────────────────── *)
+
+(** Michelson invalid-runtime-ID: passing an out-of-range runtime ID to
+    [originOf] via Michelson VIEW makes the view FAILWITH with
+    [Pair "INVALID_RUNTIME_ID" id].  A FAILWITH inside a view aborts the whole
+    call (it does not make VIEW return None), so the caller's own [IF_NONE]
+    branch never runs and the operation fails with the view's payload.  This is
+    the Michelson counterpart of the EVM precompile reverting [InvalidRuntimeId].
+    Two complementary checks: the operation receipt must report a failure
+    mentioning [INVALID_RUNTIME_ID] (proving the call rolled back for the
+    expected reason), and the sentinel initial storage [Right (Left 1)] — which
+    the success path WOULD overwrite — must be preserved (proving no value was
+    written). *)
+let test_michelson_origin_of_invalid_runtime_id () =
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~kernel:Latest
+    ~uses_client:true
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+    ~title:
+      "Michelson VIEW originOf: invalid runtime ID causes FAILWITH (sentinel \
+       preserved)"
+    ~tags:
+      (["tezosx"; "address_translation"]
+      @ runtime_tags [Tezos]
+      @ ["origin_of"; "invalid_runtime"; "michelson"; "view"; "failwith"])
+  @@ fun sequencer ->
+  let* tez_client = tezlink_client sequencer in
+  let source = Constant.bootstrap1 in
+  (* Step 1: Originate the gateway_origin_of.tz caller contract.
+     Initial storage = Right (Left 1) — a sentinel that the success path would
+     overwrite.  An unchanged sentinel after the call proves FAILWITH occurred. *)
+  let* kt1_address =
+    originate_contract
+      ~tez_client
+      ~sequencer
+      ~src:source
+      ~alias:"origin_of_caller"
+      ~script_name:["mini_scenarios"; "gateway_origin_of"]
+      ~init_storage_data:"Right (Left 1)"
+      ()
+  in
+  (* Step 2: Call with an invalid runtime ID (99).
+     Inside the kernel, runtime_id_from_nat(99) raises
+     InterpretError::FailedWith("INVALID_RUNTIME_ID", 99) within the view,
+     which aborts the call.  The operation is Failed with that payload and
+     storage stays at Right (Left 1). *)
+  let invalid_runtime_id = "99" in
+  let addr = Constant.bootstrap5.public_key_hash in
+  let* () =
+    call_contract
+      ~tez_client
+      ~sequencer
+      ~src:source
+      ~dest:kt1_address
+      ~arg_data:(sf {|Pair "%s" %s|} addr invalid_runtime_id)
+      ~force:true
+      ~gas_limit:1_000_000
+      ~storage_limit:1000
+      ()
+  in
+  let* () =
+    check_michelson_op_failed_with ~sequencer ~tez_client "INVALID_RUNTIME_ID"
+  in
+  (* Step 3: Storage must remain Right (Left 1) — the FAILWITH rolled back the
+     call.  The sentinel being preserved proves FAILWITH occurred rather than
+     the view returning a value and overwriting storage. *)
+  check_contract_storage
+    ~sequencer
+    ~tez_client
+    kt1_address
+    (`O
+       [
+         ("prim", `String "Right");
+         ( "args",
+           `A
+             [
+               `O
+                 [
+                   ("prim", `String "Left");
+                   ("args", `A [`O [("int", `String "1")]]);
+                 ];
+             ] );
+       ])
+
+(** [resolveAddress] via Michelson VIEW with an invalid runtime ID makes the
+    view FAILWITH with [Pair "INVALID_RUNTIME_ID" id], which aborts the call
+    (it does not make VIEW return None), so the operation fails with the view's
+    payload, leaving storage unchanged.  Two complementary checks: the operation
+    receipt must report a failure mentioning [INVALID_RUNTIME_ID] (proving the
+    call rolled back for the expected reason), and the sentinel initial storage
+    [Some (Pair 1 "sentinel")] — which the success path WOULD overwrite — must
+    be preserved (proving no value was written). *)
+let test_michelson_resolve_address_invalid_runtime_id () =
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~kernel:Latest
+    ~uses_client:true
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+    ~title:
+      "Michelson VIEW resolveAddress: invalid runtime ID causes FAILWITH \
+       (sentinel preserved)"
+    ~tags:
+      (["tezosx"; "address_translation"]
+      @ runtime_tags [Tezos]
+      @ ["resolve_address"; "invalid_runtime"; "michelson"; "view"; "failwith"]
+      )
+  @@ fun sequencer ->
+  let* tez_client = tezlink_client sequencer in
+  let source = Constant.bootstrap1 in
+  (* Step 1: Originate the gateway_resolve_address.tz caller contract.
+     Initial storage = Some (Pair 1 "sentinel") — a sentinel that the success
+     path would overwrite.  A preserved sentinel proves FAILWITH occurred. *)
+  let* kt1_address =
+    originate_contract
+      ~tez_client
+      ~sequencer
+      ~src:source
+      ~alias:"resolve_caller"
+      ~script_name:["mini_scenarios"; "gateway_resolve_address"]
+      ~init_storage_data:{|Some (Pair 1 "sentinel")|}
+      ()
+  in
+  (* Step 2: Call with an invalid sourceRuntime (99).
+     runtime_id_from_nat(99) raises InterpretError::FailedWith("INVALID_RUNTIME_ID", 99)
+     inside the view, which aborts the call and rolls back storage. *)
+  let invalid_runtime_id = "99" in
+  let addr = Constant.bootstrap5.public_key_hash in
+  let* () =
+    call_contract
+      ~tez_client
+      ~sequencer
+      ~src:source
+      ~dest:kt1_address
+      ~arg_data:
+        (sf {|Pair "%s" (Pair %s %s)|} addr invalid_runtime_id runtime_id_tezos)
+      ~force:true
+      ~gas_limit:1_000_000
+      ~storage_limit:1000
+      ()
+  in
+  let* () =
+    check_michelson_op_failed_with ~sequencer ~tez_client "INVALID_RUNTIME_ID"
+  in
+  (* Step 3: Storage must remain Some (Pair 1 "sentinel") — the FAILWITH rolled
+     back the call.  The sentinel being preserved proves rollback occurred. *)
+  check_contract_storage
+    ~sequencer
+    ~tez_client
+    kt1_address
+    (`O
+       [
+         ("prim", `String "Some");
+         ( "args",
+           `A
+             [
+               `O
+                 [
+                   ("prim", `String "Pair");
+                   ( "args",
+                     `A
+                       [
+                         `O [("int", `String "1")];
+                         `O [("string", `String "sentinel")];
+                       ] );
+                 ];
+             ] );
+       ])
+
+(** [originOf] via Michelson VIEW with a malformed address.
+    The kernel's [read_origin] silently returns Unknown for malformed
+    addresses, so the VIEW returns Left Unit (Unknown).  The caller
+    contract updates storage to Left Unit (no FAILWITH).
+    Initial storage is Left Unit, and it remains Left Unit after the call. *)
+let test_michelson_origin_of_malformed_address () =
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~kernel:Latest
+    ~uses_client:true
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+    ~title:
+      "Michelson VIEW originOf: malformed address → Left Unit (Unknown, no \
+       FAILWITH)"
+    ~tags:
+      (["tezosx"; "address_translation"]
+      @ runtime_tags [Tezos]
+      @ ["origin_of"; "malformed"; "michelson"; "view"])
+  @@ fun sequencer ->
+  let* tez_client = tezlink_client sequencer in
+  let source = Constant.bootstrap1 in
+  (* Step 1: Originate the gateway_origin_of.tz caller contract with a
+     distinct, NON-Unknown initial storage [Right (Left 1)] (Native,
+     home=Ethereum). The contract overwrites storage with the VIEW result,
+     and FAILWITHs if the VIEW returns None — so starting from a value other
+     than [Left Unit] is what lets Step 3 distinguish "VIEW returned
+     Some (Left Unit)" from "VIEW returned None / call failed" (which would
+     leave [Right (Left 1)] in place). *)
+  let* kt1_address =
+    originate_contract
+      ~tez_client
+      ~sequencer
+      ~src:source
+      ~alias:"malformed_caller"
+      ~script_name:["mini_scenarios"; "gateway_origin_of"]
+      ~init_storage_data:"Right (Left 1)"
+      ()
+  in
+  (* Step 2: Call with a malformed address and sourceRuntime=Tezos.
+     TezosRuntime::read_origin returns Unknown silently (no error, no charge).
+     The VIEW therefore returns Some (Left Unit), not None, so the caller
+     does not FAILWITH and overwrites its storage with Left Unit. *)
+  let* () =
+    call_contract
+      ~tez_client
+      ~sequencer
+      ~src:source
+      ~dest:kt1_address
+      ~arg_data:(sf {|Pair "%s" %s|} "not_a_valid_address" runtime_id_tezos)
+      ()
+  in
+  (* Step 3: Storage must have changed from Right (Left 1) to Left Unit —
+     proving the malformed address was classified Unknown and returned via
+     the VIEW (not a None/FAILWITH, which would have preserved Right (Left 1)). *)
+  check_contract_storage
+    ~sequencer
+    ~tez_client
+    kt1_address
+    (`O [("prim", `String "Left"); ("args", `A [`O [("prim", `String "Unit")]])])
+
 (* ── Registration ─────────────────────────────────────────────────────── *)
 
 let () =
@@ -1569,4 +1854,7 @@ let () =
   test_michelson_resolve_address_same_source_ethereum () ;
   test_michelson_resolve_address_cross_source_ethereum () ;
   test_michelson_origin_of_alias_after_crac () ;
-  test_michelson_resolve_address_recorded_after_crac ()
+  test_michelson_resolve_address_recorded_after_crac () ;
+  test_michelson_origin_of_invalid_runtime_id () ;
+  test_michelson_resolve_address_invalid_runtime_id () ;
+  test_michelson_origin_of_malformed_address ()
