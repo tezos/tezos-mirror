@@ -245,6 +245,25 @@ type aud = Aud_string of string | Aud_list of string list
     the GitLab YAML keyword reference for more information. *)
 type id_tokens = (string * aud) list
 
+(** Represents the [environment:action] field of a job.
+
+    [Access] is the relevant value for jobs that only need to read
+    variables scoped to an environment without triggering a deployment.
+
+    See {{:https://docs.gitlab.com/ee/ci/yaml/#environmentaction}environment:action}
+    in the GitLab YAML keyword reference for more information. *)
+type environment_action = Prepare | Start | Stop | Verify | Access
+
+(** Represents an [environment:] field of a job.
+
+    Setting [environment.name] on a job binds it to a GitLab environment.
+    Combined with environment-scoped CI/CD variables in GitLab settings,
+    this restricts which jobs can read sensitive variables.
+
+    See {{:https://docs.gitlab.com/ee/ci/yaml/#environment}environment} in
+    the GitLab YAML keyword reference for more information. *)
+type environment = {name : string; action : environment_action option}
+
 type job = {
   name : string;
       (** Note that [name] does not translate to a field in a job, but
@@ -279,6 +298,7 @@ type job = {
           ({{:https://docs.gitlab.com/ee/ci/yaml/artifacts_reports.html#artifactsreportscoverage_report}ref}). *)
   retry : retry option;
   parallel : parallel option;
+  environment : environment option;
 }
 
 (** Represents a trigger rule.

@@ -276,6 +276,19 @@ let enc_parallel (parallel : parallel) : value =
       in
       `O [("matrix", matrix)]
 
+let enc_environment_action : environment_action -> value = function
+  | Prepare -> `String "prepare"
+  | Start -> `String "start"
+  | Stop -> `String "stop"
+  | Verify -> `String "verify"
+  | Access -> `String "access"
+
+let enc_environment : environment -> value = function
+  | {name; action = None} -> `String name
+  | {name; action = Some a} ->
+      obj_flatten
+        [key "name" string name; key "action" enc_environment_action a]
+
 let enc_job : job -> value =
  fun {
        name = _;
@@ -300,6 +313,7 @@ let enc_job : job -> value =
        coverage;
        retry;
        parallel;
+       environment;
      } ->
   obj_flatten
     [
@@ -318,6 +332,7 @@ let enc_job : job -> value =
       opt "after_script" strings after_script;
       opt "services" enc_services services;
       opt "variables" enc_variables variables;
+      opt "environment" enc_environment environment;
       opt "artifacts" enc_artifacts artifacts;
       opt "id_tokens" enc_id_tokens id_tokens;
       opt "when" enc_when_job when_;
