@@ -217,10 +217,6 @@ pub(crate) const RUNTIME_GATEWAY_BASE_COST: u64 = 5_000;
 // (ABI decode, `to_vec()` clones, HeaderMap inserts).
 pub(crate) const RUNTIME_GATEWAY_PER_WORD_COST: u64 = 3;
 
-// Alias lookup: charged upfront before each alias resolution (durable
-// storage read). Equivalent to a cold SLOAD (EIP-2929).
-pub(crate) const ALIAS_LOOKUP_COST: u64 = 2_100;
-
 // Surcharge when msg.value > 0 (precompile balance burn after cross-runtime
 // value transfer). Equivalent to SSTORE non-zero to zero (EIP-2929 + YP).
 pub(crate) const VALUE_TRANSFER_SURCHARGE: u64 = 5_000;
@@ -233,13 +229,25 @@ pub(crate) const VALUE_TRANSFER_SURCHARGE: u64 = 5_000;
 pub(crate) const HEADER_VALIDATION_PER_HEADER: u64 = 100;
 
 // EVM code-presence back-stop info read — same shape as
-// ALIAS_LOOKUP_COST (cold SLOAD equivalent). `pub` because
-// EthereumRuntime in a separate crate charges it inside `read_origin`
+// `tezosx_interfaces::ALIAS_LOOKUP_COST` (cold SLOAD equivalent). `pub`
+// because EthereumRuntime in a separate crate charges it inside `read_origin`
 // on the back-stop fire path: when no `/origin` record exists, a
 // single account-info read decides whether the account exposes
 // bytecode (CREATE contract or EIP-7702 SET_CODE delegation, in
 // either case native to this runtime).
 pub const CODE_BACKSTOP_COST: u64 = 2_100;
+
+// `resolveAddress` flat base cost — ABI decode + dispatch + runtime
+// validation. 1 500 covers per-call dispatch overhead, consistent with
+// the derive_alias family of costs.
+pub(crate) const RESOLVE_ADDRESS_BASE_COST: u64 = 1_500;
+
+// `originOf` flat base cost.
+pub(crate) const ORIGIN_OF_BASE_COST: u64 = 1_500;
+
+// Per-hop cost for deriving an alias string (hashing + b58check or
+// hex encoding). 1 500 covers the hashing and encoding work per hop.
+pub(crate) const DERIVE_ALIAS_STRING_COST: u64 = 1_500;
 
 // Rationale regarding the cost:
 // Consumed gas is ~81000 for both queue execute_without_proxy entrypoints

@@ -85,6 +85,28 @@
   same and the source is a native account, the gateway now delivers
   the real native `msg.sender` (EVM) / `SENDER` (Michelson) to the
   callee instead of re-deriving an alias from the caller's address. (!21963)
+- Add two read-only view selectors to the runtime-gateway precompile
+  at `0xff…07`:
+  - `originOf(addr, sourceRuntime)` — returns a three-field tuple
+    `(uint8 kind, uint8 homeRuntime, string nativeAddress)` where
+    `kind` is `0` (Unknown), `1` (Native), or `2` (Alias). For an
+    EVM source with no `/origin` record, a code-presence check
+    acts as a back-stop: a non-empty `code_hash` is treated as `Native`.
+    This catches contracts deployed via CREATE/CREATE2 and EOAs that
+    installed a delegate via EIP-7702 SET_CODE — both definitively
+    native to the EVM runtime. Malformed addresses
+    return `Unknown` without reverting.
+  - `resolveAddress(addr, sourceRuntime, targetRuntime)` — returns
+    `(bool classified, uint8 res, string translated)`. `classified`
+    is `false` when the address is unknown or malformed.  When `true`,
+    `res` is `0` (Recorded — the inverse alias is already materialized)
+    or `1` (Derived — computed but not yet written).  A same-source
+    short-circuit path skips all storage reads when
+    `sourceRuntime == targetRuntime`. Both selectors are STATICCALL-
+    compatible: non-payable, no journal writes, no log emission.
+    Gas constants: `ORIGIN_OF_BASE_COST = 1 500`,
+    `RESOLVE_ADDRESS_BASE_COST = 1 500`, `CODE_BACKSTOP_COST = 2 100`
+    (conditional, charged only when the EVM back-stop path executes).
 
 ### Storage versions
 

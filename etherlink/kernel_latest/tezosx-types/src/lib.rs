@@ -255,6 +255,15 @@ impl RuntimeId {
     }
 }
 
+/// Cost of a single `/origin` durable-storage read. Equivalent to a cold
+/// SLOAD (EIP-2929). Charged inside `read_origin` for every storage-
+/// consulting path (skipped on malformed-addr short-circuits).
+pub const ALIAS_LOOKUP_COST: u64 = 2_100;
+
+/// Milligas equivalent of `ALIAS_LOOKUP_COST` (EVM gas × EVM_GAS_TO_MILLIGAS).
+pub const ALIAS_LOOKUP_MILLIGAS: u64 =
+    ALIAS_LOOKUP_COST * tezosx_constants::EVM_GAS_TO_MILLIGAS;
+
 /// Gas conversion utilities for cross-runtime calls.
 ///
 /// **Convention**: Both `X-Tezos-Gas-Limit` and `X-Tezos-Gas-Consumed` are

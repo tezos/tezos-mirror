@@ -31,7 +31,7 @@ use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::{
     AliasInfo, Classification, CrossRuntimeContext, Origin, Registry, RuntimeInterface,
-    TezosXRuntimeError, X_TEZOS_GAS_CONSUMED,
+    TezosXRuntimeError, ALIAS_LOOKUP_COST, X_TEZOS_GAS_CONSUMED,
 };
 use tezosx_journal::TezosXJournal;
 
@@ -816,53 +816,44 @@ impl RuntimeInterface for EthereumRuntime {
         &self,
         host: &Host,
         addr: &str,
-        gas: u64,
+        budget: u64,
     ) -> Result<(Classification, u64), TezosXRuntimeError>
     where
         Host: StorageV1,
     {
-        // Malformed address → Unknown, no charge, no extra read.
+        // Malformed → Unknown, no charge.
         let address = match Address::from_hex(addr) {
             Ok(a) => a,
-            Err(_) => return Ok((Classification::Unknown, gas)),
+            Err(_) => return Ok((Classification::Unknown, 0)),
         };
 
+        // Primary `/origin` durable read.
+        let consumed = ALIAS_LOOKUP_COST;
+        if budget < consumed {
+            return Err(TezosXRuntimeError::OutOfGas);
+        }
         let account = StorageAccount::from_address(&address)?;
         let origin = account.get_origin(host).map_err(|e| {
             TezosXRuntimeError::Custom(format!("Failed to read origin: {e}"))
         })?;
-
-        // Recorded origin short-circuits the back-stop.
         if let Some(o) = origin {
-            return Ok((Classification::from(o), gas));
+            return Ok((Classification::from(o), consumed));
         }
 
-        // No classification record — fall back to a code-presence check.
-        // Any account exposing non-empty bytecode either originated as a
-        // CREATE contract or had code installed by an EIP-7702 SET_CODE
-        // delegation; in both cases the account exists natively in this
-        // runtime even though its origin was never written explicitly.
-        // Reading the account info costs one extra cold-SLOAD-equivalent,
-        // so deduct CODE_BACKSTOP_COST before the read; return OutOfGas
-        // if the budget is insufficient.
-        //
-        // Caveat: legacy alias accounts that pre-date the explicit
-        // origin record also expose forwarder bytecode and will be
-        // misclassified as Native here. Accepted compromise — only
-        // Previewnet aliases hit this path.
-        let gas_after_backstop = gas
-            .checked_sub(CODE_BACKSTOP_COST)
-            .ok_or(TezosXRuntimeError::OutOfGas)?;
-
+        // Back-stop: additional `/info` read, conditional and charged separately.
+        let consumed = consumed + CODE_BACKSTOP_COST;
+        if budget < consumed {
+            return Err(TezosXRuntimeError::OutOfGas);
+        }
         let info = account.info_without_migration(host).map_err(|e| {
             TezosXRuntimeError::Custom(format!("Failed to read account info: {e}"))
         })?;
-
-        if matches!(info, Some(ref i) if i.code_hash != KECCAK_EMPTY) {
-            Ok((Classification::Native, gas_after_backstop))
+        let cls = if matches!(info, Some(ref i) if i.code_hash != KECCAK_EMPTY) {
+            Classification::Native
         } else {
-            Ok((Classification::Unknown, gas_after_backstop))
-        }
+            Classification::Unknown
+        };
+        Ok((cls, consumed))
     }
 
     // Need to implement this only for IDE. Not needed in compilation or tests.
@@ -2250,6 +2241,7 @@ mod tests {
         };
         use tezosx_interfaces::{
             AliasInfo, Classification, Origin, RuntimeId, RuntimeInterface,
+            ALIAS_LOOKUP_COST,
         };
 
         fn evm_addr(byte: u8) -> (Address, String) {
@@ -2278,8 +2270,8 @@ mod tests {
         }
 
         // (a) No /origin record, account has non-empty code → back-stop
-        //     fires → (Native, gas - COST). Covers both CREATE contracts
-        //     and EIP-7702 SET_CODE delegations.
+        //     fires → (Native, ALIAS_LOOKUP_COST + CODE_BACKSTOP_COST consumed).
+        //     Covers both CREATE contracts and EIP-7702 SET_CODE delegations.
         #[test]
         fn backstop_fires_on_account_with_code() {
             let mut host = MockKernelHost::default();
@@ -2289,14 +2281,14 @@ mod tests {
             set_account_with_code(&mut host, &addr);
 
             let budget = 100_000;
-            let (class, remaining) =
+            let (class, consumed) =
                 runtime.read_origin(&host, &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Native);
-            assert_eq!(remaining, budget - CODE_BACKSTOP_COST);
+            assert_eq!(consumed, ALIAS_LOOKUP_COST + CODE_BACKSTOP_COST);
         }
 
         // (b) No /origin record, account exists but has empty code →
-        //     back-stop read executed but negative → Unknown, COST charged.
+        //     back-stop read executed but negative → Unknown, both costs charged.
         //     A positive nonce (a sign-only EOA) must not be enough on its
         //     own — only code presence promotes to Native.
         #[test]
@@ -2317,13 +2309,13 @@ mod tests {
                 .unwrap();
 
             let budget = 100_000;
-            let (class, remaining) =
+            let (class, consumed) =
                 runtime.read_origin(&host, &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Unknown);
-            assert_eq!(remaining, budget - CODE_BACKSTOP_COST);
+            assert_eq!(consumed, ALIAS_LOOKUP_COST + CODE_BACKSTOP_COST);
         }
 
-        // (c) No /origin record, account does not exist → Unknown, COST deducted
+        // (c) No /origin record, account does not exist → Unknown, both costs charged
         #[test]
         fn backstop_no_account_returns_unknown() {
             let host = MockKernelHost::default();
@@ -2331,13 +2323,13 @@ mod tests {
             let (_, addr_str) = evm_addr(0xdd);
 
             let budget = 100_000;
-            let (class, remaining) =
+            let (class, consumed) =
                 runtime.read_origin(&host, &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Unknown);
-            assert_eq!(remaining, budget - CODE_BACKSTOP_COST);
+            assert_eq!(consumed, ALIAS_LOOKUP_COST + CODE_BACKSTOP_COST);
         }
 
-        // (d) Recorded /origin = Native → short-circuits back-stop → Native, no charge
+        // (d) Recorded /origin = Native → short-circuits back-stop → Native, only ALIAS_LOOKUP_COST
         #[test]
         fn recorded_native_origin_short_circuits_backstop() {
             let mut host = MockKernelHost::default();
@@ -2348,13 +2340,13 @@ mod tests {
             account.set_origin(&mut host, &Origin::Native).unwrap();
 
             let budget = 100_000;
-            let (class, remaining) =
+            let (class, consumed) =
                 runtime.read_origin(&host, &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Native);
-            assert_eq!(remaining, budget); // no CODE_BACKSTOP_COST charged
+            assert_eq!(consumed, ALIAS_LOOKUP_COST); // no CODE_BACKSTOP_COST charged
         }
 
-        // (e) Recorded /origin = Alias → short-circuits back-stop → Alias, no charge
+        // (e) Recorded /origin = Alias → short-circuits back-stop → Alias, only ALIAS_LOOKUP_COST
         #[test]
         fn recorded_alias_origin_short_circuits_backstop() {
             let mut host = MockKernelHost::default();
@@ -2370,23 +2362,23 @@ mod tests {
             account.set_origin(&mut host, &origin).unwrap();
 
             let budget = 100_000;
-            let (class, remaining) =
+            let (class, consumed) =
                 runtime.read_origin(&host, &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Alias(alias_info));
-            assert_eq!(remaining, budget); // no CODE_BACKSTOP_COST charged
+            assert_eq!(consumed, ALIAS_LOOKUP_COST); // no CODE_BACKSTOP_COST charged
         }
 
-        // (f) Malformed hex address → Unknown, no charge, no extra read
+        // (f) Malformed hex address → Unknown, no charge
         #[test]
         fn malformed_address_returns_unknown_no_charge() {
             let host = MockKernelHost::default();
             let runtime = EthereumRuntime::default();
 
             let budget = 100_000;
-            let (class, remaining) =
+            let (class, consumed) =
                 runtime.read_origin(&host, "not-hex", budget).unwrap();
             assert_eq!(class, Classification::Unknown);
-            assert_eq!(remaining, budget); // no charge
+            assert_eq!(consumed, 0); // malformed → no charge
         }
 
         // (g) Wrong-length hex address → Unknown, no charge
@@ -2396,38 +2388,38 @@ mod tests {
             let runtime = EthereumRuntime::default();
 
             let budget = 100_000;
-            let (class, remaining) = runtime
+            let (class, consumed) = runtime
                 .read_origin(&host, "0x00112233445566778899aabbccddeeff0011", budget)
                 .unwrap();
             assert_eq!(class, Classification::Unknown);
-            assert_eq!(remaining, budget); // no charge
+            assert_eq!(consumed, 0); // malformed → no charge
         }
 
-        // (h) Insufficient budget for back-stop read → OutOfGas
+        // (h) Insufficient budget for primary read → OutOfGas
         #[test]
         fn insufficient_budget_returns_out_of_gas() {
             let host = MockKernelHost::default();
             let runtime = EthereumRuntime::default();
             let (_, addr_str) = evm_addr(0x11);
 
-            // Budget below CODE_BACKSTOP_COST: no /origin record → back-stop path
-            let budget = CODE_BACKSTOP_COST - 1;
+            // Budget below ALIAS_LOOKUP_COST: fails at primary read
+            let budget = ALIAS_LOOKUP_COST - 1;
             let err = runtime.read_origin(&host, &addr_str, budget).unwrap_err();
             assert_eq!(err, tezosx_interfaces::TezosXRuntimeError::OutOfGas);
         }
 
-        // (i) Budget exactly CODE_BACKSTOP_COST → succeeds with 0 remaining
+        // (i) Budget exactly ALIAS_LOOKUP_COST + CODE_BACKSTOP_COST → succeeds, consumed == budget
         #[test]
         fn exact_budget_for_backstop_succeeds() {
             let host = MockKernelHost::default();
             let runtime = EthereumRuntime::default();
             let (_, addr_str) = evm_addr(0x22);
 
-            let budget = CODE_BACKSTOP_COST;
-            let (class, remaining) =
+            let budget = ALIAS_LOOKUP_COST + CODE_BACKSTOP_COST;
+            let (class, consumed) =
                 runtime.read_origin(&host, &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Unknown);
-            assert_eq!(remaining, 0);
+            assert_eq!(consumed, budget);
         }
     }
 

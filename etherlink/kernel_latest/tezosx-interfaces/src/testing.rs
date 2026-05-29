@@ -9,13 +9,13 @@
 //! the recurring shapes: a panicking stub, a `RuntimeNotFound` stub, and
 //! a configurable mock with call tracking.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_journal::TezosXJournal;
 
 use crate::{
-    AliasInfo, CrossRuntimeContext, Registry, RuntimeId, TezosXRuntimeError,
-    X_TEZOS_GAS_CONSUMED,
+    AliasInfo, Classification, CrossRuntimeContext, Registry, RuntimeId,
+    TezosXRuntimeError, X_TEZOS_GAS_CONSUMED,
 };
 
 /// Registry whose every method panics. Use when a test needs a
@@ -222,12 +222,12 @@ impl Registry for MockRegistry {
         _host: &Host,
         _addr_runtime: RuntimeId,
         _addr: &str,
-        gas: u64,
+        _budget: u64,
     ) -> Result<(crate::Classification, u64), TezosXRuntimeError>
     where
         Host: StorageV1,
     {
-        Ok((crate::Classification::Unknown, gas))
+        Ok((crate::Classification::Unknown, 0))
     }
 
     fn serve<Host>(
@@ -251,5 +251,144 @@ impl Registry for MockRegistry {
                 .body(body.clone())
                 .expect("override serve response must build"),
         }
+    }
+}
+
+/// Configurable success stub built on top of [`MockRegistry`].
+///
+/// Delegates `ensure_alias` and `serve` to the inner [`MockRegistry`]
+/// (so tests can still `inner.ensure_alias_calls.borrow()` if they
+/// need to inspect call history). Overrides the rest:
+/// - `read_origin` returns `classification` on the first call and
+///   `destination_classification` (falling back to `classification`)
+///   on subsequent calls. Differentiates source-side from
+///   destination-side reads in `resolveAddress`-style dispatch tests.
+/// - `compute_alias` returns `computed_alias`. If
+///   `expected_derivation_runtime` is set, asserts the caller passed
+///   that runtime — catches wrong-runtime dispatch bugs.
+/// - `address_from_string` rejects strings starting with `"not-"` or
+///   equal to `"invalid"` with `BadRequest`; everything else is
+///   accepted as UTF-8 bytes.
+pub struct StubRegistry {
+    pub inner: MockRegistry,
+    pub classification: Classification,
+    pub computed_alias: String,
+    pub destination_classification: Option<Classification>,
+    pub read_count: Cell<u32>,
+    pub expected_derivation_runtime: Option<RuntimeId>,
+}
+
+impl StubRegistry {
+    pub fn with_classification(classification: Classification) -> Self {
+        Self {
+            inner: MockRegistry::new(""),
+            classification,
+            computed_alias: String::new(),
+            destination_classification: None,
+            read_count: Cell::new(0),
+            expected_derivation_runtime: None,
+        }
+    }
+
+    pub fn with_alias_and_expected_runtime(
+        source_classification: Classification,
+        alias: &str,
+        destination_classification: Option<Classification>,
+        expected_derivation_runtime: RuntimeId,
+    ) -> Self {
+        Self {
+            inner: MockRegistry::new(""),
+            classification: source_classification,
+            computed_alias: alias.to_string(),
+            destination_classification,
+            read_count: Cell::new(0),
+            expected_derivation_runtime: Some(expected_derivation_runtime),
+        }
+    }
+}
+
+impl Registry for StubRegistry {
+    fn ensure_alias<Host>(
+        &self,
+        host: &mut Host,
+        journal: &mut TezosXJournal,
+        alias_info: AliasInfo,
+        native_public_key: Option<&[u8]>,
+        target_runtime: RuntimeId,
+        context: CrossRuntimeContext,
+        gas_remaining: u64,
+    ) -> Result<(String, u64), TezosXRuntimeError>
+    where
+        Host: StorageV1,
+    {
+        self.inner.ensure_alias(
+            host,
+            journal,
+            alias_info,
+            native_public_key,
+            target_runtime,
+            context,
+            gas_remaining,
+        )
+    }
+
+    fn compute_alias(&self, alias_info: AliasInfo) -> Result<String, TezosXRuntimeError> {
+        if let Some(expected) = self.expected_derivation_runtime {
+            assert_eq!(
+                alias_info.runtime, expected,
+                "StubRegistry::compute_alias called with wrong runtime \
+                 (got {:?}, expected {:?})",
+                alias_info.runtime, expected,
+            );
+        }
+        Ok(self.computed_alias.clone())
+    }
+
+    fn address_from_string(
+        &self,
+        address_str: &str,
+        _runtime_id: RuntimeId,
+    ) -> Result<Vec<u8>, TezosXRuntimeError> {
+        if address_str.starts_with("not-") || address_str == "invalid" {
+            Err(TezosXRuntimeError::BadRequest(format!(
+                "malformed address: {address_str}"
+            )))
+        } else {
+            Ok(address_str.as_bytes().to_vec())
+        }
+    }
+
+    fn read_origin<Host>(
+        &self,
+        _host: &Host,
+        _addr_runtime: RuntimeId,
+        _addr: &str,
+        _budget: u64,
+    ) -> Result<(Classification, u64), TezosXRuntimeError>
+    where
+        Host: StorageV1,
+    {
+        let count = self.read_count.get();
+        self.read_count.set(count + 1);
+        let classification = if count == 0 {
+            self.classification.clone()
+        } else {
+            self.destination_classification
+                .clone()
+                .unwrap_or_else(|| self.classification.clone())
+        };
+        Ok((classification, 0))
+    }
+
+    fn serve<Host>(
+        &self,
+        host: &mut Host,
+        journal: &mut TezosXJournal,
+        request: http::Request<Vec<u8>>,
+    ) -> http::Response<Vec<u8>>
+    where
+        Host: StorageV1,
+    {
+        self.inner.serve(host, journal, request)
     }
 }

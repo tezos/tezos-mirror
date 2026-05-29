@@ -836,14 +836,14 @@ mod test {
                 host: &Host,
                 addr_runtime: RuntimeId,
                 addr: &str,
-                gas: u64,
+                budget: u64,
             ) -> Result<(tezosx_interfaces::Classification, u64), TezosXRuntimeError>
             where
                 Host: StorageV1,
             {
                 match addr_runtime {
-                    RuntimeId::Tezos => self.mock_tezos.read_origin(host, addr, gas),
-                    RuntimeId::Ethereum => self.ethereum.read_origin(host, addr, gas),
+                    RuntimeId::Tezos => self.mock_tezos.read_origin(host, addr, budget),
+                    RuntimeId::Ethereum => self.ethereum.read_origin(host, addr, budget),
                 }
             }
 
@@ -999,13 +999,13 @@ mod test {
                 &self,
                 _host: &Host,
                 _addr: &str,
-                gas: u64,
+                _budget: u64,
             ) -> Result<(tezosx_interfaces::Classification, u64), TezosXRuntimeError>
             where
                 Host: StorageV1,
             {
-                // Mock: always return Unknown with gas unchanged.
-                Ok((tezosx_interfaces::Classification::Unknown, gas))
+                // Mock: always return Unknown with no consumption.
+                Ok((tezosx_interfaces::Classification::Unknown, 0))
             }
 
             fn string_from_address(

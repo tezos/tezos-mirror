@@ -11,9 +11,10 @@ pub use tezosx_types::headers;
 pub use tezosx_types::{
     gas, resolve_routing, AliasInfo, Classification, CrossRuntimeContext,
     KernelStorageError, Origin, RoutingDecision, RuntimeId, TezosXRuntimeError,
-    ERR_FORBIDDEN_TEZOS_HEADER, MAX_CRAC_DEPTH, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER,
-    X_TEZOS_CRAC_DEPTH, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT,
-    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
+    ALIAS_LOOKUP_COST, ALIAS_LOOKUP_MILLIGAS, ERR_FORBIDDEN_TEZOS_HEADER, MAX_CRAC_DEPTH,
+    X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_DEPTH, X_TEZOS_CRAC_ID,
+    X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE,
+    X_TEZOS_TIMESTAMP,
 };
 
 #[cfg(feature = "testing")]
@@ -69,18 +70,21 @@ pub trait Registry {
     /// `addr_runtime` is the dispatch key: the request is forwarded to the
     /// per-runtime impl that owns `addr`'s address format and storage layout.
     ///
-    /// `gas` is in `addr_runtime`'s native unit (EVM gas or milligas). The
-    /// remaining budget after the read is returned alongside the classification.
+    /// `budget` is in `addr_runtime`'s native unit (EVM gas or milligas).
+    /// The returned `consumed` value is what `read_origin` charged from the
+    /// budget for its internal work — the primary `/origin` lookup, plus the
+    /// EVM code-presence back-stop when it fires. `consumed ≤ budget` on the
+    /// `Ok` path; insufficient budget returns `Err(OutOfGas)`.
     ///
-    /// Callers that cross gas-unit boundaries must convert before calling and
-    /// convert back after — the pattern used by `ensure_alias`.
+    /// Callers that cross gas-unit boundaries must convert `budget` into
+    /// `addr_runtime`'s unit before calling and convert `consumed` back after.
     fn read_origin<Host>(
         &self,
         host: &Host,
         addr_runtime: RuntimeId,
         addr: &str,
-        gas: u64,
-    ) -> Result<(Classification, u64), TezosXRuntimeError>
+        budget: u64,
+    ) -> Result<(Classification, u64 /* consumed */), TezosXRuntimeError>
     where
         Host: StorageV1;
 
@@ -162,24 +166,24 @@ pub trait RuntimeInterface {
 
     /// Read the classification of `addr` in this runtime.
     ///
-    /// `gas` is in this runtime's native unit. Returns
-    /// `(Classification, gas_remaining_after)`. Malformed addresses
-    /// short-circuit to `(Unknown, gas)` — no storage read, no charge.
+    /// `budget` is in this runtime's native unit. Returns
+    /// `(Classification, consumed)`. Malformed addresses short-circuit to
+    /// `(Unknown, 0)` — no storage read, no charge.
     ///
     /// For the EVM runtime, when the storage record is absent **and** the
     /// account exposes non-empty bytecode (CREATE contract or EIP-7702
     /// SET_CODE delegation), the back-stop fires: returns `Native` and
-    /// deducts `CODE_BACKSTOP_COST` from `gas` (returns `OutOfGas` when
-    /// the budget is insufficient for that extra read).
+    /// charges `ALIAS_LOOKUP_COST + CODE_BACKSTOP_COST`. Returns `OutOfGas`
+    /// when the budget is insufficient.
     ///
     /// For the Tezos runtime, no back-stop is applied — a storage miss
-    /// returns `Unknown` without any extra charge.
+    /// returns `Unknown` after charging `ALIAS_LOOKUP_MILLIGAS`.
     fn read_origin<Host>(
         &self,
         host: &Host,
         addr: &str,
-        gas: u64,
-    ) -> Result<(Classification, u64), TezosXRuntimeError>
+        budget: u64,
+    ) -> Result<(Classification, u64 /* consumed */), TezosXRuntimeError>
     where
         Host: StorageV1;
 

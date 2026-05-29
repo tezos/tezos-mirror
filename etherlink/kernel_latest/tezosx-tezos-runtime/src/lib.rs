@@ -50,7 +50,7 @@ use tezos_tezlink::{
 };
 use tezosx_interfaces::{
     AliasInfo, Classification, CrossRuntimeContext, Origin, Registry, RuntimeId,
-    RuntimeInterface, TezosXRuntimeError, X_TEZOS_GAS_CONSUMED,
+    RuntimeInterface, TezosXRuntimeError, ALIAS_LOOKUP_MILLIGAS, X_TEZOS_GAS_CONSUMED,
 };
 use tezosx_journal::{DispatchSlotError, TezosXJournal};
 
@@ -1211,16 +1211,21 @@ impl RuntimeInterface for TezosRuntime {
         &self,
         host: &Host,
         addr: &str,
-        gas: u64,
+        budget: u64,
     ) -> Result<(Classification, u64), TezosXRuntimeError>
     where
         Host: StorageV1,
     {
-        // Malformed address → Unknown, no charge, no extra read.
+        // Malformed → Unknown, no charge.
         let contract = match Contract::from_b58check(addr) {
             Ok(c) => c,
-            Err(_) => return Ok((Classification::Unknown, gas)),
+            Err(_) => return Ok((Classification::Unknown, 0)),
         };
+
+        let consumed = ALIAS_LOOKUP_MILLIGAS;
+        if budget < consumed {
+            return Err(TezosXRuntimeError::OutOfGas);
+        }
         let address_hash = match contract {
             Contract::Implicit(pkh) => AddressHash::Implicit(pkh),
             Contract::Originated(kt1) => AddressHash::Kt1(kt1),
@@ -1228,7 +1233,7 @@ impl RuntimeInterface for TezosRuntime {
         let context =
             TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)?;
         let origin = context.read_origin_for_address(host, &address_hash)?;
-        Ok((Classification::from(origin), gas))
+        Ok((Classification::from(origin), consumed))
     }
 
     // Need to implement this only for IDE. Not needed in compilation or tests.
@@ -2226,6 +2231,7 @@ mod tests {
         use tezos_evm_runtime::runtime::MockKernelHost;
         use tezosx_interfaces::{
             AliasInfo, Classification, Origin, RuntimeId, RuntimeInterface,
+            ALIAS_LOOKUP_MILLIGAS,
         };
 
         use crate::{
@@ -2237,7 +2243,7 @@ mod tests {
             TezosRuntime::new(ChainId::default())
         }
 
-        // (a) Storage hit on implicit address (tz1) → Native, gas unchanged
+        // (a) Storage hit on implicit address (tz1) → Native, charges ALIAS_LOOKUP_MILLIGAS
         #[test]
         fn read_origin_implicit_native_returns_native() {
             use tezos_crypto_rs::public_key_hash::PublicKeyHash;
@@ -2249,12 +2255,12 @@ mod tests {
                     .unwrap();
             set_origin_for_implicit(&mut host, &pkh, &Origin::Native).unwrap();
 
-            let budget = 50_000;
-            let (class, remaining) = runtime
+            let budget = 1_000_000;
+            let (class, consumed) = runtime
                 .read_origin(&host, "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx", budget)
                 .unwrap();
             assert_eq!(class, Classification::Native);
-            assert_eq!(remaining, budget); // no charge
+            assert_eq!(consumed, ALIAS_LOOKUP_MILLIGAS);
         }
 
         // (b) Storage hit with Alias classification
@@ -2274,26 +2280,26 @@ mod tests {
             set_origin_for_implicit(&mut host, &pkh, &Origin::Alias(alias_info.clone()))
                 .unwrap();
 
-            let budget = 50_000;
-            let (class, remaining) = runtime
+            let budget = 1_000_000;
+            let (class, consumed) = runtime
                 .read_origin(&host, "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx", budget)
                 .unwrap();
             assert_eq!(class, Classification::Alias(alias_info));
-            assert_eq!(remaining, budget);
+            assert_eq!(consumed, ALIAS_LOOKUP_MILLIGAS);
         }
 
-        // (c) Storage miss → Unknown, gas unchanged (no back-stop in Tezos)
+        // (c) Storage miss → Unknown, charges ALIAS_LOOKUP_MILLIGAS (no back-stop in Tezos)
         #[test]
         fn read_origin_unrecorded_address_returns_unknown() {
             let host = MockKernelHost::default();
             let runtime = test_runtime();
 
-            let budget = 50_000;
-            let (class, remaining) = runtime
+            let budget = 1_000_000;
+            let (class, consumed) = runtime
                 .read_origin(&host, "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx", budget)
                 .unwrap();
             assert_eq!(class, Classification::Unknown);
-            assert_eq!(remaining, budget); // no back-stop charge on Tezos
+            assert_eq!(consumed, ALIAS_LOOKUP_MILLIGAS); // no back-stop on Tezos
         }
 
         // (d) Malformed address → Unknown, no charge
@@ -2302,12 +2308,12 @@ mod tests {
             let host = MockKernelHost::default();
             let runtime = test_runtime();
 
-            let budget = 50_000;
-            let (class, remaining) = runtime
+            let budget = 1_000_000;
+            let (class, consumed) = runtime
                 .read_origin(&host, "not-a-tezos-address", budget)
                 .unwrap();
             assert_eq!(class, Classification::Unknown);
-            assert_eq!(remaining, budget);
+            assert_eq!(consumed, 0); // malformed → no charge
         }
 
         // (e) KT1 address with recorded classification
@@ -2331,11 +2337,10 @@ mod tests {
             let account_path = account.path().clone();
             set_origin_at(&mut host, &account_path, &Origin::Native).unwrap();
 
-            let budget = 50_000;
-            let (class, remaining) =
-                runtime.read_origin(&host, &kt1_b58, budget).unwrap();
+            let budget = 1_000_000;
+            let (class, consumed) = runtime.read_origin(&host, &kt1_b58, budget).unwrap();
             assert_eq!(class, Classification::Native);
-            assert_eq!(remaining, budget);
+            assert_eq!(consumed, ALIAS_LOOKUP_MILLIGAS);
         }
     }
 }
