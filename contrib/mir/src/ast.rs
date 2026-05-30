@@ -70,6 +70,143 @@ pub struct Ticket<'a> {
 /// deprecated and ingored. For entrypoints, see
 /// [crate::ast::michelson_address::entrypoint].
 ///
+/// Indirection that owns a shared pair of values via `Rc<(T, T)>`, with
+/// the inner Rc held in an [`Option`] so the iterative [`Type::drop`]
+/// can extract it via [`Option::take`] without by move destructuring.
+/// Outside of that drop the option is always `Some`.
+#[derive(Debug)]
+pub struct PairBox<T> {
+    inner: Option<Rc<(T, T)>>,
+}
+
+impl<T> PairBox<T> {
+    /// Build a fresh pair box around `(l, r)`.
+    pub fn new(l: T, r: T) -> Self {
+        PairBox {
+            inner: Some(Rc::new((l, r))),
+        }
+    }
+    /// View the inner pair.
+    pub fn as_ref(&self) -> &(T, T) {
+        self.inner
+            .as_ref()
+            .expect("PairBox always Some outside iterative Drop")
+            .as_ref()
+    }
+    /// Take the Rc out, leaving `None`. Used by the iterative drop.
+    fn take(&mut self) -> Option<Rc<(T, T)>> {
+        self.inner.take()
+    }
+}
+
+impl<T: Clone> PairBox<T> {
+    /// Mutable access to the inner pair, cloning the Rc body if shared.
+    pub fn make_mut(&mut self) -> &mut (T, T) {
+        let rc = self
+            .inner
+            .as_mut()
+            .expect("PairBox always Some outside iterative Drop");
+        Rc::make_mut(rc)
+    }
+}
+
+impl<T> Clone for PairBox<T> {
+    fn clone(&self) -> Self {
+        PairBox {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+impl<T: PartialEq> PartialEq for PairBox<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_ref() == other.as_ref()
+    }
+}
+
+impl<T: Eq> Eq for PairBox<T> {}
+
+impl<T> std::ops::Deref for PairBox<T> {
+    type Target = (T, T);
+    fn deref(&self) -> &(T, T) {
+        self.as_ref()
+    }
+}
+
+/// Indirection that owns a shared single value via `Rc<T>`. Same role
+/// as [`PairBox`] but for single child variants.
+#[derive(Debug)]
+pub struct SingleBox<T> {
+    inner: Option<Rc<T>>,
+}
+
+impl<T> SingleBox<T> {
+    /// Build a fresh single box around `v`.
+    pub fn new(v: T) -> Self {
+        SingleBox {
+            inner: Some(Rc::new(v)),
+        }
+    }
+    /// Wrap an existing Rc into a SingleBox without cloning the contents.
+    pub fn from_rc(rc: Rc<T>) -> Self {
+        SingleBox { inner: Some(rc) }
+    }
+    /// View the inner value.
+    pub fn as_ref(&self) -> &T {
+        self.inner
+            .as_ref()
+            .expect("SingleBox always Some outside iterative Drop")
+            .as_ref()
+    }
+    /// Clone the inner Rc (cheap, just bumps refcount).
+    pub fn clone_rc(&self) -> Rc<T> {
+        Rc::clone(
+            self.inner
+                .as_ref()
+                .expect("SingleBox always Some outside iterative Drop"),
+        )
+    }
+    /// Take the Rc out, leaving `None`. Used by the iterative drop.
+    fn take(&mut self) -> Option<Rc<T>> {
+        self.inner.take()
+    }
+}
+
+impl<T> Clone for SingleBox<T> {
+    fn clone(&self) -> Self {
+        SingleBox {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+impl<T: PartialEq> PartialEq for SingleBox<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_ref() == other.as_ref()
+    }
+}
+
+impl<T: Eq> Eq for SingleBox<T> {}
+
+impl<T> std::ops::Deref for SingleBox<T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        self.as_ref()
+    }
+}
+
+impl<T> From<Rc<T>> for SingleBox<T> {
+    fn from(rc: Rc<T>) -> Self {
+        SingleBox { inner: Some(rc) }
+    }
+}
+
+impl<T> From<T> for SingleBox<T> {
+    fn from(v: T) -> Self {
+        SingleBox::new(v)
+    }
+}
+
 /// The names of the variants correspond to the names of Michelson types, but
 /// snake_case is converted to PascalCase.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -82,23 +219,23 @@ pub enum Type {
     String,
     Unit,
     Never,
-    Pair(Rc<(Type, Type)>),
-    Option(Rc<Type>),
-    List(Rc<Type>),
+    Pair(PairBox<Type>),
+    Option(SingleBox<Type>),
+    List(SingleBox<Type>),
     Operation,
-    Set(Rc<Type>),
-    Map(Rc<(Type, Type)>),
-    BigMap(Rc<(Type, Type)>),
-    Or(Rc<(Type, Type)>),
-    Contract(Rc<Type>),
+    Set(SingleBox<Type>),
+    Map(PairBox<Type>),
+    BigMap(PairBox<Type>),
+    Or(PairBox<Type>),
+    Contract(SingleBox<Type>),
     Address,
     ChainId,
     Bytes,
     Key,
     Signature,
     KeyHash,
-    Lambda(Rc<(Type, Type)>),
-    Ticket(Rc<Type>),
+    Lambda(PairBox<Type>),
+    Ticket(SingleBox<Type>),
     Timestamp,
     #[cfg(feature = "bls")]
     Bls12381Fr,
@@ -129,52 +266,105 @@ impl Type {
 
     /// Convenience function to construct a new [Self::Pair]. Allocates a new [Rc].
     pub fn new_pair(l: Self, r: Self) -> Self {
-        Self::Pair(Rc::new((l, r)))
+        Self::Pair(PairBox::new(l, r))
     }
 
     /// Convenience function to construct a new [Self::Option]. Allocates a new [Rc].
     pub fn new_option(x: Self) -> Self {
-        Self::Option(Rc::new(x))
+        Self::Option(SingleBox::new(x))
     }
 
     /// Convenience function to construct a new [Self::List]. Allocates a new [Rc].
     pub fn new_list(x: Self) -> Self {
-        Self::List(Rc::new(x))
+        Self::List(SingleBox::new(x))
     }
 
     /// Convenience function to construct a new [Self::Set]. Allocates a new [Rc].
     pub fn new_set(v: Self) -> Self {
-        Self::Set(Rc::new(v))
+        Self::Set(SingleBox::new(v))
     }
 
     /// Convenience function to construct a new [Self::Map]. Allocates a new [Rc].
     pub fn new_map(k: Self, v: Self) -> Self {
-        Self::Map(Rc::new((k, v)))
+        Self::Map(PairBox::new(k, v))
     }
 
     /// Convenience function to construct a new [Self::BigMap]. Allocates a new [Rc].
     pub fn new_big_map(k: Self, v: Self) -> Self {
-        Self::BigMap(Rc::new((k, v)))
+        Self::BigMap(PairBox::new(k, v))
     }
 
     /// Convenience function to construct a new [Self::Or]. Allocates a new [Rc].
     pub fn new_or(l: Self, r: Self) -> Self {
-        Self::Or(Rc::new((l, r)))
+        Self::Or(PairBox::new(l, r))
     }
 
     /// Convenience function to construct a new [Self::Contract]. Allocates a new [Rc].
     pub fn new_contract(ty: Self) -> Self {
-        Self::Contract(Rc::new(ty))
+        Self::Contract(SingleBox::new(ty))
     }
 
     /// Convenience function to construct a new [Self::Ticket]. Allocates a new [Rc].
     pub fn new_ticket(ty: Self) -> Self {
-        Self::Ticket(Rc::new(ty))
+        Self::Ticket(SingleBox::new(ty))
     }
 
     /// Convenience function to construct a new [Self::Lambda]. Allocates a new [Rc].
     pub fn new_lambda(ty1: Self, ty2: Self) -> Self {
-        Self::Lambda(Rc::new((ty1, ty2)))
+        Self::Lambda(PairBox::new(ty1, ty2))
+    }
+}
+
+/// Walk an owned tree iteratively. Used by the three manual `Drop` /
+/// drain impls below: each extracts the node's children into a heap
+/// worklist, leaving the leftover node trivial; this driver then keeps
+/// pulling from the worklist until empty so the recursion happens on
+/// the heap rather than the WASM call stack.
+fn drain_iteratively<T>(root: &mut T, mut extract: impl FnMut(&mut T, &mut Vec<T>)) {
+    let mut stack: Vec<T> = Vec::new();
+    extract(root, &mut stack);
+    while let Some(mut node) = stack.pop() {
+        extract(&mut node, &mut stack);
+    }
+}
+
+
+/// Manual `Drop` to avoid the recursive destructor that would otherwise
+/// blow the call stack on a deeply nested type. Walks an explicit
+/// worklist and uses [`Option::take`] on the wrapper's inner `Rc` so the
+/// leftover `Type` drops trivially without re entering this function.
+impl Drop for Type {
+    fn drop(&mut self) {
+        drain_iteratively(self, extract_type_children);
+    }
+}
+
+fn extract_type_children(node: &mut Type, stack: &mut Vec<Type>) {
+    match node {
+        Type::Pair(rcb)
+        | Type::Or(rcb)
+        | Type::Lambda(rcb)
+        | Type::Map(rcb)
+        | Type::BigMap(rcb) => {
+            if let Some(rc) = rcb.take() {
+                if let Ok((l, r)) = Rc::try_unwrap(rc) {
+                    stack.push(l);
+                    stack.push(r);
+                }
+            }
+        }
+        Type::Option(sb)
+        | Type::List(sb)
+        | Type::Set(sb)
+        | Type::Contract(sb)
+        | Type::Ticket(sb) => {
+            if let Some(rc) = sb.take() {
+                if let Ok(inner) = Rc::try_unwrap(rc) {
+                    stack.push(inner);
+                }
+            }
+        }
+        _ => {}
     }
 }
 
@@ -617,6 +807,133 @@ impl<'a> TypedValue<'a> {
     }
 }
 
+/// Drains nested `Rc<TypedValue>` children iteratively when dropping a
+/// potentially deep value (e.g. a comb of `Pair (Pair (... (Pair Int Int)))`),
+/// so the recursive `Rc<TypedValue>` destructor chain does not blow the
+/// WASM stack.
+///
+/// Not an `impl Drop` on [`TypedValue`] because that would forbid every
+/// by move destructure of its variants throughout the codebase. Called from
+/// [`Instruction`]'s `Drop` (for `PUSH` constants) and by callers that build
+/// deep values explicitly before drop.
+///
+/// Note: runtime-built deep values (a `PAIR`/`CONS` comb on the value stack,
+/// values popped/returned or left on the stack at interpreter teardown) are
+/// not yet drained by any production site, so they still recurse on the
+/// default destructor. Closing that gap — wiring this in at the release sites
+/// or giving `TypedValue` an iterative `Drop` — is tracked in Linear L2-1446.
+///
+/// `pub(crate)`: the sentinel `replace` it performs assumes the caller is
+/// about to drop `v`, so it must not be exposed to callers that might hold the
+/// value aliased.
+pub(crate) fn drain_deep_typed_value(v: &mut TypedValue<'_>) {
+    drain_iteratively(v, extract_tv_children);
+}
+
+fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<TypedValue<'a>>) {
+    use std::mem::{replace, take};
+    use TypedValue as TV;
+    let push_rc = |rc: Rc<TV<'a>>, stack: &mut Vec<TV<'a>>| {
+        if let Ok(v) = Rc::try_unwrap(rc) {
+            stack.push(v);
+        }
+    };
+    match node {
+        TV::Pair(l, r) => {
+            let old_l = replace(l, Rc::new(TV::Unit));
+            let old_r = replace(r, Rc::new(TV::Unit));
+            push_rc(old_l, stack);
+            push_rc(old_r, stack);
+        }
+        TV::Option(opt) => {
+            if let Some(rc) = opt.take() {
+                push_rc(rc, stack);
+            }
+        }
+        TV::Or(or) => {
+            let old = replace(or, Or::Left(Rc::new(TV::Unit)));
+            let rc = match old {
+                Or::Left(r) | Or::Right(r) => r,
+            };
+            push_rc(rc, stack);
+        }
+        TV::List(l) => {
+            for rc in take(l) {
+                push_rc(rc, stack);
+            }
+        }
+        TV::Set(s) => {
+            for rc in take(s) {
+                push_rc(rc, stack);
+            }
+        }
+        TV::Map(m) => {
+            for (k, v) in take(m) {
+                push_rc(k, stack);
+                push_rc(v, stack);
+            }
+        }
+        TV::Lambda(closure) => {
+            // Walk the `Closure::Apply` spine iteratively so the
+            // `Box<Closure>` chain (a deep `APPLY` chain) does not recurse on
+            // drop, pushing each captured `arg_val` (a possibly-deep value)
+            // onto the worklist. The final `Closure::Lambda` drops trivially:
+            // its `Type` fields and `Rc<[Instruction]>` code have their own
+            // iterative `Drop`.
+            let dummy = Closure::Lambda(Lambda::Lambda {
+                micheline_code: Micheline::Seq(&[]),
+                code: Vec::new().into(),
+            });
+            let mut cur = replace(closure, dummy);
+            while let Closure::Apply {
+                arg_val,
+                closure: inner,
+                ..
+            } = cur
+            {
+                stack.push(*arg_val);
+                cur = *inner;
+            }
+        }
+        TV::Ticket(t) => {
+            // Move the ticket payload out so it is drained via the worklist
+            // rather than recursing through the default `TypedValue` destructor.
+            stack.push(replace(&mut t.content, TV::Unit));
+        }
+        TV::Operation(info) => {
+            // Operations carry `TypedValue` payloads (transfer parameter, emit
+            // value, originated storage) that may be deep; drain them.
+            match &mut info.operation {
+                Operation::TransferTokens(tt) => stack.push(replace(&mut tt.param, TV::Unit)),
+                Operation::Emit(e) => stack.push(replace(&mut e.value, TV::Unit)),
+                Operation::CreateContract(c) => stack.push(replace(&mut c.storage, TV::Unit)),
+                Operation::SetDelegate(_) => {}
+            }
+        }
+        TV::BigMap(m) => {
+            // The in-memory keys/values (and the lazy-storage overlay diff) are
+            // owned `TypedValue`s that may be deep; drain them.
+            match &mut m.content {
+                big_map::BigMapContent::InMemory(map) => {
+                    for (k, v) in take(map) {
+                        stack.push(k);
+                        stack.push(v);
+                    }
+                }
+                big_map::BigMapContent::FromId(from_id) => {
+                    for (k, v) in take(&mut from_id.overlay) {
+                        stack.push(k);
+                        if let Some(v) = v {
+                            stack.push(v);
+                        }
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Enum representing typechecked Michelson instructions. Some instructions may
 /// be applied to different input stacks, for those cases the variant carries a
 /// enum specifying the particular version of the instruction (here called
@@ -749,6 +1066,70 @@ pub enum Instruction<'a> {
         name: String,
         return_type: Type,
     },
+}
+
+/// Manual `Drop` to avoid the recursive destructor on deeply nested
+/// instruction trees (DIP, IF, IF_*, LOOP, LOOP_LEFT, ITER, MAP, SEQ).
+/// Uses an explicit worklist; nested bodies are extracted via
+/// [`std::mem::take`] on each `Vec<Self>` field so the leftover variant
+/// drops trivially without re entering this function.
+impl<'a> Drop for Instruction<'a> {
+    fn drop(&mut self) {
+        drain_iteratively(self, extract_instr_children);
+    }
+}
+
+fn extract_instr_children<'a>(
+    node: &mut Instruction<'a>,
+    stack: &mut Vec<Instruction<'a>>,
+) {
+    use std::mem::{replace, take};
+    match node {
+        Instruction::Dip(_, body)
+        | Instruction::Loop(body)
+        | Instruction::LoopLeft(body)
+        | Instruction::Iter(_, body)
+        | Instruction::Map(_, body)
+        | Instruction::Seq(body) => {
+            for instr in take(body) {
+                stack.push(instr);
+            }
+        }
+        Instruction::If(t, f)
+        | Instruction::IfNone(t, f)
+        | Instruction::IfCons(t, f)
+        | Instruction::IfLeft(t, f) => {
+            for instr in take(t) {
+                stack.push(instr);
+            }
+            for instr in take(f) {
+                stack.push(instr);
+            }
+        }
+        Instruction::Push(rc) => {
+            // The pushed constant may be a deep value. It is a `TypedValue`,
+            // not an `Instruction`, so it cannot go on this worklist; drain it
+            // with its own iterative routine instead (when solely owned here).
+            let old = replace(rc, Rc::new(TypedValue::Unit));
+            if let Ok(mut tv) = Rc::try_unwrap(old) {
+                drain_deep_typed_value(&mut tv);
+            }
+        }
+        Instruction::Lambda(lambda) => {
+            // Push the lambda body's instructions onto the worklist so a
+            // lexically nested `LAMBDA { LAMBDA { … } }` does not recurse one
+            // frame per nesting level through the body `Rc<[Instruction]>`.
+            let code = match lambda {
+                Lambda::Lambda { code, .. } | Lambda::LambdaRec { code, .. } => code,
+            };
+            if let Some(slice) = Rc::get_mut(code) {
+                for slot in slice.iter_mut() {
+                    stack.push(replace(slot, Instruction::Drop(None)));
+                }
+            }
+        }
+        _ => {}
+    }
 }
 
 /// An untyped view, as it appears in a script
@@ -1129,5 +1510,156 @@ mod test_untypers {
         // should be triggered during traversal, not only after.
         let result = outer_list.into_micheline_optimized_legacy(&arena, &mut gas);
         assert_eq!(result, Err(OutOfGas));
+    }
+}
+
+#[cfg(test)]
+mod drop_safety {
+    //! Regression tests for the iterative `Drop`/drain on deeply nested
+    //! values. Each builds a structure deep enough to overflow a recursive
+    //! destructor and runs on a 1 MiB worker thread (the WASM kernel stack
+    //! budget); completion of the thread is the assertion.
+    use super::*;
+
+    const DEPTH: usize = 100_000;
+
+    fn on_kernel_stack(f: impl FnOnce() + Send + 'static) {
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(f)
+            .unwrap()
+            .join()
+            .expect("worker thread completes without stack overflow");
+    }
+
+    #[test]
+    fn drain_deep_lambda_apply_spine() {
+        // A deep `APPLY` chain nests `Closure::Apply { closure: Box<Closure> }`;
+        // the `Box<Closure>` spine must be drained iteratively, not recurse.
+        on_kernel_stack(|| {
+            let mut closure = Closure::Lambda(Lambda::Lambda {
+                micheline_code: Micheline::Seq(&[]),
+                code: Vec::new().into(),
+            });
+            for _ in 0..DEPTH {
+                closure = Closure::Apply {
+                    arg_ty: Type::Unit,
+                    arg_val: Box::new(TypedValue::Unit),
+                    closure: Box::new(closure),
+                };
+            }
+            let mut tv = TypedValue::Lambda(closure);
+            drain_deep_typed_value(&mut tv);
+        });
+    }
+
+    #[test]
+    fn drain_deep_ticket_content() {
+        // The ticket payload (`content: TypedValue`) must be drained, not left
+        // to recurse through the default destructor.
+        on_kernel_stack(|| {
+            let mut content = TypedValue::Unit;
+            for _ in 0..DEPTH {
+                content = TypedValue::new_pair(TypedValue::Unit, content);
+            }
+            let ticket = Ticket {
+                ticketer: AddressHash::from_base58_check(
+                    "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye",
+                )
+                .unwrap(),
+                content_type: Type::Unit,
+                content,
+                amount: 1u32.into(),
+            };
+            let mut tv = TypedValue::new_ticket(ticket);
+            drain_deep_typed_value(&mut tv);
+        });
+    }
+
+    #[test]
+    fn drop_deep_push_constant() {
+        // Dropping `PUSH <deep constant>` must drain the pushed value rather
+        // than recurse through its `Rc<TypedValue>` spine.
+        on_kernel_stack(|| {
+            let mut content = TypedValue::Unit;
+            for _ in 0..DEPTH {
+                content = TypedValue::new_pair(TypedValue::Unit, content);
+            }
+            let instr = Instruction::Push(Rc::new(content));
+            drop(instr);
+        });
+    }
+
+    #[test]
+    fn drop_deeply_nested_lambda_instruction() {
+        // A lexically nested `LAMBDA { LAMBDA { … } }` must drain its body
+        // instructions onto the worklist, not recurse one frame per level.
+        on_kernel_stack(|| {
+            let mut instr = Instruction::Drop(None);
+            for _ in 0..DEPTH {
+                instr = Instruction::Lambda(Lambda::Lambda {
+                    micheline_code: Micheline::Seq(&[]),
+                    code: vec![instr].into(),
+                });
+            }
+            drop(instr);
+        });
+    }
+
+    #[test]
+    fn drop_shared_deeply_nested_lambda_instruction() {
+        // The common runtime case: the lambda body `Rc` is shared (AST
+        // instruction + a pushed lambda value hold the same code). The first
+        // owner to drop hits `Rc::get_mut` == None and skips draining; the
+        // *last* owner finds each body sole-owned and drains it iteratively.
+        // Neither drop may overflow.
+        on_kernel_stack(|| {
+            let mut instr = Instruction::Drop(None);
+            for _ in 0..DEPTH {
+                instr = Instruction::Lambda(Lambda::Lambda {
+                    micheline_code: Micheline::Seq(&[]),
+                    code: vec![instr].into(),
+                });
+            }
+            let shared = instr.clone(); // top code Rc now refcount 2
+            drop(instr); // get_mut == None at the shared level: skipped
+            drop(shared); // last owner: drains iteratively
+        });
+    }
+
+    fn deep_pair(depth: usize) -> TypedValue<'static> {
+        let mut v = TypedValue::Unit;
+        for _ in 0..depth {
+            v = TypedValue::new_pair(TypedValue::Unit, v);
+        }
+        v
+    }
+
+    #[test]
+    fn drain_deep_operation_value() {
+        // An operation carries a `TypedValue` payload (here an EMIT value) that
+        // may be deep; it must be drained, not recurse on the default destructor.
+        on_kernel_stack(|| {
+            let mut tv = TypedValue::Operation(Box::new(OperationInfo {
+                operation: Operation::Emit(Emit {
+                    tag: None,
+                    value: deep_pair(DEPTH),
+                    arg_ty: Or::Left(Type::Unit),
+                }),
+                counter: 0,
+            }));
+            drain_deep_typed_value(&mut tv);
+        });
+    }
+
+    #[test]
+    fn drain_deep_bigmap_value() {
+        // A big_map's in-memory values are owned `TypedValue`s that may be deep.
+        on_kernel_stack(|| {
+            let mut map = std::collections::BTreeMap::new();
+            map.insert(TypedValue::Unit, deep_pair(DEPTH));
+            let mut tv = TypedValue::BigMap(BigMap::new(Type::Unit, Type::Unit, map));
+            drain_deep_typed_value(&mut tv);
+        });
     }
 }

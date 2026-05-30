@@ -353,7 +353,7 @@ where
         let code = typecheck_view(
             instrs,
             mir_ctx.gas(),
-            Type::Pair(Rc::new((input_ty, storage_ty))),
+            Type::new_pair(input_ty, storage_ty),
             output_ty,
         )
         .map_err(classify_tc_error)?;

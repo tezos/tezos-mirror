@@ -475,7 +475,7 @@ impl<'arena> MichelineContractScript<&'_ Micheline<'arena>> {
                         typecheck_view(
                             instrs,
                             gas,
-                            Type::Pair(Rc::new((input_type.clone(), storage.clone()))),
+                            Type::Pair(PairBox::new(input_type.clone(), storage.clone())),
                             output_type.clone(),
                         )?;
                     }
@@ -2002,6 +2002,13 @@ fn typecheck_instruction_step<'a, 'b>(
     // empty, returns TcError::InternalError via `?`.
     // `pop!(T::Foo)` pops the stack, expects a `T::Foo(x)`, and returns `x`;
     // a non-matching value returns TcError::InternalError via `?`.
+    //
+    // The variants use `ref` binding + `Clone::clone` rather than
+    // destructuring by move because `Type` has a manual `Drop` impl (for
+    // iterative destruction of deep types) and Rust forbids moving out
+    // of a type with `Drop`. Cloning the field is cheap for the variants
+    // we destructure: they all hold an `Rc<...>` whose clone just bumps
+    // the refcount.
     macro_rules! pop {
         () => {{
             stack
@@ -2012,7 +2019,7 @@ fn typecheck_instruction_step<'a, 'b>(
             let v = pop!();
             match v {
                 #[allow(unused_parens)]
-                $p(i) => i,
+                $p(ref i) => Clone::clone(i),
                 _ => {
                     return Err(TcError::InternalError(
                         TcInvariant::TypeMismatchOnPop {
@@ -3657,9 +3664,9 @@ fn get_nth_field_ref(mut m: u16, mut ty: &mut Type) -> Result<&mut Type, Type> {
     Ok(loop {
         match (m, ty) {
             (0, ty_) => break ty_,
-            (1, Type::Pair(p)) => break &mut Rc::make_mut(p).0,
+            (1, Type::Pair(p)) => break &mut p.make_mut().0,
             (_, Type::Pair(p)) => {
-                ty = &mut Rc::make_mut(p).1;
+                ty = &mut p.make_mut().1;
                 m -= 2;
             }
             (_, ty) => {
@@ -4472,7 +4479,7 @@ fn visit_value<'a, 'b>(
         }
         (T::Contract(ty), addr) => {
             frames.push(TvFrame::BuildContract {
-                contract_ty: ty.clone(),
+                contract_ty: ty.clone_rc(),
             });
             frames.push(TvFrame::Visit {
                 v: addr,
@@ -4587,7 +4594,7 @@ fn visit_value<'a, 'b>(
             ensure_ty_eq(ctx.gas(), content_type, &parsed_bis)?;
             // BuildTicketExplicit pops 3 in LIFO order: amount, content, ticketer.
             frames.push(TvFrame::BuildTicketExplicit {
-                content_type: content_type.clone(),
+                content_type: content_type.clone_rc(),
             });
             frames.push(TvFrame::Visit {
                 v: amount,
@@ -4825,12 +4832,11 @@ mod typecheck_tests {
     use Instruction::*;
     use Option::None;
 
-    /// Parses a 100k deep right leaning `pair` type without overflowing
-    /// the Rust call stack. Currently ignored: the parser completes, but
-    /// the resulting `Type` overflows on its own recursive Drop, which a
-    /// follow up commit converts to an iterative Drop.
+    /// Parses a 100k deep right leaning `pair` type without overflowing the
+    /// Rust call stack, then drops it at end of scope -- exercising the
+    /// iterative `Drop for Type` this MR adds. Both the parse and the drop
+    /// would overflow at this depth with a recursive implementation.
     #[test]
-    #[ignore]
     fn deeply_nested_pair_parses() {
         const DEPTH: usize = 100_000;
         let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
@@ -4842,15 +4848,16 @@ mod typecheck_tests {
         }
         let mut gas = Gas::new(u32::MAX);
         let parsed = parse_ty(&mut gas, &current).expect("deep pair parses");
-        assert!(matches!(parsed, Type::Pair(_)));
+        assert!(matches!(parsed, Type::Pair(_)), "expected outer Type::Pair");
+        // `parsed` (a 100k-deep Type) drops here through the iterative
+        // `Drop for Type`; a recursive destructor would overflow.
     }
 
-    /// Typechecks a 100k deep nested IF, demonstrating that the iterative
-    /// instruction typechecker driver no longer blows the Rust call stack.
-    /// Ignored: the resulting `Instruction` tree overflows on its own
-    /// recursive Drop (follow up).
+    /// Typechecks a 100k deep nested IF, demonstrating that both the
+    /// iterative instruction typechecker driver and the iterative `Drop`
+    /// on `Instruction` allow the resulting tree to be built and freed
+    /// without overflowing the Rust call stack.
     #[test]
-    #[ignore]
     fn deeply_nested_if_typechecks() {
         const DEPTH: usize = 100_000;
         // Build: IF { PUSH bool True ; IF { PUSH bool True ; IF { ... } { } } { } } { }
@@ -4893,18 +4900,17 @@ mod typecheck_tests {
         let program = arena.alloc_extend([push_true, root_if]);
         let mut gas = Gas::new(u32::MAX);
         let mut stack = tc_stk![];
-        let result = typecheck(program, &mut gas, None, &mut stack, false)
+        let _result = typecheck(program, &mut gas, None, &mut stack, false)
             .expect("deep IF typechecks");
-        // Avoid the recursive Drop on the deep Instruction tree.
-        std::mem::forget(result);
-        std::mem::forget(stack);
     }
 
     /// Typechecks a 100k deep right leaning pair value at the matching
-    /// pair type. Ignored for the same reason as the parse test: the
-    /// resulting `Type`/`TypedValue` tree overflows on Drop.
+    /// pair type. `TypedValue` does not implement `Drop` itself (that would
+    /// forbid by move destructuring of its variants); instead the test
+    /// flattens the resulting value with `drain_deep_typed_value` before it
+    /// is dropped, which is the same draining routine deep value producers
+    /// would call in production code paths.
     #[test]
-    #[ignore]
     fn deeply_nested_pair_value_typechecks() {
         const DEPTH: usize = 100_000;
         let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
@@ -4928,10 +4934,9 @@ mod typecheck_tests {
         }
         let mut ctx = Ctx::default();
         ctx.gas = Gas::new(u32::MAX);
-        let _ = typecheck_value(&v_node, &mut ctx, &parsed_ty)
+        let mut tv = typecheck_value(&v_node, &mut ctx, &parsed_ty)
             .expect("deep pair value typechecks");
-        // The resulting Type and TypedValue overflow on their own Drop;
-        // covered by a follow up that converts those to iterative.
+        crate::ast::drain_deep_typed_value(&mut tv);
     }
 
     /// hack to simplify syntax in tests
@@ -8289,7 +8294,7 @@ mod typecheck_tests {
             ),
             Err(TcError::InvalidEltForMap(
                 "Int(8)".into(),
-                Type::BigMap((Type::Int, Type::Int).into())
+                Type::BigMap(PairBox::new(Type::Int, Type::Int))
             ))
         );
 
@@ -8553,7 +8558,7 @@ mod typecheck_tests {
             .typecheck_script(&mut gas, true, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::ViewInput,
-                Type::BigMap(Rc::new((Type::String, Type::Nat)))
+                Type::BigMap(PairBox::new(Type::String, Type::Nat))
             ))
         );
     }
@@ -8572,7 +8577,7 @@ mod typecheck_tests {
             .split_script().unwrap().typecheck_script(&mut gas, true, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::ViewOutput,
-                Type::BigMap(Rc::new((Type::String, Type::Nat)))
+                Type::BigMap(PairBox::new(Type::String, Type::Nat))
             ))
         );
     }

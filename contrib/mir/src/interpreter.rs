@@ -1244,7 +1244,7 @@ fn interpret_step<'a, 'b, 'c>(
                 if let Ok(code) = crate::typechecker::typecheck_view(
                     instrs,
                     ctx.gas(),
-                    Type::Pair(Rc::new((input_type, storage_ty))),
+                    Type::Pair(PairBox::new(input_type, storage_ty)),
                     output_type,
                 ) {
                     let initial = stk![TypedValue::new_pair(input, storage)];

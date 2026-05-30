@@ -181,8 +181,8 @@ mod tests {
         let ast = ast
             .typecheck_instruction(&mut Gas::default(), None, &[parse("nat").unwrap()])
             .unwrap();
-        let mut istack = stk![TypedValue::nat(10)];
         let temp = Arena::new();
+        let mut istack = stk![TypedValue::nat(10)];
         assert!(ast
             .interpret(&mut Ctx::default(), &temp, &mut istack)
             .is_ok());
@@ -206,8 +206,8 @@ mod tests {
         let ast = ast
             .typecheck_instruction(&mut Gas::default(), None, &[parse("nat").unwrap()])
             .unwrap();
-        let mut istack = stk![TypedValue::nat(5)];
         let temp = Arena::new();
+        let mut istack = stk![TypedValue::nat(5)];
         let mut ctx = Ctx::default();
         report_gas(&mut ctx, |ctx| {
             assert!(ast.interpret(ctx, &temp, &mut istack).is_ok());
@@ -224,8 +224,8 @@ mod tests {
         let ast = ast
             .typecheck_instruction(&mut Gas::default(), None, &[parse("nat").unwrap()])
             .unwrap();
-        let mut istack = stk![TypedValue::nat(5)];
         let temp = Arena::new();
+        let mut istack = stk![TypedValue::nat(5)];
         let ctx = &mut Ctx::default();
         ctx.gas = Gas::new(1);
         assert_eq!(
@@ -240,8 +240,8 @@ mod tests {
         let ast = ast
             .typecheck_instruction(&mut Gas::default(), None, &[parse("option nat").unwrap()])
             .unwrap();
-        let mut istack = stk![TypedValue::new_option(Some(TypedValue::nat(5)))];
         let temp = Arena::new();
+        let mut istack = stk![TypedValue::new_option(Some(TypedValue::nat(5)))];
         assert!(ast
             .interpret(&mut Ctx::default(), &temp, &mut istack)
             .is_ok());

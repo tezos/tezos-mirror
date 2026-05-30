@@ -1483,7 +1483,7 @@ pub(crate) fn get_enshrined_contract_entrypoint(
                 Type::new_pair(
                     Type::String,
                     Type::new_pair(
-                        Type::List(Rc::new(Type::new_pair(Type::String, Type::String))),
+                        Type::new_list(Type::new_pair(Type::String, Type::String)),
                         Type::new_pair(
                             Type::Bytes,
                             Type::new_pair(
