@@ -12,7 +12,7 @@
       "node",
       "refutation",
       "riscv",
-      "riscv_slow_sequential",
+      "riscv_slow",
       "sc_rollup",
       "smart_rollup_node"
     ],
