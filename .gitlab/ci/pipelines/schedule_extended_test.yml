@@ -58,7 +58,7 @@ oc.docker:rust-sdk-bindings:amd64:
   variables:
     DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "false"
-    IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-05e36a5c
+    IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
   artifacts:
     reports:
       dotenv: rust_sdk_bindings_image_tag.env
@@ -1466,7 +1466,7 @@ test_sdk_rust:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 oc.compile_sources_doc_deps_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-05e36a5c
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -1487,7 +1487,7 @@ oc.compile_sources_doc_deps_debian:
     CARGO_NET_OFFLINE: "false"
 
 oc.compile_sources_doc_deps_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-05e36a5c
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-100afa6d
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -1508,7 +1508,7 @@ oc.compile_sources_doc_deps_ubuntu:
     CARGO_NET_OFFLINE: "false"
 
 oc.compile_sources_doc_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-build:trixie-master-05e36a5c
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-build:trixie-master-100afa6d
   stage: test
   tags:
   - gcp_very_high_cpu_ramfs
@@ -1538,7 +1538,7 @@ oc.compile_sources_doc_debian:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 oc.compile_sources_doc_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-build:24.04-master-05e36a5c
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-build:24.04-master-100afa6d
   stage: test
   tags:
   - gcp_very_high_cpu_ramfs

@@ -89,7 +89,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.build-data_packages:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-05e36a5c
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
   stage: build
   tags:
   - $TAGS
@@ -221,7 +221,7 @@ oc.build:static-x86_64-linux-released-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build-ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-05e36a5c
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
   stage: build
   tags:
   - $TAGS
@@ -267,7 +267,7 @@ oc.build-ubuntu:
       - gcp_arm64
 
 apt_repo_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-05e36a5c
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-100afa6d
   stage: publish
   tags:
   - gcp
@@ -300,7 +300,7 @@ apt_repo_ubuntu:
   retry: 0
 
 oc.build-debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-05e36a5c
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
   stage: build
   tags:
   - $TAGS
@@ -345,7 +345,7 @@ oc.build-debian:
       - gcp_arm64
 
 apt_repo_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-05e36a5c
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
   stage: publish
   tags:
   - gcp
