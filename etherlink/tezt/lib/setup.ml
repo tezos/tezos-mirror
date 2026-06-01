@@ -235,6 +235,16 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
        drift_monitor_ready event here is to prevent regressions on
        this. *)
     Evm_node.wait_for_drift_monitor_ready observer
+  and* () =
+    (* The prevalidator starts asynchronously and may not yet have
+       access to a usable state when the observer accepts its first
+       RPCs. Waiting on [prevalidator_is_ready] before returning the
+       observer guarantees that tests sending transactions right
+       after setup do not race on [No_worker]. Skipped in
+       [finalized_view] mode, where the observer only catches up to
+       finalized blocks and the prevalidator may never become ready. *)
+    if finalized_view then unit
+    else Evm_node.wait_for_prevalidator_is_ready observer
   in
   return observer
 
