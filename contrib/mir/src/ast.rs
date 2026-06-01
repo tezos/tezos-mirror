@@ -482,6 +482,16 @@ impl<'a> IntoMicheline<'a> for &'_ Type {
 
         impl ExactSizeIterator for LinearizePairIter<'_> {}
 
+        // Worklist-driver invariant: every `Build*` frame pops exactly the
+        // number of `results` its construction site pushed `Visit` frames
+        // for (1 for `BuildPrim1`, 2 for `BuildPrim2`, `count` for
+        // `BuildPairChain`). The `.expect`s / `results.len() - count`
+        // arithmetic below are therefore unreachable on any well-formed
+        // input — a panic here would indicate a frame-state-machine bug
+        // in the `Visit` arm above, not an attacker-triggerable PVM trap.
+        // (A typed `IntoMichelineError::Invariant(_)` variant could replace
+        // the `.expect`s; tracked as a follow-up since it widens the
+        // trait's error type across every caller.)
         enum TyImFrame<'b> {
             Visit(&'b Type),
             BuildPrim1(Prim),
@@ -659,6 +669,16 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
         use Micheline as V;
         use TypedValue as TV;
 
+        // Worklist-driver invariant: every `Build*` frame pops exactly the
+        // number of `results` its construction site pushed `Visit` frames
+        // for (per-variant pop counts are documented inline below). The
+        // `.expect`s / `results.len() - count` arithmetic in the `Build*`
+        // arms are therefore unreachable on any well-formed input — a panic
+        // here would indicate a frame-state-machine bug in the `Visit` arm
+        // above, not an attacker-triggerable PVM trap. (A typed
+        // `IntoMichelineError::Invariant(_)` variant could replace the
+        // `.expect`s; tracked as a follow-up since it widens the trait's
+        // error type across every caller.)
         enum TvImFrame<'b> {
             /// Owned input to process; produces one `Micheline` on `results`.
             Visit(TypedValue<'b>),
