@@ -1,0 +1,5 @@
+# Trailing-zero rejection applies to negative numbers too: a negative
+# multi-byte zarith terminated by a 0x00 group is non-canonical.
+code { UNPACK int } ;
+input { Stack_elt bytes 0x0500c1c08100 } ;
+output { Stack_elt (option int) None }

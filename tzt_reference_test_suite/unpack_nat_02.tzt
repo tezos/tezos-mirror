@@ -1,0 +1,4 @@
+# Non-minimal zarith for nat: 1 encoded in two bytes instead of one.
+code { UNPACK nat } ;
+input { Stack_elt bytes 0x05008100 } ;
+output { Stack_elt (option nat) None }

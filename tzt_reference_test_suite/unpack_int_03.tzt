@@ -1,0 +1,6 @@
+# Non-minimal zarith: 0 encoded in two bytes instead of one. The
+# single-byte 0x00 is the canonical encoding of zero, so the
+# trailing-zero check must fire on the continuation byte.
+code { UNPACK int } ;
+input { Stack_elt bytes 0x05008000 } ;
+output { Stack_elt (option int) None }

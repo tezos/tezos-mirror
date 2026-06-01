@@ -8131,6 +8131,45 @@ mod interpreter_tests {
         );
     }
 
+    // Non-canonical zarith encodings must be rejected for every zarith-backed
+    // type, matching Tezos L1, which returns `None` for these UNPACK inputs.
+    // `0500b9c08100` is `int 12345` with a spurious trailing 0x00 group;
+    // `05008100` is `nat 1` encoded non-minimally in two bytes.
+    #[test]
+    fn unpack_noncanonical_zarith_returns_none() {
+        let trailing_zero = || hex::decode("0500b9c08100").unwrap();
+        let non_minimal = || hex::decode("05008100").unwrap();
+        for ty in [Type::Int, Type::Nat, Type::Mutez, Type::Timestamp] {
+            let mut stack = stk![V::Bytes(trailing_zero())];
+            let ctx = &mut Ctx::default();
+            assert_eq!(interpret_one(&Unpack(ty.clone()), ctx, &mut stack), Ok(()));
+            assert_eq!(
+                stack,
+                stk![V::new_option(None)],
+                "UNPACK {ty:?} should reject trailing-zero zarith"
+            );
+
+            let mut stack = stk![V::Bytes(non_minimal())];
+            let ctx = &mut Ctx::default();
+            assert_eq!(interpret_one(&Unpack(ty.clone()), ctx, &mut stack), Ok(()));
+            assert_eq!(
+                stack,
+                stk![V::new_option(None)],
+                "UNPACK {ty:?} should reject non-minimal zarith"
+            );
+        }
+    }
+
+    // Control: the canonical encoding of `int 12345` (`0500b9c001`) still
+    // decodes successfully after the trailing-zero rejection above.
+    #[test]
+    fn unpack_canonical_zarith_succeeds() {
+        let mut stack = stk![V::Bytes(hex::decode("0500b9c001").unwrap())];
+        let ctx = &mut Ctx::default();
+        assert_eq!(interpret_one(&Unpack(Type::Int), ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::new_option(Some(V::int(12345)))]);
+    }
+
     #[test]
     fn unpack_oversized_annotation() {
         // Regression for L2-1376: UNPACK of a packed lambda

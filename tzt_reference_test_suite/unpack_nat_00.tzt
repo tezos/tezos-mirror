@@ -1,0 +1,6 @@
+# UNPACK nat on the canonical multi-byte encoding of 12345 must
+# succeed. Control case for the trailing-zero rejection in
+# unpack_nat_01..02.
+code { UNPACK nat } ;
+input { Stack_elt bytes 0x0500b9c001 } ;
+output { Stack_elt (option nat) (Some 12345) }

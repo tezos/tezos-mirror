@@ -1,0 +1,5 @@
+# Non-minimal zarith: 1 encoded in two bytes instead of one. L1
+# rejects this as Trailing_zero and UNPACK pushes None.
+code { UNPACK int } ;
+input { Stack_elt bytes 0x05008100 } ;
+output { Stack_elt (option int) None }

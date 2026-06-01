@@ -1,0 +1,6 @@
+# Non-canonical zarith: the canonical encoding of 12345 with a
+# spurious trailing 0x00 group. L1 rejects this as Trailing_zero and
+# UNPACK pushes None; MIR must match.
+code { UNPACK int } ;
+input { Stack_elt bytes 0x0500b9c08100 } ;
+output { Stack_elt (option int) None }
