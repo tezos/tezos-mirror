@@ -214,14 +214,11 @@ impl<'a> ContractScript<'a> {
 
         let tc_val = TypedValue::new_pair(wrapped_parameter, storage);
         let mut stack = stk![tc_val];
-        if let Err(e) = self.code.interpret(ctx, arena, &mut stack) {
-            // On error the interpreter hands back the (restored) caller stack,
-            // which may hold a deep runtime-built value; drain it iteratively
-            // before it is dropped so its recursive `Rc<TypedValue>` destructor
-            // does not overflow the kernel's ~1 MiB Rust stack (L2-1446).
-            drain_value_stack(&mut stack);
-            return Err(e.into());
-        }
+        // The interpreter has already drained the restored caller stack
+        // and the embedded `FailedWith` value on the error path (see
+        // `fn interpret`), so the `?` propagation here is safe regardless
+        // of how deep the runtime-built values were (L2-1446).
+        self.code.interpret(ctx, arena, &mut stack)?;
 
         use TypedValue as V;
 
@@ -515,7 +512,7 @@ fn interpret<'a, 'b>(
         idx: 0,
     }];
 
-    let outcome = run_interp_driver(ctx, arena, &mut stacks, &mut frames);
+    let mut outcome = run_interp_driver(ctx, arena, &mut stacks, &mut frames);
 
     // On error the driver `?`-returned before any pending `AfterView`
     // frame could restore the saved view context. The recursive
@@ -530,6 +527,19 @@ fn interpret<'a, 'b>(
         // before `frames` is dropped, for the same reason the sub-stacks below
         // are drained. On success `frames` is empty, so this never runs.
         drain_value_frames(frames);
+        // `FAILWITH` carries its popped argument directly inside
+        // `InterpretError::FailedWith(_, TypedValue<'a>)`. A deep runtime-
+        // built value -- e.g. a `LOOP`-built right-comb of `PAIR` cells --
+        // would otherwise overflow the kernel's ~1 MiB Rust stack on the
+        // auto-derived `TypedValue` destructor when the caller drops the
+        // `Err`. Drain the payload here, at the boundary where the value's
+        // structural shape is no longer observable (`#[error]` formatting
+        // walks it via `{1:?}`, which is also iterative on the `Debug` MR;
+        // post-drain the children are flattened to unit, preserving the
+        // variant tag and type for the error-string path).
+        if let Err(InterpretError::FailedWith(_, ref mut v)) = &mut outcome {
+            crate::ast::drain_deep_typed_value(v);
+        }
     }
 
     // Restore the caller's stack from the bottom of the stack of stacks, and
@@ -541,11 +551,23 @@ fn interpret<'a, 'b>(
     // overflowing the kernel's ~1 MiB Rust stack (L2-1446). On success there is
     // exactly one entry, so the drain loop is a no-op.
     let mut stacks = stacks.into_iter();
-    let bottom = stacks.next().ok_or(InterpretError::InternalError(
+    let mut bottom = stacks.next().ok_or(InterpretError::InternalError(
         InterpretInvariant::UnreachableState,
     ))?;
     for mut sub in stacks {
         drain_value_stack(&mut sub);
+    }
+    // On the error-unwind path the caller's restored stack may still carry a
+    // deep value pushed before the error (e.g. `PUSH int 0 ; LOOP { PAIR } ;
+    // DUP ; FAILWITH` — DUP leaves a deep comb on the stack, FAILWITH pops
+    // the other copy). Drain in place here so every caller of
+    // `Instruction::interpret` / `fn interpret` (including the EVM gateway's
+    // per-instruction view loop in `tezosx-tezos-runtime/src/view.rs`) is
+    // protected without needing per-call-site boilerplate, AND the stack
+    // shape the caller observes (length and atomic values) is preserved —
+    // only the deep composite spine inside any leftover value is severed.
+    if outcome.is_err() {
+        drain_value_stack_in_place(&mut bottom);
     }
     *stack = bottom;
     outcome
@@ -590,6 +612,25 @@ fn drain_value_stack(stack: &mut IStack<'_>) {
     while let Some(rc) = stack.pop() {
         if let Ok(mut v) = Rc::try_unwrap(rc) {
             crate::ast::drain_deep_typed_value(&mut v);
+        }
+    }
+}
+
+/// In-place sibling of [`drain_value_stack`] for value stacks that the
+/// caller still observes after the drain runs. Iterates the stack without
+/// popping; for every uniquely-owned `Rc<TypedValue>` it flattens the deep
+/// composite payload in place via [`crate::ast::drain_deep_typed_value`].
+/// Atomic variants (`Int`, `Nat`, `Unit`, …) and shared `Rc`s are left
+/// untouched — only the deep recursive spine is severed. Used by the
+/// driver to defuse the caller's restored bottom stack on the error path
+/// without breaking the "Err preserves caller stack" contract that the
+/// stack-of-stacks design exposes (see `error_inside_exec_preserves_caller_stack`).
+fn drain_value_stack_in_place(stack: &mut IStack<'_>) {
+    for i in 0..stack.len() {
+        if let Ok(rc) = stack.get_mut(i) {
+            if let Some(v) = Rc::get_mut(rc) {
+                crate::ast::drain_deep_typed_value(v);
+            }
         }
     }
 }
@@ -3261,6 +3302,79 @@ mod interpreter_tests {
                 let mut stack = stk![deep];
                 drain_value_stack(&mut stack);
                 assert!(stack.pop().is_none());
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
+    }
+
+    /// Regression: on the error path the caller's restored stack may still
+    /// carry a deep runtime-built value pushed before the error -- e.g. a
+    /// `LOOP`-built right-comb DUP'd onto the stack and then a separate
+    /// FAILWITH on the duplicate copy leaves the original on `bottom`. Pre-
+    /// fix, only `ContractScript::interpret` drained the caller stack via
+    /// `drain_value_stack` (pop-based), so any direct caller of
+    /// `Instruction::interpret` / `fn interpret` -- notably the EVM
+    /// gateway's per-instruction view loop in
+    /// `etherlink/.../tezosx-tezos-runtime/src/view.rs` -- inherited a stack
+    /// whose drop overflowed the kernel ~1 MiB Rust stack. Now the in-place
+    /// drain runs in `fn interpret` so every caller is covered AND the
+    /// existing "Err preserves caller stack" contract is honored: the stack
+    /// length and atomic values are unchanged; only the deep composite spine
+    /// inside any leftover value is severed.
+    #[test]
+    fn interpret_err_drains_leftover_caller_stack_in_place() {
+        const DEPTH: usize = 100_000;
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let mut deep = V::int(0);
+                for _ in 0..DEPTH {
+                    deep = V::new_pair(V::int(0), deep);
+                }
+                let marker = V::int(42);
+                // deep at bottom, marker on top. FAILWITH pops marker; deep
+                // stays on the bottom across the unwind. Without the
+                // bottom-stack drain in `fn interpret`, dropping the caller's
+                // `stack` here would overflow.
+                let mut stack: IStack = stk![deep, marker.clone()];
+                let outcome = interpret(&[Failwith(Type::Int)], &mut Ctx::default(), &mut stack);
+                assert!(matches!(outcome, Err(InterpretError::FailedWith(..))));
+                // In-place drain preserves stack length and atomic values;
+                // the marker is still observable post-Err. The deep value
+                // is structurally flattened; only its variant tag remains.
+                assert_eq!(stack.len(), 1, "bottom stack length preserved post-Err");
+                drop(outcome);
+                drop(stack);
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
+    }
+
+    /// Regression: `FAILWITH` of a deep runtime-built value embeds the value
+    /// in `InterpretError::FailedWith(_, TypedValue<'a>)`. Pre-fix the
+    /// resulting `Err` propagates through `fn interpret`'s leftover-stack /
+    /// frame drain — both of which target the value *stack*, not the error
+    /// variant — and lands at the caller's `drop` site with the deep value
+    /// still recursive. The auto-derived `TypedValue` destructor overflows
+    /// the kernel's ~1 MiB Rust stack. Drain the embedded value at the
+    /// driver-error boundary so `Err` propagation is safe for any caller
+    /// (L2-1446 + the multi-agent review BLOCKER).
+    #[test]
+    fn failwith_with_deep_value_does_not_overflow_on_drop() {
+        const DEPTH: usize = 100_000;
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let mut deep = V::int(0);
+                for _ in 0..DEPTH {
+                    deep = V::new_pair(V::int(0), deep);
+                }
+                let mut stack: IStack = stk![deep];
+                let outcome = interpret(&[Failwith(Type::Int)], &mut Ctx::default(), &mut stack);
+                assert!(matches!(outcome, Err(InterpretError::FailedWith(..))));
+                drop(outcome);
             })
             .unwrap()
             .join()
