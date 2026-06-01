@@ -162,6 +162,11 @@
 
 ### Internals
 
+- Reserve the `X-Tezos-Storage-Cost` CRAC response header in the
+  `X-Tezos-*` namespace. The header lets a callee convey, in mutez,
+  the storage cost it asks the caller to bill back for bytes
+  allocated during a CRAC sub-execution. (!22093)
+
 ## Version 0.6 (ae3d731879b9443f52dc14de64e3208ab256d7a0)
 
 ### EVM Runtime
