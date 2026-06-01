@@ -541,4 +541,57 @@ mod tests {
             ));
         }
     }
+
+    /// `EnshrinedViewDispatchError::InvalidDestination` carries caller-
+    /// supplied data (the destination URL the Michelson program passed)
+    /// — caller-controllable malformed input must route to
+    /// [`TezosXRuntimeError::BadRequest`] (4xx, catchable revert) so the
+    /// caller can recover. The other four `EnshrinedViewDispatchError`
+    /// variants (`AliasResolution`, `BudgetOverflow`, `DispatchSetup`,
+    /// `UnclassifiableResponse`) represent kernel-side brokenness
+    /// reachable from a MIR `VIEW staticcall_evm` and must route to
+    /// [`TezosXRuntimeError::Custom`], which the gateway maps to a 5xx
+    /// blueprint-abort. Pin every routing so a future arm reorder or
+    /// guard typo cannot silently flip them; the inline `match` over
+    /// every variant is exhaustive, so a future 6th variant fails to
+    /// compile until its expected routing is decided here.
+    #[test]
+    fn classify_interpret_error_enshrined_view_dispatch_routing() {
+        use EnshrinedViewDispatchError::*;
+        let cases = [
+            InvalidDestination {
+                destination: "not-a-url".to_owned(),
+            },
+            AliasResolution,
+            BudgetOverflow,
+            DispatchSetup,
+            UnclassifiableResponse { status: 599 },
+        ];
+        for case in cases {
+            // Exhaustive match: a future variant must add its routing
+            // decision here AND to `cases` above, or this test fails to
+            // compile.
+            let expected_is_bad_request = match &case {
+                InvalidDestination { .. } => true,
+                AliasResolution
+                | BudgetOverflow
+                | DispatchSetup
+                | UnclassifiableResponse { .. } => false,
+            };
+            let actual = classify_interpret_error(InterpretError::EnshrinedViewDispatch(
+                case.clone(),
+            ));
+            if expected_is_bad_request {
+                assert!(
+                    matches!(actual, TezosXRuntimeError::BadRequest(_)),
+                    "expected BadRequest for {case:?}, got {actual:?}",
+                );
+            } else {
+                assert!(
+                    matches!(actual, TezosXRuntimeError::Custom(_)),
+                    "expected Custom for {case:?}, got {actual:?}",
+                );
+            }
+        }
+    }
 }
