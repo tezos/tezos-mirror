@@ -276,6 +276,7 @@ pub struct StubRegistry {
     pub destination_classification: Option<Classification>,
     pub read_count: Cell<u32>,
     pub expected_derivation_runtime: Option<RuntimeId>,
+    pub expected_native_address: Option<Vec<u8>>,
 }
 
 impl StubRegistry {
@@ -287,6 +288,7 @@ impl StubRegistry {
             destination_classification: None,
             read_count: Cell::new(0),
             expected_derivation_runtime: None,
+            expected_native_address: None,
         }
     }
 
@@ -303,7 +305,13 @@ impl StubRegistry {
             destination_classification,
             read_count: Cell::new(0),
             expected_derivation_runtime: Some(expected_derivation_runtime),
+            expected_native_address: None,
         }
+    }
+
+    pub fn expecting_native_address(mut self, expected: Vec<u8>) -> Self {
+        self.expected_native_address = Some(expected);
+        self
     }
 }
 
@@ -339,6 +347,16 @@ impl Registry for StubRegistry {
                 "StubRegistry::compute_alias called with wrong runtime \
                  (got {:?}, expected {:?})",
                 alias_info.runtime, expected,
+            );
+        }
+        if let Some(expected) = self.expected_native_address.as_deref() {
+            assert_eq!(
+                alias_info.native_address.as_slice(),
+                expected,
+                "StubRegistry::compute_alias called with wrong native_address \
+                 (got {:?}, expected {:?})",
+                String::from_utf8_lossy(&alias_info.native_address),
+                String::from_utf8_lossy(expected),
             );
         }
         Ok(self.computed_alias.clone())

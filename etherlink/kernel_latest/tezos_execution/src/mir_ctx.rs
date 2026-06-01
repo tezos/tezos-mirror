@@ -433,6 +433,14 @@ impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> CtxTrait<'
                 crate::enshrined_contracts::EnshrinedContracts::TezosXGateway,
                 "staticcall_evm",
             ) => self.dispatch_staticcall_evm_view(input, return_type),
+            (
+                crate::enshrined_contracts::EnshrinedContracts::TezosXGateway,
+                "originOf",
+            ) => self.dispatch_origin_of_view(input, return_type),
+            (
+                crate::enshrined_contracts::EnshrinedContracts::TezosXGateway,
+                "resolveAddress",
+            ) => self.dispatch_resolve_address_view(input, return_type),
             _ => unreachable!(
                 "synthetic view {name:?} on {contract:?} is enumerated in \
                  enshrined_synthetic_views but has no dispatch arm in \
@@ -472,6 +480,21 @@ pub fn enshrined_synthetic_views(
                 Type::new_pair(Type::String, Type::Bytes),
                 Type::Bytes,
             ),
+            // view "originOf" (pair string nat) (or unit (or nat (pair nat string)))
+            (
+                "originOf",
+                Type::new_pair(Type::String, Type::Nat),
+                Type::new_or(
+                    Type::Unit,
+                    Type::new_or(Type::Nat, Type::new_pair(Type::Nat, Type::String)),
+                ),
+            ),
+            // view "resolveAddress" (pair string (pair nat nat)) (option (pair nat string))
+            (
+                "resolveAddress",
+                Type::new_pair(Type::String, Type::new_pair(Type::Nat, Type::Nat)),
+                Type::new_option(Type::new_pair(Type::Nat, Type::String)),
+            ),
         ],
         crate::enshrined_contracts::EnshrinedContracts::ERC20Wrapper => vec![],
     }
@@ -480,6 +503,117 @@ pub fn enshrined_synthetic_views(
 impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry>
     Ctx<'_, 'a, Host, C, R>
 {
+    /// Body of the `originOf` arm of
+    /// [`try_dispatch_enshrined_view`](CtxTrait::try_dispatch_enshrined_view).
+    ///
+    /// Input shape: `pair string nat` — `(addr_str, source_runtime_nat)`.
+    /// Return type: `or unit (or nat (pair nat string))`.
+    ///
+    /// Gas: only `Registry::read_origin`'s `consumed` is charged (alias
+    /// lookup + optional EVM code-presence back-stop) via
+    /// `classify_origin_for_view`. No flat per-call constant —
+    /// see [`crate::enshrined_contracts::charge_gateway_base_cost`].
+    ///
+    /// On an invalid `source_runtime` nat, returns
+    /// `Err(InterpretError::FailedWith(...))` with the Michelson payload
+    /// `(Pair "INVALID_RUNTIME_ID" received_nat)` — standard Michelson
+    /// FAILWITH semantics, causing the operation to revert with that value.
+    fn dispatch_origin_of_view(
+        &mut self,
+        input: &TypedValue<'a>,
+        return_type: &Type,
+    ) -> Option<Result<Option<TypedValue<'a>>, mir::interpreter::InterpretError<'a>>>
+    {
+        // Return-type guard: `or unit (or nat (pair nat string))`.
+        if !matches!(
+            return_type,
+            Type::Or(rc) if matches!(
+                rc.as_ref(),
+                (Type::Unit, Type::Or(inner))
+                    if matches!(
+                        inner.as_ref(),
+                        (Type::Nat, Type::Pair(inner2))
+                            if matches!(inner2.as_ref(), (Type::Nat, Type::String))
+                    )
+            )
+        ) {
+            return Some(Ok(None));
+        }
+        // Input shape: `pair string nat`.
+        let (addr_str, source_runtime_nat) = match input {
+            TypedValue::Pair(a, b) => match (a.as_ref(), b.as_ref()) {
+                (TypedValue::String(a), TypedValue::Nat(b)) => (a.as_str(), b),
+                _ => return Some(Ok(None)),
+            },
+            _ => return Some(Ok(None)),
+        };
+        // Distinct-field borrows.
+        let host: &Host = self.tc_ctx.host;
+        let operation_gas: &mut crate::gas::TezlinkOperationGas =
+            self.tc_ctx.operation_gas;
+        let result = crate::enshrined_contracts::dispatch_origin_of_get(
+            host,
+            operation_gas,
+            self.registry,
+            addr_str,
+            source_runtime_nat,
+        );
+        Some(result.map(Some))
+    }
+
+    /// Body of the `resolveAddress` arm of
+    /// [`try_dispatch_enshrined_view`](CtxTrait::try_dispatch_enshrined_view).
+    ///
+    /// Input shape: `pair string (pair nat nat)` —
+    /// `(addr_str, (source_runtime_nat, target_runtime_nat))`.
+    /// Return type: `option (pair nat string)`.
+    ///
+    /// Same gas model as `originOf` plus derivation overhead when the
+    /// derivation path is taken.
+    fn dispatch_resolve_address_view(
+        &mut self,
+        input: &TypedValue<'a>,
+        return_type: &Type,
+    ) -> Option<Result<Option<TypedValue<'a>>, mir::interpreter::InterpretError<'a>>>
+    {
+        // Return-type guard: `option (pair nat string)`.
+        if !matches!(
+            return_type,
+            Type::Option(inner) if matches!(
+                inner.as_ref(),
+                Type::Pair(rc) if matches!(rc.as_ref(), (Type::Nat, Type::String))
+            )
+        ) {
+            return Some(Ok(None));
+        }
+        // Input shape: `pair string (pair nat nat)`.
+        let (addr_str, source_runtime_nat, target_runtime_nat) = match input {
+            TypedValue::Pair(a, b) => match (a.as_ref(), b.as_ref()) {
+                (TypedValue::String(a), TypedValue::Pair(s, t)) => {
+                    match (s.as_ref(), t.as_ref()) {
+                        (TypedValue::Nat(s), TypedValue::Nat(t)) => (a.as_str(), s, t),
+                        _ => return Some(Ok(None)),
+                    }
+                }
+                _ => return Some(Ok(None)),
+            },
+            _ => return Some(Ok(None)),
+        };
+        // Distinct-field borrows.
+        let host: &Host = self.tc_ctx.host;
+        let operation_gas: &mut crate::gas::TezlinkOperationGas =
+            self.tc_ctx.operation_gas;
+        let result = crate::enshrined_contracts::dispatch_resolve_address_get(
+            host,
+            operation_gas,
+            self.registry,
+            addr_str,
+            source_runtime_nat,
+            target_runtime_nat,
+        );
+        Some(result.map(Some))
+    }
+
     /// Body of the `staticcall_evm` arm of
     /// [`try_dispatch_enshrined_view`](CtxTrait::try_dispatch_enshrined_view).
     /// Type-checks `return_type == bytes`, destructures the
@@ -2088,23 +2222,40 @@ pub mod tests {
         assert!(ctx.host.store_has(&path2).unwrap().is_none());
     }
 
-    /// The TezosX gateway exposes a single synthetic view today,
-    /// `staticcall_evm`, with input type `(pair string bytes)` and
-    /// return type `bytes`. This test pins the enumeration so
-    /// off-chain consumers of the synthesized `/script` get a stable
-    /// schema; any change to the enumeration must also update the
-    /// matching dispatch arm in
+    /// The TezosX gateway exposes three synthetic views today:
+    /// `staticcall_evm`, `originOf`, and `resolveAddress`. This test
+    /// pins the enumeration (names and types) so off-chain consumers
+    /// of the synthesized `/script` get a stable schema; any change to
+    /// the enumeration must also update the matching dispatch arm in
     /// [`CtxTrait::try_dispatch_enshrined_view`].
     #[test]
     fn test_gateway_synthetic_views_enumeration() {
         let views = enshrined_synthetic_views(
             crate::enshrined_contracts::EnshrinedContracts::TezosXGateway,
         );
-        assert_eq!(views.len(), 1);
-        let (name, param_ty, return_ty) = &views[0];
-        assert_eq!(*name, "staticcall_evm");
-        assert_eq!(*param_ty, Type::new_pair(Type::String, Type::Bytes));
-        assert_eq!(*return_ty, Type::Bytes);
+        assert_eq!(
+            views,
+            vec![
+                (
+                    "staticcall_evm",
+                    Type::new_pair(Type::String, Type::Bytes),
+                    Type::Bytes,
+                ),
+                (
+                    "originOf",
+                    Type::new_pair(Type::String, Type::Nat),
+                    Type::new_or(
+                        Type::Unit,
+                        Type::new_or(Type::Nat, Type::new_pair(Type::Nat, Type::String),),
+                    ),
+                ),
+                (
+                    "resolveAddress",
+                    Type::new_pair(Type::String, Type::new_pair(Type::Nat, Type::Nat)),
+                    Type::new_option(Type::new_pair(Type::Nat, Type::String)),
+                ),
+            ]
+        );
     }
 
     /// The ERC-20 wrapper has no synthetic views today; pin this so
