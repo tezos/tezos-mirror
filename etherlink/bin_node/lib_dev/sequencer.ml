@@ -6,11 +6,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type tezlink_sandbox = {
-  chain_id : int;
-  funded_addresses : Signature.V2.public_key list;
-}
-
 type sandbox_config = {
   init_from_snapshot : string option;
   network : Configuration.supported_network option;
@@ -19,7 +14,6 @@ type sandbox_config = {
   disable_da_fees : bool;
   kernel_verbosity : Events.kernel_log_level option;
   with_runtimes : (Tezosx.runtime * int option) list;
-  tezlink : tezlink_sandbox option;
   michelson_hard_gas_limit_per_block : int option;
       (** Sandbox-only override for [Tezlink_constants]'s
           [hard_gas_limit_per_block]. Plumbed into [Evm_ro_context.t] so that
@@ -172,39 +166,6 @@ let loop_sequencer multichain ?sandbox_config ~rpc_timeout
           in
           loop Misc.(now ()))
 
-let activate_tezlink ~storage_version chain_id =
-  let open Lwt_result_syntax in
-  let* () =
-    Evm_context.patch_state
-      ~key:Durable_storage_path.Feature_flags.multichain
-      ~value:""
-      ()
-  in
-  let* () =
-    Evm_context.patch_state
-      ~key:"/evm/chain_id"
-      ~value:
-        Ethereum_types.(
-          encode_u256_le (Qty Z.(of_int chain_id)) |> String.of_bytes)
-      ()
-  in
-  let* () =
-    Evm_context.patch_state
-      ~key:
-        (Durable_storage_path.Chain_configuration.chain_family
-           ~storage_version
-           (L2_types.Chain_id.of_string_exn (string_of_int chain_id)))
-      ~value:"Michelson"
-      ()
-  in
-  let* () =
-    Evm_context.patch_state
-      ~key:(Format.sprintf "%s/next_id" Durable_storage_path.tezos_big_map_root)
-      ~value:(Data_encoding.Binary.to_string_exn Data_encoding.z @@ Z.of_int 4)
-      ()
-  in
-  return_unit
-
 let main ~cctxt ?(genesis_timestamp = Misc.now ())
     ~(configuration : Configuration.t) ?kernel ?sandbox_config () =
   let open Lwt_result_syntax in
@@ -287,14 +248,8 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
   let* () =
     match sandbox_config with
     | Some
-        {
-          funded_addresses;
-          disable_da_fees;
-          kernel_verbosity;
-          with_runtimes;
-          tezlink;
-          _;
-        } ->
+        {funded_addresses; disable_da_fees; kernel_verbosity; with_runtimes; _}
+      ->
         let new_balance =
           Ethereum_types.quantity_of_z Z.(of_int 10_000 * pow (of_int 10) 18)
         in
@@ -364,67 +319,6 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
             ~value:
               Ethereum_types.(encode_u256_le (Qty Z.zero) |> String.of_bytes)
             ()
-        in
-        let* () =
-          Option.iter_es
-            (fun (tezlink : tezlink_sandbox) ->
-              let* () =
-                activate_tezlink
-                  ~storage_version:head.storage_version
-                  tezlink.chain_id
-              in
-              let bootstrap_balances =
-                Data_encoding.Binary.to_string_exn
-                  Tezos_types.Tez.encoding
-                  Tezos_types.Tez.(mul_exn one 3_800_000)
-              in
-              let* () =
-                List.iter_es
-                  (fun pk ->
-                    let contract =
-                      Tezos_types.Contract.of_implicit
-                        (Signature.V2.Public_key.hash pk)
-                    in
-                    (* Patch the balance of bootstrap accounts *)
-                    let* () =
-                      Evm_context.patch_state
-                        ~key:
-                          (Durable_storage_path.michelson_contract_balance
-                             contract)
-                        ~value:bootstrap_balances
-                        ()
-                    in
-                    let manager =
-                      Data_encoding.Binary.to_string_exn
-                        Tezos_types.Manager.encoding
-                        (Tezos_types.Manager.Public_key pk)
-                    in
-                    (* Patch the manager field of bootstrap accounts to make operations *)
-                    let* () =
-                      Evm_context.patch_state
-                        ~key:
-                          (Durable_storage_path.michelson_contract_dir contract
-                          ^ "/manager")
-                        ~value:manager
-                        ()
-                    in
-                    (* Patch the counter field of bootstrap accounts to make operations *)
-                    let* () =
-                      Evm_context.patch_state
-                        ~key:
-                          (Durable_storage_path.michelson_contract_dir contract
-                          ^ "/counter")
-                        ~value:
-                          (Data_encoding.Binary.to_string_exn
-                             Data_encoding.n
-                             Z.zero)
-                        ()
-                    in
-                    return ())
-                  tezlink.funded_addresses
-              in
-              return ())
-            tezlink
         in
         return_unit
     | None -> return_unit

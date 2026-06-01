@@ -32,7 +32,7 @@ type history_mode = Archive | Rolling of int | Full of int | Seed of int
 
 type tez_contract = {address : string; path : string; initial_storage : string}
 
-(** Configuration shared by Sequencer, Sandbox, and Tezlink_sandbox modes. *)
+(** Configuration shared by Sequencer and Sandbox modes. *)
 type sequencer_config = {
   time_between_blocks : time_between_blocks option;
   genesis_timestamp : Client.timestamp option;
@@ -99,12 +99,6 @@ type mode =
       network : string option;
       funded_addresses : string list;
       sequencer_keys : string list;
-      michelson_hard_gas_limit_per_block : int option;
-    }
-  | Tezlink_sandbox of {
-      sequencer_config : sequencer_config;
-      funded_addresses : string list;
-      verbose : bool;
       michelson_hard_gas_limit_per_block : int option;
     }
   | Rpc of mode
@@ -290,19 +284,19 @@ let mode t = t.persistent_state.mode
 
 let is_sequencer t =
   match t.persistent_state.mode with
-  | Sequencer _ | Sandbox _ | Tezlink_sandbox _ -> true
+  | Sequencer _ | Sandbox _ -> true
   | Observer _ | Rpc _ -> false
 
 let is_observer t =
   match t.persistent_state.mode with
-  | Sequencer _ | Sandbox _ | Tezlink_sandbox _ | Rpc _ -> false
+  | Sequencer _ | Sandbox _ | Rpc _ -> false
   | Observer _ -> true
 
 let initial_kernel t = t.persistent_state.initial_kernel
 
 let can_apply_blueprint t =
   match t.persistent_state.mode with
-  | Sequencer _ | Sandbox _ | Tezlink_sandbox _ | Observer _ -> true
+  | Sequencer _ | Sandbox _ | Observer _ -> true
   | Rpc _ -> false
 
 let connection_arguments ?rpc_addr ?rpc_port ?runner () =
@@ -942,7 +936,6 @@ let create ?(node_setup = make_setup ()) ~mode () =
     match mode with
     | Sequencer _ -> "sequencer_"
     | Sandbox _ -> "sandbox_"
-    | Tezlink_sandbox _ -> "tezlink_sandbox_"
     | Observer _ -> "observer_"
     | Rpc _ -> "rpc_"
   in
@@ -1047,22 +1040,6 @@ let run_args evm_node =
         @ sequencer_keys
         @ sequencer_args sequencer_config
         @ fund_args funded_addresses
-        @ Cli_arg.optional_arg
-            "michelson-hard-gas-limit-per-block"
-            string_of_int
-            michelson_hard_gas_limit_per_block
-    | Tezlink_sandbox
-        {
-          sequencer_config;
-          funded_addresses;
-          verbose;
-          michelson_hard_gas_limit_per_block;
-        } ->
-        ["run"; "tezlink"; "sandbox"]
-        @ Cli_arg.optional_arg "kernel" Fun.id initial_kernel
-        @ sequencer_args sequencer_config
-        @ fund_args funded_addresses
-        @ Cli_arg.optional_switch "verbose" verbose
         @ Cli_arg.optional_arg
             "michelson-hard-gas-limit-per-block"
             string_of_int
@@ -1339,17 +1316,6 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
             "http://dummyvalue:8932";
           ]
         @ sequencer_args sequencer_config
-    | Tezlink_sandbox {sequencer_config; verbose; _} ->
-        [
-          (* These two fields are not necessary for the sandbox mode, however,
-           the init configuration needs them. *)
-          "--sequencer-key";
-          "unencrypted:edsk3tNH5Ye6QaaRQev3eZNcXgcN6sjCJRXChYFz42L6nKfRVwuL1n";
-          "--rollup-node-endpoint";
-          "http://dummyvalue:8932";
-        ]
-        @ sequencer_args sequencer_config
-        @ Cli_arg.optional_switch "verbose" verbose
     | Observer {rollup_node_endpoint; evm_node_endpoint} ->
         ["--evm-node-endpoint"; evm_node_endpoint]
         @ (match rollup_node_endpoint with

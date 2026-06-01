@@ -61,7 +61,7 @@ type time_between_blocks =
       (** Interval at which the sequencer creates an empty block by
           default. *)
 
-(** Configuration shared by Sequencer, Sandbox, and Tezlink_sandbox modes. *)
+(** Configuration shared by Sequencer and Sandbox modes. *)
 type sequencer_config = {
   time_between_blocks : time_between_blocks option;
       (** See {!time_between_blocks}, if the value is not
@@ -99,14 +99,6 @@ type mode =
       network : string option;
       funded_addresses : string list;
       sequencer_keys : string list;
-      michelson_hard_gas_limit_per_block : int option;
-          (** Override [hard_gas_limit_per_block] in the sandbox's Michelson
-              runtime constants. None keeps the L1-aligned default (3M). *)
-    }
-  | Tezlink_sandbox of {
-      sequencer_config : sequencer_config;
-      funded_addresses : string list;
-      verbose : bool;
       michelson_hard_gas_limit_per_block : int option;
           (** Override [hard_gas_limit_per_block] in the sandbox's Michelson
               runtime constants. None keeps the L1-aligned default (3M). *)
