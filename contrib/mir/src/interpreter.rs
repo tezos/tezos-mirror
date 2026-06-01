@@ -1835,7 +1835,16 @@ fn interpret_one<'a>(
                 let o1 = pop!(V::Bytes);
                 let o2 = pop!(V::Nat);
 
-                let o2_usize = o2.to_usize().ok_or(InterpretError::Overflow)?;
+                // L1 deliberately leaves `LSR bytes` unbounded on the shift
+                // count: any count too large to address the bit width of `o1`
+                // shifts the operand out completely and yields empty bytes
+                // (see `Script_bytes.bytes_lsr` in
+                // `src/proto_alpha/lib_protocol/script_bytes.ml`). Saturating
+                // an out-of-`usize` count to `usize::MAX` produces empty bytes
+                // the same way L1 does, instead of trapping with `Overflow`:
+                // `byte_shifts` below clamps to `o1.len()`, so the result is
+                // an empty vector.
+                let o2_usize = o2.to_usize().unwrap_or(usize::MAX);
                 ctx.gas()
                     .consume(interpret_cost::lsr_bytes(&o1, &o2_usize)?)?;
 
