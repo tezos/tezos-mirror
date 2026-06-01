@@ -1272,6 +1272,12 @@ enum StepResult<'a, 'b> {
     /// the outer stack receives the lambda type at finalize time; otherwise
     /// it emits `Instruction::Lambda(...)` and the outer stack must already
     /// carry the lambda type (set at instruction-step time).
+    ///
+    /// `depth_guard` carries the `LambdaTypecheckDepthGuard` for the PUSH
+    /// path (Some) and is None for the instruction-level path. Threading it
+    /// through the worklist preserves the RAII invariant: the guard's Drop
+    /// fires whether the AfterLambda frame is consumed normally or the
+    /// `frames` Vec is torn down on the Err path.
     OpenLambda {
         body: &'b [Micheline<'a>],
         in_ty: Type,
@@ -1279,6 +1285,7 @@ enum StepResult<'a, 'b> {
         recursive: bool,
         micheline_code: Micheline<'a>,
         for_push: bool,
+        depth_guard: Option<LambdaTypecheckDepthGuard>,
     },
     /// MAP block on a List / Option / Map. The body runs on a clone of the
     /// outer stack plus `inner_ty` pushed on top (the element / pair type).
@@ -1372,10 +1379,17 @@ enum TcIFrame<'a, 'b> {
         /// finalize as `Instruction::Push(Rc::new(TypedValue::Lambda(...)))`
         /// and push the lambda type onto the (restored) outer stack. `false`
         /// for the bare `LAMBDA`/`LAMBDA_REC` instruction, where the type was
-        /// already pushed onto the outer stack at step time. Tracks
-        /// `LAMBDA_TYPECHECK_DEPTH` so its decrement on finalize matches the
-        /// increment at PUSH-step time (L1-parity for the PUSH path).
+        /// already pushed onto the outer stack at step time.
         for_push: bool,
+        /// `LambdaTypecheckDepthGuard` for the PUSH path, taken at the PUSH
+        /// step and dropped here -- either on the finalize Ok/Err path of
+        /// this match arm (the local binding falls out of scope) or on the
+        /// driver Err exit, when `frames: Vec<TcIFrame>` is torn down. Either
+        /// way the counter decrement runs exactly once per matching
+        /// increment, preserving L1 parity across `?`-propagated Errs. None
+        /// for the instruction-level LAMBDA path (it does not touch the
+        /// counter, matching pre-fix behavior).
+        depth_guard: Option<LambdaTypecheckDepthGuard>,
     },
     /// Finalize a `MAP` block. Pops the body's instructions, pops the
     /// inner-result type off the body's stack, restores the outer stack,
@@ -1597,6 +1611,7 @@ fn typecheck<'a, 'b>(
                         recursive,
                         micheline_code,
                         for_push,
+                        depth_guard,
                     } => {
                         // Save outer state.
                         let saved_self_entrypoints = cur_self_entrypoints;
@@ -1625,6 +1640,7 @@ fn typecheck<'a, 'b>(
                             saved_self_entrypoints,
                             saved_in_view,
                             for_push,
+                            depth_guard,
                         });
                         block_results.push(Vec::new());
                         frames.push(TcIFrame::NextInstr { block: body, idx: 0 });
@@ -1820,7 +1836,13 @@ fn typecheck<'a, 'b>(
                 saved_self_entrypoints,
                 saved_in_view,
                 for_push,
+                depth_guard,
             } => {
+                // Bind the guard locally so it drops on every match-arm exit
+                // (Ok finalize OR `?`-propagated Err below). Decrement is
+                // implicit via `Drop for LambdaTypecheckDepthGuard`. None for
+                // the instruction-level path is a no-op drop.
+                let _depth_guard = depth_guard;
                 let body_instrs = block_results.pop().ok_or(TcError::InternalError(
                     TcInvariant::EmptyResultStack { expected: "lambda body" },
                 ))?;
@@ -1833,12 +1855,6 @@ fn typecheck<'a, 'b>(
                 cur_self_entrypoints = saved_self_entrypoints;
                 cur_in_view = saved_in_view;
                 let code = Rc::from(body_instrs);
-                if for_push {
-                    // PUSH path: balance the LAMBDA_TYPECHECK_DEPTH increment
-                    // applied at PUSH step time. Mirrors the RAII guard's Drop
-                    // in `typecheck_value`'s Lambda arm (non-PUSH paths).
-                    LAMBDA_TYPECHECK_DEPTH.with(|d| d.set(d.get().saturating_sub(1)));
-                }
                 let lam = if recursive {
                     Lambda::LambdaRec {
                         micheline_code,
@@ -1862,8 +1878,11 @@ fn typecheck<'a, 'b>(
                     // (restored) outer stack — the regular PUSH step path
                     // does this immediately, but here it has to wait until
                     // the body has been typechecked because the outer stack
-                    // was swapped out for the body's fresh `[in_ty]`. Then
-                    // emit `Push(Lambda(...))` as the typechecked instruction.
+                    // was swapped out for the body's fresh `[in_ty]`. The
+                    // restored stack was Ok at PUSH step time (the step
+                    // handler acquires it via `access_mut(FailNotInTail)?`
+                    // before returning), so this `access_mut` cannot fail in
+                    // practice; the error code matches the step-time choice.
                     opt_stack
                         .access_mut(TcError::FailNotInTail)?
                         .push(Type::new_lambda(in_ty, out_ty));
@@ -2798,22 +2817,19 @@ fn typecheck_instruction_step<'a, 'b>(
             match (&t, v) {
                 (T::Lambda(tys), raw @ (Seq(instrs) | App(Prim::Lambda_rec, [Seq(instrs)], _))) => {
                     let (in_ty, out_ty) = tys.as_ref();
-                    // Mirror `typecheck_value`'s value-level Lambda arm: bump
-                    // the L1-parity depth counter so the PUSH path stays
-                    // within the same 10 000-deep envelope as the non-PUSH
-                    // value paths. AfterLambda decrements on finalize; an
-                    // Err propagation here means the increment is leaked,
-                    // matching the non-PUSH path's RAII Drop-on-?-skipped
-                    // semantics (`enter()` returns Err *before* the guard is
-                    // constructed, so Drop never runs).
-                    LAMBDA_TYPECHECK_DEPTH.with(|d| -> Result<(), TcError> {
-                        let cur = d.get();
-                        if cur > MAX_LAMBDA_TYPECHECK_DEPTH {
-                            return Err(TcError::TypecheckingTooManyRecursiveCalls);
-                        }
-                        d.set(cur + 1);
-                        Ok(())
-                    })?;
+                    // Mirror `typecheck_value`'s value-level Lambda arm: take
+                    // the RAII depth guard so the PUSH path stays within the
+                    // same 10 000-deep envelope as the non-PUSH value paths.
+                    // The guard is moved into `OpenLambda` and threaded into
+                    // `AfterLambda`; its Drop runs whether AfterLambda
+                    // finalizes normally, propagates `?` Err mid-finalize, or
+                    // is torn down with `frames: Vec<TcIFrame>` on the
+                    // driver's Err exit path. Without this RAII threading, a
+                    // failure inside the body (unify mismatch, ill-typed
+                    // sub-instruction, OOG) would leak the increment to
+                    // subsequent operations on the same kernel thread, mis-
+                    // tripping `TypecheckingTooManyRecursiveCalls`.
+                    let depth_guard = LambdaTypecheckDepthGuard::enter()?;
                     let recursive = matches!(raw, App(Prim::Lambda_rec, ..));
                     let micheline_code = Micheline::Seq(instrs);
                     let in_ty = in_ty.clone();
@@ -2825,6 +2841,7 @@ fn typecheck_instruction_step<'a, 'b>(
                         recursive,
                         micheline_code,
                         for_push: true,
+                        depth_guard: Option::Some(depth_guard),
                     });
                 }
                 _ => {
@@ -3355,6 +3372,7 @@ fn typecheck_instruction_step<'a, 'b>(
                 recursive: matches!(prim, LAMBDA_REC),
                 micheline_code,
                 for_push: false,
+                depth_guard: Option::None,
             });
         }
         (App(LAMBDA | LAMBDA_REC, expect_args!(3 last_seq), _), _) => unexpected_micheline!(),
@@ -10364,6 +10382,43 @@ mod typecheck_tests {
             );
             // Restore so subsequent tests aren't biased by the residual.
             d.set(0);
+        });
+    }
+
+    /// Regression: when a `PUSH (lambda T1 T2) <body>` typecheck fails after
+    /// `LAMBDA_TYPECHECK_DEPTH` was bumped at PUSH step time -- whether the
+    /// failure originates in the body (e.g. `unify_stacks` Err on the lambda
+    /// output type, or an ill-typed instruction inside the body) -- the
+    /// counter must still return to 0 by the time the outer typecheck call
+    /// returns. The kernel runs a single thread, so a leaked increment
+    /// poisons every subsequent operation on that thread and eventually
+    /// trips `TypecheckingTooManyRecursiveCalls` for legitimate input. With
+    /// the RAII guard threaded through the `AfterLambda` frame, the Drop
+    /// fires on both normal finalize and on Vec teardown on the Err path.
+    #[test]
+    fn lambda_typecheck_depth_counter_balances_on_push_lambda_body_err() {
+        // Defensive: reset thread-local in case a prior test on the same
+        // pool worker left it nonzero.
+        LAMBDA_TYPECHECK_DEPTH.with(|d| d.set(0));
+        // `PUSH (lambda unit int) { DROP ; UNIT }`: body produces Unit, the
+        // declared output is Int -> unify_stacks at AfterLambda finalize
+        // returns StacksNotEqual. Pre-fix this leaked one increment because
+        // the manual decrement at AfterLambda was reached only via the Ok
+        // path.
+        let err = crate::parser::test_helpers::parse("PUSH (lambda unit int) { DROP ; UNIT }")
+            .unwrap()
+            .typecheck_instruction(&mut Gas::default(), None, &[])
+            .unwrap_err();
+        assert!(
+            matches!(err, TcError::StacksNotEqual(..)),
+            "expected unify failure, got {err:?}",
+        );
+        LAMBDA_TYPECHECK_DEPTH.with(|d| {
+            assert_eq!(
+                d.get(),
+                0,
+                "depth counter leaked across an Err return -- subsequent operations on this kernel thread would mis-trip TypecheckingTooManyRecursiveCalls",
+            );
         });
     }
 
