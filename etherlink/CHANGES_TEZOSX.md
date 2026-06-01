@@ -121,7 +121,11 @@
   ordering — also run on iterative worklists so deep `pair`/`option`/`or`
   values can no longer overflow the kernel stack inside the cost pre-charge
   (which previously ran before any gas could gate it).
-  (!21982, !21983, !21984, !21985, !21986, !22024, !22025)
+  The value-level `PUSH (lambda T1 T2) <body>` typecheck is also routed
+  through the worklist driver, closing a sequencer DoS reachable via
+  `callMichelsonView` input bytes that overflowed the kernel's WASM stack
+  around depth ~224 — well below the L1-parity 10 000-deep typecheck guard.
+  (!21982, !21983, !21984, !21985, !21986, !22024, !22025, !22029)
 - MIR: `UNPACK string` now rejects carriage return (`0x0d`) — and any
   other byte outside L1's permitted set of newline (`0x0a`) plus
   printable ASCII (`0x20..=0x7e`) — by returning `None` instead of
