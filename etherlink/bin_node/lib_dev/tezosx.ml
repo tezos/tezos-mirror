@@ -100,6 +100,14 @@ module Tezos_runtime = struct
       | _ -> fail "list" ()
     with _ -> fail "decoding values" ()
 
+  (** [extract_field f bytes] decodes [bytes] as an [account_info] and
+      returns [f info]. Helper for [Durable_storage] resolvers that
+      only need to project a single field out of the RLP-encoded info. *)
+  let extract_field f bytes =
+    let open Result_syntax in
+    let* info = decode_account_info bytes in
+    return (f info)
+
   let encode_account_info {balance; nonce; public_key} =
     let padded_32_le_int_bytes z =
       String.of_bytes @@ Ethereum_types.encode_u256_le (Qty z)

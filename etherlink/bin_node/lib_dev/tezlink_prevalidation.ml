@@ -149,15 +149,11 @@ let () =
 (** Search for the manager info (public key, counter), and checks that it is
     valid: the public key must be already revealed, or be the reveal must be
     the first operation of the batch. *)
-let validate_manager_info ~state ~data_model ~error_clue
-    (Contents op : packed_contents) =
+let validate_manager_info ~state ~error_clue (Contents op : packed_contents) =
   let open Lwt_result_syntax in
   match op with
   | Manager_operation {source; operation; counter; _} -> (
-      let contract = Tezos_types.Contract.of_implicit source in
-      let* manager =
-        Tezlink_durable_storage.manager state ~data_model contract
-      in
+      let* manager = Tezlink_durable_storage.manager state source in
       match (manager, operation) with
       | Some (Public_key _), Reveal _ ->
           tzfail_p
@@ -420,12 +416,9 @@ let rec validate_batch ~(ctxt : batch_validation_context)
       let** ctxt = validate_operation_in_batch ~ctxt c in
       (validate_batch [@ocaml.tailcall]) ~ctxt rest
 
-let validate_first_counter ~state ~data_model ~source ~first_counter =
+let validate_first_counter ~state ~source ~first_counter =
   let open Lwt_result_syntax in
-  let* counter =
-    Tezlink_durable_storage.counter state ~data_model
-    @@ Tezos_types.Contract.of_implicit source
-  in
+  let* counter = Tezlink_durable_storage.counter state source in
   let counter = Option.value ~default:Z.zero counter in
   let*? first_counter = Tezos_types.Operation.counter_to_z first_counter in
   if Z.gt first_counter counter then
@@ -519,7 +512,7 @@ let compute_minimal_fees ~(op_raw_size : int) ~(op_gas_limit : Z.t)
   Imported_env.wrap_tzresult @@ Tezos_types.Tez.(da_fees +? execution_fees)
 
 let parse_and_validate_for_queue ~simulator_mode ~nanotez_per_michelson_gas
-    ~state ~data_model raw =
+    ~state raw =
   let open Lwt_result_syntax in
   let raw = Bytes.of_string raw in
   let op_raw_size = Bytes.length raw in
@@ -547,14 +540,15 @@ let parse_and_validate_for_queue ~simulator_mode ~nanotez_per_michelson_gas
   in
   let** () = signature_exists ~check_signature signature in
   let** pk, source, first_counter =
-    validate_manager_info ~state ~data_model ~error_clue first
+    validate_manager_info ~state ~error_clue first
   in
   let signature_check_cost = signature_cost pk op in
   let* balance_left =
-    Tezlink_durable_storage.balance state ~data_model
-    @@ Tezos_types.Contract.of_implicit source
+    Tezlink_durable_storage.balance
+      state
+      (Tezos_types.Contract.of_implicit source)
   in
-  let** () = validate_first_counter ~state ~data_model ~source ~first_counter in
+  let** () = validate_first_counter ~state ~source ~first_counter in
   let initial_context =
     {
       source;
@@ -607,9 +601,13 @@ let parse_and_validate_for_queue ~simulator_mode ~nanotez_per_michelson_gas
     in
     return (Ok operation)
 
-let init_blueprint_validation state ~data_model () =
-  let get_counter = Tezlink_durable_storage.counter state ~data_model in
-  let get_balance = Tezlink_durable_storage.balance_z state ~data_model in
+let init_blueprint_validation state () =
+  let get_counter pkh = Tezlink_durable_storage.counter state pkh in
+  let get_balance pkh =
+    Tezlink_durable_storage.balance_z
+      state
+      (Tezos_types.Contract.of_implicit pkh)
+  in
   let michelson_config = {get_balance; get_counter} in
   empty_validation_state
     ~michelson_config
@@ -631,7 +629,7 @@ let get_ read cache source =
     String.Map.find (Signature.V2.Public_key_hash.to_b58check source) cache
   with
   | Some v -> return v
-  | None -> read (Tezlink_imports.Imported_context.Contract.Implicit source)
+  | None -> read source
 
 let validate_for_blueprint state (operation : Tezos_types.Operation.t) =
   let open Lwt_result_syntax in

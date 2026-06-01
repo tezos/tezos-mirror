@@ -25,6 +25,11 @@ val michelson_contracts_index : path
     that the kernel writes under the Tezlink context root. *)
 val tezos_big_map_root : path
 
+(** [michelson_contract_dir contract] is the durable storage path of [contract]'s directory
+    under the Michelson contracts index. The directory contains all data
+    related to the contract, including balance, storage and code. *)
+val michelson_contract_dir : Tezos_types.Contract.t -> path
+
 (** [michelson_contract_storage contract] is the durable storage path of
     [contract]'s Michelson storage script
     ([/tez/tez_accounts/contracts/index/<hex>/data/storage]). *)
@@ -36,19 +41,28 @@ val michelson_contract_storage : Tezos_types.Contract.t -> path
 val michelson_contract_code : Tezos_types.Contract.t -> path
 
 (** [michelson_contract_balance contract] is the durable storage path of
-    [contract]'s balance under the Tezlink Path data model
+    [contract]'s balance under the legacy Path data model
     ([/tez/tez_accounts/contracts/index/<hex>/balance]). *)
 val michelson_contract_balance : Tezos_types.Contract.t -> path
 
-(** [michelson_contract_manager contract] is the durable storage path of
-    [contract]'s revealed-public-key manager under the Tezlink Path data
-    model ([/tez/tez_accounts/contracts/index/<hex>/manager]). *)
-val michelson_contract_manager : Tezos_types.Contract.t -> path
+(** [tezos_big_map_value id key_hash] is the durable storage path of
+    big_map [id]'s value at [key_hash]
+    ([/tez/tez_accounts/big_map/<id>/<key_hex>]). *)
+val tezos_big_map_value :
+  Tezlink_imports.Imported_context.Big_map.Id.t ->
+  Tezlink_imports.Imported_protocol.Script_expr_hash.t ->
+  path
 
-(** [michelson_contract_counter contract] is the durable storage path of
-    [contract]'s nonce under the Tezlink Path data model
-    ([/tez/tez_accounts/contracts/index/<hex>/counter]). *)
-val michelson_contract_counter : Tezos_types.Contract.t -> path
+(** [tezos_big_map_key_type id] is the durable storage path of big_map
+    [id]'s declared key type ([/tez/tez_accounts/big_map/<id>/key_type]). *)
+val tezos_big_map_key_type :
+  Tezlink_imports.Imported_context.Big_map.Id.t -> path
+
+(** [tezos_big_map_value_type id] is the durable storage path of big_map
+    [id]'s declared value type
+    ([/tez/tez_accounts/big_map/<id>/value_type]). *)
+val tezos_big_map_value_type :
+  Tezlink_imports.Imported_context.Big_map.Id.t -> path
 
 (** [/kernel/boot.wasm] — path of the kernel's WASM blob, the entry
     point [Pvm.Kernel] runs. Writable by the EVM node only for

@@ -194,7 +194,7 @@ let activate_tezlink ~storage_version chain_id =
   in
   let* () =
     Evm_context.patch_state
-      ~key:(Format.sprintf "%s/next_id" Tezlink_durable_storage.Path.big_map)
+      ~key:(Format.sprintf "%s/next_id" Durable_storage_path.tezos_big_map_root)
       ~value:(Data_encoding.Binary.to_string_exn Data_encoding.z @@ Z.of_int 4)
       ()
   in
@@ -383,7 +383,9 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
                     (* Patch the balance of bootstrap accounts *)
                     let* () =
                       Evm_context.patch_state
-                        ~key:(Tezlink_durable_storage.Path.balance contract)
+                        ~key:
+                          (Durable_storage_path.michelson_contract_balance
+                             contract)
                         ~value:bootstrap_balances
                         ()
                     in
@@ -395,14 +397,18 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
                     (* Patch the manager field of bootstrap accounts to make operations *)
                     let* () =
                       Evm_context.patch_state
-                        ~key:(Tezlink_durable_storage.Path.manager contract)
+                        ~key:
+                          (Durable_storage_path.michelson_contract_dir contract
+                          ^ "/manager")
                         ~value:manager
                         ()
                     in
                     (* Patch the counter field of bootstrap accounts to make operations *)
                     let* () =
                       Evm_context.patch_state
-                        ~key:(Tezlink_durable_storage.Path.counter contract)
+                        ~key:
+                          (Durable_storage_path.michelson_contract_dir contract
+                          ^ "/counter")
                         ~value:
                           (Data_encoding.Binary.to_string_exn
                              Data_encoding.n

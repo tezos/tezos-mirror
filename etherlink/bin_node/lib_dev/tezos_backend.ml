@@ -161,9 +161,6 @@ let make (ctxt : Evm_ro_context.t) =
       | Implicit pkh -> k pkh
       | Originated _ -> failwith "Only implicit account are supported"
 
-    let contract_path contract suffix =
-      Tezlink_durable_storage.Path.account contract ^ suffix
-
     let constants chain (_block : block_param) =
       let open Lwt_result_syntax in
       let `Main = chain in
@@ -197,29 +194,7 @@ let make (ctxt : Evm_ro_context.t) =
       let open Lwt_result_syntax in
       let* block = shell_block_param_to_eth_block_param block in
       let* state = Evm_ro_context.get_state ctxt ~block () in
-      match (contract : Tezos_types.Contract.t) with
-      | Implicit pkh -> (
-          let* info_opt =
-            Durable_storage.read_opt (Tezos_account_info pkh) state
-          in
-          match info_opt with
-          | Some info -> return info.balance
-          | None -> return Tezos_types.Tez.zero)
-      | Originated _ -> (
-          let path = contract_path contract "/balance" in
-          let* read_result = Evm_ro_context.read_state state path in
-          match read_result with
-          | Some bytes -> (
-              match
-                Data_encoding.Binary.of_bytes Tezos_types.Tez.encoding bytes
-              with
-              | Ok balance -> return balance
-              | Error e ->
-                  failwith
-                    "Cannot decode KT1 balance: %a"
-                    Data_encoding.Binary.pp_read_error
-                    e)
-          | None -> return Tezos_types.Tez.zero)
+      Tezlink_durable_storage.balance state contract
 
     let subkeys ~block p =
       let open Lwt_result_syntax in

@@ -50,6 +50,8 @@ let convert_using_serialization ~name ~dst ~src value =
 module Contract = struct
   type t = Tezlink_imports.Imported_context.Contract.t
 
+  type implicit = Signature.V2.Public_key_hash.t
+
   let encoding = Tezlink_imports.Imported_context.Contract.encoding
 
   let implicit_encoding =

@@ -52,6 +52,11 @@ module Tezos_runtime : sig
 
   val decode_account_info : bytes -> account_info tzresult
 
+  (** [extract_field f bytes] decodes [bytes] as an [account_info] and
+      returns [f info]. Helper for [Durable_storage] resolvers that only
+      need to project a single field out of the RLP-encoded info. *)
+  val extract_field : (account_info -> 'a) -> bytes -> 'a tzresult
+
   val encode_account_info : account_info -> bytes
 
   val generate_alias : string -> Tezos_types.Contract.t
