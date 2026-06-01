@@ -34,6 +34,7 @@ use tezos_execution::account_storage::{
 use tezos_execution::context::Context;
 use tezos_execution::mir_ctx::{Ctx, ExecCtx, OperationCtx, TcCtx};
 use tezos_execution::{OriginationNonce, TezlinkOperationGas};
+use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKeyHash;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::TezosXRuntimeError;
@@ -264,8 +265,12 @@ where
     // ExecCtx carries what MIR's VIEW semantics expect: self = dest,
     // sender = caller alias, amount = 0 (checked above), balance =
     // destination balance just read.
+    let sender_address = match &hdrs.sender {
+        Contract::Originated(kt1) => AddressHash::Kt1(kt1.clone()),
+        Contract::Implicit(pkh) => AddressHash::Implicit(pkh.clone()),
+    };
     let exec_ctx = ExecCtx {
-        sender: AddressHash::Kt1(hdrs.sender.clone()),
+        sender: sender_address,
         amount: 0,
         self_address: AddressHash::Kt1(destination_kt1.clone()),
         balance,
