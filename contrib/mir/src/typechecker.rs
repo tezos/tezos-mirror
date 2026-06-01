@@ -1855,34 +1855,39 @@ fn typecheck<'a, 'b>(
                 cur_self_entrypoints = saved_self_entrypoints;
                 cur_in_view = saved_in_view;
                 let code = Rc::from(body_instrs);
-                let lam = if recursive {
-                    Lambda::LambdaRec {
-                        micheline_code,
-                        code,
-                        in_ty: in_ty.clone(),
-                        out_ty: out_ty.clone(),
-                    }
-                } else {
-                    Lambda::Lambda {
-                        micheline_code,
-                        code,
-                    }
-                };
                 let parent_results = block_results.last_mut().ok_or(TcError::InternalError(
                     TcInvariant::EmptyResultStack {
                         expected: "lambda parent",
                     },
                 ))?;
                 if for_push {
-                    // PUSH-lambda value path: push the lambda type onto the
-                    // (restored) outer stack — the regular PUSH step path
-                    // does this immediately, but here it has to wait until
-                    // the body has been typechecked because the outer stack
-                    // was swapped out for the body's fresh `[in_ty]`. The
-                    // restored stack was Ok at PUSH step time (the step
-                    // handler acquires it via `access_mut(FailNotInTail)?`
-                    // before returning), so this `access_mut` cannot fail in
-                    // practice; the error code matches the step-time choice.
+                    // PUSH-lambda value path: `LambdaRec` needs owned
+                    // `in_ty`/`out_ty`, and `Type::new_lambda` below needs
+                    // them too -- so the recursive case still clones once.
+                    // `Lambda::Lambda` ignores them, leaving the originals
+                    // free to move into the stack-type push.
+                    let lam = if recursive {
+                        Lambda::LambdaRec {
+                            micheline_code,
+                            code,
+                            in_ty: in_ty.clone(),
+                            out_ty: out_ty.clone(),
+                        }
+                    } else {
+                        Lambda::Lambda {
+                            micheline_code,
+                            code,
+                        }
+                    };
+                    // Push the lambda type onto the (restored) outer stack —
+                    // the regular PUSH step path does this immediately, but
+                    // here it has to wait until the body has been typechecked
+                    // because the outer stack was swapped out for the body's
+                    // fresh `[in_ty]`. The restored stack was Ok at PUSH step
+                    // time (the step handler acquires it via
+                    // `access_mut(FailNotInTail)?` before returning), so this
+                    // `access_mut` cannot fail in practice; the error code
+                    // matches the step-time choice.
                     opt_stack
                         .access_mut(TcError::FailNotInTail)?
                         .push(Type::new_lambda(in_ty, out_ty));
@@ -1890,6 +1895,25 @@ fn typecheck<'a, 'b>(
                         Closure::Lambda(lam),
                     ))));
                 } else {
+                    // Instruction-level LAMBDA: the outer stack already
+                    // carries the lambda type (pushed at step time), so
+                    // `in_ty`/`out_ty` can move straight into `LambdaRec`
+                    // instead of being cloned. For deep types this avoids a
+                    // non-trivial walk on every nested instruction-level
+                    // `LAMBDA_REC`.
+                    let lam = if recursive {
+                        Lambda::LambdaRec {
+                            micheline_code,
+                            code,
+                            in_ty,
+                            out_ty,
+                        }
+                    } else {
+                        Lambda::Lambda {
+                            micheline_code,
+                            code,
+                        }
+                    };
                     parent_results.push(Instruction::Lambda(lam));
                 }
             }
