@@ -35,6 +35,14 @@
   (`Ok`-with-revert), not only on the `Err` arm — previously the deposit
   value could be stranded on `FEED_DEPOSIT_ADDR` while the receiver was
   uncredited. (!22017)
+- The `CracSent` event now reports the same `targetAddress` regardless
+  of the gateway surface used. The generic `call(POST)` entry previously
+  emitted the full URL path including a trailing entrypoint
+  (`<KT1>/<entrypoint>`), while the typed `callMichelson` entry emitted
+  the bare contract address (`<KT1>`); both now report the contract
+  address, so indexers correlating CRACs by `(targetRuntime,
+  targetAddress)` no longer split one contract into two identities.
+  (!22032)
 
 ### Michelson Runtime
 

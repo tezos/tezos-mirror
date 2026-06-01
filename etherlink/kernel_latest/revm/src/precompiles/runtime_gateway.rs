@@ -480,6 +480,37 @@ where
     Ok(())
 }
 
+/// Emit a `CracSent` log for an outgoing CRAC.
+///
+/// Shared by the three state-mutating gateway entries (`transfer`,
+/// `callMichelson`, generic `call(POST)`) so the event schema and the
+/// meaning of each field stay identical across surfaces. `target_address`
+/// is always the bare target *contract* — callers strip any
+/// entrypoint/view segment before passing it (L2-1456).
+fn emit_crac_sent<'j, CTX, Host, R>(
+    context: &mut CTX,
+    crac_id: String,
+    target_runtime: &str,
+    target_address: String,
+    amount: U256,
+) where
+    Host: StorageV1 + 'j,
+    R: Registry + 'j,
+    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
+{
+    let crac_log = Log {
+        address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+        data: CracSent {
+            cracId: crac_id,
+            targetRuntime: target_runtime.to_string(),
+            targetAddress: target_address,
+            amount,
+        }
+        .into_log_data(),
+    };
+    context.journal_mut().log(crac_log);
+}
+
 /// Build an [`OriginalSource`] for `source_addr` under the current
 /// originating runtime, without touching the journal. For Tezos
 /// origins, the address's stored `Origin` is read back to recover the
@@ -825,18 +856,7 @@ where
             let _body =
                 classify_and_charge_crac_response(response, RuntimeId::Tezos, &mut gas)?;
 
-            // Emit CracSent event
-            let crac_log = Log {
-                address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
-                data: CracSent {
-                    cracId: crac_id,
-                    targetRuntime: "tezos".to_string(),
-                    targetAddress: implicit_address,
-                    amount,
-                }
-                .into_log_data(),
-            };
-            context.journal_mut().log(crac_log);
+            emit_crac_sent(context, crac_id, "tezos", implicit_address, amount);
         }
         RuntimeGatewayCalls::callMichelson(call) => {
             if inputs.is_static {
@@ -902,18 +922,7 @@ where
             let _body =
                 classify_and_charge_crac_response(response, RuntimeId::Tezos, &mut gas)?;
 
-            // Emit CracSent event
-            let crac_log = Log {
-                address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
-                data: CracSent {
-                    cracId: crac_id,
-                    targetRuntime: "tezos".to_string(),
-                    targetAddress: destination,
-                    amount,
-                }
-                .into_log_data(),
-            };
-            context.journal_mut().log(crac_log);
+            emit_crac_sent(context, crac_id, "tezos", destination, amount);
         }
         RuntimeGatewayCalls::callMichelsonView(call) => {
             charge_gateway_request(&mut gas, calldata.len(), call.input.len())?;
@@ -1108,7 +1117,21 @@ where
             // Extract URI info before the request is consumed by the call.
             let uri = request.uri().clone();
             let target_rt = uri.host().unwrap_or("unknown").to_string();
-            let target_addr = uri.path().trim_start_matches('/').to_string();
+            // `targetAddress` identifies the target *contract*. A target
+            // URI is `http://<runtime>/<address>[/<entrypoint-or-view>]`,
+            // so keep only the first path segment — the address — and
+            // drop any trailing entrypoint/view. This matches the typed
+            // `callMichelson` / `transfer` entries, which emit the bare
+            // destination; reporting the full path here would split one
+            // contract into two indexer identities depending on the ABI
+            // surface used (L2-1456).
+            let target_addr = uri
+                .path()
+                .trim_start_matches('/')
+                .split('/')
+                .next()
+                .unwrap_or("")
+                .to_string();
 
             let response = context.journal_mut().tezosx_call_http(request);
             let output =
@@ -1121,18 +1144,7 @@ where
             // read-only end-to-end.
             if !is_get {
                 burn_gateway_residual(context, &mut gas)?;
-
-                let crac_log = Log {
-                    address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
-                    data: CracSent {
-                        cracId: crac_id,
-                        targetRuntime: target_rt,
-                        targetAddress: target_addr,
-                        amount,
-                    }
-                    .into_log_data(),
-                };
-                context.journal_mut().log(crac_log);
+                emit_crac_sent(context, crac_id, &target_rt, target_addr, amount);
             }
 
             return Ok(InterpreterResult {
