@@ -8,6 +8,35 @@
 
 ### RPCs changes
 
+### Monitoring changes
+
+### Command-line interface changes
+
+### Execution changes
+
+### Storage changes
+
+### Documentation changes
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.60 (2026-06-01)
+
+This is a bug-fix release addressing two RPC issues: `eth_getLogs` returned logs
+advertising an incorrect block level, and the RPCs serving transaction objects
+(e.g. `eth_getBlockByNumber`, `eth_getTransactionByHash`) returned typed delayed
+transactions as bare legacy objects, breaking strict Ethereum deserializers.
+
+This release will not apply any migration to the node’s store (version 24),
+meaning it is possible to downgrade to previous version).
+
+### RPCs changes
+
 - Fix transaction objects of delayed transactions returned by the RPCs (e.g.
   `eth_getBlockByNumber` with full objects, `eth_getTransactionByHash`): typed
   delayed transactions (EIP-2930/1559/7702) are now reconstructed with their
@@ -19,12 +48,6 @@
   block that actually emitted it. Over a range spanning more than one block,
   every log was previously stamped with the request's `fromBlock` (the
   `blockHash` was already correct). (!21995)
-
-### Monitoring changes
-
-### Command-line interface changes
-
-### Execution changes
 
 ### Storage changes
 
@@ -48,15 +71,6 @@
   legacy `/evm/`, `/tez/world_state/` and `/evm/world_state/` paths otherwise.
   Operators must upgrade to this release before running a V60+ kernel; the
   release stays backward-compatible with pre-V60 kernels. (!21957)
-
-### Documentation changes
-
-### Experimental features changes
-
-*No guarantees are provided regarding backward compatibility of experimental
-features. They can be modified or removed without any deprecation notices. If
-you start using them, you probably want to use `octez-evm-node check config
---config-file PATH` to assert your configuration file is still valid.*
 
 ## Version 0.59 (2026-05-18)
 
