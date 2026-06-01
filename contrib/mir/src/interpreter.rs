@@ -105,6 +105,33 @@ pub enum InterpretError<'a> {
     InternalError(InterpretInvariant),
 }
 
+/// `FAILWITH` embeds its popped argument directly in
+/// `InterpretError::FailedWith(_, TypedValue<'a>)`. A deep runtime-built
+/// value -- e.g. a `LOOP`-built right-comb of `PAIR` cells -- would
+/// otherwise overflow the kernel's ~1 MiB Rust stack on the auto-derived
+/// `TypedValue` destructor when the error is dropped (L2-1446). Draining
+/// here, at the last drop point, lets the kernel's `#[error]` formatter
+/// observe the value's original structural shape (matching L1 protocol
+/// observability and the TZT `expectation` matcher) before the children
+/// are flattened to unit sentinels by [`drain_deep_typed_value`]. The
+/// `Drop` impl forbids partial-move destructuring; the only existing
+/// destructure site (`tzt/expectation.rs`) is updated to use `ref`
+/// patterns.
+impl<'a> Drop for InterpretError<'a> {
+    fn drop(&mut self) {
+        // Only `FailedWith` currently carries a `TypedValue` payload that
+        // can be deep at runtime. If a future variant gains an owned
+        // `TypedValue` / `Rc<TypedValue>` reachable from attacker input
+        // (e.g. a richer FAILWITH-with-context variant, or a Closure-
+        // returning error), extend this match — otherwise its
+        // auto-derived destructor would re-introduce the L2-1446
+        // overflow on `Drop` of the `Err`.
+        if let InterpretError::FailedWith(_, ref mut v) = self {
+            crate::ast::drain_deep_typed_value(v);
+        }
+    }
+}
+
 /// Categorises invariant violations reachable only on a typechecker bug or
 /// malformed Micheline that bypassed typechecking. Mirrors
 /// [`crate::typechecker::TcInvariant`] on the interpreter side: variants
@@ -512,7 +539,7 @@ fn interpret<'a, 'b>(
         idx: 0,
     }];
 
-    let mut outcome = run_interp_driver(ctx, arena, &mut stacks, &mut frames);
+    let outcome = run_interp_driver(ctx, arena, &mut stacks, &mut frames);
 
     // On error the driver `?`-returned before any pending `AfterView`
     // frame could restore the saved view context. The recursive
@@ -527,19 +554,6 @@ fn interpret<'a, 'b>(
         // before `frames` is dropped, for the same reason the sub-stacks below
         // are drained. On success `frames` is empty, so this never runs.
         drain_value_frames(frames);
-        // `FAILWITH` carries its popped argument directly inside
-        // `InterpretError::FailedWith(_, TypedValue<'a>)`. A deep runtime-
-        // built value -- e.g. a `LOOP`-built right-comb of `PAIR` cells --
-        // would otherwise overflow the kernel's ~1 MiB Rust stack on the
-        // auto-derived `TypedValue` destructor when the caller drops the
-        // `Err`. Drain the payload here, at the boundary where the value's
-        // structural shape is no longer observable (`#[error]` formatting
-        // walks it via `{1:?}`, which is also iterative on the `Debug` MR;
-        // post-drain the children are flattened to unit, preserving the
-        // variant tag and type for the error-string path).
-        if let Err(InterpretError::FailedWith(_, ref mut v)) = &mut outcome {
-            crate::ast::drain_deep_typed_value(v);
-        }
     }
 
     // Restore the caller's stack from the bottom of the stack of stacks, and
@@ -617,15 +631,46 @@ fn drain_value_stack(stack: &mut IStack<'_>) {
 }
 
 /// In-place sibling of [`drain_value_stack`] for value stacks that the
-/// caller still observes after the drain runs. Iterates the stack without
-/// popping; for every uniquely-owned `Rc<TypedValue>` it flattens the deep
-/// composite payload in place via [`crate::ast::drain_deep_typed_value`].
-/// Atomic variants (`Int`, `Nat`, `Unit`, …) and shared `Rc`s are left
-/// untouched — only the deep recursive spine is severed. Used by the
-/// driver to defuse the caller's restored bottom stack on the error path
-/// without breaking the "Err preserves caller stack" contract that the
-/// stack-of-stacks design exposes (see `error_inside_exec_preserves_caller_stack`).
+/// caller still observes after the drain runs. Walks the stack twice:
+///
+/// 1. First pass: every `Rc<TypedValue>` that is *aliased* on the same
+///    stack (e.g. via `DUP` on a runtime-built deep value, leaving two
+///    `Rc::clone` siblings of the same inner tree at refcount ≥ 2) is
+///    replaced in place by a shallow `Rc<TypedValue::Unit>` sentinel.
+///    Each replacement decrements the original `Rc`'s strong count; once
+///    only one alias remains on the stack the surviving slot becomes
+///    uniquely-owned.
+/// 2. Second pass: every now-uniquely-owned `Rc<TypedValue>` is drained
+///    in place via [`crate::ast::drain_deep_typed_value`], flattening the
+///    deep composite spine while preserving the variant tag.
+///
+/// Atomic variants (`Int`, `Nat`, `Unit`, …) survive both passes
+/// untouched — `drain_deep_typed_value` is a no-op on them, and they are
+/// never aliased deeply enough to trigger the sentinel replacement (the
+/// recursive `Rc<TypedValue>` destructor only overflows on deep
+/// composites). The first-pass sentinel replacement loses the original
+/// value at *aliased* slots; this is the documented in-place-drain
+/// contract for error-path teardown: callers on the Err path must not
+/// rely on aliased slots preserving their original deep content. The
+/// existing `error_inside_exec_preserves_caller_stack` test (which uses
+/// distinct atomic markers, never aliased deep values) is unaffected.
 fn drain_value_stack_in_place(stack: &mut IStack<'_>) {
+    // Pass 1: sentinel-replace every aliased Rc so the survivor becomes
+    // unique. Atomic values are sometimes aliased too (e.g. a constant
+    // pushed via `DUP`), but their shared destructor is shallow — the
+    // replacement is harmless on them and necessary on the deep case
+    // because we cannot distinguish "shared atom" from "shared deep" at
+    // this layer without a recursive walk.
+    for i in 0..stack.len() {
+        if let Ok(rc) = stack.get_mut(i) {
+            if Rc::strong_count(rc) > 1 {
+                *rc = Rc::new(TypedValue::Unit);
+            }
+        }
+    }
+    // Pass 2: every Rc is now uniquely-owned on this stack (modulo
+    // external aliases the kernel cannot enumerate, which the caller's
+    // own Drop will handle). Drain the composite spine.
     for i in 0..stack.len() {
         if let Ok(rc) = stack.get_mut(i) {
             if let Some(v) = Rc::get_mut(rc) {
@@ -3302,6 +3347,44 @@ mod interpreter_tests {
                 let mut stack = stk![deep];
                 drain_value_stack(&mut stack);
                 assert!(stack.pop().is_none());
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
+    }
+
+    /// Regression for round-2 BLOCKER (shared-Rc evasion of
+    /// `drain_value_stack_in_place`): `DUP` of a deep value bumps the Rc
+    /// refcount; both copies on the stack see `Rc::get_mut == None`. Pre-
+    /// fix the in-place drain skipped both; the last one to drop hit
+    /// refcount=1 and recursed through the deep spine -> SIGABRT. Post-
+    /// fix the in-place drain has a sentinel-replacement first pass that
+    /// breaks aliased Rcs so the second pass can drain the survivor.
+    /// Builds the shape directly via shared `Rc::clone` (matches the
+    /// runtime shape of `PUSH ; LOOP { PAIR } ; DUP ; PUSH 42 ; FAILWITH`).
+    #[test]
+    fn dup_deep_value_then_failwith_does_not_overflow_on_drop() {
+        const DEPTH: usize = 100_000;
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let mut deep = V::int(0);
+                for _ in 0..DEPTH {
+                    deep = V::new_pair(V::int(0), deep);
+                }
+                let shared = Rc::new(deep);
+                // Two Rc::clone siblings (refcount=2) plus a shallow marker
+                // on top — matches the runtime shape of `PUSH ; LOOP { PAIR }
+                // ; DUP ; PUSH 1 ; FAILWITH`. FAILWITH pops the marker, the
+                // shared deep value stays on bottom twice.
+                let mut stack: IStack = Stack::new();
+                stack.push(Rc::clone(&shared));
+                stack.push(shared);
+                stack.push(Rc::new(V::int(42)));
+                let outcome = interpret(&[Failwith(Type::Int)], &mut Ctx::default(), &mut stack);
+                assert!(matches!(outcome, Err(InterpretError::FailedWith(..))));
+                drop(outcome);
+                drop(stack);
             })
             .unwrap()
             .join()
