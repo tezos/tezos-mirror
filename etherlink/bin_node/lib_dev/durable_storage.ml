@@ -396,12 +396,12 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
               (Durable_storage_path.michelson_runtime_sunrise_level
                  ~storage_version))
   | Current_block_number chain_family ->
-      let root = Durable_storage_path.root_of_chain_family chain_family in
+      let root = Durable_storage_path.block_root_of_chain_family chain_family in
       static_ro
         (qty_le_ro_codec
            ~path:(Durable_storage_path.Block.current_number ~root))
   | Current_block_hash chain_family ->
-      let root = Durable_storage_path.root_of_chain_family chain_family in
+      let root = Durable_storage_path.block_root_of_chain_family chain_family in
       static_ro
         {
           path = Durable_storage_path.Block.current_hash ~root;
@@ -454,13 +454,13 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
           rlp_codec
             ~path:(Durable_storage_path.Assemble_block.input ~storage_version))
   | Current_block chain_family ->
-      let root = Durable_storage_path.root_of_chain_family chain_family in
+      let root = Durable_storage_path.block_root_of_chain_family chain_family in
       static_ro
         (block_ro_codec
            ~path:(Durable_storage_path.Block.current_block ~root)
            ~chain_family)
   | Block_by_hash (chain_family, block_hash) ->
-      let root = Durable_storage_path.root_of_chain_family chain_family in
+      let root = Durable_storage_path.block_root_of_chain_family chain_family in
       static_read_delete
         {
           path = Durable_storage_path.Block.by_hash ~root block_hash;
@@ -468,7 +468,7 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
             (fun bytes -> Ok (L2_types.block_from_bytes ~chain_family bytes));
         }
   | Block_index (chain_family, block_number) ->
-      let root = Durable_storage_path.root_of_chain_family chain_family in
+      let root = Durable_storage_path.block_root_of_chain_family chain_family in
       Versioned
         (fun ~storage_version ->
           Delete_only
