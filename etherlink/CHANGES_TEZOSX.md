@@ -64,6 +64,9 @@
 
 ### Michelson Runtime
 
+- Big-map usage now counts toward a contract's storage footprint, so
+  receipts and storage burn cover big-maps the same way they do on
+  L1. (!22040)
 - Bootstrap contracts injected at genesis now have their `used_bytes`
   / `paid_bytes` storage space initialised to the size they
   occupy. (!22089)
