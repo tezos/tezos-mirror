@@ -35,6 +35,13 @@
   behavior. Previously the filters were ignored (clients could receive
   heads they had filtered out) and the current head was never sent on
   subscription, blocking wait-for-head flows until the next block. (!22023)
+- A cross-runtime call or `staticcall_evm` view whose EVM target
+  exhausts the forwarded gas (HTTP 429) now fails closed with an
+  out-of-gas error instead of being collapsed onto a generic 4xx
+  outcome. Previously the `staticcall_evm` view returned `None` on EVM
+  out-of-gas, indistinguishable from an absent/no-result view, so a
+  caller treating `None` as a default/allow/fallback branch could be
+  driven there by a gas-exhausting EVM target. (!22035)
 - When the Michelson runtime services an inbound cross-runtime call, the
   gateway now forwards the call's originator (the alias carried in
   `X-Tezos-Source`) as the outbound `X-Tezos-Source`, instead of this

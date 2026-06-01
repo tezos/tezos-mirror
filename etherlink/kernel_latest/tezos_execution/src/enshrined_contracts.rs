@@ -1557,6 +1557,20 @@ fn encode_origin_of<'a>(
     })
 }
 
+/// HTTP `429 TOO_MANY_REQUESTS` is the cross-runtime out-of-gas
+/// sentinel: the EVM runtime's `build_response` maps
+/// `HaltReason::OutOfGas` (and its own `TezosXRuntimeError::OutOfGas`)
+/// to `429` *specifically* so the dispatching Michelson side can tell
+/// gas exhaustion apart from the other 4xx outcomes it would otherwise
+/// fold into a generic operation failure or `Ok(None)` (L2-1457). Both
+/// the state-mutating call path ([`classify_and_charge_crac_response`])
+/// and the read-only view path ([`dispatch_staticcall_evm_get`]) must
+/// surface it as an out-of-gas failure so a forwarded-gas exhaustion is
+/// never confused with an absent view or a plain contract rejection.
+fn is_cross_runtime_oog(status: http::StatusCode) -> bool {
+    status == http::StatusCode::TOO_MANY_REQUESTS
+}
+
 /// Read-only counterpart to [`dispatch_crac_call`], shaped for the
 /// view-side bridge that backs the gateway's `staticcall_evm`
 /// synthetic view: build a `GET http://ethereum/<destination>`,
@@ -1565,11 +1579,17 @@ fn encode_origin_of<'a>(
 /// to `operation_gas`, and classify the response.
 ///
 /// - **2xx** → `Ok(Some(body))`.
-/// - **4xx** → `Ok(None)`, mirroring the standard MIR view dispatch's
-///   "view not found" outcome so the Michelson caller can `IF_NONE`.
+/// - **429** → `Err(InterpretError::OutOfGas)`: the cross-runtime
+///   out-of-gas sentinel (see [`is_cross_runtime_oog`]) must fail
+///   closed rather than be confused with an absent view, otherwise an
+///   EVM target that exhausts the forwarded view gas drives the
+///   Michelson caller down the `IF_NONE` branch.
+/// - **other 4xx** → `Ok(None)`, mirroring the standard MIR view
+///   dispatch's "view not found" outcome so the Michelson caller can
+///   `IF_NONE`.
 /// - **5xx / 1xx / 3xx** →
 ///   `Err(EnshrinedViewDispatchError::UnclassifiableResponse)`. The
-///   EVM runtime's `serve()` only ever emits 200/400/500-class
+///   EVM runtime's `serve()` only ever emits 200/400/429/500-class
 ///   statuses today, so 1xx/3xx are unreachable; the typed variant
 ///   surfaces the status code if that ever changes.
 ///
@@ -1704,6 +1724,8 @@ where
 
     if (200..300).contains(&status) {
         Ok(Some(response.into_body()))
+    } else if is_cross_runtime_oog(response.status()) {
+        Err(mir::interpreter::InterpretError::OutOfGas)
     } else if (400..500).contains(&status) {
         Ok(None)
     } else {
@@ -1741,6 +1763,13 @@ fn biguint_to_u256(value: num_bigint::BigUint) -> Result<U256, TransferError> {
 /// Gas is charged on a best-effort basis for all statuses, on block
 /// aborts the block is reverted anyway, so a missing header is harmless.
 /// On 2xx the header is mandatory.
+///
+/// `429` is the cross-runtime out-of-gas sentinel (see
+/// [`is_cross_runtime_oog`]) and maps to a catchable
+/// `CracError::Operation(TransferError::OutOfGas)` rather than the
+/// generic client-error envelope, so a forwarded-gas exhaustion stays
+/// a typed out-of-gas failure (L2-1457). Every other 4xx is a generic
+/// operation-level failure; 5xx aborts the block.
 fn classify_and_charge_crac_response(
     response: http::Response<Vec<u8>>,
     target_host: Option<&str>,
@@ -1763,6 +1792,8 @@ fn classify_and_charge_crac_response(
             .into());
         }
         Ok(response.into_body())
+    } else if is_cross_runtime_oog(response.status()) {
+        Err(CracError::Operation(TransferError::OutOfGas(OutOfGas)))
     } else if response.status().is_client_error() {
         Err(CracError::Operation(TransferError::GatewayError(format!(
             "Cross-runtime call failed with status {}: {}",
@@ -2698,6 +2729,80 @@ mod tests {
             err.to_string().contains("bad request"),
             "error should contain response body: {err}"
         );
+    }
+
+    #[test]
+    fn test_cross_runtime_call_429_is_out_of_gas() {
+        let response = http::Response::builder()
+            .status(429)
+            .body(b"OOG".to_vec())
+            .unwrap();
+        let mut operation_gas =
+            crate::gas::TezlinkOperationGas::start_milligas(1_000_000).unwrap();
+        let err = classify_and_charge_crac_response(
+            response,
+            Some("ethereum"),
+            &mut operation_gas,
+        )
+        .unwrap_err();
+        assert!(
+            matches!(err, CracError::Operation(TransferError::OutOfGas(OutOfGas))),
+            "429 must map to a typed OutOfGas, got {err:?}"
+        );
+    }
+
+    // Drive `dispatch_staticcall_evm_get` against a mock EVM peer that
+    // returns `status`. Alias resolution falls back to the deterministic
+    // native path (empty host → no stored origin), so the test reaches
+    // the response classifier with a generous gas budget.
+    fn run_staticcall_evm_get(
+        status: u16,
+    ) -> Result<Option<Vec<u8>>, mir::interpreter::InterpretError<'static>> {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string())
+            .with_serve_response(status, b"body".to_vec());
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+        );
+        let context = crate::context::TezlinkContext::init_context();
+        let calling_kt1 = ContractKt1Hash::from([0u8; 20]);
+        let mut operation_gas =
+            crate::gas::TezlinkOperationGas::start_milligas(100_000_000).unwrap();
+        dispatch_staticcall_evm_get(
+            &mut host,
+            &mut operation_gas,
+            &registry,
+            &mut journal,
+            &context,
+            &calling_kt1,
+            "1",
+            "0",
+            "1",
+            0,
+            "0x1234567890123456789012345678901234567890",
+            &[],
+        )
+    }
+
+    // The view path is the issue's core: an EVM out-of-gas (429) must fail
+    // closed with `OutOfGas` so the Michelson caller cannot mistake gas
+    // exhaustion for an absent view via `IF_NONE` (L2-1457).
+    #[test]
+    fn test_staticcall_evm_429_is_out_of_gas() {
+        let result = run_staticcall_evm_get(429);
+        assert!(
+            matches!(result, Err(mir::interpreter::InterpretError::OutOfGas)),
+            "429 must surface as InterpretError::OutOfGas, got {result:?}"
+        );
+    }
+
+    // A genuine 4xx ("view not found") must still collapse to `Ok(None)`,
+    // so the OOG carve-out above does not regress absence detection.
+    #[test]
+    fn test_staticcall_evm_400_is_none() {
+        let result = run_staticcall_evm_get(400);
+        assert_eq!(result, Ok(None));
     }
 
     // --- address_hash_bytes encoding ---
