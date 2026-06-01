@@ -223,9 +223,6 @@ struct
     (version, metadata)
 end
 
-module Current_block_header =
-  Make_block_header (Tezlink_imported_protocol) (Tezlink_imported_protocol)
-
 (** [wrap conversion service_implementation] changes the output type
     of [service_implementation] using [conversion]. *)
 let wrap conv impl p q i =
@@ -819,38 +816,100 @@ let register_chain_services ~l2_chain_id ~get_da_fee_per_byte
     (Tezos_rpc.Directory.prefix chain_directory_path dir)
 
 (** Builds the directory registering the service at `/monitor/heads/<chain>`. *)
-let register_monitor_heads (module Backend : Tezlink_backend_sig.S) dir =
+let register_monitor_heads ~l2_chain_id (module Backend : Tezlink_backend_sig.S)
+    dir =
   Tezos_rpc.Directory.gen_register
     dir
     Tezos_services.monitor_heads
     (fun ((), chain) query () ->
+      let open Lwt_syntax in
       let stream, stopper = Backend.monitor_heads chain query in
       let shutdown () = Lwt_watcher.shutdown stopper in
-      let next () =
-        let open Lwt_syntax in
-        let* block_opt = Lwt_stream.get stream in
-        match block_opt with
-        | None -> return_none
-        | Some block -> (
-            match
-              ( Current_block_header.tezlink_block_to_shell_header block,
-                ethereum_to_tezos_block_hash block.hash )
-            with
-            | Ok shell, Ok hash ->
-                return_some
-                  ( hash,
-                    ({
-                       shell;
-                       protocol_data =
-                         Data_encoding.Binary.to_bytes_exn
-                           Tezlink_imported_protocol.Block_header_repr
-                           .protocol_data_encoding
-                           Tezlink_imported_protocol.mock_protocol_data;
-                     }
-                      : Block_header.t) )
-            | Error _, _ | _, Error _ -> return_none)
+      let requested_or_any requested actual =
+        match requested with
+        | [] -> true
+        | _ -> List.exists (Protocol_hash.equal actual) requested
       in
+      (* Convert a head into its level and the shell [(hash, header)] pair
+         returned by [monitor_heads], dropping it when it does not match the
+         requested [protocol]/[next_protocol] filters (like L1 [monitor_heads]).
 
+         The protocol hashes are resolved from the block itself with the same
+         logic as the block services, so this keeps applying the right filter
+         across future Michelson-interface protocol migrations. Heads are live
+         blocks, so [allowing_mock] is [false], like the [Head 0] block RPC. *)
+      let head_of_block (block : L2_types.Tezos_block.t) =
+        let open Result_syntax in
+        let ( (module Proto : Tezlink_protocol),
+              (module Next_proto : Tezlink_protocol) ) =
+          protocol_for_block_or_level ~allowing_mock:false (Ok block)
+        in
+        if
+          requested_or_any query#protocols Proto.hash
+          && requested_or_any query#next_protocols Next_proto.hash
+        then
+          let module Block_header_of = Make_block_header (Proto) (Next_proto) in
+          let* chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
+          let* ({shell; protocol_data} :
+                 Block_header_of.Block_services.raw_block_header) =
+            Block_header_of.tezlink_block_to_raw_block_header ~chain_id block
+          in
+          let* hash = ethereum_to_tezos_block_hash block.hash in
+          let protocol_data =
+            Data_encoding.Binary.to_bytes_exn
+              Proto.block_header_data_encoding
+              protocol_data
+          in
+          return_some
+            (block.level, (hash, ({shell; protocol_data} : Block_header.t)))
+        else return_none
+      in
+      let head_of_block_opt block =
+        match head_of_block block with
+        | Ok head_opt -> head_opt
+        | Error _ -> None
+      in
+      let head_stream = Lwt_stream.filter_map head_of_block_opt stream in
+      (* Capture the current head eagerly, at subscription time: reading it
+         lazily on the first [next] call would let blueprints produced before a
+         slow consumer's first read pile up in [stream], so the prelude could
+         then be fresher than the stream's next elements. *)
+      let* prelude =
+        let open Lwt_result_syntax in
+        let*? chain = check_chain chain in
+        Backend.block chain (`Head 0l)
+      in
+      let prelude =
+        ref
+          (match prelude with
+          | Ok block -> head_of_block_opt block
+          | Error _ -> None)
+      in
+      (* Emit strictly increasing levels: like L1 [monitor_heads], drop any
+         streamed head whose level is not greater than the last emitted one, so
+         the prelude never yields duplicate or out-of-order heads even if the
+         stream already buffered fresher blocks. *)
+      let last_level = ref None in
+      let fresh level =
+        match !last_level with
+        | Some l when Compare.Int32.(level <= l) -> false
+        | _ ->
+            last_level := Some level ;
+            true
+      in
+      let rec next () =
+        match !prelude with
+        | Some (level, head) ->
+            prelude := None ;
+            ignore (fresh level) ;
+            return_some head
+        | None -> (
+            let* head_opt = Lwt_stream.get head_stream in
+            match head_opt with
+            | None -> return_none
+            | Some (level, head) ->
+                if fresh level then return_some head else next ())
+      in
       Tezos_rpc.Answer.return_stream {next; shutdown})
 
 (** Builds the root directory. *)
@@ -877,7 +936,7 @@ let build_dir ~l2_chain_id ~add_operation ~get_da_fee_per_byte
          let open Result_syntax in
          let* hash = ethereum_to_tezos_block_hash input_hash in
          return (hash, input_time))
-  |> register_monitor_heads backend
+  |> register_monitor_heads ~l2_chain_id backend
   |> register ~service:Tezos_services.version ~impl:(fun () () () -> version ())
   |> register_with_conversion
        ~service:Tezos_services.injection_operation

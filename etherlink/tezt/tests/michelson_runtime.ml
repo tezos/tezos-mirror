@@ -873,83 +873,122 @@ let test_monitor_heads =
   let open Lwt.Syntax in
   (* Prepare the RPC endpoint *)
   let endpoint = tezlink_endpoint_from_evm_node sequencer in
-
-  let total_headers = 4 in
-
-  (* Promise to resolve when we’ve received all expected headers *)
-  let wait_for_all, notify_all = Lwt.wait () in
-  let received_count = ref 0 in
-
-  (* Fetch the initial head for monotonicity checks *)
-  let* initial =
-    Client.RPC.call ~hooks ~endpoint client @@ RPC.get_chain_block_header ()
-  in
-  let previous_header = ref initial in
-
-  (* Notifier that is going to be used to indicate the block has been received by the monitor *)
-  let notify_block_received : (unit -> unit) ref =
-    ref (fun () -> ())
-    (* dummy, will be replaced below *)
+  let protocol_hash = Protocol.hash Michelson_contracts.tezlink_protocol in
+  (* A syntactically valid protocol hash that is *not* the Michelson runtime
+     protocol, used to exercise the [protocol]/[next_protocol] query filters. *)
+  let other_protocol_hash =
+    "PtParisBxoLz5gzMmn3d9WBQNoPSZakgnkMC2VNuQ3KXfUtUQeZ"
   in
 
-  (* Process each JSON header line from curl *)
-  let process_line line process =
-    !notify_block_received () ;
-    incr received_count ;
-    Log.info "Received block header #%d" !received_count ;
-    let current = JSON.parse ~origin:"curl_monitor_heads" line in
-    check_header
-      ~previous_header:!previous_header
-      ~current_header:current
-      ~current_timestamp:None
-      ~chain_id:None ;
-    previous_header := current ;
-    if !received_count = total_headers then (
-      Log.info "Received all %d headers" total_headers ;
-      Tezt.Process.terminate process ;
-      Lwt.wakeup_later notify_all ()) ;
-    unit
-  in
-
-  (* Start streaming headers via curl and process lines *)
-  let start_monitor () =
-    let url = Evm_node.endpoint sequencer ^ "/tezlink/monitor/heads/main" in
+  (* Spawn a [curl] streaming the monitor/heads endpoint with the given query
+     string, run [f] with a getter for the next header line (decoded as JSON),
+     and always terminate the underlying [curl] afterwards. A global timeout
+     guards every read so a missing head fails the test instead of hanging it
+     forever. *)
+  let with_monitor ?(query = "") ?(timeout = 30.0) f =
+    let url =
+      Evm_node.endpoint sequencer ^ "/tezlink/monitor/heads/main" ^ query
+    in
     let process = Tezt.Process.spawn "curl" ["--no-buffer"; "--silent"; url] in
     let ic = Tezt.Process.stdout process in
-    let rec loop () =
+    let next_header () =
       let* line_opt = Lwt_io.read_line_opt ic in
-      match line_opt with
-      | None -> Lwt.return_unit
-      | Some line ->
-          let* () = process_line line process in
-          loop ()
+      Lwt.return (Option.map (JSON.parse ~origin:"curl_monitor_heads") line_opt)
     in
-    Lwt.async loop ;
-    unit
+    Lwt.finalize
+      (fun () ->
+        let body = f next_header in
+        let timeout =
+          let* () = Lwt_unix.sleep timeout in
+          Test.fail ~__LOC__ "monitor/heads (query %S) timed out" query
+        in
+        Lwt.pick [body; timeout])
+      (fun () ->
+        Tezt.Process.terminate process ;
+        Lwt.return_unit)
+  in
+  let get_header next_header =
+    let* header_opt = next_header () in
+    match header_opt with
+    | Some header -> Lwt.return header
+    | None -> Test.fail ~__LOC__ "monitor/heads stream closed unexpectedly"
+  in
+  (* Check that the stream opened with [query] emits the current head first
+     (regression for L2-1419), then a consecutive header per produced block. *)
+  let check_prelude_and_stream ?query ~blocks () =
+    let* head =
+      Client.RPC.call ~hooks ~endpoint client @@ RPC.get_chain_block_header ()
+    in
+    with_monitor ?query (fun next_header ->
+        let* prelude = get_header next_header in
+        Check.(
+          (JSON.(prelude |-> "level" |> as_int)
+          = JSON.(head |-> "level" |> as_int))
+            int)
+          ~error_msg:
+            "monitor/heads should emit the current head (level %R) first, but \
+             got level %L" ;
+        Check.(
+          (JSON.(prelude |-> "hash" |> as_string)
+          = JSON.(head |-> "hash" |> as_string))
+            string)
+          ~error_msg:
+            "monitor/heads prelude hash should be the current head %R, but got \
+             %L" ;
+        let previous_header = ref prelude in
+        let rec produce_and_check i =
+          if i = 0 then Lwt.return_unit
+          else
+            let* _ = Rpc.produce_block sequencer in
+            let* current_header = get_header next_header in
+            check_header
+              ~previous_header:!previous_header
+              ~current_header
+              ~current_timestamp:None
+              ~chain_id:None ;
+            previous_header := current_header ;
+            produce_and_check (i - 1)
+        in
+        produce_and_check blocks)
   in
 
-  (* Produce blocks *)
-  let rec produce i =
-    if i = 0 then Lwt.return_unit
-    else
-      let wait_block_received, block_notifier = Lwt.wait () in
-      (notify_block_received := fun () -> Lwt.wakeup_later block_notifier ()) ;
+  (* --- Unfiltered stream: prelude followed by produced blocks. *)
+  let* () = check_prelude_and_stream ~blocks:4 () in
+
+  (* --- Matching protocol filter: prelude and stream behave as unfiltered. *)
+  let* () =
+    check_prelude_and_stream
+      ~query:(sf "?protocol=%s&next_protocol=%s" protocol_hash protocol_hash)
+      ~blocks:2
+      ()
+  in
+
+  (* --- Non-matching protocol filter: regression for L2-1419, the stream must
+     emit no head at all (instead of ignoring the filter). *)
+  with_monitor
+    ~query:(sf "?protocol=%s" other_protocol_hash)
+    ~timeout:10.0
+    (fun next_header ->
+      (* Produce a block to make sure a head would have been streamed if the
+         filter were ignored. *)
       let* _ = Rpc.produce_block sequencer in
-      let* () = wait_block_received in
-      produce (i - 1)
-  in
-
-  (* Timeout in case headers don’t arrive in time *)
-  let timeout =
-    let* () = Evm_node.wait_for_blueprint_applied sequencer total_headers in
-    let* () = Lwt_unix.sleep 10.0 in
-    Test.fail ~__LOC__ "Timed out waiting for streamed headers"
-  in
-
-  let* () = start_monitor () and* () = produce total_headers in
-  let* () = Lwt.pick [wait_for_all; timeout] in
-
-  unit
+      let no_header =
+        let* header_opt = next_header () in
+        match header_opt with
+        | None -> Lwt.return_unit
+        | Some header ->
+            Test.fail
+              ~__LOC__
+              "a non-matching protocol filter should stream no head, but got %s"
+              (JSON.encode header)
+      in
+      (* The stream is expected to stay open while emitting nothing: give it a
+         short window, then conclude no head was streamed. *)
+      let settle =
+        let* () = Lwt_unix.sleep 5.0 in
+        Lwt.return_unit
+      in
+      Lwt.pick [no_header; settle])
 
 let test_produceBlock =
   register_tezosx_test
