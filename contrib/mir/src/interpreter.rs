@@ -113,10 +113,23 @@ pub enum InterpretError<'a> {
 /// here, at the last drop point, lets the kernel's `#[error]` formatter
 /// observe the value's original structural shape (matching L1 protocol
 /// observability and the TZT `expectation` matcher) before the children
-/// are flattened to unit sentinels by [`drain_deep_typed_value`]. The
-/// `Drop` impl forbids partial-move destructuring; the only existing
-/// destructure site (`tzt/expectation.rs`) is updated to use `ref`
-/// patterns.
+/// are flattened to unit sentinels by [`drain_deep_typed_value`].
+///
+/// The `Drop` impl forbids partial-move destructuring of `InterpretError`
+/// anywhere in the workspace. Existing match sites all consume the error
+/// by *reference*: `tzt/expectation.rs::unify_interpreter_error` takes
+/// `err: &InterpretError`, and the kernel's
+/// `tezosx-tezos-runtime::view::classify_interpret_error` matches on
+/// `&e`. Both use match-ergonomics auto-borrow on the inner fields, so
+/// `Drop` is irrelevant to their soundness.
+///
+/// Scope note: this `Drop` closes the *drop-time* overflow on a deep
+/// `FailedWith` payload. The *observation-time* overflow via the auto-
+/// derived `Debug` walk on `TypedValue` (reached by the kernel's
+/// `BadRequest(format!("{e:?}"))` and the `#[error("…{1:?}…")]` derive)
+/// is independent and is closed by !21988 (iterative `Debug for
+/// TypedValue`, Linear L2-1436). The two MRs are conjugate: this MR
+/// makes the drop safe; !21988 makes the observation safe.
 impl<'a> Drop for InterpretError<'a> {
     fn drop(&mut self) {
         // Only `FailedWith` currently carries a `TypedValue` payload that

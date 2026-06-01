@@ -106,8 +106,12 @@
   input is bounded by gas rather than trapping the PVM. Runtime-built deep
   `TypedValue`s left on a value stack, in a control-flow worklist frame, or
   inside `InterpretError::FailedWith` are flattened iteratively on the
-  interpreter's error-unwind path so their `Rc<TypedValue>` destructor cannot
-  overflow when the kernel drops the error or the caller-restored stack.
+  interpreter's *drop / error-unwind* path so their `Rc<TypedValue>`
+  destructor cannot overflow when the kernel drops the error or the caller-
+  restored stack. The conjugate *observation* path — the auto-derived
+  `Debug` walk on a deep `TypedValue` invoked by the kernel's error-body
+  formatter — is closed separately by the iterative `Debug` rewrite
+  (tracked under !21988).
   (!21982, !21983, !21984, !21985, !21986, !22025)
 - MIR: `UNPACK string` now rejects carriage return (`0x0d`) — and any
   other byte outside L1's permitted set of newline (`0x0a`) plus
