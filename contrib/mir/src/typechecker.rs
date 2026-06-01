@@ -1898,9 +1898,11 @@ fn typecheck<'a, 'b>(
                     // Instruction-level LAMBDA: the outer stack already
                     // carries the lambda type (pushed at step time), so
                     // `in_ty`/`out_ty` can move straight into `LambdaRec`
-                    // instead of being cloned. For deep types this avoids a
-                    // non-trivial walk on every nested instruction-level
-                    // `LAMBDA_REC`.
+                    // instead of being cloned. `Type`'s composite variants
+                    // are all `Rc<...>`-backed (ast.rs), so the saving is one
+                    // `Rc::clone` (refcount bump) per nested
+                    // instruction-level `LAMBDA_REC` rather than a deep walk
+                    // — small per call, but cumulative on deep nesting.
                     let lam = if recursive {
                         Lambda::LambdaRec {
                             micheline_code,
