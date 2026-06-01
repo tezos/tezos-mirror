@@ -276,7 +276,39 @@ let deploy_minimal_contract ~sequencer ~sender ~nonce () =
       Test.fail "Minimal contract deployment transaction failed"
   | _ -> Test.fail "No receipt or no contract address for minimal deployment tx"
 
-(* ── EVM precompile tests — classification paths (commit 1) ───────────── *)
+(* ── CRAC helper ──────────────────────────────────────────────────────── *)
+
+(** [send_crac_to_michelson ~sequencer ~target ()] sends a CRAC from
+    [Eth_account.bootstrap_accounts.(0)] to the Michelson contract [target]
+    through the gateway's [callMichelson] entrypoint, produces a block, and
+    checks the transaction succeeded.  This writes the sender's Tezos alias
+    into [/origin] on both sides.  Returns the sender account. *)
+let send_crac_to_michelson ~sequencer ~target () =
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:sender.Eth_account.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas:3_000_000
+      ~gas_price:1_000_000_000
+      ~value:Wei.zero
+      ~address:evm_gateway_address
+      ~signature:"callMichelson(string,string,bytes)"
+      ~arguments:[target; ""; "0x"]
+      ()
+  in
+  let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
+  let*@ _block = Rpc.produce_block sequencer in
+  let*@ receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
+  (match receipt with
+  | Some r ->
+      Check.(
+        (r.status = true) bool ~error_msg:"CRAC transaction should succeed")
+  | None -> Test.fail "No receipt for CRAC transaction") ;
+  return sender
+
+(* ── EVM precompile tests — classification paths ──────────────────────── *)
 
 (** Back-stop edge: [originOf] of an EVM address with deployed bytecode returns
     kind=1 (Native) via the EVM code-presence back-stop, without an explicit
@@ -520,7 +552,7 @@ let test_evm_resolve_address_cross_source_tezos_to_eth () =
        (cross-source routing returns Unknown)" ;
   unit
 
-(* ── EVM precompile tests — back-stop derive + round-trips (commit 2) ─── *)
+(* ── EVM precompile tests — back-stop derive + round-trips ────────────── *)
 
 (** [originOf] of an EVM contract with bytecode (code_hash != KECCAK_EMPTY)
     returns Native via the code-presence back-stop.  Then [resolveAddress]
@@ -696,28 +728,7 @@ let test_evm_resolve_address_roundtrip_recorded () =
   in
   (* Step 2: Send a CRAC from EVM to the Michelson contract.  This writes
      the sender's Tezos alias into /origin on both sides. *)
-  let sender = Eth_account.bootstrap_accounts.(0) in
-  let* raw_tx =
-    Cast.craft_tx
-      ~source_private_key:sender.Eth_account.private_key
-      ~chain_id:1337
-      ~nonce:0
-      ~gas:3_000_000
-      ~gas_price:1_000_000_000
-      ~value:Wei.zero
-      ~address:evm_gateway_address
-      ~signature:"callMichelson(string,string,bytes)"
-      ~arguments:[kt1_target; ""; "0x"]
-      ()
-  in
-  let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
-  let*@ _block = Rpc.produce_block sequencer in
-  let*@ receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
-  (match receipt with
-  | Some r ->
-      Check.(
-        (r.status = true) bool ~error_msg:"CRAC transaction should succeed")
-  | None -> Test.fail "No receipt for CRAC transaction") ;
+  let* sender = send_crac_to_michelson ~sequencer ~target:kt1_target () in
 
   (* Step 3: Resolve the sender's Tezos alias via the RPC. *)
   let* alias_result =
@@ -807,7 +818,7 @@ let test_evm_resolve_address_roundtrip_recorded () =
         "Expected reverse translated address to match original EVM sender, got \
          %L") ;
   unit
-(* ── EVM precompile tests — error paths (commit 3) ────────────────────── *)
+(* ── EVM precompile tests — error paths ───────────────────────────────── *)
 
 (** Edge: [originOf] with an invalid runtime ID (2) reverts with the ABI-encoded
     [InvalidRuntimeId] Solidity custom error.
@@ -1052,7 +1063,7 @@ let test_evm_resolve_address_invalid_target_runtime () =
       ~error_msg:"Expected received=0x02 in revert data last byte, got 0x%L") ;
   unit
 
-(* ── Michelson VIEW tests — classification paths (commit 4) ──────────── *)
+(* ── Michelson VIEW tests — classification paths ──────────────────────── *)
 
 (** [originOf] via Michelson VIEW on an unknown Tezos address.
     Calls the [gateway_origin_of.tz] helper contract.
@@ -1453,7 +1464,7 @@ let test_michelson_resolve_address_cross_source_ethereum () =
   Log.info "EVM contract %s → Derived KT1 %s" evm_contract_addr kt1_str ;
   unit
 
-(* ── Michelson VIEW tests — post-CRAC Recorded/Alias (commit 5) ─── *)
+(* ── Michelson VIEW tests — post-CRAC Recorded/Alias ──────────────────── *)
 
 (** [originOf] via Michelson VIEW after a CRAC transfer materialises the
     alias.  The CRAC-classified KT1 is expected to be an Alias of the EVM
@@ -1490,28 +1501,7 @@ let test_michelson_origin_of_alias_after_crac () =
   in
   (* Step 2: Send a CRAC from EVM to the Michelson contract.  This writes
      the sender's Tezos alias into /origin on both sides. *)
-  let sender = Eth_account.bootstrap_accounts.(0) in
-  let* raw_tx =
-    Cast.craft_tx
-      ~source_private_key:sender.Eth_account.private_key
-      ~chain_id:1337
-      ~nonce:0
-      ~gas:3_000_000
-      ~gas_price:1_000_000_000
-      ~value:Wei.zero
-      ~address:evm_gateway_address
-      ~signature:"callMichelson(string,string,bytes)"
-      ~arguments:[kt1_target; ""; "0x"]
-      ()
-  in
-  let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
-  let*@ _block = Rpc.produce_block sequencer in
-  let*@ receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
-  (match receipt with
-  | Some r ->
-      Check.(
-        (r.status = true) bool ~error_msg:"CRAC transaction should succeed")
-  | None -> Test.fail "No receipt for CRAC transaction") ;
+  let* sender = send_crac_to_michelson ~sequencer ~target:kt1_target () in
   (* Step 3: Resolve the sender's Tezos alias via the RPC. *)
   let* alias_result =
     Rpc.Tezosx.tez_getEthereumTezosAddress sender.address sequencer
@@ -1600,28 +1590,7 @@ let test_michelson_resolve_address_recorded_after_crac () =
       ()
   in
   (* Step 2: Send a CRAC from EVM to the Michelson contract. *)
-  let sender = Eth_account.bootstrap_accounts.(0) in
-  let* raw_tx =
-    Cast.craft_tx
-      ~source_private_key:sender.Eth_account.private_key
-      ~chain_id:1337
-      ~nonce:0
-      ~gas:3_000_000
-      ~gas_price:1_000_000_000
-      ~value:Wei.zero
-      ~address:evm_gateway_address
-      ~signature:"callMichelson(string,string,bytes)"
-      ~arguments:[kt1_target; ""; "0x"]
-      ()
-  in
-  let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
-  let*@ _block = Rpc.produce_block sequencer in
-  let*@ receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
-  (match receipt with
-  | Some r ->
-      Check.(
-        (r.status = true) bool ~error_msg:"CRAC transaction should succeed")
-  | None -> Test.fail "No receipt for CRAC transaction") ;
+  let* sender = send_crac_to_michelson ~sequencer ~target:kt1_target () in
   (* Step 3: Resolve the sender's Tezos alias via the RPC. *)
   let* alias_result =
     Rpc.Tezosx.tez_getEthereumTezosAddress sender.address sequencer
@@ -1680,7 +1649,7 @@ let test_michelson_resolve_address_recorded_after_crac () =
              ] );
        ])
 
-(* ── Michelson VIEW tests — error paths (commit 6) ────────────────────── *)
+(* ── Michelson VIEW tests — error paths ───────────────────────────────── *)
 
 (** Michelson invalid-runtime-ID: passing an out-of-range runtime ID to
     [originOf] via Michelson VIEW makes the view FAILWITH with
@@ -1915,6 +1884,7 @@ let test_michelson_origin_of_malformed_address () =
 (* ── Registration ─────────────────────────────────────────────────────── *)
 
 let () =
+  (* EVM classification paths *)
   test_evm_origin_of_code_backstop () ;
   test_evm_resolve_address_same_source_ethereum () ;
   test_evm_resolve_address_same_source_tezos () ;
@@ -1922,26 +1892,28 @@ let () =
   test_evm_resolve_address_unknown_source () ;
   test_evm_origin_of_cross_source_evm_as_tezos () ;
   test_evm_resolve_address_cross_source_tezos_to_eth () ;
+  (* EVM back-stop derive + round-trips *)
   test_evm_backstop_derive_same_source () ;
   test_evm_resolve_address_roundtrip_derive_then_unknown () ;
   test_evm_resolve_address_roundtrip_recorded () ;
+  (* EVM error paths *)
   test_evm_origin_of_invalid_runtime_id () ;
   test_evm_resolve_address_invalid_runtime_id () ;
   test_evm_origin_of_malformed_tezos_address () ;
   test_evm_origin_of_malformed_ethereum_address () ;
   test_evm_resolve_address_malformed_tezos_address () ;
   test_evm_resolve_address_invalid_target_runtime () ;
-  (* commit 4 — Michelson classification paths *)
+  (* Michelson classification paths *)
   test_michelson_origin_of_unknown () ;
   test_michelson_origin_of_evm_native_cross_source () ;
   test_michelson_resolve_address_unknown () ;
   test_michelson_resolve_address_same_source () ;
   test_michelson_resolve_address_same_source_ethereum () ;
   test_michelson_resolve_address_cross_source_ethereum () ;
-  (* commit 5 — Michelson post-CRAC Recorded/Alias *)
+  (* Michelson post-CRAC Recorded/Alias *)
   test_michelson_origin_of_alias_after_crac () ;
   test_michelson_resolve_address_recorded_after_crac () ;
-  (* commit 6 — Michelson error paths *)
+  (* Michelson error paths *)
   test_michelson_origin_of_invalid_runtime_id () ;
   test_michelson_resolve_address_invalid_runtime_id () ;
   test_michelson_origin_of_malformed_address ()
