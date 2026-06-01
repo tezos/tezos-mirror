@@ -2169,29 +2169,37 @@ fn interpret_one<'a>(
         }
         I::UnpairN(n) => {
             ctx.gas().consume(interpret_cost::unpair_n(*n as usize)?)?;
-            fn fill<'a>(
-                n: u16,
-                stack: &mut IStack<'a>,
-                p: Rc<TypedValue<'a>>,
-            ) -> Result<(), InterpretError<'a>> {
-                if n == 0 {
-                    stack.push(p);
-                    Ok(())
-                } else if let V::Pair(l, r) = p.as_ref() {
-                    fill(n - 1, stack, r.clone())?;
-                    stack.push(l.clone());
-                    Ok(())
-                } else {
-                    Err(InterpretError::InternalError(
-                        InterpretInvariant::TypeMismatch {
-                            expected: "V::Pair",
-                        },
-                    ))
-                }
+            // Iterative descent: walk the right-comb spine, recording each
+            // `l` in `lefts` (post-order push: deepest pair value goes first,
+            // then `lefts` in reverse so `l_0` ends on top). Mirrors the
+            // recursive `fn fill` behaviour bit-for-bit but does not grow a
+            // Rust frame per nesting level -- a depth-N right-comb on the
+            // stack with `UNPAIR (N+1)` would otherwise overflow the kernel's
+            // ~1 MiB Rust stack around N ≈ 100. L2-1434 in-scope item.
+            let mut cur = pop_rc!();
+            let total = *n as usize;
+            stack.reserve(total);
+            let mut lefts: Vec<Rc<TypedValue<'a>>> = Vec::with_capacity(total.saturating_sub(1));
+            for _ in 0..(n - 1) {
+                let next = match cur.as_ref() {
+                    V::Pair(l, r) => {
+                        lefts.push(l.clone());
+                        r.clone()
+                    }
+                    _ => {
+                        return Err(InterpretError::InternalError(
+                            InterpretInvariant::TypeMismatch {
+                                expected: "V::Pair",
+                            },
+                        ))
+                    }
+                };
+                cur = next;
             }
-            let p = pop_rc!();
-            stack.reserve(*n as usize);
-            fill(n - 1, stack, p)?;
+            stack.push(cur);
+            for l in lefts.into_iter().rev() {
+                stack.push(l);
+            }
         }
         I::ISome => {
             ctx.gas().consume(interpret_cost::SOME)?;
@@ -4614,6 +4622,35 @@ mod interpreter_tests {
             stk![V::String("foo".into()), V::Unit, V::nat(42), V::Bool(false)],
         );
         assert!(ctx.gas().milligas().unwrap() < Ctx::default().gas.milligas().unwrap())
+    }
+
+    /// Regression for L2-1434 (UNPAIR n): pre-fix `fn fill` recursed one
+    /// Rust frame per pair level, so `UNPAIR (N+1)` on a depth-N right-comb
+    /// value reliably overflowed the kernel's ~1 MiB Rust stack around
+    /// N ≈ 100 (well below `u16::MAX` and within an operation's gas
+    /// budget). With the iterative spine walk depth is bounded by gas only.
+    /// 60_000 fits in `u16` and dwarfs the pre-fix overflow threshold.
+    #[test]
+    fn unpair_n_deep_does_not_overflow() {
+        use std::thread;
+        const DEPTH: u16 = 60_000;
+        thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let mut deep = V::Unit;
+                for _ in 0..DEPTH {
+                    deep = V::new_pair(V::Unit, deep);
+                }
+                let mut stack = stk![deep];
+                let ctx = &mut Ctx::default();
+                ctx.gas = crate::gas::Gas::new(u32::MAX);
+                interpret_one(&UnpairN(DEPTH + 1), ctx, &mut stack)
+                    .expect("deep UnpairN must walk the spine iteratively");
+                assert_eq!(stack.len(), DEPTH as usize + 1);
+            })
+            .unwrap()
+            .join()
+            .expect("worker joined");
     }
 
     #[test]

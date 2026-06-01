@@ -209,7 +209,11 @@ impl<T> From<T> for SingleBox<T> {
 
 /// The names of the variants correspond to the names of Michelson types, but
 /// snake_case is converted to PascalCase.
-#[derive(Debug, Clone, Eq, PartialEq)]
+///
+/// `PartialEq` is implemented manually as an iterative tree walk so equality
+/// of deeply nested types does not blow the WASM call stack. `Eq` is a
+/// marker and stays derived.
+#[derive(Debug, Clone, Eq)]
 #[allow(missing_docs)]
 pub enum Type {
     Nat,
@@ -247,21 +251,32 @@ pub enum Type {
 
 impl Type {
     /// Returns abstract size of the type representation. Used for gas cost
-    /// estimation.
+    /// estimation. Iterative tree walk so it does not blow the WASM call
+    /// stack on deeply nested types.
     pub fn size_for_gas(&self) -> usize {
         use Type::*;
-        match self {
-            Nat | Int | Bool | Mutez | String | Unit | Never | Operation | Address | ChainId
-            | Bytes | Key | Signature | KeyHash | Timestamp => 1,
-
-            #[cfg(feature = "bls")]
-            Bls12381Fr | Bls12381G1 | Bls12381G2 => 1,
-
-            Pair(p) | Or(p) | Map(p) | BigMap(p) | Lambda(p) => {
-                1 + p.0.size_for_gas() + p.1.size_for_gas()
+        let mut total: usize = 0;
+        // SmallVec keeps the worklist on the stack for shallow types (the
+        // hot case: this runs per gas charge), spilling to the heap only for
+        // deep ones — avoiding a per-call heap allocation a `Vec` would force.
+        let mut stack: smallvec::SmallVec<[&Type; 8]> = smallvec::smallvec![self];
+        while let Some(t) = stack.pop() {
+            total += 1;
+            match t {
+                Nat | Int | Bool | Mutez | String | Unit | Never | Operation | Address
+                | ChainId | Bytes | Key | Signature | KeyHash | Timestamp => {}
+                #[cfg(feature = "bls")]
+                Bls12381Fr | Bls12381G1 | Bls12381G2 => {}
+                Pair(p) | Or(p) | Map(p) | BigMap(p) | Lambda(p) => {
+                    stack.push(&p.0);
+                    stack.push(&p.1);
+                }
+                Option(x) | List(x) | Set(x) | Contract(x) | Ticket(x) => {
+                    stack.push(x);
+                }
             }
-            Option(x) | List(x) | Set(x) | Contract(x) | Ticket(x) => 1 + x.size_for_gas(),
         }
+        total
     }
 
     /// Convenience function to construct a new [Self::Pair]. Allocates a new [Rc].
@@ -315,6 +330,59 @@ impl Type {
     }
 }
 
+/// Iterative `PartialEq` so that comparing two deeply nested types (e.g.
+/// the two arms of an IF whose unify_stacks runs ensure_ty_eq on a 100k
+/// deep pair type) does not blow the WASM call stack. Semantics match
+/// what `#[derive(PartialEq)]` would produce: structural equality, with
+/// `PairBox` and `SingleBox` compared by their inner values.
+impl PartialEq for Type {
+    fn eq(&self, other: &Self) -> bool {
+        use Type::*;
+        // SmallVec to avoid a per-call heap allocation on shallow types —
+        // this runs per control-flow stack-merge (IF/LOOP/MAP/ITER); deep
+        // types spill to the heap as before.
+        let mut stack: smallvec::SmallVec<[(&Type, &Type); 8]> = smallvec::smallvec![(self, other)];
+        while let Some((a, b)) = stack.pop() {
+            match (a, b) {
+                (Nat, Nat)
+                | (Int, Int)
+                | (Bool, Bool)
+                | (Mutez, Mutez)
+                | (String, String)
+                | (Unit, Unit)
+                | (Never, Never)
+                | (Operation, Operation)
+                | (Address, Address)
+                | (ChainId, ChainId)
+                | (Bytes, Bytes)
+                | (Key, Key)
+                | (Signature, Signature)
+                | (KeyHash, KeyHash)
+                | (Timestamp, Timestamp) => {}
+                #[cfg(feature = "bls")]
+                (Bls12381Fr, Bls12381Fr) | (Bls12381G1, Bls12381G1) | (Bls12381G2, Bls12381G2) => {}
+                (Pair(p), Pair(q))
+                | (Or(p), Or(q))
+                | (Map(p), Map(q))
+                | (BigMap(p), BigMap(q))
+                | (Lambda(p), Lambda(q)) => {
+                    stack.push((&p.0, &q.0));
+                    stack.push((&p.1, &q.1));
+                }
+                (Option(p), Option(q))
+                | (List(p), List(q))
+                | (Set(p), Set(q))
+                | (Contract(p), Contract(q))
+                | (Ticket(p), Ticket(q)) => {
+                    stack.push((p, q));
+                }
+                _ => return false,
+            }
+        }
+        true
+    }
+}
+
 /// Walk an owned tree iteratively. Used by the three manual `Drop` /
 /// drain impls below: each extracts the node's children into a heap
 /// worklist, leaving the leftover node trivial; this driver then keeps
@@ -327,7 +395,6 @@ fn drain_iteratively<T>(root: &mut T, mut extract: impl FnMut(&mut T, &mut Vec<T
         extract(&mut node, &mut stack);
     }
 }
-
 
 /// Manual `Drop` to avoid the recursive destructor that would otherwise
 /// blow the call stack on a deeply nested type. Walks an explicit
@@ -369,6 +436,13 @@ fn extract_type_children(node: &mut Type, stack: &mut Vec<Type>) {
 }
 
 impl<'a> IntoMicheline<'a> for &'_ Type {
+    /// Iterative tree fold over the input `Type`. Right leaning `Pair` combs
+    /// are linearized via `LinearizePairIter` so they emit a single flat
+    /// `App(pair, [...])`, matching the reference implementation. All other
+    /// branching variants (`Or`, `Map`, `BigMap`, `Lambda`) and the single
+    /// child variants (`Option`, `List`, `Set`, `Contract`, `Ticket`) flow
+    /// through a `frames: Vec<TyImFrame>` worklist so deeply nested input
+    /// does not blow the WASM call stack.
     fn into_micheline_optimized_legacy(
         self,
         arena: &'a Arena<Micheline<'a>>,
@@ -376,10 +450,10 @@ impl<'a> IntoMicheline<'a> for &'_ Type {
     ) -> Result<Micheline<'a>, OutOfGas> {
         use Type::*;
 
-        struct LinearizePairIter<'a>(std::option::Option<&'a Type>);
+        struct LinearizePairIter<'b>(std::option::Option<&'b Type>);
 
-        impl<'a> Iterator for LinearizePairIter<'a> {
-            type Item = &'a Type;
+        impl<'b> Iterator for LinearizePairIter<'b> {
+            type Item = &'b Type;
             fn next(&mut self) -> std::option::Option<Self::Item> {
                 match self.0 {
                     Some(Type::Pair(x)) => {
@@ -408,97 +482,123 @@ impl<'a> IntoMicheline<'a> for &'_ Type {
 
         impl ExactSizeIterator for LinearizePairIter<'_> {}
 
-        match self {
-            Nat => Micheline::prim0(Prim::nat, gas),
-            Int => Micheline::prim0(Prim::int, gas),
-            Bool => Micheline::prim0(Prim::bool, gas),
-            Mutez => Micheline::prim0(Prim::mutez, gas),
-            String => Micheline::prim0(Prim::string, gas),
-            Unit => Micheline::prim0(Prim::unit, gas),
-            Operation => Micheline::prim0(Prim::operation, gas),
-            Address => Micheline::prim0(Prim::address, gas),
-            ChainId => Micheline::prim0(Prim::chain_id, gas),
-            Bytes => Micheline::prim0(Prim::bytes, gas),
-            Key => Micheline::prim0(Prim::key, gas),
-            Signature => Micheline::prim0(Prim::signature, gas),
-            Timestamp => Micheline::prim0(Prim::timestamp, gas),
-            KeyHash => Micheline::prim0(Prim::key_hash, gas),
-            Never => Micheline::prim0(Prim::never, gas),
-            #[cfg(feature = "bls")]
-            Bls12381Fr => Micheline::prim0(Prim::bls12_381_fr, gas),
-            #[cfg(feature = "bls")]
-            Bls12381G1 => Micheline::prim0(Prim::bls12_381_g1, gas),
-            #[cfg(feature = "bls")]
-            Bls12381G2 => Micheline::prim0(Prim::bls12_381_g2, gas),
-
-            Option(x) => Micheline::prim1(
-                arena,
-                Prim::option,
-                x.into_micheline_optimized_legacy(arena, gas)?,
-                gas,
-            ),
-            List(x) => Micheline::prim1(
-                arena,
-                Prim::list,
-                x.into_micheline_optimized_legacy(arena, gas)?,
-                gas,
-            ),
-            Set(x) => Micheline::prim1(
-                arena,
-                Prim::set,
-                x.into_micheline_optimized_legacy(arena, gas)?,
-                gas,
-            ),
-            Contract(x) => Micheline::prim1(
-                arena,
-                Prim::contract,
-                x.into_micheline_optimized_legacy(arena, gas)?,
-                gas,
-            ),
-            Ticket(x) => Micheline::prim1(
-                arena,
-                Prim::ticket,
-                x.into_micheline_optimized_legacy(arena, gas)?,
-                gas,
-            ),
-
-            Pair(_) => {
-                let args = Micheline::alloc_iter(
-                    arena,
-                    LinearizePairIter(Some(self))
-                        .map(|x| x.into_micheline_optimized_legacy(arena, gas)),
-                )?;
-                Micheline::prim_n(Prim::pair, args, gas)
-            }
-            Map(x) => Micheline::prim2(
-                arena,
-                Prim::map,
-                x.0.into_micheline_optimized_legacy(arena, gas)?,
-                x.1.into_micheline_optimized_legacy(arena, gas)?,
-                gas,
-            ),
-            BigMap(x) => Micheline::prim2(
-                arena,
-                Prim::big_map,
-                x.0.into_micheline_optimized_legacy(arena, gas)?,
-                x.1.into_micheline_optimized_legacy(arena, gas)?,
-                gas,
-            ),
-            Or(x) => Micheline::prim2(
-                arena,
-                Prim::or,
-                x.0.into_micheline_optimized_legacy(arena, gas)?,
-                x.1.into_micheline_optimized_legacy(arena, gas)?,
-                gas,
-            ),
-            Lambda(x) => Micheline::prim2(
-                arena,
-                Prim::lambda,
-                x.0.into_micheline_optimized_legacy(arena, gas)?,
-                x.1.into_micheline_optimized_legacy(arena, gas)?,
-                gas,
-            ),
+        // Worklist-driver invariant: every `Build*` frame pops exactly the
+        // number of `results` its construction site pushed `Visit` frames
+        // for (1 for `BuildPrim1`, 2 for `BuildPrim2`, `count` for
+        // `BuildPairChain`). The `.expect`s / `results.len() - count`
+        // arithmetic below are therefore unreachable on any well-formed
+        // input — a panic here would indicate a frame-state-machine bug
+        // in the `Visit` arm above, not an attacker-triggerable PVM trap.
+        // (A typed `IntoMichelineError::Invariant(_)` variant could replace
+        // the `.expect`s; tracked as a follow-up since it widens the
+        // trait's error type across every caller.)
+        enum TyImFrame<'b> {
+            Visit(&'b Type),
+            BuildPrim1(Prim),
+            BuildPrim2(Prim),
+            BuildPairChain { count: usize },
         }
+
+        let mut frames: Vec<TyImFrame<'_>> = vec![TyImFrame::Visit(self)];
+        let mut results: Vec<Micheline<'a>> = Vec::new();
+
+        while let Some(frame) = frames.pop() {
+            match frame {
+                TyImFrame::Visit(ty) => match ty {
+                    Nat => results.push(Micheline::prim0(Prim::nat, gas)?),
+                    Int => results.push(Micheline::prim0(Prim::int, gas)?),
+                    Bool => results.push(Micheline::prim0(Prim::bool, gas)?),
+                    Mutez => results.push(Micheline::prim0(Prim::mutez, gas)?),
+                    String => results.push(Micheline::prim0(Prim::string, gas)?),
+                    Unit => results.push(Micheline::prim0(Prim::unit, gas)?),
+                    Operation => results.push(Micheline::prim0(Prim::operation, gas)?),
+                    Address => results.push(Micheline::prim0(Prim::address, gas)?),
+                    ChainId => results.push(Micheline::prim0(Prim::chain_id, gas)?),
+                    Bytes => results.push(Micheline::prim0(Prim::bytes, gas)?),
+                    Key => results.push(Micheline::prim0(Prim::key, gas)?),
+                    Signature => results.push(Micheline::prim0(Prim::signature, gas)?),
+                    Timestamp => results.push(Micheline::prim0(Prim::timestamp, gas)?),
+                    KeyHash => results.push(Micheline::prim0(Prim::key_hash, gas)?),
+                    Never => results.push(Micheline::prim0(Prim::never, gas)?),
+                    #[cfg(feature = "bls")]
+                    Bls12381Fr => results.push(Micheline::prim0(Prim::bls12_381_fr, gas)?),
+                    #[cfg(feature = "bls")]
+                    Bls12381G1 => results.push(Micheline::prim0(Prim::bls12_381_g1, gas)?),
+                    #[cfg(feature = "bls")]
+                    Bls12381G2 => results.push(Micheline::prim0(Prim::bls12_381_g2, gas)?),
+
+                    Option(x) => {
+                        frames.push(TyImFrame::BuildPrim1(Prim::option));
+                        frames.push(TyImFrame::Visit(x));
+                    }
+                    List(x) => {
+                        frames.push(TyImFrame::BuildPrim1(Prim::list));
+                        frames.push(TyImFrame::Visit(x));
+                    }
+                    Set(x) => {
+                        frames.push(TyImFrame::BuildPrim1(Prim::set));
+                        frames.push(TyImFrame::Visit(x));
+                    }
+                    Contract(x) => {
+                        frames.push(TyImFrame::BuildPrim1(Prim::contract));
+                        frames.push(TyImFrame::Visit(x));
+                    }
+                    Ticket(x) => {
+                        frames.push(TyImFrame::BuildPrim1(Prim::ticket));
+                        frames.push(TyImFrame::Visit(x));
+                    }
+
+                    Pair(_) => {
+                        let children: Vec<&Type> = LinearizePairIter(Some(ty)).collect();
+                        let count = children.len();
+                        frames.push(TyImFrame::BuildPairChain { count });
+                        for child in children.into_iter().rev() {
+                            frames.push(TyImFrame::Visit(child));
+                        }
+                    }
+                    Map(x) => {
+                        frames.push(TyImFrame::BuildPrim2(Prim::map));
+                        frames.push(TyImFrame::Visit(&x.1));
+                        frames.push(TyImFrame::Visit(&x.0));
+                    }
+                    BigMap(x) => {
+                        frames.push(TyImFrame::BuildPrim2(Prim::big_map));
+                        frames.push(TyImFrame::Visit(&x.1));
+                        frames.push(TyImFrame::Visit(&x.0));
+                    }
+                    Or(x) => {
+                        frames.push(TyImFrame::BuildPrim2(Prim::or));
+                        frames.push(TyImFrame::Visit(&x.1));
+                        frames.push(TyImFrame::Visit(&x.0));
+                    }
+                    Lambda(x) => {
+                        frames.push(TyImFrame::BuildPrim2(Prim::lambda));
+                        frames.push(TyImFrame::Visit(&x.1));
+                        frames.push(TyImFrame::Visit(&x.0));
+                    }
+                },
+
+                TyImFrame::BuildPrim1(prim) => {
+                    let arg = results.pop().expect("BuildPrim1: missing result");
+                    results.push(Micheline::prim1(arena, prim, arg, gas)?);
+                }
+                TyImFrame::BuildPrim2(prim) => {
+                    let arg2 = results.pop().expect("BuildPrim2: missing arg2");
+                    let arg1 = results.pop().expect("BuildPrim2: missing arg1");
+                    results.push(Micheline::prim2(arena, prim, arg1, arg2, gas)?);
+                }
+                TyImFrame::BuildPairChain { count } => {
+                    let start = results.len() - count;
+                    // The drain iterator does not allocate in the arena, so
+                    // the alloc_extend pothole does not apply here.
+                    #[allow(clippy::disallowed_methods)]
+                    let slice = arena.alloc_extend(results.drain(start..));
+                    results.push(Micheline::prim_n(Prim::pair, slice, gas)?);
+                }
+            }
+        }
+
+        Ok(results.pop().expect("final result"))
     }
 }
 
@@ -555,6 +655,12 @@ pub enum TypedValue<'a> {
 }
 
 impl<'a> IntoMicheline<'a> for TypedValue<'a> {
+    /// Iterative tree fold over the input [`TypedValue`] driven by a
+    /// `frames: Vec<TvImFrame>` worklist plus a `results: Vec<Micheline>`
+    /// output stack. Replaces the previous recursive `go` / `go_rc`
+    /// closures so deeply nested values (e.g. a comb of `Pair … (Pair x y)`
+    /// built dynamically through `UNIT ; PAIR` and then passed to `PACK`)
+    /// do not blow the WASM call stack.
     fn into_micheline_optimized_legacy(
         self,
         arena: &'a Arena<Micheline<'a>>,
@@ -562,155 +668,406 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
     ) -> Result<Micheline<'a>, OutOfGas> {
         use Micheline as V;
         use TypedValue as TV;
-        let go = |x: Self, gas: &mut Gas| x.into_micheline_optimized_legacy(arena, gas);
-        let go_rc = |x: Rc<Self>, gas: &mut Gas| go(TypedValue::unwrap_rc(x), gas);
-        let option_into_micheline = |x: Option<Self>, gas: &mut Gas| match x {
-            None => V::prim0(Prim::None, gas),
-            Some(x) => V::prim1(arena, Prim::Some, go(x, gas)?, gas),
-        };
 
-        match self {
-            TV::Int(i) => V::int(i, gas),
-            TV::Nat(u) => V::int(u.into(), gas),
-            TV::Mutez(u) => V::int(u.into(), gas),
-            TV::Bool(true) => V::prim0(Prim::True, gas),
-            TV::Bool(false) => V::prim0(Prim::False, gas),
-            TV::String(s) => V::string(s, gas),
-            TV::Unit => V::prim0(Prim::Unit, gas),
-            // This transformation for pairs deviates from the optimized representation of the
-            // reference implementation, because reference implementation optimizes the size of combs
-            // and uses an untyped representation that is the shortest.
-            TV::Pair(l, r) => V::prim2(arena, Prim::Pair, go_rc(l, gas)?, go_rc(r, gas)?, gas),
-            TV::List(l) => {
-                let args = V::alloc_iter(arena, l.into_iter().map(|x| go_rc(x, gas)))?;
-                V::seq(args, gas)
-            }
-            TV::Set(s) => {
-                let args = V::alloc_iter(arena, s.into_iter().map(|x| go_rc(x, gas)))?;
-                V::seq(args, gas)
-            }
-            TV::Map(m) => {
-                let args = V::alloc_iter(
-                    arena,
-                    m.into_iter().map(|(key, val)| {
-                        V::prim2(arena, Prim::Elt, go_rc(key, gas)?, go_rc(val, gas)?, gas)
-                    }),
-                )?;
-                V::seq(args, gas)
-            }
-            TV::BigMap(m) => match m.content {
-                big_map::BigMapContent::InMemory(m) => {
-                    let args = V::alloc_iter(
-                        arena,
-                        m.into_iter().map(|(key, val)| {
-                            V::prim2(arena, Prim::Elt, go(key, gas)?, go(val, gas)?, gas)
-                        }),
-                    )?;
-                    V::seq(args, gas)
-                }
-                big_map::BigMapContent::FromId(m) => {
-                    let id_part = V::int(m.id.value.into(), gas)?;
-                    let overlay_empty = m.overlay.is_empty();
-                    if overlay_empty {
-                        Ok(id_part)
-                    } else {
-                        let args = V::alloc_iter(
-                            arena,
-                            m.overlay.into_iter().map(|(key, val)| {
-                                V::prim2(
-                                    arena,
-                                    Prim::Elt,
-                                    go(key, gas)?,
-                                    option_into_micheline(val, gas)?,
-                                    gas,
-                                )
-                            }),
-                        )?;
-                        let map_part = V::seq(args, gas)?;
-                        V::prim2(arena, Prim::Pair, id_part, map_part, gas)
+        // Worklist-driver invariant: every `Build*` frame pops exactly the
+        // number of `results` its construction site pushed `Visit` frames
+        // for (per-variant pop counts are documented inline below). The
+        // `.expect`s / `results.len() - count` arithmetic in the `Build*`
+        // arms are therefore unreachable on any well-formed input — a panic
+        // here would indicate a frame-state-machine bug in the `Visit` arm
+        // above, not an attacker-triggerable PVM trap. (A typed
+        // `IntoMichelineError::Invariant(_)` variant could replace the
+        // `.expect`s; tracked as a follow-up since it widens the trait's
+        // error type across every caller.)
+        enum TvImFrame<'b> {
+            /// Owned input to process; produces one `Micheline` on `results`.
+            Visit(TypedValue<'b>),
+            /// Emit a precomputed `Micheline` directly (used for the `None`
+            /// arm of a `BigMap` `FromId` overlay value).
+            Leaf(Micheline<'b>),
+            /// Pops 1: `prim1(prim, x)`. Covers Some / Left / Right.
+            BuildPrim1(Prim),
+            /// Pops 2: `prim2(prim, left, right)`. Covers Pair / Elt.
+            BuildPrim2(Prim),
+            /// Pops `count`: `Seq([..])`.
+            BuildSeqOf { count: usize },
+            /// Pops 3: `prim3(Transfer_tokens, param, addr, mutez)`.
+            BuildTransferTokens,
+            /// Pops 1: `prim_n(Emit, [value, arg_ty_mich])`, then annotates
+            /// with the field tag (so the annotation gas charge is applied).
+            BuildEmit {
+                arg_ty_mich: Micheline<'b>,
+                tag: Option<FieldAnnotation<'b>>,
+            },
+            /// Pops 1: `App(Create_contract, [code, delegate, mutez, storage], no_anns)`.
+            BuildCreateContract {
+                code_mich: Micheline<'b>,
+                delegate_mich: Micheline<'b>,
+                mutez_mich: Micheline<'b>,
+            },
+            /// Pops `count`: assembles `BigMap` `FromId` final result as
+            /// `prim2(Pair, id_part, Seq([elts]))`.
+            BuildBigMapFromId {
+                id_part: Micheline<'b>,
+                count: usize,
+            },
+            /// Pops `arg_ty_michs.len()` unparsed `APPLY` arg values (the
+            /// closure's captured `arg_val`s, drained via `Visit` so a deep
+            /// chain of lambda-valued args does not recurse) and assembles the
+            /// nested `seq[PUSH(arg_ty, arg_val); PAIR; …]` closure encoding.
+            /// `arg_ty_michs` are the (already unparsed) captured arg types,
+            /// outer-to-inner; `inner_tail` is the innermost seq's tail after
+            /// `PUSH; PAIR` (the lambda body, or `LAMBDA_REC; SWAP; EXEC`).
+            BuildClosure {
+                arg_ty_michs: Vec<Micheline<'b>>,
+                inner_tail: Vec<Micheline<'b>>,
+            },
+        }
+
+        let mut frames: Vec<TvImFrame<'a>> = vec![TvImFrame::Visit(self)];
+        let mut results: Vec<Micheline<'a>> = Vec::new();
+
+        while let Some(frame) = frames.pop() {
+            match frame {
+                TvImFrame::Leaf(m) => results.push(m),
+                TvImFrame::Visit(v) => match v {
+                    TV::Int(i) => results.push(V::int(i, gas)?),
+                    TV::Nat(u) => results.push(V::int(u.into(), gas)?),
+                    TV::Mutez(u) => results.push(V::int(u.into(), gas)?),
+                    TV::Bool(true) => results.push(V::prim0(Prim::True, gas)?),
+                    TV::Bool(false) => results.push(V::prim0(Prim::False, gas)?),
+                    TV::String(s) => results.push(V::string(s, gas)?),
+                    TV::Unit => results.push(V::prim0(Prim::Unit, gas)?),
+                    TV::Address(x) => results.push(V::bytes(x.to_bytes_vec(), gas)?),
+                    TV::ChainId(x) => results.push(V::bytes(x.into(), gas)?),
+                    TV::Bytes(x) => results.push(V::bytes(x, gas)?),
+                    // to_bytes() cannot fail for a well-formed key.
+                    TV::Key(k) => results.push(V::bytes(k.to_bytes().unwrap(), gas)?),
+                    TV::Signature(s) => results.push(V::bytes(s.into(), gas)?),
+                    // to_bytes() cannot fail for a well-formed key hash.
+                    TV::KeyHash(s) => results.push(V::bytes(s.to_bytes().unwrap(), gas)?),
+                    TV::Timestamp(s) => results.push(V::int(s, gas)?),
+                    TV::Contract(x) => results.push(V::bytes(x.to_bytes_vec(), gas)?),
+                    TV::Lambda(closure) => {
+                        // Flatten the closure onto this worklist: a captured
+                        // `APPLY` arg (`Closure::Apply.arg_val`) may itself be a
+                        // deep lambda, so unparsing it via a recursive
+                        // `Closure -> TypedValue` call could overflow the stack.
+                        // The arg *types* (and a LambdaRec's in/out types) are
+                        // `Type`s, whose own `into_micheline` is iterative, so
+                        // they are unparsed synchronously here; only the arg
+                        // *values* are pushed back as `Visit` frames.
+                        let mut applies: Vec<(Type, TypedValue<'a>)> = Vec::new();
+                        let mut cur = closure;
+                        let terminal = loop {
+                            match cur {
+                                Closure::Apply {
+                                    arg_ty,
+                                    arg_val,
+                                    closure,
+                                } => {
+                                    applies.push((arg_ty, *arg_val));
+                                    cur = *closure;
+                                }
+                                Closure::Lambda(lambda) => break lambda,
+                            }
+                        };
+                        if applies.is_empty() {
+                            // Bare lambda: emit its stored Micheline directly.
+                            results.push(match terminal {
+                                Lambda::Lambda { micheline_code, .. } => micheline_code,
+                                Lambda::LambdaRec { micheline_code, .. } => {
+                                    V::prim1(arena, Prim::Lambda_rec, micheline_code, gas)?
+                                }
+                            });
+                        } else {
+                            // Tail of the innermost seq, after `PUSH; PAIR`.
+                            let inner_tail: Vec<V<'a>> = match terminal {
+                                Lambda::Lambda { micheline_code, .. } => vec![micheline_code],
+                                Lambda::LambdaRec {
+                                    in_ty,
+                                    out_ty,
+                                    micheline_code,
+                                    ..
+                                } => vec![
+                                    V::prim3(
+                                        arena,
+                                        Prim::LAMBDA_REC,
+                                        (&in_ty).into_micheline_optimized_legacy(arena, gas)?,
+                                        (&out_ty).into_micheline_optimized_legacy(arena, gas)?,
+                                        micheline_code,
+                                        gas,
+                                    )?,
+                                    V::prim0(Prim::SWAP, gas)?,
+                                    V::prim0(Prim::EXEC, gas)?,
+                                ],
+                            };
+                            let mut arg_ty_michs: Vec<V<'a>> = Vec::with_capacity(applies.len());
+                            let mut arg_vals: Vec<TypedValue<'a>> =
+                                Vec::with_capacity(applies.len());
+                            for (arg_ty, arg_val) in applies {
+                                arg_ty_michs
+                                    .push((&arg_ty).into_micheline_optimized_legacy(arena, gas)?);
+                                arg_vals.push(arg_val);
+                            }
+                            frames.push(TvImFrame::BuildClosure {
+                                arg_ty_michs,
+                                inner_tail,
+                            });
+                            // Reverse-push so arg values land in `results` in
+                            // outer-to-inner order.
+                            while let Some(arg_val) = arg_vals.pop() {
+                                frames.push(TvImFrame::Visit(arg_val));
+                            }
+                        }
                     }
-                }
-            },
-            TV::Option(x) => option_into_micheline(x.map(TypedValue::unwrap_rc), gas),
-            TV::Or(or) => match or {
-                Or::Left(x) => V::prim1(arena, Prim::Left, go_rc(x, gas)?, gas),
-                Or::Right(x) => V::prim1(arena, Prim::Right, go_rc(x, gas)?, gas),
-            },
-            TV::Address(x) => V::bytes(x.to_bytes_vec(), gas),
-            TV::ChainId(x) => V::bytes(x.into(), gas),
-            TV::Bytes(x) => V::bytes(x, gas),
-            // to_bytes() cannot fail for a well-formed key.
-            TV::Key(k) => V::bytes(k.to_bytes().unwrap(), gas),
-            TV::Signature(s) => V::bytes(s.into(), gas),
-            TV::Lambda(lam) => lam.into_micheline_optimized_legacy(arena, gas),
-            // to_bytes() cannot fail for a well-formed key hash.
-            TV::KeyHash(s) => V::bytes(s.to_bytes().unwrap(), gas),
-            TV::Timestamp(s) => V::int(s, gas),
-            TV::Contract(x) => go(TV::Address(x), gas),
-            TV::Operation(operation_info) => match operation_info.operation {
-                Operation::TransferTokens(tt) => Micheline::prim3(
-                    arena,
-                    Prim::Transfer_tokens,
-                    go(tt.param, gas)?,
-                    go(TV::Address(tt.destination_address), gas)?,
-                    go(TV::Mutez(tt.amount), gas)?,
-                    gas,
-                ),
-                Operation::SetDelegate(sd) => Micheline::prim1(
-                    arena,
-                    Prim::Set_delegate,
-                    match sd.0 {
-                        Some(kh) => V::prim1(arena, Prim::Some, go(TV::KeyHash(kh), gas)?, gas)?,
-                        None => V::prim0(Prim::None, gas)?,
+                    #[cfg(feature = "bls")]
+                    TV::Bls12381Fr(x) => results.push(V::bytes(x.to_bytes().to_vec(), gas)?),
+                    #[cfg(feature = "bls")]
+                    TV::Bls12381G1(x) => results.push(V::bytes(x.to_bytes().to_vec(), gas)?),
+                    #[cfg(feature = "bls")]
+                    TV::Bls12381G2(x) => results.push(V::bytes(x.to_bytes().to_vec(), gas)?),
+
+                    // This transformation for pairs deviates from the optimized
+                    // representation of the reference implementation, because
+                    // reference implementation optimizes the size of combs and uses
+                    // an untyped representation that is the shortest.
+                    TV::Pair(l, r) => {
+                        frames.push(TvImFrame::BuildPrim2(Prim::Pair));
+                        frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(r)));
+                        frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(l)));
+                    }
+                    TV::Option(None) => results.push(V::prim0(Prim::None, gas)?),
+                    TV::Option(Some(rc)) => {
+                        frames.push(TvImFrame::BuildPrim1(Prim::Some));
+                        frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(rc)));
+                    }
+                    TV::Or(or) => match or {
+                        Or::Left(x) => {
+                            frames.push(TvImFrame::BuildPrim1(Prim::Left));
+                            frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(x)));
+                        }
+                        Or::Right(x) => {
+                            frames.push(TvImFrame::BuildPrim1(Prim::Right));
+                            frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(x)));
+                        }
                     },
-                    gas,
-                ),
-                Operation::Emit(em) => {
-                    let mut node = Micheline::prim_n_arr(
-                        arena,
-                        Prim::Emit,
-                        [
-                            go(em.value, gas)?,
-                            match em.arg_ty {
+                    TV::List(l) => {
+                        let mut elems: Vec<TypedValue<'a>> =
+                            l.into_iter().map(TypedValue::unwrap_rc).collect();
+                        frames.push(TvImFrame::BuildSeqOf { count: elems.len() });
+                        while let Some(elem) = elems.pop() {
+                            frames.push(TvImFrame::Visit(elem));
+                        }
+                    }
+                    TV::Set(s) => {
+                        let mut elems: Vec<TypedValue<'a>> =
+                            s.into_iter().map(TypedValue::unwrap_rc).collect();
+                        frames.push(TvImFrame::BuildSeqOf { count: elems.len() });
+                        while let Some(elem) = elems.pop() {
+                            frames.push(TvImFrame::Visit(elem));
+                        }
+                    }
+                    TV::Map(m) => {
+                        let mut entries: Vec<(Rc<Self>, Rc<Self>)> = m.into_iter().collect();
+                        frames.push(TvImFrame::BuildSeqOf {
+                            count: entries.len(),
+                        });
+                        while let Some((key, val)) = entries.pop() {
+                            frames.push(TvImFrame::BuildPrim2(Prim::Elt));
+                            frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(val)));
+                            frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(key)));
+                        }
+                    }
+                    TV::BigMap(m) => match m.content {
+                        big_map::BigMapContent::InMemory(m) => {
+                            let mut entries: Vec<(Self, Self)> = m.into_iter().collect();
+                            frames.push(TvImFrame::BuildSeqOf {
+                                count: entries.len(),
+                            });
+                            while let Some((key, val)) = entries.pop() {
+                                frames.push(TvImFrame::BuildPrim2(Prim::Elt));
+                                frames.push(TvImFrame::Visit(val));
+                                frames.push(TvImFrame::Visit(key));
+                            }
+                        }
+                        big_map::BigMapContent::FromId(m) => {
+                            let id_part = V::int(m.id.value.into(), gas)?;
+                            if m.overlay.is_empty() {
+                                results.push(id_part);
+                            } else {
+                                let mut overlay: Vec<(Self, Option<Self>)> =
+                                    m.overlay.into_iter().collect();
+                                frames.push(TvImFrame::BuildBigMapFromId {
+                                    id_part,
+                                    count: overlay.len(),
+                                });
+                                while let Some((key, val)) = overlay.pop() {
+                                    frames.push(TvImFrame::BuildPrim2(Prim::Elt));
+                                    match val {
+                                        Some(v) => {
+                                            frames.push(TvImFrame::BuildPrim1(Prim::Some));
+                                            frames.push(TvImFrame::Visit(v));
+                                        }
+                                        None => {
+                                            frames.push(TvImFrame::Leaf(V::prim0(Prim::None, gas)?));
+                                        }
+                                    }
+                                    frames.push(TvImFrame::Visit(key));
+                                }
+                            }
+                        }
+                    },
+                    TV::Ticket(t) => {
+                        // unwrap_ticket builds a (small) Pair chain; let it flow through Visit.
+                        frames.push(TvImFrame::Visit(unwrap_ticket(t.as_ref().clone())));
+                    }
+                    TV::Operation(operation_info) => match operation_info.operation {
+                        Operation::TransferTokens(tt) => {
+                            frames.push(TvImFrame::BuildTransferTokens);
+                            frames.push(TvImFrame::Visit(TV::Mutez(tt.amount)));
+                            frames.push(TvImFrame::Visit(TV::Address(tt.destination_address)));
+                            frames.push(TvImFrame::Visit(tt.param));
+                        }
+                        Operation::SetDelegate(sd) => {
+                            // Inner value is a leaf (`Some(KeyHash)` or `None`) so this
+                            // is fully eager; no Visit needed.
+                            let inner = match sd.0 {
+                                Some(kh) => V::prim1(
+                                    arena,
+                                    Prim::Some,
+                                    V::bytes(kh.to_bytes().unwrap(), gas)?,
+                                    gas,
+                                )?,
+                                None => V::prim0(Prim::None, gas)?,
+                            };
+                            results.push(V::prim1(arena, Prim::Set_delegate, inner, gas)?);
+                        }
+                        Operation::Emit(em) => {
+                            let arg_ty_mich = match em.arg_ty {
                                 Or::Right(mich) => mich,
-                                Or::Left(typ) => typ.into_micheline_optimized_legacy(arena, gas)?,
-                            },
-                        ],
-                        gas,
-                    )?;
-                    if let Some(tag) = em.tag {
+                                Or::Left(typ) => {
+                                    (&typ).into_micheline_optimized_legacy(arena, gas)?
+                                }
+                            };
+                            frames.push(TvImFrame::BuildEmit {
+                                arg_ty_mich,
+                                tag: em.tag,
+                            });
+                            frames.push(TvImFrame::Visit(em.value));
+                        }
+                        Operation::CreateContract(cc) => {
+                            let delegate_mich = match cc.delegate {
+                                Some(kh) => {
+                                    let addr = Address {
+                                        hash: AddressHash::from(kh),
+                                        entrypoint: Entrypoint::default(),
+                                    };
+                                    V::prim1(
+                                        arena,
+                                        Prim::Some,
+                                        V::bytes(addr.to_bytes_vec(), gas)?,
+                                        gas,
+                                    )?
+                                }
+                                None => V::prim0(Prim::None, gas)?,
+                            };
+                            let mutez_mich = V::int(cc.amount.into(), gas)?;
+                            let code_mich = cc.micheline_code.clone();
+                            frames.push(TvImFrame::BuildCreateContract {
+                                code_mich,
+                                delegate_mich,
+                                mutez_mich,
+                            });
+                            frames.push(TvImFrame::Visit(cc.storage));
+                        }
+                    },
+                },
+
+                TvImFrame::BuildPrim1(prim) => {
+                    let inner = results.pop().expect("BuildPrim1: missing inner");
+                    results.push(V::prim1(arena, prim, inner, gas)?);
+                }
+                TvImFrame::BuildPrim2(prim) => {
+                    let right = results.pop().expect("BuildPrim2: missing right");
+                    let left = results.pop().expect("BuildPrim2: missing left");
+                    results.push(V::prim2(arena, prim, left, right, gas)?);
+                }
+                TvImFrame::BuildSeqOf { count } => {
+                    let start = results.len() - count;
+                    // The drain iterator does not allocate in the arena.
+                    #[allow(clippy::disallowed_methods)]
+                    let slice = arena.alloc_extend(results.drain(start..));
+                    results.push(V::seq(slice, gas)?);
+                }
+                TvImFrame::BuildTransferTokens => {
+                    let mutez = results.pop().expect("BuildTransferTokens: missing mutez");
+                    let addr = results.pop().expect("BuildTransferTokens: missing addr");
+                    let param = results.pop().expect("BuildTransferTokens: missing param");
+                    results.push(V::prim3(arena, Prim::Transfer_tokens, param, addr, mutez, gas)?);
+                }
+                TvImFrame::BuildEmit { arg_ty_mich, tag } => {
+                    let value_mich = results.pop().expect("BuildEmit: missing value");
+                    let mut node =
+                        Micheline::prim_n_arr(arena, Prim::Emit, [value_mich, arg_ty_mich], gas)?;
+                    // Use `annotate` (not a raw stamp-on) so the field-tag
+                    // annotation is charged `unparsing_cost::annotation`.
+                    if let Some(tag) = tag {
                         node.annotate(Annotation::Field(tag.into_cow()), gas)?;
                     }
-                    Ok(node)
+                    results.push(node);
                 }
-                Operation::CreateContract(cc) => Micheline::prim_n_arr(
-                    arena,
-                    Prim::Create_contract,
-                    [
-                        cc.micheline_code.clone(),
-                        go(
-                            TypedValue::new_option(cc.delegate.map(|x| {
-                                TypedValue::Address(Address {
-                                    hash: AddressHash::from(x),
-                                    entrypoint: Entrypoint::default(),
-                                })
-                            })),
-                            gas,
-                        )?,
-                        go(TypedValue::Mutez(cc.amount), gas)?,
-                        go(cc.storage, gas)?,
-                    ],
-                    gas,
-                ),
-            },
-            TV::Ticket(t) => go(unwrap_ticket(t.as_ref().clone()), gas),
-            #[cfg(feature = "bls")]
-            TV::Bls12381Fr(x) => V::bytes(x.to_bytes().to_vec(), gas),
-            #[cfg(feature = "bls")]
-            TV::Bls12381G1(x) => V::bytes(x.to_bytes().to_vec(), gas),
-            #[cfg(feature = "bls")]
-            TV::Bls12381G2(x) => V::bytes(x.to_bytes().to_vec(), gas),
+                TvImFrame::BuildCreateContract {
+                    code_mich,
+                    delegate_mich,
+                    mutez_mich,
+                } => {
+                    let storage_mich = results.pop().expect("BuildCreateContract: missing storage");
+                    results.push(Micheline::prim_n_arr(
+                        arena,
+                        Prim::Create_contract,
+                        [code_mich, delegate_mich, mutez_mich, storage_mich],
+                        gas,
+                    )?);
+                }
+                TvImFrame::BuildBigMapFromId { id_part, count } => {
+                    let start = results.len() - count;
+                    #[allow(clippy::disallowed_methods)]
+                    let slice = arena.alloc_extend(results.drain(start..));
+                    let map_part = V::seq(slice, gas)?;
+                    results.push(V::prim2(arena, Prim::Pair, id_part, map_part, gas)?);
+                }
+                TvImFrame::BuildClosure {
+                    mut arg_ty_michs,
+                    inner_tail,
+                } => {
+                    let k = arg_ty_michs.len();
+                    let start = results.len() - k;
+                    // Unparsed arg values, outer-to-inner (`results` order).
+                    let mut arg_val_michs: Vec<V<'a>> = results.drain(start..).collect();
+                    // Assemble inner-to-outer: pop the innermost (last) layer
+                    // first, then wrap outward.
+                    let at = arg_ty_michs.pop().expect("BuildClosure: arg_ty");
+                    let av = arg_val_michs.pop().expect("BuildClosure: arg_val");
+                    let mut inner: Vec<V<'a>> = Vec::with_capacity(2 + inner_tail.len());
+                    inner.push(V::prim2(arena, Prim::PUSH, at, av, gas)?);
+                    inner.push(V::prim0(Prim::PAIR, gas)?);
+                    inner.extend(inner_tail);
+                    #[allow(clippy::disallowed_methods)]
+                    let mut acc = V::seq(arena.alloc_extend(inner), gas)?;
+                    while let (Some(at), Some(av)) =
+                        (arg_ty_michs.pop(), arg_val_michs.pop())
+                    {
+                        let push = V::prim2(arena, Prim::PUSH, at, av, gas)?;
+                        let pair = V::prim0(Prim::PAIR, gas)?;
+                        acc = V::seq_arr(arena, [push, pair, acc], gas)?;
+                    }
+                    results.push(acc);
+                }
+            }
         }
+
+        Ok(results.pop().expect("final result"))
     }
 }
 
@@ -1511,6 +1868,43 @@ mod test_untypers {
         let result = outer_list.into_micheline_optimized_legacy(&arena, &mut gas);
         assert_eq!(result, Err(OutOfGas));
     }
+
+    /// Unparsing an `EMIT` value with a field tag must charge
+    /// `unparsing_cost::annotation` for the tag — the old `*a = annots`
+    /// stamp-on skipped it, under-charging tagged emits.
+    #[test]
+    fn emit_with_tag_charges_annotation_gas() {
+        use crate::gas::unparsing_cost;
+
+        fn emit(tag: Option<FieldAnnotation<'static>>) -> TypedValue<'static> {
+            TypedValue::Operation(Box::new(OperationInfo {
+                operation: Operation::Emit(Emit {
+                    tag,
+                    value: TypedValue::Unit,
+                    arg_ty: Or::Left(Type::Unit),
+                }),
+                counter: 0,
+            }))
+        }
+        fn unparse(tv: TypedValue<'static>) -> u32 {
+            let arena = Arena::new();
+            let mut gas = Gas::default();
+            tv.into_micheline_optimized_legacy(&arena, &mut gas).unwrap();
+            Gas::default().milligas().unwrap() - gas.milligas().unwrap()
+        }
+
+        let used_no_tag = unparse(emit(None));
+        let used_tag = unparse(emit(Some(FieldAnnotation::from_str_unchecked("foo"))));
+        let expected = unparsing_cost::annotation(&Annotation::Field(
+            FieldAnnotation::from_str_unchecked("foo").into_cow(),
+        ))
+        .unwrap();
+        assert_eq!(
+            used_tag - used_no_tag,
+            expected,
+            "EMIT field tag must charge unparsing_cost::annotation"
+        );
+    }
 }
 
 #[cfg(test)]
@@ -1660,6 +2054,34 @@ mod drop_safety {
             map.insert(TypedValue::Unit, deep_pair(DEPTH));
             let mut tv = TypedValue::BigMap(BigMap::new(Type::Unit, Type::Unit, map));
             drain_deep_typed_value(&mut tv);
+        });
+    }
+
+    #[test]
+    fn pack_deep_apply_arg_lambda() {
+        // A closure whose captured APPLY arg is itself a lambda, nested deeply
+        // (`Apply { arg_val: Lambda(Apply { arg_val: Lambda(…) }) }`), must
+        // unparse (PACK) without recursing through Closure -> TypedValue per
+        // level. The worklist drains each `arg_val` as a Visit frame instead.
+        use crate::ast::{Closure, Lambda};
+        on_kernel_stack(|| {
+            let mk_terminal = || {
+                Closure::Lambda(Lambda::Lambda {
+                    micheline_code: Micheline::Seq(&[]),
+                    code: Vec::new().into(),
+                })
+            };
+            let mut tv = TypedValue::Lambda(mk_terminal());
+            for _ in 0..DEPTH {
+                tv = TypedValue::Lambda(Closure::Apply {
+                    arg_ty: Type::Unit,
+                    arg_val: Box::new(tv),
+                    closure: Box::new(mk_terminal()),
+                });
+            }
+            let arena = Arena::new();
+            let mut gas = Gas::unmetered();
+            tv.into_micheline_optimized_legacy(&arena, &mut gas).unwrap();
         });
     }
 }

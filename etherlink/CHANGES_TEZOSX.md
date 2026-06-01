@@ -74,9 +74,11 @@
   tooling that map big map ids to positions in the storage type can
   rely on this for both origination paths. (!21953)
 - MIR: prevent kernel stack overflow on deeply nested Michelson — Micheline
-  (de)serialization, typechecking, and interpretation now run on iterative
-  heap worklists instead of recursion, so adversarially deep input is bounded
-  by gas rather than trapping the PVM. (!21982, !21983, !21984)
+  (de)serialization, typechecking, interpretation, value/instruction
+  destruction, and the residual gas-sizing / type-equality / PACK walks now
+  run on iterative heap worklists instead of recursion, so adversarially deep
+  input is bounded by gas rather than trapping the PVM. (!21982, !21983,
+  !21984, !21985, !21986)
 - MIR: `UNPACK string` now rejects carriage return (`0x0d`) — and any
   other byte outside L1's permitted set of newline (`0x0a`) plus
   printable ASCII (`0x20..=0x7e`) — by returning `None` instead of

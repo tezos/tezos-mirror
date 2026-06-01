@@ -1382,10 +1382,7 @@ fn typecheck<'a, 'b>(
     opt_stack: &mut FailingTypeStack,
     in_view: bool,
 ) -> Result<Vec<Instruction<'a>>, TcError> {
-    let mut frames: Vec<TcIFrame<'a, 'b>> = vec![TcIFrame::NextInstr {
-        block: ast,
-        idx: 0,
-    }];
+    let mut frames: Vec<TcIFrame<'a, 'b>> = vec![TcIFrame::NextInstr { block: ast, idx: 0 }];
     // One accumulator per active block. The root accumulator is at index 0;
     // nested blocks push and pop their own.
     let mut block_results: Vec<Vec<Instruction<'a>>> = vec![Vec::new()];
@@ -1448,9 +1445,8 @@ fn typecheck<'a, 'b>(
                         // inner type) is what the None arm runs against;
                         // the Some arm needs its own clone with `some_top_ty`
                         // pushed on top.
-                        let mut some_stack: TypeStack = opt_stack
-                            .access_mut(TcError::FailNotInTail)?
-                            .clone();
+                        let mut some_stack: TypeStack =
+                            opt_stack.access_mut(TcError::FailNotInTail)?.clone();
                         some_stack.push(some_top_ty);
                         let saved_some_stack = FailingTypeStack::Ok(some_stack);
                         frames.push(parent);
@@ -1500,9 +1496,8 @@ fn typecheck<'a, 'b>(
                         // current opt_stack already has the left type pushed
                         // (set up by the step before yielding). Build the
                         // right stack from the clone.
-                        let mut right_stack: TypeStack = opt_stack
-                            .access_mut(TcError::FailNotInTail)?
-                            .clone();
+                        let mut right_stack: TypeStack =
+                            opt_stack.access_mut(TcError::FailNotInTail)?.clone();
                         // Replace the top of right_stack (currently the
                         // left type) with the right type.
                         *right_stack.get_mut(0)? = right_top_ty;
@@ -1518,14 +1513,14 @@ fn typecheck<'a, 'b>(
                             idx: 0,
                         });
                     }
-                    StepResult::OpenLoop {
-                        body,
-                        initial_copy,
-                    } => {
+                    StepResult::OpenLoop { body, initial_copy } => {
                         frames.push(parent);
                         frames.push(TcIFrame::AfterLoop { initial_copy });
                         block_results.push(Vec::new());
-                        frames.push(TcIFrame::NextInstr { block: body, idx: 0 });
+                        frames.push(TcIFrame::NextInstr {
+                            block: body,
+                            idx: 0,
+                        });
                     }
                     StepResult::OpenLoopLeft {
                         body,
@@ -1533,12 +1528,12 @@ fn typecheck<'a, 'b>(
                         r_ty,
                     } => {
                         frames.push(parent);
-                        frames.push(TcIFrame::AfterLoopLeft {
-                            initial_copy,
-                            r_ty,
-                        });
+                        frames.push(TcIFrame::AfterLoopLeft { initial_copy, r_ty });
                         block_results.push(Vec::new());
-                        frames.push(TcIFrame::NextInstr { block: body, idx: 0 });
+                        frames.push(TcIFrame::NextInstr {
+                            block: body,
+                            idx: 0,
+                        });
                     }
                     StepResult::OpenIter {
                         body,
@@ -1551,7 +1546,10 @@ fn typecheck<'a, 'b>(
                             outer_opt_stack,
                         });
                         block_results.push(Vec::new());
-                        frames.push(TcIFrame::NextInstr { block: body, idx: 0 });
+                        frames.push(TcIFrame::NextInstr {
+                            block: body,
+                            idx: 0,
+                        });
                     }
                     StepResult::OpenDip {
                         body,
@@ -1564,13 +1562,19 @@ fn typecheck<'a, 'b>(
                             protected,
                         });
                         block_results.push(Vec::new());
-                        frames.push(TcIFrame::NextInstr { block: body, idx: 0 });
+                        frames.push(TcIFrame::NextInstr {
+                            block: body,
+                            idx: 0,
+                        });
                     }
                     StepResult::OpenSeq { body } => {
                         frames.push(parent);
                         frames.push(TcIFrame::AfterSeq);
                         block_results.push(Vec::new());
-                        frames.push(TcIFrame::NextInstr { block: body, idx: 0 });
+                        frames.push(TcIFrame::NextInstr {
+                            block: body,
+                            idx: 0,
+                        });
                     }
                     StepResult::OpenLambda {
                         body,
@@ -1751,9 +1755,7 @@ fn typecheck<'a, 'b>(
             TcIFrame::AfterLoopLeft { initial_copy, r_ty } => {
                 let body = block_results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "loop_left body" }))?;
                 unify_stacks(gas, opt_stack, initial_copy)?;
-                *opt_stack
-                    .access_mut(TcError::FailNotInTail)?
-                    .get_mut(0)? = r_ty;
+                *opt_stack.access_mut(TcError::FailNotInTail)?.get_mut(0)? = r_ty;
                 block_results
                     .last_mut()
                     .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "loop_left parent" }))?
@@ -1924,7 +1926,6 @@ fn typecheck<'a, 'b>(
             where_: "typecheck driver tail (after len check)",
         }))
 }
-
 
 macro_rules! nothing_to_none {
     () => {
@@ -2850,24 +2851,36 @@ fn typecheck_instruction_step<'a, 'b>(
                 return Err(TcError::PairN01(UNPAIR, n));
             }
             gas.consume(tc_cost::unpair_n(n as usize)?)?;
-            fn fill(n: u16, stack: &mut Stack<Type>, p: &Type) -> Result<(), TcError> {
-                if n == 0 {
-                    stack.push(p.clone());
-                } else if let Type::Pair(p) = p {
-                    fill(n - 1, stack, &p.1)?;
-                    stack.push(p.0.clone());
-                } else {
-                    return Err(TcError::NoMatchingOverload {
-                        instr: UNPAIR,
-                        stack: stack.clone(),
-                        reason: Option::Some(NMOR::ExpectedPair(p.clone())),
-                    });
-                }
-                Ok(())
-            }
             stack.reserve(n as usize);
             let p = pop!();
-            fill(n - 1, stack, &p)?;
+            // Walk n-1 levels down the right spine of p, collecting left
+            // children. After the loop, current points at the deepest
+            // right element. Iterative form of the previous recursive fn;
+            // bounded by n <= 1023 but flattened so the recursion is not
+            // a latent WASM stack consumer.
+            let mut current: &Type = &p;
+            let mut lefts: Vec<Type> = Vec::with_capacity((n - 1) as usize);
+            for _ in 0..(n - 1) {
+                match current {
+                    Type::Pair(p) => {
+                        lefts.push(p.0.clone());
+                        current = &p.1;
+                    }
+                    other => {
+                        return Err(TcError::NoMatchingOverload {
+                            instr: UNPAIR,
+                            stack: stack.clone(),
+                            reason: Option::Some(NMOR::ExpectedPair(other.clone())),
+                        });
+                    }
+                }
+            }
+            // Original recursion pushed the deepest right first, then each
+            // left as it unwound. Mirror that order.
+            stack.push(current.clone());
+            for ty in lefts.into_iter().rev() {
+                stack.push(ty);
+            }
             I::UnpairN(n)
         }
         (App(UNPAIR, [Micheline::Int(_)], _), []) => no_overload!(UNPAIR, len 1),
@@ -3768,7 +3781,8 @@ fn set_ordering_check<'a>(
     next: &TypedValue<'a>,
 ) -> Result<(), TcError> {
     if let Some(prev) = prev {
-        ctx.gas().consume(gas::interpret_cost::compare(prev, next)?)?;
+        ctx.gas()
+            .consume(gas::interpret_cost::compare(prev, next)?)?;
         match prev.cmp(next) {
             std::cmp::Ordering::Less => Ok(()),
             std::cmp::Ordering::Equal => Err(TcError::DuplicateElements(set_ty.clone())),
@@ -3787,7 +3801,8 @@ fn map_key_ordering_check<'a>(
     next_key: &TypedValue<'a>,
 ) -> Result<(), TcError> {
     if let Some(prev) = prev_key {
-        ctx.gas().consume(gas::interpret_cost::compare(prev, next_key)?)?;
+        ctx.gas()
+            .consume(gas::interpret_cost::compare(prev, next_key)?)?;
         match prev.cmp(next_key) {
             std::cmp::Ordering::Less => Ok(()),
             std::cmp::Ordering::Equal => Err(TcError::DuplicateElements(map_ty.clone())),
@@ -3825,10 +3840,7 @@ pub fn typecheck_value<'a, 'b>(
     ctx: &mut impl TypecheckingCtx<'a>,
     t: &Type,
 ) -> Result<TypedValue<'a>, TcError> {
-    let mut frames: Vec<TvFrame<'a, 'b>> = vec![TvFrame::Visit {
-        v,
-        t: t.clone(),
-    }];
+    let mut frames: Vec<TvFrame<'a, 'b>> = vec![TvFrame::Visit { v, t: t.clone() }];
     let mut results: Vec<TypedValue<'a>> = Vec::new();
 
     while let Some(frame) = frames.pop() {
@@ -3938,10 +3950,7 @@ fn step_typecheck_value<'a, 'b>(
                     elem_t: elem_t.clone(),
                     acc,
                 });
-                frames.push(TvFrame::Visit {
-                    v: next,
-                    t: elem_t,
-                });
+                frames.push(TvFrame::Visit { v: next, t: elem_t });
             } else {
                 results.push(TV::List(MichelsonList::from(acc)));
             }
@@ -3966,10 +3975,7 @@ fn step_typecheck_value<'a, 'b>(
                     acc,
                     prev: next_prev,
                 });
-                frames.push(TvFrame::Visit {
-                    v: next,
-                    t: elem_t,
-                });
+                frames.push(TvFrame::Visit { v: next, t: elem_t });
             } else {
                 results.push(TV::Set(acc.into_iter().map(Rc::new).collect()));
             }
@@ -4073,10 +4079,7 @@ fn step_typecheck_value<'a, 'b>(
                             prev_key,
                             stage: BigMapDiffStage::AwaitingValue { key },
                         });
-                        frames.push(TvFrame::Visit {
-                            v: inner,
-                            t: val_t,
-                        });
+                        frames.push(TvFrame::Visit { v: inner, t: val_t });
                     }
                     V::App(Prim::None, [], _) => {
                         // None entry: no value typecheck; commit (key, None)
@@ -4327,7 +4330,10 @@ fn visit_value<'a, 'b>(
                     elem_t: elem_t.clone(),
                     acc: Vec::with_capacity(vs.len()),
                 });
-                frames.push(TvFrame::Visit { v: first, t: elem_t });
+                frames.push(TvFrame::Visit {
+                    v: first,
+                    t: elem_t,
+                });
             } else {
                 results.push(TV::List(MichelsonList::default()));
             }
@@ -4346,7 +4352,10 @@ fn visit_value<'a, 'b>(
                     acc: BTreeSet::new(),
                     prev: None,
                 });
-                frames.push(TvFrame::Visit { v: first, t: elem_t });
+                frames.push(TvFrame::Visit {
+                    v: first,
+                    t: elem_t,
+                });
             } else {
                 results.push(TV::Set(BTreeSet::new()));
             }
@@ -4354,10 +4363,8 @@ fn visit_value<'a, 'b>(
         (T::Map(m), V::Seq(vs)) => {
             let (tk, tv) = m.as_ref();
             let key_t = tk.clone();
-            ctx.gas().consume(gas::tc_cost::construct_map(
-                key_t.size_for_gas(),
-                vs.len(),
-            )?)?;
+            ctx.gas()
+                .consume(gas::tc_cost::construct_map(key_t.size_for_gas(), vs.len())?)?;
             visit_map_or_bigmap_inmem(
                 t.clone(),
                 vs,
@@ -4372,10 +4379,8 @@ fn visit_value<'a, 'b>(
             // In-memory big map: same syntax as a regular map.
             let (tk, tv) = m.as_ref();
             let key_t = tk.clone();
-            ctx.gas().consume(gas::tc_cost::construct_map(
-                key_t.size_for_gas(),
-                vs.len(),
-            )?)?;
+            ctx.gas()
+                .consume(gas::tc_cost::construct_map(key_t.size_for_gas(), vs.len())?)?;
             visit_map_or_bigmap_inmem(
                 t.clone(),
                 vs,
@@ -4422,10 +4427,8 @@ fn visit_value<'a, 'b>(
                     }));
                 }
                 Some(vs) => {
-                    ctx.gas().consume(gas::tc_cost::construct_map(
-                        key_t.size_for_gas(),
-                        vs.len(),
-                    )?)?;
+                    ctx.gas()
+                        .consume(gas::tc_cost::construct_map(key_t.size_for_gas(), vs.len())?)?;
                     if let Some((first_elt, rest)) = vs.split_first() {
                         let (k_expr, v_expr) = expect_elt(first_elt, &map_ty)?;
                         if !diff {
@@ -4516,17 +4519,17 @@ fn visit_value<'a, 'b>(
         }
         (T::Signature, V::String(str)) => {
             ctx.gas().consume(gas::tc_cost::KEY_READABLE)?;
-            results.push(TV::Signature(
-                Signature::from_base58_check(str)
-                    .map_err(|e| TcError::ByteReprError(T::Signature, e.into()))?,
-            ));
+            results
+                .push(TV::Signature(Signature::from_base58_check(str).map_err(
+                    |e| TcError::ByteReprError(T::Signature, e.into()),
+                )?));
         }
         (T::Signature, V::Bytes(bs)) => {
             ctx.gas().consume(gas::tc_cost::KEY_OPTIMIZED)?;
-            results.push(TV::Signature(
-                Signature::try_from(bs.clone())
-                    .map_err(|e| TcError::ByteReprError(T::Signature, e.into()))?,
-            ));
+            results
+                .push(TV::Signature(Signature::try_from(bs.clone()).map_err(
+                    |e| TcError::ByteReprError(T::Signature, e.into()),
+                )?));
         }
         (T::KeyHash, V::String(str)) => {
             ctx.gas().consume(gas::tc_cost::KEY_HASH_READABLE)?;
@@ -4642,9 +4645,7 @@ fn visit_value<'a, 'b>(
         #[cfg(feature = "bls")]
         (T::Bls12381Fr, V::Bytes(bs)) => {
             ctx.gas().consume(gas::tc_cost::BLS_FR)?;
-            results.push(TV::Bls12381Fr(
-                bls::Fr::from_bytes(bs).ok_or_else(invalid)?,
-            ));
+            results.push(TV::Bls12381Fr(bls::Fr::from_bytes(bs).ok_or_else(invalid)?));
         }
         #[cfg(feature = "bls")]
         (T::Bls12381G1, V::Bytes(bs)) => {
@@ -4885,10 +4886,7 @@ mod typecheck_tests {
             );
             let if_instr = Micheline::App(
                 Prim::IF,
-                arena.alloc_extend([
-                    Micheline::Seq(current_then),
-                    Micheline::Seq(&[]),
-                ]),
+                arena.alloc_extend([Micheline::Seq(current_then), Micheline::Seq(&[])]),
                 NO_ANNS,
             );
             current_then = arena.alloc_extend([push_true, if_instr]);
@@ -4910,8 +4908,8 @@ mod typecheck_tests {
         let program = arena.alloc_extend([push_true, root_if]);
         let mut gas = Gas::new(u32::MAX);
         let mut stack = tc_stk![];
-        let _result = typecheck(program, &mut gas, None, &mut stack, false)
-            .expect("deep IF typechecks");
+        let _result =
+            typecheck(program, &mut gas, None, &mut stack, false).expect("deep IF typechecks");
     }
 
     /// Typechecks a 100k deep right leaning pair value at the matching
@@ -4944,9 +4942,51 @@ mod typecheck_tests {
         }
         let mut ctx = Ctx::default();
         ctx.gas = Gas::new(u32::MAX);
-        let mut tv = typecheck_value(&v_node, &mut ctx, &parsed_ty)
-            .expect("deep pair value typechecks");
+        let mut tv =
+            typecheck_value(&v_node, &mut ctx, &parsed_ty).expect("deep pair value typechecks");
         crate::ast::drain_deep_typed_value(&mut tv);
+    }
+
+    /// Typechecks `IF {} {}` on a stack carrying a 100k deep `pair` type,
+    /// exercising the iterative `size_for_gas` and iterative `PartialEq`
+    /// on `Type` through unify_stacks / ensure_ty_eq. The previous
+    /// derive-based equality would have recursed to depth 100k and blown
+    /// the WASM stack.
+    #[test]
+    fn deeply_nested_if_unifies_deep_types() {
+        const DEPTH: usize = 100_000;
+        let mut deep = Type::Int;
+        for _ in 0..DEPTH {
+            deep = Type::new_pair(Type::Int, deep);
+        }
+        let mut stack = tc_stk![deep, Type::Bool];
+        let if_instr = parse("IF {} {}").unwrap();
+        let mut gas = Gas::new(u32::MAX);
+        typecheck_instruction(&if_instr, &mut gas, &mut stack).expect("IF unifies deep types");
+    }
+
+    /// Packs a 100k deep `TypedValue::Pair`, exercising the iterative
+    /// `TypedValue::into_micheline_optimized_legacy` plus iterative
+    /// `gas::collect_micheline_size`. Mirrors the PACK scenario from the
+    /// Linear "Prevent stack overflows in MIR" project (dynamically
+    /// building a deep value with `UNIT ; PAIR`, then packing it).
+    #[test]
+    fn deeply_nested_pair_packs() {
+        use crate::ast::IntoMicheline;
+        use std::rc::Rc;
+        const DEPTH: usize = 100_000;
+        let mut deep: TypedValue<'_> = TypedValue::Unit;
+        for _ in 0..DEPTH {
+            deep = TypedValue::Pair(Rc::new(TypedValue::Unit), Rc::new(deep));
+        }
+        let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+        let mich = deep
+            .into_micheline_optimized_legacy(&arena, &mut Gas::new(u32::MAX))
+            .expect("into_micheline succeeds");
+        let _bytes = mich
+            .encode_for_pack(&mut Gas::default())
+            .expect("gas suffices")
+            .expect("pack succeeds");
     }
 
     /// hack to simplify syntax in tests

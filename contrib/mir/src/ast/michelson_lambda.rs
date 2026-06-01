@@ -6,10 +6,7 @@
 
 use std::rc::Rc;
 
-use crate::{
-    gas::{Gas, OutOfGas},
-    lexer::Prim,
-};
+use crate::gas::{Gas, OutOfGas};
 
 use super::{Instruction, IntoMicheline, Micheline, Type, TypedValue};
 
@@ -67,69 +64,16 @@ pub enum Closure<'a> {
 }
 
 impl<'a> IntoMicheline<'a> for Closure<'a> {
+    /// Delegates to the iterative `TypedValue::Lambda(self)` unparser, whose
+    /// worklist flattens both the `Closure::Apply` spine and the captured arg
+    /// values (which may themselves be deep lambdas), so neither overflows the
+    /// WASM call stack.
     fn into_micheline_optimized_legacy(
         self,
         arena: &'a typed_arena::Arena<Micheline<'a>>,
         gas: &mut Gas,
     ) -> Result<Micheline<'a>, OutOfGas> {
-        Ok(match self {
-            Closure::Lambda(Lambda::Lambda { micheline_code, .. }) => micheline_code,
-            Closure::Lambda(Lambda::LambdaRec { micheline_code, .. }) => {
-                Micheline::prim1(arena, Prim::Lambda_rec, micheline_code, gas)?
-            }
-            Closure::Apply {
-                arg_ty,
-                arg_val,
-                closure,
-            } => match *closure {
-                Closure::Lambda(Lambda::LambdaRec {
-                    in_ty,
-                    out_ty,
-                    micheline_code,
-                    ..
-                }) => Micheline::seq_arr(
-                    arena,
-                    [
-                        Micheline::prim2(
-                            arena,
-                            Prim::PUSH,
-                            arg_ty.into_micheline_optimized_legacy(arena, gas)?,
-                            arg_val.into_micheline_optimized_legacy(arena, gas)?,
-                            gas,
-                        )?,
-                        Micheline::prim0(Prim::PAIR, gas)?,
-                        Micheline::prim3(
-                            arena,
-                            Prim::LAMBDA_REC,
-                            in_ty.into_micheline_optimized_legacy(arena, gas)?,
-                            out_ty.into_micheline_optimized_legacy(arena, gas)?,
-                            micheline_code,
-                            gas,
-                        )?,
-                        Micheline::prim0(Prim::SWAP, gas)?,
-                        Micheline::prim0(Prim::EXEC, gas)?,
-                    ],
-                    gas,
-                )?,
-                Closure::Apply { .. } | Closure::Lambda(Lambda::Lambda { .. }) => {
-                    Micheline::seq_arr(
-                        arena,
-                        [
-                            Micheline::prim2(
-                                arena,
-                                Prim::PUSH,
-                                arg_ty.into_micheline_optimized_legacy(arena, gas)?,
-                                arg_val.into_micheline_optimized_legacy(arena, gas)?,
-                                gas,
-                            )?,
-                            Micheline::prim0(Prim::PAIR, gas)?,
-                            closure.into_micheline_optimized_legacy(arena, gas)?,
-                        ],
-                        gas,
-                    )?
-                }
-            },
-        })
+        TypedValue::Lambda(self).into_micheline_optimized_legacy(arena, gas)
     }
 }
 
