@@ -593,6 +593,10 @@ let wait_for_drift_monitor_ready ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"drift_monitor_is_ready.v0"
   @@ Fun.const (Some ())
 
+let wait_for_prevalidator_is_ready ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"prevalidator_is_ready.v0"
+  @@ Fun.const (Some ())
+
 let wait_for_import_finished ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"import_finished.v0"
   @@ Fun.const (Some ())

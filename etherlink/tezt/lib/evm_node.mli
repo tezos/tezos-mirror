@@ -377,6 +377,8 @@ val wait_for_spawn_rpc_ready : ?timeout:float -> t -> unit Lwt.t
 
 val wait_for_drift_monitor_ready : ?timeout:float -> t -> unit Lwt.t
 
+val wait_for_prevalidator_is_ready : ?timeout:float -> t -> unit Lwt.t
+
 val wait_for_import_finished : ?timeout:float -> t -> unit Lwt.t
 
 val wait_for_finished_exporting_snapshot : ?timeout:float -> t -> string Lwt.t
