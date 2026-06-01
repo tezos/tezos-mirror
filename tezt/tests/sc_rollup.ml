@@ -8389,13 +8389,13 @@ let register_riscv_kernel ~protocols ~kernel =
     ~title:("node advances PVM state with messages (" ^ variant ^ ")")
     ~boot_sector
     ~inbox_file:inbox_file_uses ;
-  (* The refutation game scenario is too long to enable in merge pipelines and currently
-   * consumes too much memory to run as a regular slow test.
-   * It can be manually run as part of the `tezt-riscv-slow-sequential` job. *)
+  (* The refutation game scenario is too long to enable in merge pipelines.
+   * It can be manually run as part of the `tezt-riscv-slow` job,
+   * which also defines how many tests to run in parallel. *)
   test_refutation_scenario
     ~kind
     ~ci_disabled:true
-    ~extra_tags:["riscv_slow_sequential"]
+    ~extra_tags:["riscv_slow"]
     ~mode:Operator
     ~challenge_window:400
     ~timeout:400

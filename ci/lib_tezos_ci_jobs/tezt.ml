@@ -96,15 +96,16 @@ let job_tezt_time_sensitive =
     ~parallel_jobs:2
     ~retry_jobs:2
 
-let job_tezt_riscv_slow_sequential =
+let job_tezt_riscv_slow =
   Cacio.parameterize @@ fun pipeline ->
   tezt_job
-    "riscv-slow-sequential"
+    "riscv-slow"
     ~__POS__
     ~pipeline
-    ~description:"Run Tezt tests tagged as riscv_slow_sequential."
-    ~test_selection:(Tezt_core.TSL_AST.Has_tag "riscv_slow_sequential")
+    ~description:"Run Tezt tests tagged as riscv_slow."
+    ~test_selection:(Tezt_core.TSL_AST.Has_tag "riscv_slow")
     ~test_timeout:No_timeout
+      (* the two [etherlink] and [jstz] variants run in parallel *)
     ~parallel_tests:2
     ~retry_jobs:2
 
@@ -172,7 +173,7 @@ let register () =
     [
       (Auto, job_tezt `merge_request);
       (Auto, job_tezt_time_sensitive `merge_request);
-      (Manual, job_tezt_riscv_slow_sequential `merge_request);
+      (Manual, job_tezt_riscv_slow `merge_request);
       (Manual, job_tezt_slow `merge_request);
       (Manual, job_tezt_extra `merge_request);
       (Manual, job_tezt_flaky `merge_request);
@@ -183,7 +184,7 @@ let register () =
     [
       (Auto, job_tezt `scheduled);
       (Auto, job_tezt_time_sensitive `scheduled);
-      (Auto, job_tezt_riscv_slow_sequential `scheduled);
+      (Auto, job_tezt_riscv_slow `scheduled);
       (Auto, job_tezt_slow `scheduled);
       (Auto, job_tezt_extra `scheduled);
       (Auto, job_tezt_flaky `scheduled);

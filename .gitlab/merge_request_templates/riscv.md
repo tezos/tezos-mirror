@@ -40,7 +40,7 @@ make -C src/riscv all
   - `dune build src/rollup_node_rust_deps`
   - `dune build etherlink/lib_wasm_runtime`
   - `dune test src/lib_riscv`
-- [ ] If applicable, trigger the `tezt-riscv-slow-sequential` test job.
+- [ ] If applicable, trigger the `tezt-riscv-slow` test job.
 - [ ] Write commit messages to reflect the changes they're about.
 - [ ] Self-review your changes to ensure they are high-quality.
 - [ ] Complete all of the above before assigning this MR to reviewers.
