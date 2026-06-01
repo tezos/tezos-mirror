@@ -103,8 +103,12 @@
   (de)serialization, typechecking, interpretation, value/instruction
   destruction, and the residual gas-sizing / type-equality / PACK walks now
   run on iterative heap worklists instead of recursion, so adversarially deep
-  input is bounded by gas rather than trapping the PVM. (!21982, !21983,
-  !21984, !21985, !21986)
+  input is bounded by gas rather than trapping the PVM. Runtime-built deep
+  `TypedValue`s left on a value stack, in a control-flow worklist frame, or
+  inside `InterpretError::FailedWith` are flattened iteratively on the
+  interpreter's error-unwind path so their `Rc<TypedValue>` destructor cannot
+  overflow when the kernel drops the error or the caller-restored stack.
+  (!21982, !21983, !21984, !21985, !21986, !22025)
 - MIR: `UNPACK string` now rejects carriage return (`0x0d`) — and any
   other byte outside L1's permitted set of newline (`0x0a`) plus
   printable ASCII (`0x20..=0x7e`) — by returning `None` instead of
