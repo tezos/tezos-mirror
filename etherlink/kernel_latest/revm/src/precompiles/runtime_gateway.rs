@@ -458,10 +458,36 @@ where
     Ok(())
 }
 
-/// Build an [`OriginalSource`] from `tx().caller()` and the
+/// Build an [`OriginalSource`] for `source_addr` under the current
 /// originating runtime, without touching the journal. For Tezos
-/// origins, the caller's stored `Origin` is read back to recover the
+/// origins, the address's stored `Origin` is read back to recover the
 /// PKH instead of the lossy EVM alias.
+fn build_original_source<'j, CTX, Host, R>(
+    context: &CTX,
+    source_addr: Address,
+    remaining_evm_gas: u64,
+) -> Result<OriginalSource, CustomPrecompileError>
+where
+    Host: StorageV1 + 'j,
+    R: Registry + 'j,
+    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
+{
+    let runtime = context.journal().crac_origin_runtime();
+    let native_address = match runtime {
+        RuntimeId::Ethereum => source_addr.to_string().to_lowercase(),
+        RuntimeId::Tezos => context.journal().tezosx_resolve_source_alias_readonly(
+            source_addr,
+            RuntimeId::Tezos,
+            remaining_evm_gas,
+        )?,
+    };
+    Ok(OriginalSource::new(runtime, native_address, source_addr))
+}
+
+/// Capture the original source from `tx().caller()` for the
+/// state-mutating gateway entries, which persist the result via
+/// [`resolve_original_source`] and propagate it across re-entrant
+/// frames.
 fn capture_original_source<'j, CTX, Host, R>(
     context: &CTX,
     remaining_evm_gas: u64,
@@ -471,17 +497,37 @@ where
     R: Registry + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
-    let caller = context.tx().caller();
-    let runtime = context.journal().crac_origin_runtime();
-    let native_address = match runtime {
-        RuntimeId::Ethereum => caller.to_string().to_lowercase(),
-        RuntimeId::Tezos => context.journal().tezosx_resolve_source_alias_readonly(
-            caller,
-            RuntimeId::Tezos,
-            remaining_evm_gas,
-        )?,
-    };
-    Ok(OriginalSource::new(runtime, native_address, caller))
+    build_original_source(context, context.tx().caller(), remaining_evm_gas)
+}
+
+/// Capture the original source for the read-only gateway entries
+/// (`callMichelsonView`, generic `call(..., GET)`) when no source has
+/// been persisted yet.
+///
+/// Unlike [`capture_original_source`], this prefers the inbound CRAC's
+/// transitive originator ([`CrossRuntimeCall::cross_runtime_originator`])
+/// when one is present, falling back to `tx().caller()` for a direct EVM
+/// transaction — the exact precedence the custom `ORIGIN` opcode applies
+/// (`etherlink_origin` in `revm/src/lib.rs`). The outgoing
+/// `X-Tezos-Source` of the first read-only gateway call therefore agrees
+/// with `tx.origin` as observed in the same frame; without it, a
+/// Michelson → EVM CRAC frame would forward the immediate sender alias
+/// as `X-Tezos-Source` while `ORIGIN` reported the real transitive
+/// source (L2-1462). `X-Tezos-Sender` stays on the immediate caller.
+fn capture_readonly_original_source<'j, CTX, Host, R>(
+    context: &CTX,
+    remaining_evm_gas: u64,
+) -> Result<OriginalSource, CustomPrecompileError>
+where
+    Host: StorageV1 + 'j,
+    R: Registry + 'j,
+    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
+{
+    let source_addr = context
+        .journal()
+        .cross_runtime_originator()
+        .unwrap_or_else(|| context.tx().caller());
+    build_original_source(context, source_addr, remaining_evm_gas)
 }
 
 /// Return the captured original source, building and persisting it on
@@ -895,7 +941,7 @@ where
             // one locally without writing to the journal.
             let source = match context.journal().original_source() {
                 Some(s) => s.clone(),
-                None => capture_original_source(context, gas.remaining())?,
+                None => capture_readonly_original_source(context, gas.remaining())?,
             };
             let sender_alias = context.journal().tezosx_resolve_source_alias_readonly(
                 inputs.caller,
@@ -993,7 +1039,7 @@ where
                 // STATICCALL-compatible: capture without persisting.
                 let source = match context.journal().original_source() {
                     Some(s) => s.clone(),
-                    None => capture_original_source(context, gas.remaining())?,
+                    None => capture_readonly_original_source(context, gas.remaining())?,
                 };
                 (
                     context.journal().tezosx_resolve_source_alias_readonly(

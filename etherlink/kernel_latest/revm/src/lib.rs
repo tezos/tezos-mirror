@@ -880,6 +880,30 @@ mod test {
         const MOCK_TEZOS_BALANCES_PATH: RefPath =
             RefPath::assert_from(b"/mock_tezos/balances");
 
+        // Paths where the mock Tezos runtime records the last inbound
+        // `X-Tezos-Source` / `X-Tezos-Sender` header values, so a test
+        // can assert what an outgoing CRAC actually forwarded.
+        const MOCK_TEZOS_LAST_SOURCE_PATH: RefPath =
+            RefPath::assert_from(b"/mock_tezos/last_source");
+        const MOCK_TEZOS_LAST_SENDER_PATH: RefPath =
+            RefPath::assert_from(b"/mock_tezos/last_sender");
+
+        /// Read back the `X-Tezos-Source` header recorded by the last
+        /// CRAC the mock Tezos runtime served.
+        pub(crate) fn last_recorded_source(host: &impl StorageV1) -> Option<String> {
+            host.store_read_all(&MOCK_TEZOS_LAST_SOURCE_PATH)
+                .ok()
+                .and_then(|bytes| String::from_utf8(bytes).ok())
+        }
+
+        /// Read back the `X-Tezos-Sender` header recorded by the last
+        /// CRAC the mock Tezos runtime served.
+        pub(crate) fn last_recorded_sender(host: &impl StorageV1) -> Option<String> {
+            host.store_read_all(&MOCK_TEZOS_LAST_SENDER_PATH)
+                .ok()
+                .and_then(|bytes| String::from_utf8(bytes).ok())
+        }
+
         pub(crate) fn test_alias_creation_context() -> CrossRuntimeContext {
             CrossRuntimeContext {
                 gas_limit: GAS_LIMIT,
@@ -964,6 +988,25 @@ mod test {
                 let mut balance_bytes = [0u8; 32];
                 new_balance.to_little_endian(&mut balance_bytes);
                 host.store_write_all(&full_path, &balance_bytes).unwrap();
+
+                // Record the trusted identity headers so a test can
+                // assert what the outgoing CRAC actually forwarded.
+                for (header, path) in [
+                    (
+                        tezosx_interfaces::X_TEZOS_SOURCE,
+                        &MOCK_TEZOS_LAST_SOURCE_PATH,
+                    ),
+                    (
+                        tezosx_interfaces::X_TEZOS_SENDER,
+                        &MOCK_TEZOS_LAST_SENDER_PATH,
+                    ),
+                ] {
+                    if let Some(value) =
+                        request.headers().get(header).and_then(|v| v.to_str().ok())
+                    {
+                        host.store_write_all(path, value.as_bytes()).unwrap();
+                    }
+                }
 
                 http::Response::builder()
                     .status(http::StatusCode::OK)
@@ -3269,11 +3312,14 @@ mod test {
             run_transaction,
             storage::world_state_handler::StorageAccount,
             test::{
-                utilities::{Registry, DEFAULT_SPEC_ID},
+                utilities::{
+                    last_recorded_sender, last_recorded_source, Registry, DEFAULT_SPEC_ID,
+                },
                 GAS_LIMIT,
             },
             ExecutionOutcome, GasData, TransactionOrigin,
         };
+        use tezosx_interfaces::{AliasInfo, Registry as RegistryTrait, RuntimeId};
 
         sol!("contracts/tests/static_caller.sol");
         sol!("contracts/tests/delegate_caller.sol");
@@ -3602,6 +3648,138 @@ mod test {
                 res.result.is_success(),
                 "STATICCALL on call(GET) (view) should succeed, got {:?}",
                 res.result
+            );
+        }
+
+        // --- L2-1462: read-only source forwarding -----------------------------
+
+        /// Drive a transaction straight into the gateway with a
+        /// pre-seeded `cross_runtime_originator`, mirroring an inbound
+        /// Michelson → EVM CRAC frame.
+        fn call_gateway_with_originator(
+            host: &mut MockKernelHost,
+            caller: Address,
+            originator: Address,
+            calldata: Bytes,
+        ) -> ExecutionOutcome {
+            let registry = Registry::new();
+            let mut journal = TezosXJournal::default();
+            journal.evm.set_cross_runtime_originator(Some(originator));
+            run_transaction(
+                host,
+                &registry,
+                &mut journal,
+                DEFAULT_SPEC_ID,
+                &block_constants(),
+                None,
+                caller,
+                Some(RUNTIME_GATEWAY_PRECOMPILE_ADDRESS),
+                calldata,
+                GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
+                U256::ZERO,
+                None,
+                None,
+                false,
+                TransactionOrigin::UserInput {
+                    access_list: AccessList::default(),
+                },
+            )
+            .unwrap()
+        }
+
+        fn tezos_alias_of(registry: &Registry, addr: Address) -> String {
+            registry
+                .compute_alias(AliasInfo {
+                    runtime: RuntimeId::Tezos,
+                    native_address: addr.to_string().to_lowercase().into_bytes(),
+                })
+                .unwrap()
+        }
+
+        /// Regression test for L2-1462. In an inbound Michelson → EVM
+        /// CRAC frame the custom `ORIGIN` opcode reports the transitive
+        /// source (`cross_runtime_originator`), while `TxEnv.caller`
+        /// stays on the immediate sender. The first read-only gateway
+        /// call must forward that same transitive source as
+        /// `X-Tezos-Source`, not recapture the immediate sender.
+        ///
+        /// Reverting the `capture_original_source` fix makes
+        /// `X-Tezos-Source` collapse onto the immediate sender alias,
+        /// failing the `assert_eq` on the source and the `assert_ne`
+        /// between source and sender.
+        #[test]
+        fn call_michelson_view_forwards_transitive_source_not_immediate_sender() {
+            let mut host = MockKernelHost::default();
+            let caller = Address::from([1u8; 20]); // immediate sender
+            let originator = Address::from([2u8; 20]); // transitive source
+            fund_caller(&mut host, caller);
+
+            let res = call_gateway_with_originator(
+                &mut host,
+                caller,
+                originator,
+                call_michelson_view_payload(),
+            );
+            assert!(
+                res.result.is_success(),
+                "callMichelsonView should succeed, got {:?}",
+                res.result
+            );
+
+            let registry = Registry::new();
+            let expected_source = tezos_alias_of(&registry, originator);
+            let expected_sender = tezos_alias_of(&registry, caller);
+            // Guard the test's own premise: the two aliases must differ,
+            // otherwise the assertions below would pass vacuously.
+            assert_ne!(expected_source, expected_sender);
+
+            assert_eq!(
+                last_recorded_source(&host).as_deref(),
+                Some(expected_source.as_str()),
+                "X-Tezos-Source must be the alias of the transitive originator"
+            );
+            assert_eq!(
+                last_recorded_sender(&host).as_deref(),
+                Some(expected_sender.as_str()),
+                "X-Tezos-Sender must stay on the immediate sender alias"
+            );
+        }
+
+        /// Sibling of the above for the generic `call(..., GET)`
+        /// selector, which shares the read-only forwarding path.
+        #[test]
+        fn generic_get_forwards_transitive_source_not_immediate_sender() {
+            let mut host = MockKernelHost::default();
+            let caller = Address::from([1u8; 20]);
+            let originator = Address::from([2u8; 20]);
+            fund_caller(&mut host, caller);
+
+            let res = call_gateway_with_originator(
+                &mut host,
+                caller,
+                originator,
+                call_payload(0),
+            );
+            assert!(
+                res.result.is_success(),
+                "call(GET) should succeed, got {:?}",
+                res.result
+            );
+
+            let registry = Registry::new();
+            let expected_source = tezos_alias_of(&registry, originator);
+            let expected_sender = tezos_alias_of(&registry, caller);
+            assert_ne!(expected_source, expected_sender);
+
+            assert_eq!(
+                last_recorded_source(&host).as_deref(),
+                Some(expected_source.as_str()),
+                "X-Tezos-Source must be the alias of the transitive originator"
+            );
+            assert_eq!(
+                last_recorded_sender(&host).as_deref(),
+                Some(expected_sender.as_str()),
+                "X-Tezos-Sender must stay on the immediate sender alias"
             );
         }
     }
