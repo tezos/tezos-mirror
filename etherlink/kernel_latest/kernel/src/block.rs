@@ -1547,7 +1547,7 @@ mod tests {
         let origination = make_origination_operation(
             1,
             1,
-            1000,
+            5000,
             500,
             boostrap1.clone(),
             35_u64.into(),
