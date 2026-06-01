@@ -297,9 +297,11 @@ fn lex_string(lex: &mut Lexer) -> Result<String, LexerError> {
     // this may overreserve, but no more than 2x
     res.reserve(s.len());
 
+    // L1's `Script_string.of_string` accepts only newline `\n` and printable
+    // ASCII `0x20..=0x7e`, so `\r` must not be producible in a Michelson
+    // string — drop it from the escape table to match.
     let unescape_char = |c| match c {
         'n' => Ok('\n'),
-        'r' => Ok('\r'),
         '"' => Ok('"'),
         '\\' => Ok('\\'),
         _ => Err(LexerError::UndefinedEscape(c)),
@@ -362,7 +364,10 @@ mod tests {
         assert_parse!(r#""bar""#, Ok("bar"));
         assert_parse!(r#""foo\nbar""#, Ok("foo\nbar"));
         assert_parse!(r#""foo\"bar\"""#, Ok("foo\"bar\""));
-        assert_parse!(r#""foo\rbar""#, Ok("foo\rbar"));
+        // `\r` escape is forbidden — L1's string type does not accept
+        // carriage returns (only `\n` and printable ASCII).
+        assert_parse!(r#""foo\rbar""#, Err("undefined escape sequence: \"\\r\""));
+        // The raw substring `\\r` (a backslash followed by `r`) is still fine.
         assert_parse!(r#""foo\\rbar""#, Ok("foo\\rbar"));
         assert_parse!(r#""foo\\nbar""#, Ok("foo\\nbar"));
         assert_parse!(r#""foo\\\\bar""#, Ok("foo\\\\bar"));

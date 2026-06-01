@@ -1,0 +1,5 @@
+# Newline (0x0a) is the single non-printable byte L1 permits in a
+# string. UNPACK must accept "a\nb" and push Some "a\nb".
+code { UNPACK string } ;
+input { Stack_elt bytes 0x050100000003610a62 } ;
+output { Stack_elt (option string) (Some "a\nb") }

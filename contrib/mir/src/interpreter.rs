@@ -8089,6 +8089,48 @@ mod interpreter_tests {
         assert_eq!(stack, stk![V::new_option(None)]);
     }
 
+    // L1's string type only accepts newline `\n` (0x0a) and printable ASCII
+    // `0x20..=0x7e`. UNPACK string on bytes carrying any other control char
+    // (carriage return `\r`, TAB, NUL, ...) must push `None`, not `Some`.
+    // Encoding scheme: PACK tag 05, string tag 01, 4-byte big-endian length,
+    // payload.
+    #[test]
+    fn unpack_string_forbidden_char_returns_none() {
+        // "a\rb" — the case from L2-1357.
+        let cr = hex::decode("050100000003610d62").unwrap();
+        // "\t" alone.
+        let tab = hex::decode("05010000000109").unwrap();
+        // "\0" alone (already exercised by `validate_str`, kept for symmetry).
+        let nul = hex::decode("05010000000100").unwrap();
+        for payload in [cr, tab, nul] {
+            let mut stack = stk![V::Bytes(payload)];
+            let ctx = &mut Ctx::default();
+            assert_eq!(
+                interpret_one(&Unpack(Type::String), ctx, &mut stack),
+                Ok(())
+            );
+            assert_eq!(stack, stk![V::new_option(None)]);
+        }
+    }
+
+    // Control: a string whose bytes are all in the L1-permitted set still
+    // decodes via UNPACK.
+    #[test]
+    fn unpack_string_allowed_chars_succeeds() {
+        // "ab\n~" — all bytes within `0x20..=0x7e ∪ {0x0a}`.
+        let payload = hex::decode("05010000000461620a7e").unwrap();
+        let mut stack = stk![V::Bytes(payload)];
+        let ctx = &mut Ctx::default();
+        assert_eq!(
+            interpret_one(&Unpack(Type::String), ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(
+            stack,
+            stk![V::new_option(Some(V::String("ab\n~".to_owned())))]
+        );
+    }
+
     #[test]
     fn unpack_oversized_annotation() {
         // Regression for L2-1376: UNPACK of a packed lambda

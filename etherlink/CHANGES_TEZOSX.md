@@ -59,6 +59,12 @@
   (de)serialization, typechecking, and interpretation now run on iterative
   heap worklists instead of recursion, so adversarially deep input is bounded
   by gas rather than trapping the PVM. (!21982, !21983, !21984)
+- MIR: `UNPACK string` now rejects carriage return (`0x0d`) — and any
+  other byte outside L1's permitted set of newline (`0x0a`) plus
+  printable ASCII (`0x20..=0x7e`) — by returning `None` instead of
+  `Some "...\\r..."`. The textual lexer no longer recognises `\r` as
+  an escape for the same reason. Strings whose bytes are all in the
+  permitted set are unaffected. (!22005)
 
 ### Native Atomic Composability
 

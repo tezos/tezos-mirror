@@ -418,11 +418,12 @@ fn get_bytes<'a>(bytes: &mut BytesIt<'a>) -> Result<&'a [u8], DecodeError> {
 }
 
 fn validate_str(bytes: &[u8]) -> Result<&str, DecodeError> {
-    // check if all characters are printable ASCII
-    if !bytes
-        .iter()
-        .all(|c| matches!(c, b' '..=b'~' | b'\n' | b'\r'))
-    {
+    // L1's `Script_string.of_string` accepts only newline `\n` (0x0a) and
+    // printable ASCII `0x20..=0x7e`. UNPACK string decodes attacker-supplied
+    // bytes at runtime, so mismatching this set lets MIR push `Some`
+    // where L1 pushes `None` — notably for carriage return (0x0d), which
+    // used to be allowed here but is forbidden on L1.
+    if !bytes.iter().all(|c| matches!(c, b' '..=b'~' | b'\n')) {
         return Err(DecodeError::ForbiddenStringCharacter);
     }
     // SAFETY: we just checked all characters are ASCII.
@@ -526,7 +527,18 @@ mod test {
             check_err("0x09", DecodeError::UnexpectedEOF);
             check_err("0xff", DecodeError::UnknownTag(0xff));
             check_err("0x03ff", DecodeError::UnknownPrim(0xff));
+            // 0x00 (NUL) is forbidden in a Michelson string.
             check_err("0x010000000100", DecodeError::ForbiddenStringCharacter);
+            // 0x0d (carriage return) is forbidden: L1 accepts only `\n` and
+            // printable ASCII `0x20..=0x7e`. Encoding `"a\rb"` as a string
+            // payload (string tag 01, length 00000003, content 61 0d 62)
+            // must error, not yield `Some "a\rb"`.
+            check_err("0x0100000003610d62", DecodeError::ForbiddenStringCharacter);
+            // 0x09 (TAB) is likewise forbidden.
+            check_err("0x010000000109", DecodeError::ForbiddenStringCharacter);
+            // Sanity: 0x0a (newline) and 0x7e (`~`) are still allowed.
+            check("\n", "0x01000000010a");
+            check("~", "0x01000000017e");
         }
 
         mod number {

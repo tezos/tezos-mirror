@@ -1,0 +1,6 @@
+# UNPACK string on the canonical encoding of "ab" must succeed.
+# Control case for the forbidden-character rejection in
+# unpack_string_01..02.
+code { UNPACK string } ;
+input { Stack_elt bytes 0x0501000000026162 } ;
+output { Stack_elt (option string) (Some "ab") }
