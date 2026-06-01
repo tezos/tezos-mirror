@@ -1,0 +1,6 @@
+# PUSH timestamp with a negative arbitrary-precision integer string.
+# Symmetric companion to push_timestamp_01.tzt — `Z.of_string` accepts
+# an optional leading `-`, and a `timestamp` is a signed Z internally.
+code { PUSH timestamp "-99999999999999999999" } ;
+input { } ;
+output { Stack_elt timestamp -99999999999999999999 }

@@ -1,0 +1,8 @@
+# PUSH timestamp with an RFC3339 leap-second string. L1 uses Ptime,
+# which folds a leap second (`:60`) into the following POSIX second
+# (epoch 60 here). MIR used to defer to chrono, which keeps the prior
+# POSIX second (epoch 59) and stashes the leap second in the
+# nanosecond field — a silent value divergence from L1 (L2-1375).
+code { PUSH timestamp "1970-01-01T00:00:60Z" } ;
+input { } ;
+output { Stack_elt timestamp 60 }

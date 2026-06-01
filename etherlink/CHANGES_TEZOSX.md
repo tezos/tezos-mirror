@@ -35,6 +35,18 @@
   across an `EVM -> Michelson -> EVM` round-trip — it resolves back to
   the originating EOA — rather than collapsing every originator onto a
   single `alias(null)`. (!21981)
+- MIR's `PUSH timestamp "..."` value parser now matches L1's
+  `Script_timestamp.of_string`: a decimal-string literal larger than
+  `i64::MAX` falls back to arbitrary-precision parsing instead of being
+  rejected, and an RFC3339 leap-second (`...:60Z`) realigns onto the
+  following POSIX second the way L1's Ptime does, instead of silently
+  decoding to the prior second. The integer fallback now also follows
+  Zarith's `Z.of_string` grammar byte-for-byte — an optional `-` then an
+  optional `+` then a `0x`/`0o`/`0b` radix prefix — so e.g. `"-+42"` and
+  `"-+0x10"` parse (to `-42` and `-16`) while `"++42"`, `"+-42"` and
+  `"0x+10"` are rejected, on both sides. Same Michelson source now
+  produces the same `timestamp` value on L1 and the Michelson runtime.
+  (L2-1375)
 - Aliases originated as part of a native atomic calls are now surfaced via
   dedicated receipts. (!21904)
 - MIR: harden the Michelson runtime — internal aborts now surface as

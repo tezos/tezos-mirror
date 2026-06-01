@@ -153,6 +153,10 @@ Used a few times as an utility in other tzts.
 
 - [push_int_00.tzt](push_int_00.tzt)
 - [push_string_00.tzt](push_string_00.tzt)
+- [push_timestamp_00.tzt](push_timestamp_00.tzt)
+- [push_timestamp_01.tzt](push_timestamp_01.tzt)
+- [push_timestamp_02.tzt](push_timestamp_02.tzt)
+- [push_timestamp_03.tzt](push_timestamp_03.tzt)
 
 `PUSH` is used quite a bit as a utility in other tzts, hence indirectly covered
 to some extent. Not all pushable types are tested with `PUSH`, however.
