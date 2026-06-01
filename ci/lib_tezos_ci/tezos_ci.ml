@@ -1473,10 +1473,10 @@ module Base_images = struct
 
   (* DEB packaging *)
 
-  (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2491675993
+  (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2566178052
      May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
-     https://gitlab.com/tezos/tezos/-/commit/05e36a5c/pipelines *)
-  let debian_version = "master-05e36a5c"
+     https://gitlab.com/tezos/tezos/-/commit/100afa6d/pipelines *)
+  let debian_version = "master-100afa6d"
 
   let debian_bookworm = make_img "debian:bookworm" debian_version
 
@@ -1519,11 +1519,11 @@ module Base_images = struct
   let debian_jsonnet_trixie = make_img "debian-jsonnet:trixie" "master-d70f7d37"
 
   (* [debian-homebrew-trixie] *)
-  (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
+  (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2566178052
      May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
-     https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines *)
+     https://gitlab.com/tezos/tezos/-/commit/100afa6d/pipelines *)
   let debian_homebrew_trixie =
-    make_img "debian-homebrew:trixie" "master-be43e621"
+    make_img "debian-homebrew:trixie" "master-100afa6d"
 
   (* [debian-rust-trixie] *)
   (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2555089489
