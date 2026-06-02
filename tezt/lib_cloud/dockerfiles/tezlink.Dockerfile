@@ -39,13 +39,11 @@ RUN apt-get update && apt-get install -y \
     sudo \
     # to clone Tzkt and faucet sources
     git \
-    # to run the faucet application
-    npm \
     # to generate SSL certificates
     certbot \
     python3-certbot-nginx \
-    # to build Umami
-    nodejs \
+    # to extract the Node.js .tar.xz tarball
+    xz-utils \
     # DL3015: Use --no-install-recommends
     --no-install-recommends
 
@@ -80,6 +78,22 @@ RUN sed -i 's/#PermitUserEnvironment no/PermitUserEnvironment yes/' /etc/ssh/ssh
 # We run the ssh server but not as a daemon on the port 30000
 CMD ["-D", "-p", "30000", "-e"]
 ENTRYPOINT ["/usr/sbin/sshd"]
+
+# Debian Trixie ships Node.js 20, but the pnpm used to build Umami below
+# requires Node >=22.13 and otherwise crashes with ERR_UNKNOWN_BUILTIN_MODULE.
+# Install Node.js 22 from the official binary tarball (which also provides npm),
+# avoiding apt-repo signature issues on newer Debian (same rationale as the
+# dotnet install above).
+ENV NODE_VERSION=22.22.3
+RUN ARCH=$(dpkg --print-architecture) && \
+    case "$ARCH" in \
+    amd64) NODE_ARCH=x64 ;; \
+    arm64) NODE_ARCH=arm64 ;; \
+    *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;; \
+    esac && \
+    wget -q "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.xz" -O /tmp/node.tar.xz && \
+    tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 && \
+    rm /tmp/node.tar.xz
 
 # Build Umami
 RUN git clone https://github.com/trilitech/umami-v2 /tmp/umami-v2
