@@ -140,6 +140,13 @@ let () =
       ~description:"RC number (e.g. 1 for -rc1)."
       ()
   in
+  let beta =
+    Clap.optional_int
+      ~long:"beta"
+      ~placeholder:"BETA"
+      ~description:"Beta release number (e.g. 1 for -beta1)."
+      ()
+  in
   let announcement =
     Clap.optional_string
       ~long:"announcement"
@@ -238,11 +245,12 @@ let () =
   in
   Clap.close () ;
   let version_qualifier =
-    match (stable, rc) with
-    | true, None -> Some Stable
-    | false, Some n -> Some (Prerelease (RC n))
-    | false, None -> None
-    | true, Some _ -> failwith "Cannot specify both --stable and --rc"
+    match (stable, rc, beta) with
+    | true, None, None -> Some Stable
+    | false, Some n, None -> Some (Prerelease (RC n))
+    | false, None, Some n -> Some (Prerelease (Beta n))
+    | false, None, None -> None
+    | _ -> failwith "specify at most one of --stable, --rc, --beta"
   in
   let prerelease =
     Option.bind version_qualifier (function
