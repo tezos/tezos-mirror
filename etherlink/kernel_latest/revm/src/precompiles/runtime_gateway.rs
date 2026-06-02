@@ -116,6 +116,42 @@ fn charge_payload(gas: &mut Gas, bytes: usize) -> Result<(), CustomPrecompileErr
     Ok(())
 }
 
+/// Charge the gateway's flat base cost plus the per-word payload
+/// surcharge on the inbound calldata and the outgoing request body.
+///
+/// Shared by every CRAC entrypoint (`transfer`, `callMichelson`,
+/// `callMichelsonView`, `call`) so the upfront gas model stays identical
+/// across them. `body_len` is `0` for `transfer` (empty body); the
+/// per-word helper then charges nothing for it.
+fn charge_gateway_request(
+    gas: &mut Gas,
+    calldata_len: usize,
+    body_len: usize,
+) -> Result<(), CustomPrecompileError> {
+    charge(gas, RUNTIME_GATEWAY_BASE_COST)?;
+    charge_payload(gas, calldata_len)?;
+    charge_payload(gas, body_len)?;
+    Ok(())
+}
+
+/// Classify the CRAC response (charging the converted callee gas), then
+/// charge the per-word surcharge on the returned response body and
+/// ABI-encode it for return to the EVM caller.
+///
+/// Shared by the entrypoints that surface the response body to the
+/// caller (`callMichelsonView`, `call`). Entrypoints that discard the
+/// body (`transfer`, `callMichelson`) call
+/// [`classify_and_charge_crac_response`] directly instead.
+fn charge_and_encode_crac_response(
+    response: http::Response<Vec<u8>>,
+    target_runtime: RuntimeId,
+    gas: &mut Gas,
+) -> Result<Vec<u8>, CustomPrecompileError> {
+    let body = classify_and_charge_crac_response(response, target_runtime, gas)?;
+    charge_payload(gas, body.len())?;
+    Ok((body,).abi_encode_params())
+}
+
 /// Build an `http::Request<Vec<u8>>` from ABI-decoded parameters.
 fn build_http_request(
     url: &str,
@@ -738,9 +774,7 @@ where
                     gas,
                 ));
             }
-            charge(&mut gas, RUNTIME_GATEWAY_BASE_COST)?;
-            // Per-byte payload surcharge on calldata (body is empty).
-            charge_payload(&mut gas, calldata.len())?;
+            charge_gateway_request(&mut gas, calldata.len(), 0)?;
 
             let implicit_address = call.implicitAddress;
             let amount = inputs.value.get();
@@ -811,10 +845,7 @@ where
                     gas,
                 ));
             }
-            charge(&mut gas, RUNTIME_GATEWAY_BASE_COST)?;
-            // Per-byte payload surcharge on calldata + outgoing body.
-            charge_payload(&mut gas, calldata.len())?;
-            charge_payload(&mut gas, call.parameters.len())?;
+            charge_gateway_request(&mut gas, calldata.len(), call.parameters.len())?;
 
             let destination = call.destination;
             let entrypoint = call.entrypoint;
@@ -885,7 +916,7 @@ where
             context.journal_mut().log(crac_log);
         }
         RuntimeGatewayCalls::callMichelsonView(call) => {
-            charge(&mut gas, RUNTIME_GATEWAY_BASE_COST)?;
+            charge_gateway_request(&mut gas, calldata.len(), call.input.len())?;
 
             let destination = call.destination;
             let view_name = call.viewName;
@@ -960,9 +991,8 @@ where
             )?;
 
             let response = context.journal_mut().tezosx_call_http(request);
-            let body =
-                classify_and_charge_crac_response(response, RuntimeId::Tezos, &mut gas)?;
-            let output: Vec<u8> = (body,).abi_encode_params();
+            let output =
+                charge_and_encode_crac_response(response, RuntimeId::Tezos, &mut gas)?;
 
             // Intentionally no log emission. A dedicated
             // `MichelsonViewCalled` event was considered for indexer
@@ -980,11 +1010,7 @@ where
             });
         }
         RuntimeGatewayCalls::call(call) => {
-            charge(&mut gas, RUNTIME_GATEWAY_BASE_COST)?;
-            // Per-byte payload surcharge on calldata + outgoing body.
-            // The response body is charged after the CRAC completes.
-            charge_payload(&mut gas, calldata.len())?;
-            charge_payload(&mut gas, call.body.len())?;
+            charge_gateway_request(&mut gas, calldata.len(), call.body.len())?;
 
             let mut request = build_http_request(
                 &call.url,
@@ -1085,11 +1111,8 @@ where
             let target_addr = uri.path().trim_start_matches('/').to_string();
 
             let response = context.journal_mut().tezosx_call_http(request);
-            let body =
-                classify_and_charge_crac_response(response, target_runtime, &mut gas)?;
-            // Response body is ABI-encoded and returned; charge per byte.
-            charge_payload(&mut gas, body.len())?;
-            let output: Vec<u8> = (body,).abi_encode_params();
+            let output =
+                charge_and_encode_crac_response(response, target_runtime, &mut gas)?;
 
             // POST-only state effects: burn any residual precompile
             // balance from a bridged value, and emit the CracSent
