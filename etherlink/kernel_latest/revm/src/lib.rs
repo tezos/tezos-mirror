@@ -302,6 +302,63 @@ where
     );
 }
 
+/// EVM opcode for `GASPRICE` (0x3A). Stable across all hardforks since
+/// Frontier; named here so the override site reads as code, not magic.
+const GASPRICE_OPCODE: u8 = 0x3A;
+
+/// Static gas cost of the `GASPRICE` opcode (2, `GAS_BASE` — the same
+/// cost the stock `revm-interpreter` `instructions::gasprice` handler
+/// charges).
+const GASPRICE_STATIC_GAS: u64 = 2;
+
+/// Custom `GASPRICE` opcode handler, installed only when servicing a
+/// cross-runtime call. An inbound CRAC carries `gas_price = 0` on its
+/// `TxEnv` (Michelson has no fee market and the originating runtime
+/// settles payment at the topmost frame), so the stock opcode would
+/// surface `0` to bytecode — diverging from the native EVM path. Push
+/// the live block basefee instead: Etherlink ignores priority fees
+/// (see `kernel::fees`), so the effective gas price of *every*
+/// transaction — including the one that originated this CRAC — is
+/// exactly `base_fee_per_gas`. Only the *observed* value is overridden:
+/// `TxEnv.gas_price` stays `0`, so the caller debit and basefee burn
+/// (role: accounting) are untouched. Mirrors the `ORIGIN` override,
+/// which likewise reports a value distinct from what the `TxEnv` drives.
+fn etherlink_gasprice<'a, Host, R>(
+    context: revm::interpreter::InstructionContext<
+        '_,
+        EVMInnerContext<'a, Host, R>,
+        EthInterpreter,
+    >,
+) where
+    Host: StorageV1,
+    R: Registry,
+{
+    use revm::interpreter::Host as InterpHost;
+    let value = InterpHost::basefee(context.host);
+    if !context.interpreter.stack.push(value) {
+        context.interpreter.halt_overflow();
+    }
+}
+
+/// Install [`etherlink_gasprice`] as the `GASPRICE` handler. Called from
+/// the context builders only for cross-runtime origins, so a native EVM
+/// transaction keeps the stock handler (reading the real
+/// `TxEnv.gas_price`) and is left completely untouched.
+fn install_etherlink_gasprice<'a, Host, R, INSP>(
+    evm: &mut EvmInspection<'a, Host, INSP, R>,
+) where
+    Host: StorageV1,
+    R: Registry,
+{
+    evm.instruction.insert_instruction(
+        GASPRICE_OPCODE,
+        revm::interpreter::Instruction::new(
+            etherlink_gasprice::<Host, R>,
+            GASPRICE_STATIC_GAS,
+        ),
+    );
+}
+
 #[instrument(skip_all)]
 #[allow(clippy::too_many_arguments)]
 fn build_evm_inspector_context<
@@ -320,6 +377,7 @@ fn build_evm_inspector_context<
     spec_id: SpecId,
     inspector: INSP,
     is_simulation: bool,
+    is_cross_runtime: bool,
 ) -> EvmInspection<'a, Host, INSP, R>
 where
     Host: StorageV1,
@@ -329,6 +387,15 @@ where
         .with_spec_and_mainnet_gas_params(spec_id);
     cfg.disable_eip3607 = is_simulation;
     cfg.tx_gas_limit_cap = Some(maximum_gas_per_transaction);
+    // Cross-runtime calls carry `gas_price = 0` and now run against a
+    // live block environment, so the EIP-1559 basefee preflight (which
+    // validates a fee-paying user transaction) would reject every CRAC.
+    // Disable it for cross-runtime origins; CRAC payment is settled at
+    // the topmost frame. Native user transactions are unaffected. The
+    // block-gas-limit check needs no such opt-out: a CRAC forwards at
+    // most the caller's remaining gas (bounded by the per-transaction
+    // cap), which the live block gas limit always exceeds.
+    cfg.disable_base_fee = is_cross_runtime;
 
     // IMPORTANT
     // `Journal::new_with_inner` is the only working constructor of our `Journal` implementation.
@@ -350,6 +417,9 @@ where
         .build_mainnet_with_inspector(inspector)
         .with_precompiles(precompiles);
     install_etherlink_origin(&mut evm);
+    if is_cross_runtime {
+        install_etherlink_gasprice(&mut evm);
+    }
     evm
 }
 
@@ -365,6 +435,7 @@ fn build_evm_context<'a, Host, R: Registry>(
     chain_id: u64,
     spec_id: SpecId,
     is_simulation: bool,
+    is_cross_runtime: bool,
 ) -> EvmContext<'a, Host, R>
 where
     Host: StorageV1,
@@ -374,6 +445,10 @@ where
         .with_spec_and_mainnet_gas_params(spec_id);
     cfg.disable_eip3607 = is_simulation;
     cfg.tx_gas_limit_cap = Some(maximum_gas_per_transaction);
+    // See `build_evm_inspector_context` for the rationale: open the
+    // basefee preflight gate for cross-runtime origins, which run
+    // `gas_price = 0` against a live block.
+    cfg.disable_base_fee = is_cross_runtime;
 
     // IMPORTANT
     // `Journal::new_with_inner` is the only working constructor of our `Journal` implementation.
@@ -393,6 +468,9 @@ where
     };
     let mut evm = ctx.build_mainnet().with_precompiles(precompiles);
     install_etherlink_origin(&mut evm);
+    if is_cross_runtime {
+        install_etherlink_gasprice(&mut evm);
+    }
     evm
 }
 
@@ -495,6 +573,11 @@ where
         TransactionOrigin::CrossRuntime { .. }
         | TransactionOrigin::CrossRuntimeStatic => (),
     };
+
+    let is_cross_runtime = matches!(
+        origin,
+        TransactionOrigin::CrossRuntime { .. } | TransactionOrigin::CrossRuntimeStatic
+    );
     let db = EtherlinkVMDB::new(host, registry, block_constants)?;
 
     if let Some(tracer_input) = tracer_input {
@@ -513,6 +596,7 @@ where
                 spec_id,
             ),
             is_simulation,
+            is_cross_runtime,
         );
 
         let credit_checkpoint = match origin {
@@ -587,6 +671,7 @@ where
             block_constants.chain_id.as_u64(),
             spec_id,
             is_simulation,
+            is_cross_runtime,
         );
 
         let credit_checkpoint = match origin {

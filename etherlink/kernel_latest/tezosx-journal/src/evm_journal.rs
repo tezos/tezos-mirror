@@ -9,6 +9,7 @@ use revm::{
     primitives::{Address, U256},
     JournalEntry,
 };
+use tezos_ethereum::block::BlockConstants;
 use tezosx_types::RuntimeId;
 
 use crate::LayeredState;
@@ -89,10 +90,26 @@ pub struct EvmJournal {
     /// deduction, etc.) keep their standard REVM meaning — the
     /// immediate caller's alias (L2-1363 / L2-1441).
     cross_runtime_originator: Option<Address>,
+    /// The originating runtime's L2 block environment, supplied at journal
+    /// creation (a native EVM transaction's block, or the EVM-runtime
+    /// block constants of a Michelson operation). When servicing an
+    /// inbound CRAC, `create_block_constants` inherits the block-level
+    /// observables from it — `BASEFEE`, `GASLIMIT` (block gas limit),
+    /// `BLOBBASEFEE`, `PREVRANDAO`, coinbase, number, timestamp — so EVM
+    /// bytecode reached through the gateway sees the same block as the
+    /// native path instead of zero/placeholder values. Block constants are
+    /// block-invariant, so the value set at the top is correct for every
+    /// re-entrant frame (L2-1417).
+    outer_block: BlockConstants,
 }
 
 impl EvmJournal {
-    pub fn new() -> Self {
+    /// Construct an EVM journal seeded with the originating block
+    /// environment. The block is supplied at creation time — forwarded by
+    /// [`crate::TezosXJournal::new`] — rather than poked in afterwards, so
+    /// the cross-runtime journal owns the single point that distributes
+    /// block context to each runtime's sub-journal.
+    pub fn new(outer_block: BlockConstants) -> Self {
         Self {
             layered_state: LayeredState::new(),
             inner: JournalInner::new(),
@@ -102,6 +119,7 @@ impl EvmJournal {
             crac_chain_depth: 0,
             revm_call_depth: None,
             cross_runtime_originator: None,
+            outer_block,
         }
     }
 }
@@ -117,6 +135,12 @@ impl EvmJournal {
         self.crac_chain_depth = 0;
         self.revm_call_depth = None;
         self.cross_runtime_originator = None;
+        // `outer_block` is intentionally NOT reset: it is
+        // top-level-transaction context, set once at creation and
+        // invariant for the whole operation. `clear()` runs on a
+        // backtracked Michelson operation to drop accumulated EVM state,
+        // but a later CRAC in the same operation must still observe the
+        // same block — wiping it here would re-zero those observables.
     }
 
     /// See the field doc on [`Self::cross_runtime_originator`].
@@ -127,6 +151,11 @@ impl EvmJournal {
     /// See the field doc on [`Self::cross_runtime_originator`].
     pub fn set_cross_runtime_originator(&mut self, originator: Option<Address>) {
         self.cross_runtime_originator = originator;
+    }
+
+    /// See the field doc on [`Self::outer_block`].
+    pub fn outer_block(&self) -> &BlockConstants {
+        &self.outer_block
     }
 
     pub fn crac_chain_depth(&self) -> u32 {
@@ -202,7 +231,7 @@ impl EvmJournal {
 
 impl Default for EvmJournal {
     fn default() -> Self {
-        Self::new()
+        Self::new(BlockConstants::dummy())
     }
 }
 
@@ -213,7 +242,7 @@ mod tests {
 
     #[test]
     fn test_set_crac_tx_info_errors_on_duplicate() {
-        let mut journal = EvmJournal::new();
+        let mut journal = EvmJournal::new(BlockConstants::dummy());
         let info1 = CracTransactionInfo {
             source: Address::from([0x11; 20]),
             sender: Address::from([0x22; 20]),
@@ -233,19 +262,19 @@ mod tests {
 
     #[test]
     fn test_take_crac_data_returns_none_when_no_crac() {
-        let mut journal = EvmJournal::new();
+        let mut journal = EvmJournal::new(BlockConstants::dummy());
         assert!(journal.take_crac_data().is_none());
     }
 
     #[test]
     fn test_take_crac_data_returns_none_without_tx_info() {
-        let mut journal = EvmJournal::new();
+        let mut journal = EvmJournal::new(BlockConstants::dummy());
         assert!(journal.take_crac_data().is_none());
     }
 
     #[test]
     fn test_take_crac_data_with_info_but_no_logs() {
-        let mut journal = EvmJournal::new();
+        let mut journal = EvmJournal::new(BlockConstants::dummy());
         journal
             .set_crac_tx_info(CracTransactionInfo {
                 source: Address::from([0x11; 20]),
@@ -260,7 +289,7 @@ mod tests {
 
     #[test]
     fn test_take_crac_data_consumes() {
-        let mut journal = EvmJournal::new();
+        let mut journal = EvmJournal::new(BlockConstants::dummy());
         journal
             .set_crac_tx_info(CracTransactionInfo {
                 source: Address::from([0x11; 20]),
@@ -277,13 +306,13 @@ mod tests {
 
     #[test]
     fn test_original_source_starts_unset() {
-        let journal = EvmJournal::new();
+        let journal = EvmJournal::new(BlockConstants::dummy());
         assert_eq!(journal.original_source(), None);
     }
 
     #[test]
     fn test_original_source_first_set_wins() {
-        let mut journal = EvmJournal::new();
+        let mut journal = EvmJournal::new(BlockConstants::dummy());
         let eoa = OriginalSource::new(
             RuntimeId::Ethereum,
             "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_string(),
@@ -304,7 +333,7 @@ mod tests {
 
     #[test]
     fn test_original_source_preserves_tezos_pkh() {
-        let mut journal = EvmJournal::new();
+        let mut journal = EvmJournal::new(BlockConstants::dummy());
         let tz_origin = OriginalSource::new(
             RuntimeId::Tezos,
             "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx".to_string(),
@@ -323,7 +352,7 @@ mod tests {
 
     #[test]
     fn test_clear_resets_original_source() {
-        let mut journal = EvmJournal::new();
+        let mut journal = EvmJournal::new(BlockConstants::dummy());
         let eoa = OriginalSource::new(
             RuntimeId::Ethereum,
             "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_string(),

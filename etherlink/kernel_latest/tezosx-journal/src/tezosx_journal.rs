@@ -6,6 +6,7 @@ use std::fmt;
 
 use crate::{EvmJournal, MichelsonJournal};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
+use tezos_ethereum::block::BlockConstants;
 
 /// Unique identifier for a cross-runtime call chain within a block.
 ///
@@ -190,12 +191,22 @@ impl TezosXJournal {
     /// distinct seeds — see
     /// [`Self::synthetic_operation_hash`] for the canonical
     /// derivation.
+    /// [`outer_block`] is the originating runtime's L2 block environment.
+    /// Outside a block-producing context (traces, unit tests) pass
+    /// [`BlockConstants::dummy`]. The cross-runtime journal is the single
+    /// place that distributes block context to each runtime's sub-journal
+    /// — it forwards the block to the EVM journal at *its* creation, so an
+    /// inbound CRAC serviced under this journal exposes the live block
+    /// observables (`BASEFEE`, `GASLIMIT`, ...) instead of zero. New
+    /// runtimes plug in by receiving the same block here, rather than the
+    /// kernel reaching into a specific runtime's journal after the fact.
     pub fn new(
         crac_id: CracId,
         operation_hash: tezos_crypto_rs::hash::OperationHash,
+        outer_block: BlockConstants,
     ) -> Self {
         Self {
-            evm: EvmJournal::default(),
+            evm: EvmJournal::new(outer_block),
             michelson: MichelsonJournal::new(operation_hash),
             finalized_http_traces: Vec::new(),
             pending_http_traces: Vec::new(),
@@ -332,6 +343,7 @@ mod tests {
         let journal = TezosXJournal::new(
             test_crac_id(),
             tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
         );
         assert_eq!(journal.crac_id().origin_runtime, 1);
         assert_eq!(journal.crac_id().tx_index, 42);
@@ -343,6 +355,7 @@ mod tests {
         let journal = TezosXJournal::new(
             test_crac_id(),
             tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
         );
         assert!(journal.verify_crac_id("1-42").is_ok());
     }
@@ -352,6 +365,7 @@ mod tests {
         let journal = TezosXJournal::new(
             test_crac_id(),
             tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
         );
         assert!(journal.verify_crac_id("0-99").is_err());
     }
@@ -370,10 +384,12 @@ mod tests {
         let j1 = TezosXJournal::new(
             test_crac_id(),
             tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
         );
         let j2 = TezosXJournal::new(
             test_crac_id(),
             tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
         );
         assert_eq!(j1.crac_id(), j2.crac_id());
     }
@@ -383,6 +399,7 @@ mod tests {
         let mut journal = TezosXJournal::new(
             test_crac_id(),
             tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
         );
 
         let request = http::Request::builder()
@@ -419,6 +436,7 @@ mod tests {
         let mut journal = TezosXJournal::new(
             test_crac_id(),
             tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
         );
 
         // Outer call: EVM → Tezos

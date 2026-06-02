@@ -3558,6 +3558,206 @@ let test_crac_tez_to_evm_inner_logs_in_receipt =
       ~error_msg:"Expected eth_getLogs to surface exactly 1 EventB, got %L") ;
   unit
 
+(** Block-observable opcodes inside a CRAC frame see the live block.
+ *
+ *  Regression test for L2-1417.  An inbound Michelson→EVM CRAC used to run
+ *  EVM bytecode against a synthesized [BlockConstants] whose block-level
+ *  observables were zeroed, so a contract reached through the gateway saw
+ *  [BASEFEE], [GASLIMIT] (the block gas limit), [GASPRICE] and [PREVRANDAO]
+ *  as 0 — diverging from the native EVM path for identical bytecode.  This
+ *  MR forwards the originating block through the cross-runtime journal so
+ *  the observables stay live.
+ *
+ *  Deploys an EVM probe whose 16-byte runtime stores each observable into a
+ *  distinct slot ([BASEFEE]→0, [GASLIMIT]→1, [GASPRICE]→2, [PREVRANDAO]→3 —
+ *  the same probe as the [tezosx-ethereum-runtime] unit test
+ *  [test_serve_block_observables_reflect_outer_block]).  First sends a
+ *  native EVM tx to capture the live values a normal EVM execution sees,
+ *  then fires a TEZ→EVM CRAC into the same probe and checks the CRAC-frame
+ *  values against the producing block's header.  [GASPRICE] resolves to the
+ *  block basefee, since Etherlink ignores priority fees (see
+ *  [kernel::fees]).
+ *
+ *  The kernel-side journal forwarding under test is in [chains.rs] and
+ *  [apply.rs]; the unit test mocks the journal directly and does not reach
+ *  those paths.
+ *)
+let test_crac_tez_to_evm_block_observables_visible =
+  register_crac_runner_test
+    ~title:"CRAC: TEZ->EVM block-observable opcodes see the live block"
+    ~tags:
+      [
+        "basefee";
+        "gaslimit";
+        "gasprice";
+        "prevrandao";
+        "observables";
+        "regression";
+      ]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-OBS" in
+  (* Init code that deploys a 16-byte runtime running four observable
+     opcodes, each [<OPCODE> PUSH1 <slot> SSTORE]:
+       48 60 00 55   BASEFEE    -> slot 0
+       45 60 01 55   GASLIMIT   -> slot 1
+       3a 60 02 55   GASPRICE   -> slot 2
+       44 60 03 55   PREVRANDAO -> slot 3
+     Deploy prefix (11 bytes): PUSH1 16; DUP1; PUSH1 11; PUSH1 0; CODECOPY;
+     PUSH1 0; RETURN. *)
+  let probe_init_code =
+    "601080600b6000396000f348600055456001553a60025544600355"
+  in
+  (* Normalize a 256-bit hex string (e.g. an [eth_getStorageAt] result or a
+     block header field) to lowercase, [0x]-stripped, leading-zeros-stripped
+     form so values can be compared regardless of zero-padding. *)
+  let normalize_hex s =
+    let s = String.lowercase_ascii s in
+    let s =
+      if String.length s >= 2 && String.sub s 0 2 = "0x" then
+        String.sub s 2 (String.length s - 2)
+      else s
+    in
+    let i = ref 0 in
+    while !i < String.length s - 1 && s.[!i] = '0' do
+      incr i
+    done ;
+    String.sub s !i (String.length s - !i)
+  in
+  Log.debug ~prefix "Deploy block-observables probe" ;
+  let* probe_addr =
+    EvmContract.deploy_contract
+      ~sequencer
+      ~sender
+      ~nonce:(evm_nonce ())
+      ~init_code:probe_init_code
+      ()
+  in
+  let read_slot pos = Rpc.get_storage_at ~address:probe_addr ~pos sequencer in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  Log.debug ~prefix "Send native EVM tx to probe (observables -> slots 0-3)" ;
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:sender.Eth_account.private_key
+      ~chain_id:1337
+      ~nonce:(evm_nonce ())
+      ~gas:300_000
+      ~gas_price:1_000_000_000
+      ~value:Wei.zero
+      ~address:probe_addr
+      ()
+  in
+  let*@ _tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
+  let*@ _block_number = Rpc.produce_block sequencer in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  Log.debug ~prefix "Read native observables from slots 0-3 and block header" ;
+  let*@ native_basefee_hex = read_slot "0x0" in
+  let*@ native_gaslimit_hex = read_slot "0x1" in
+  let*@ native_gasprice_hex = read_slot "0x2" in
+  let*@ native_prevrandao_hex = read_slot "0x3" in
+  let*@ native_block = Rpc.get_block_by_number ~block:"latest" sequencer in
+  let native_basefee = Int64.of_string native_basefee_hex in
+  let native_gaslimit = Int64.of_string native_gaslimit_hex in
+  Log.info
+    "Native EVM: BASEFEE=%s GASLIMIT=%s GASPRICE=%s PREVRANDAO=%s | \
+     block.baseFeePerGas=%Ld block.gasLimit=%Ld block.prevRandao=%s"
+    native_basefee_hex
+    native_gaslimit_hex
+    native_gasprice_hex
+    native_prevrandao_hex
+    native_block.Block.baseFeePerGas
+    native_block.Block.gasLimit
+    native_block.Block.prevRandao ;
+  (* Sanity: the native EVM path observes the live, non-zero block values.
+     A zero here would mean the sandbox itself is misconfigured (e.g.
+     [minimum_base_fee] unset), making the CRAC comparison meaningless. *)
+  Check.(
+    (native_basefee = native_block.Block.baseFeePerGas)
+      int64
+      ~error_msg:
+        "Sanity: native EVM BASEFEE in slot 0 (%L) differs from block \
+         baseFeePerGas (%R)") ;
+  Check.(
+    (native_basefee <> 0L)
+      int64
+      ~error_msg:
+        "Sanity: native EVM BASEFEE is 0; sandbox minimum_base_fee not set") ;
+  Check.(
+    (native_gaslimit = native_block.Block.gasLimit)
+      int64
+      ~error_msg:
+        "Sanity: native EVM GASLIMIT in slot 1 (%L) differs from block \
+         gasLimit (%R)") ;
+  Check.(
+    (native_gaslimit <> 0L) int64 ~error_msg:"Sanity: native EVM GASLIMIT is 0") ;
+  Log.debug ~prefix "Fire CRAC into probe (TEZ->EVM)" ;
+  let evm_target = `Evm_runner probe_addr in
+  let* () = Gateway.call_evm ~evm_target ~method_sig:"" ~abi_params:"" () in
+  Log.debug ~prefix "Read CRAC observables from slots 0-3 and block header" ;
+  let*@ crac_basefee_hex = read_slot "0x0" in
+  let*@ crac_gaslimit_hex = read_slot "0x1" in
+  let*@ crac_gasprice_hex = read_slot "0x2" in
+  let*@ crac_prevrandao_hex = read_slot "0x3" in
+  let*@ crac_block = Rpc.get_block_by_number ~block:"latest" sequencer in
+  let crac_basefee = Int64.of_string crac_basefee_hex in
+  let crac_gaslimit = Int64.of_string crac_gaslimit_hex in
+  let crac_gasprice = Int64.of_string crac_gasprice_hex in
+  Log.info
+    "CRAC: BASEFEE=%s GASLIMIT=%s GASPRICE=%s PREVRANDAO=%s | \
+     block.baseFeePerGas=%Ld block.gasLimit=%Ld block.prevRandao=%s"
+    crac_basefee_hex
+    crac_gaslimit_hex
+    crac_gasprice_hex
+    crac_prevrandao_hex
+    crac_block.Block.baseFeePerGas
+    crac_block.Block.gasLimit
+    crac_block.Block.prevRandao ;
+  (* BASEFEE: live block basefee, not 0. *)
+  Check.(
+    (crac_basefee <> 0L) int64 ~error_msg:"CRAC BASEFEE is 0 — see L2-1417") ;
+  Check.(
+    (crac_basefee = crac_block.Block.baseFeePerGas)
+      int64
+      ~error_msg:
+        "CRAC BASEFEE (%L) differs from the producing block's baseFeePerGas \
+         (%R)") ;
+  (* GASLIMIT: the block gas limit, not the forwarded call gas nor 0. *)
+  Check.(
+    (crac_gaslimit <> 0L) int64 ~error_msg:"CRAC GASLIMIT is 0 — see L2-1417") ;
+  Check.(
+    (crac_gaslimit = crac_block.Block.gasLimit)
+      int64
+      ~error_msg:
+        "CRAC GASLIMIT (%L) differs from the producing block's gasLimit (%R)") ;
+  (* GASPRICE: resolves to the block basefee (Etherlink ignores priority
+     fees), not the cross-runtime TxEnv's 0. *)
+  Check.(
+    (crac_gasprice <> 0L) int64 ~error_msg:"CRAC GASPRICE is 0 — see L2-1417") ;
+  Check.(
+    (crac_gasprice = crac_block.Block.baseFeePerGas)
+      int64
+      ~error_msg:
+        "CRAC GASPRICE (%L) differs from the producing block's baseFeePerGas \
+         (%R)") ;
+  (* PREVRANDAO: the CRAC frame must observe the same value as the producing
+     block, inherited from the originating block rather than the synthesized
+     block's default.  Note this sandbox always produces a zeroed prevRandao,
+     so this guards forwarding consistency rather than acting as a non-zero
+     regression; the [tezosx-ethereum-runtime] unit test exercises PREVRANDAO
+     with a non-zero value. *)
+  Check.(
+    (normalize_hex crac_prevrandao_hex
+    = normalize_hex crac_block.Block.prevRandao)
+      string
+      ~error_msg:
+        "CRAC PREVRANDAO (%L) differs from the producing block's prevRandao \
+         (%R)") ;
+  unit
+
 (** debug_traceTransaction on a CRAC fake transaction (TEZ→EVM).
  *
  *  Sets up a TEZ→EVM CRAC, fetches the fake tx hash from the EVM block,
@@ -11773,6 +11973,7 @@ let () =
   test_crac_tez_to_evm_fake_tx_in_block [Alpha] ;
   test_crac_tez_to_evm_fake_tx_unique_hash_across_blocks [Alpha] ;
   test_crac_tez_to_evm_inner_logs_in_receipt [Alpha] ;
+  test_crac_tez_to_evm_block_observables_visible [Alpha] ;
   test_crac_tez_revert_rolls_back_inner_evm_storage [Alpha] ;
   test_crac_tez_revert_propagates_to_evm [Alpha] ;
   test_crac_evm_journal_state_preserved [Alpha] ;

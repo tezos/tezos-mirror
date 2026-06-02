@@ -1238,6 +1238,7 @@ mod tests {
         let journal = TezosXJournal::new(
             CracId::new(0, 0),
             tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
         );
         super::maybe_store_http_traces_for_tx(&mut host, false, &tx_hash, &journal);
         let path = super::http_traces_path(&tx_hash).unwrap();
@@ -1255,6 +1256,7 @@ mod tests {
         let journal = TezosXJournal::new(
             CracId::new(0, 0),
             tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
         );
         super::maybe_store_http_traces_for_tx(&mut host, true, &tx_hash, &journal);
         let path = super::http_traces_path(&tx_hash).unwrap();
@@ -1272,6 +1274,7 @@ mod tests {
         let mut journal = TezosXJournal::new(
             CracId::new(0, 0),
             tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
         );
         let request = http::Request::builder()
             .method("GET")
@@ -1324,6 +1327,7 @@ mod tests {
         let mut journal = TezosXJournal::new(
             CracId::new(0, 0),
             tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
         );
 
         // First exchange: GET /first.

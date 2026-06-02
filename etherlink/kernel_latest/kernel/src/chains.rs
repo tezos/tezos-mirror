@@ -800,7 +800,15 @@ impl ChainConfigTrait for EvmChainConfig {
                     self.chain_id.low_u64(),
                     block_in_progress.number.low_u64(),
                 );
-                let mut journal = TezosXJournal::new(crac_id, operation_hash);
+                // Seed the journal with this block's EVM environment so any
+                // inbound CRAC the Michelson operation dispatches to the EVM
+                // runtime exposes the live block observables (BASEFEE,
+                // GASLIMIT, ...) rather than zero.
+                let mut journal = TezosXJournal::new(
+                    crac_id,
+                    operation_hash,
+                    block_constants.evm_runtime_block_constants.clone(),
+                );
                 let result = apply_tezos_operation(
                     &self.michelson_chain_config.chain_id,
                     block_in_progress,
@@ -1465,7 +1473,11 @@ impl ChainConfigTrait for MichelsonChainConfig {
                     self.get_chain_id().low_u64(),
                     block_in_progress.number.low_u64(),
                 );
-                let mut journal = TezosXJournal::new(crac_id, operation_hash);
+                let mut journal = TezosXJournal::new(
+                    crac_id,
+                    operation_hash,
+                    tezos_ethereum::block::BlockConstants::dummy(),
+                );
                 // Not supported in standalone Tezlink (no ExperimentalFeatures).
                 let enable_gas_refund = false;
                 let result = apply_tezos_operation(

@@ -316,8 +316,19 @@ where
         eth_chain_id.low_u64(),
         block_in_progress.number.low_u64(),
     );
-    let mut trace_journal =
-        tezosx_journal::TezosXJournal::new(trace_crac_id, trace_operation_hash);
+    // Seed the journal with the live simulation block (built above from
+    // `block_in_progress`), exactly as the applied path seeds the real
+    // block, so a CRAC dispatched during a simulated/pre-applied Michelson
+    // operation observes the live block environment (`BASEFEE`, `GASLIMIT`,
+    // `GASPRICE`, `PREVRANDAO`) instead of the placeholder
+    // `BlockConstants::dummy()`. This keeps simulation and pre-application
+    // consistent with execution; mirrors `Evaluation::run` for the
+    // `eth_call`/`estimateGas` path.
+    let mut trace_journal = tezosx_journal::TezosXJournal::new(
+        trace_crac_id,
+        trace_operation_hash,
+        block_constants.evm_runtime_block_constants.clone(),
+    );
     let execution_result = match transaction {
         chains::TezosXTransaction::Tezos(operation) => {
             let enable_gas_refund = evm_config

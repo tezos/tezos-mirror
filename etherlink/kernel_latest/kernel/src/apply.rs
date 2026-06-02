@@ -726,7 +726,8 @@ where
         block_constants.chain_id.low_u64(),
         block_constants.number.low_u64(),
     );
-    let mut journal = TezosXJournal::new(crac_id, operation_hash);
+    let mut journal =
+        TezosXJournal::new(crac_id, operation_hash, block_constants.clone());
     let run_result = revm_run_transaction(
         host,
         registry,
@@ -838,6 +839,7 @@ where
     let mut journal = TezosXJournal::new(
         CracId::default(),
         tezos_crypto_rs::hash::OperationHash::from(transaction_hash),
+        block_constants.clone(),
     );
     match revm_run_transaction(
         host,
@@ -966,6 +968,7 @@ where
     let mut journal = TezosXJournal::new(
         CracId::default(),
         tezos_crypto_rs::hash::OperationHash::from(transaction_hash),
+        block_constants.clone(),
     );
     revm_run_transaction(
         host,
@@ -1317,7 +1320,11 @@ where
                 block_constants.chain_id.low_u64(),
                 block_constants.number.low_u64(),
             );
-            let mut tezosx_journal = TezosXJournal::new(crac_id, synthetic_op_hash);
+            // Seed the journal with this block's EVM environment so an
+            // inbound CRAC the Michelson operation dispatches exposes the
+            // live block observables instead of zero (see chains.rs).
+            let mut tezosx_journal =
+                TezosXJournal::new(crac_id, synthetic_op_hash, block_constants.clone());
             let validation_result = tezos_execution::validate_and_apply_operation(
                 host,
                 registry,
@@ -1982,6 +1989,7 @@ mod tests {
         let mut journal = TezosXJournal::new(
             CracId::new(1, 0),
             tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
         );
         journal
             .michelson
@@ -2027,6 +2035,7 @@ mod tests {
         let mut journal = TezosXJournal::new(
             CracId::new(1, 0),
             tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
         );
         // First-executed CRAC fails (top=Failed in the source receipt),
         // second one succeeds.
@@ -2054,6 +2063,7 @@ mod tests {
         let mut journal = TezosXJournal::new(
             CracId::new(1, 0),
             tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
         );
         let mut r1 = dummy_crac_receipt(vec![make_transfer(0, 100)]);
         make_top_level_failed(&mut r1);
@@ -2082,6 +2092,7 @@ mod tests {
         let mut journal = TezosXJournal::new(
             CracId::new(1, 0),
             tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
         );
         // Execution order: failed(100), pending(200), failed(300)
         journal
