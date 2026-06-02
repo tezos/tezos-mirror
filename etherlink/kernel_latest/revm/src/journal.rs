@@ -39,7 +39,8 @@ use tezos_ethereum::block::BlockConstants;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::{
-    resolve_routing, AliasInfo, CrossRuntimeContext, Registry, RoutingDecision, RuntimeId,
+    canonicalize_native_address, resolve_routing, AliasInfo, CrossRuntimeContext,
+    Registry, RoutingDecision, RuntimeId,
 };
 
 /// A journal of state changes internal to the EVM
@@ -698,7 +699,11 @@ where
             RoutingDecision::Transitive(info) => info,
             RoutingDecision::Native => AliasInfo {
                 runtime: RuntimeId::Ethereum,
-                native_address: source.to_string().to_lowercase().into_bytes(),
+                native_address: canonicalize_native_address(
+                    RuntimeId::Ethereum,
+                    &source.to_string(),
+                )
+                .into_bytes(),
             },
         };
         // Convert remaining EVM gas to target runtime units to cap
@@ -757,7 +762,10 @@ where
         {
             RoutingDecision::RoundTrip(target) => return Ok(target),
             RoutingDecision::Transitive(info) => info.native_address,
-            RoutingDecision::Native => source.to_string().to_lowercase().into_bytes(),
+            RoutingDecision::Native => {
+                canonicalize_native_address(RuntimeId::Ethereum, &source.to_string())
+                    .into_bytes()
+            }
         };
         // Deterministic fallback: reproduce the alias that the target
         // runtime's `ensure_alias` would compute (and persist on the

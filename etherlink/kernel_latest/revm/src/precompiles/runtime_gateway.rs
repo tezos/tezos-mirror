@@ -9,10 +9,10 @@ use revm::{
 };
 use tezosx_interfaces::headers::format_tez_from_wei;
 use tezosx_interfaces::{
-    gas, AliasInfo, Classification, Registry, RuntimeId, ALIAS_LOOKUP_COST,
-    ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_DEPTH,
-    X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER,
-    X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
+    canonicalize_native_address, gas, AliasInfo, Classification, Registry, RuntimeId,
+    ALIAS_LOOKUP_COST, ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER,
+    X_TEZOS_CRAC_DEPTH, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT,
+    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
 };
 
 use crate::{
@@ -253,31 +253,21 @@ fn dispatch_origin_of<Host: StorageV1, R: Registry>(
         Classification::Unknown => {
             (ORIGIN_KIND_UNKNOWN, 0u16, String::new()).abi_encode_params()
         }
-        Classification::Native => {
-            let native_str = if source_runtime == RuntimeId::Ethereum {
-                addr_str.to_lowercase()
-            } else {
-                addr_str
-            };
-            (
-                ORIGIN_KIND_NATIVE,
-                u16::from(u8::from(source_runtime)),
-                native_str,
-            )
-                .abi_encode_params()
-        }
+        Classification::Native => (
+            ORIGIN_KIND_NATIVE,
+            u16::from(u8::from(source_runtime)),
+            canonicalize_native_address(source_runtime, &addr_str),
+        )
+            .abi_encode_params(),
         Classification::Alias(info) => {
-            let native_str = String::from_utf8(info.native_address).map_err(|e| {
+            let runtime = info.runtime;
+            let native_str = info.into_native_address_string().map_err(|e| {
                 CustomPrecompileError::Revert(
                     format!("originOf: alias native_address is not UTF-8: {e}"),
                     *gas,
                 )
             })?;
-            (
-                ORIGIN_KIND_ALIAS,
-                u16::from(u8::from(info.runtime)),
-                native_str,
-            )
+            (ORIGIN_KIND_ALIAS, u16::from(u8::from(runtime)), native_str)
                 .abi_encode_params()
         }
     };
@@ -337,7 +327,7 @@ fn dispatch_resolve_address<Host: StorageV1, R: Registry>(
         }
         Classification::Alias(info) if info.runtime == target_runtime => {
             // Direct recorded lookup — target address is in the Alias record.
-            let native_str = String::from_utf8(info.native_address).map_err(|e| {
+            let native_str = info.into_native_address_string().map_err(|e| {
                 CustomPrecompileError::Revert(
                     format!("resolveAddress: alias native_address is not UTF-8: {e}"),
                     *gas,
@@ -349,13 +339,9 @@ fn dispatch_resolve_address<Host: StorageV1, R: Registry>(
             // Derivation path: either Native or Alias pointing to a third
             // runtime (vacuous in two-runtime mode).
             let basis: Vec<u8> = match &source_class {
-                Classification::Native if source_runtime == RuntimeId::Ethereum => {
-                    // Canonicalize EVM hex so alias derivation is
-                    // casing-insensitive; the journal performs the same
-                    // normalization on its native-source path.
-                    addr_str.to_lowercase().into_bytes()
+                Classification::Native => {
+                    canonicalize_native_address(source_runtime, &addr_str).into_bytes()
                 }
-                Classification::Native => addr_str.as_bytes().to_vec(),
                 Classification::Alias(info) => info.native_address.clone(),
                 Classification::Unknown => unreachable!("Unknown handled above"),
             };

@@ -132,6 +132,21 @@ pub enum RuntimeId {
     Ethereum = 1,
 }
 
+/// Canonical form of a native address for alias derivation and for
+/// storing as the `Native` representation in classification records.
+///
+/// Ethereum hex is case-insensitive on the wire, so two callers that
+/// pass `0xABC...` and `0xabc...` must derive the same alias; lowercase
+/// is the canonical form. Tezos base58check is case-sensitive (`tz1ABC`
+/// and `tz1abc` are different addresses, typically with one invalid),
+/// so the input is passed through unchanged.
+pub fn canonicalize_native_address(runtime: RuntimeId, addr: &str) -> String {
+    match runtime {
+        RuntimeId::Ethereum => addr.to_lowercase(),
+        RuntimeId::Tezos => addr.to_string(),
+    }
+}
+
 /// Payload carried by the alias variant of Origin.
 ///
 /// The address bytes hold the UTF-8 form of the address string (hex
@@ -144,6 +159,19 @@ pub struct AliasInfo {
     pub runtime: RuntimeId,
     #[encoding(dynamic, bytes)]
     pub native_address: Vec<u8>,
+}
+
+impl AliasInfo {
+    /// Decode [`Self::native_address`] as the UTF-8 string it is
+    /// invariantly supposed to be (see the type's doc comment),
+    /// consuming `self`. A non-UTF-8 payload is data corruption;
+    /// callers should surface it as a runtime-local kernel error, not
+    /// silently substitute `U+FFFD`.
+    pub fn into_native_address_string(
+        self,
+    ) -> Result<String, std::string::FromUtf8Error> {
+        String::from_utf8(self.native_address)
+    }
 }
 
 /// Classification record stored at an account classification path.

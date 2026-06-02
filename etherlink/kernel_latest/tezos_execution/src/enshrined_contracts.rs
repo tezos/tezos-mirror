@@ -1435,11 +1435,8 @@ where
         }
         Classification::Alias(info) if info.runtime == target_runtime => {
             // Direct recorded lookup — target address is already in the record.
-            // Strict UTF-8: `AliasInfo.native_address` is a kernel invariant
-            // (declared in tezosx-types) and a non-UTF-8 payload here is data
-            // corruption, not legitimate state. Mirrors the EVM twin in
-            // `revm/src/precompiles/runtime_gateway.rs` which reverts.
-            let native_str = String::from_utf8(info.native_address).map_err(|_| {
+            // Strict UTF-8 per `AliasInfo` invariant; failure is data corruption.
+            let native_str = info.into_native_address_string().map_err(|_| {
                 mir::interpreter::EnshrinedViewDispatchError::AliasResolution
             })?;
             TypedValue::new_option(Some(TypedValue::new_pair(
@@ -1523,11 +1520,9 @@ fn make_invalid_runtime_id_error<'a>(
 /// Encode an origin classification as the Michelson type
 /// `or unit (or nat (pair nat string))`.
 ///
-/// Strict UTF-8 on the alias arm: `AliasInfo.native_address` is a kernel
-/// invariant (declared in tezosx-types) and a non-UTF-8 payload here is
-/// data corruption. Surfaces as
-/// [`EnshrinedViewDispatchError::AliasResolution`], mirroring the EVM
-/// twin in `revm/src/precompiles/runtime_gateway.rs` which reverts.
+/// Fallible on the alias arm: `AliasInfo::into_native_address_string`
+/// enforces the UTF-8 invariant; failure surfaces as
+/// [`EnshrinedViewDispatchError::AliasResolution`].
 fn encode_origin_of<'a>(
     classification: Classification,
     source_runtime: RuntimeId,
@@ -1547,9 +1542,9 @@ fn encode_origin_of<'a>(
             // Alias → Right (Right (Pair (<home_runtime as nat>, <native_str>)))
             let home_nat = TypedValue::Nat((u8::from(info.runtime) as u64).into());
             let native_str =
-                TypedValue::String(String::from_utf8(info.native_address).map_err(
-                    |_| mir::interpreter::EnshrinedViewDispatchError::AliasResolution,
-                )?);
+                TypedValue::String(info.into_native_address_string().map_err(|_| {
+                    mir::interpreter::EnshrinedViewDispatchError::AliasResolution
+                })?);
             TypedValue::new_or(Or::Right(TypedValue::new_or(Or::Right(
                 TypedValue::new_pair(home_nat, native_str),
             ))))
