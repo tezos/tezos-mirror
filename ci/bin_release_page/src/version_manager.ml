@@ -8,19 +8,10 @@
 open Base
 open Base.Version
 
-(* Used for both parsing of [--rc] and predicate filtering.
+(* Used for both predicate filtering and version creation.
    [Stable] selects only non-prerelease versions; [Prerelease p] selects
    versions with that specific prerelease. [None] (absent) means no filter. *)
-type prerelease = Stable | Prerelease of Version.prerelease
-
-let parse_prerelease_opt = function
-  | "stable" -> Some Stable
-  | n -> Option.map (fun n -> Prerelease (RC n)) (int_of_string_opt n)
-
-let show_prerelease = function
-  | Stable -> "stable"
-  | Prerelease (RC n) -> sf "%i" n
-  | Prerelease (Beta b) -> sf "beta%d" b
+type version_qualifier = Stable | Prerelease of Version.prerelease
 
 let create_version_from_args ?major ?minor ?(active = false) ?announcement
     ?prerelease ?(publication_date = 0.) () =
@@ -38,12 +29,12 @@ let create_version_from_args ?major ?minor ?(active = false) ?announcement
         ~publication_date
         ()
 
-let predicate_from_args ?major ?minor ?prerelease_filter () =
+let predicate_from_args ?major ?minor ?version_qualifier () =
  fun version ->
   let check x = function None -> true | Some y -> x = y in
   check version.major major && check version.minor minor
   &&
-  match prerelease_filter with
+  match version_qualifier with
   | None -> true
   | Some Stable -> Option.is_none version.prerelease
   | Some (Prerelease p) -> version.prerelease = Some p
@@ -135,22 +126,18 @@ let () =
       ~description:"Minor version number"
       ()
   in
-  let rc_typ =
-    Clap.typ
-      ~name:"rc"
-      ~dummy:Stable
-      ~parse:parse_prerelease_opt
-      ~show:show_prerelease
+  let stable =
+    Clap.flag
+      ~set_long:"stable"
+      ~description:"Filter for stable (non-prerelease) versions."
+      false
   in
   let rc =
-    Clap.optional
-      rc_typ
+    Clap.optional_int
       ~long:"rc"
       ~short:'r'
       ~placeholder:"RC"
-      ~description:
-        "RC value.\n\
-         Its value is \"stable\" if the version is not a Release Candidate."
+      ~description:"RC number (e.g. 1 for -rc1)."
       ()
   in
   let announcement =
@@ -250,10 +237,18 @@ let () =
       "feed.xml"
   in
   Clap.close () ;
-  let prerelease =
-    match rc with None | Some Stable -> None | Some (Prerelease p) -> Some p
+  let version_qualifier =
+    match (stable, rc) with
+    | true, None -> Some Stable
+    | false, Some n -> Some (Prerelease (RC n))
+    | false, None -> None
+    | true, Some _ -> failwith "Cannot specify both --stable and --rc"
   in
-  let prerelease_filter = rc in
+  let prerelease =
+    Option.bind version_qualifier (function
+      | Stable -> None
+      | Prerelease p -> Some p)
+  in
   let require_path () =
     match remote_path with
     | Some path -> path
@@ -306,7 +301,7 @@ let () =
       | Some latest -> Format.printf "Set %s as latest@." (to_string latest)
       | None -> Format.printf "Warning: No version marked as latest@.")
   | `set_active ->
-      let predicate = predicate_from_args ?major ?minor ?prerelease_filter () in
+      let predicate = predicate_from_args ?major ?minor ?version_qualifier () in
       let updated = Base.Version.set_active predicate (load_from_file file) in
       save_to_file updated file ;
       let active_versions = find_active updated in
@@ -318,7 +313,7 @@ let () =
           (fun v -> Format.printf "  - %s@." (to_string v))
           active_versions)
   | `set_inactive ->
-      let predicate = predicate_from_args ?major ?minor ?prerelease_filter () in
+      let predicate = predicate_from_args ?major ?minor ?version_qualifier () in
       let updated = Base.Version.set_inactive predicate (load_from_file file) in
       save_to_file updated file ;
       let still_active = find_active updated in
