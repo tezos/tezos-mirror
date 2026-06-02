@@ -764,6 +764,21 @@ where
                 result
             };
 
+            // Charge gas for the two durable writes performed by `set_storage`:
+            // the actual storage and its size. Also charge the used bytes update
+            // in `update_storage_space` and the three reads (code_size,
+            // storage_size and used_bytes).
+            consume_storage_write_milligas(
+                tc_ctx.operation_gas,
+                1,
+                new_storage.len() as u64,
+            )
+            .map_err(TransferError::OutOfGas)?;
+            consume_storage_write_milligas(tc_ctx.operation_gas, 2, COUNTER_SIZE)
+                .map_err(TransferError::OutOfGas)?;
+            consume_storage_read_milligas(tc_ctx.operation_gas, 3, COUNTER_SIZE)
+                .map_err(TransferError::OutOfGas)?;
+
             dest_account
                 .set_storage(tc_ctx.host, &new_storage)
                 .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
@@ -2965,7 +2980,7 @@ mod tests {
                             balance_updates: vec![],
                             ticket_receipt: vec![],
                             originated_contracts: vec![],
-                            consumed_milligas: 177701_u64.into(),
+                            consumed_milligas: 1377901_u64.into(),
                             storage_size: 69_u64.into(), // code (67) + unit (2)
                             paid_storage_size_diff: 0_u64.into(), // unit unchanged
                             allocated_destination_contract: false,
@@ -3155,7 +3170,7 @@ mod tests {
         let operation = make_transfer_operation(
             15,
             1,
-            1040,
+            21040,
             5,
             src.clone(),
             30_u64.into(),
@@ -3236,7 +3251,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 173463_u64.into(),
+                        consumed_milligas: 1373752_u64.into(),
                         storage_size: 44_u64.into(), // code (33) + "Hello world" (11)
                         paid_storage_size_diff: 4_u64.into(), // "Hello world" (11) − "initial" (7)
                         allocated_destination_contract: false,
@@ -3295,7 +3310,7 @@ mod tests {
         let operation = make_transfer_operation(
             15,
             1,
-            1040,
+            21040,
             5,
             src.clone(),
             30_u64.into(),
@@ -3362,7 +3377,7 @@ mod tests {
         let operation = make_transfer_operation(
             15,
             1,
-            1040,
+            21040,
             5,
             src.clone(),
             30_u64.into(),
@@ -3435,7 +3450,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 173463_u64.into(),
+                        consumed_milligas: 1373752_u64.into(),
                         storage_size: 44_u64.into(), // code (33) + "Hello world" (11)
                         paid_storage_size_diff: 4_u64.into(), // "Hello world" (11) − "initial" (7)
                         allocated_destination_contract: false,
@@ -6090,7 +6105,7 @@ mod tests {
         let operation = make_transfer_operation(
             15,
             2,
-            1110,
+            21110,
             5,
             src.clone(),
             0.into(),

@@ -615,7 +615,7 @@ let test_partial_internal_burn_failure_backtracks_all () =
     Contract.Double_send.call
       ~amount:Tez.zero
       ~fee:call_fee
-      ~gas_limit:5000
+      ~gas_limit:10000
       ~storage_limit:600
       ~giver:Constant.bootstrap5.alias
       ~burn_cap:Tez.one
@@ -767,7 +767,7 @@ let test_partial_internal_storage_limit_overshoot_backtracks_all () =
     Contract.Double_send.call
       ~amount:Tez.zero
       ~fee:call_fee
-      ~gas_limit:5000
+      ~gas_limit:10000
       ~storage_limit
       ~giver:Constant.bootstrap1.alias
       ~burn_cap:Tez.one

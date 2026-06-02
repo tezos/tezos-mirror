@@ -14,10 +14,10 @@ pragma solidity ^0.8.20;
 // CRAC runner test framework (cross_runtime.ml).
 
 contract GasBurner {
-    uint256[120] public data;
+    uint256[170] public data;
 
     function run() external payable {
-        for (uint256 i = 0; i < 120; i++) {
+        for (uint256 i = 0; i < 170; i++) {
             data[i] = data[i] + 1;
         }
     }

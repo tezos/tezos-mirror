@@ -1563,7 +1563,7 @@ mod tests {
         let call = make_transaction_operation(
             1,
             2,
-            1000,
+            2000,
             300,
             boostrap1,
             0.into(),
