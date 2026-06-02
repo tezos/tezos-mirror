@@ -224,6 +224,66 @@ impl Entrypoint {
     pub fn from_string_unchecked(s: String) -> Entrypoint {
         Self(s)
     }
+
+    /// Build an [Entrypoint] from the entrypoint suffix of a readable
+    /// (base58-check) `address` literal, matching Tezos L1's rule.
+    ///
+    /// Unlike [`TryFrom<&str>`], this does **not** apply the Michelson
+    /// entrypoint annotation charset (`[_0-9a-zA-Z]`, with `.`/`%`/`@`
+    /// permitted only after the first char). L1's `parse_address`
+    /// (`Entrypoint.of_string_strict`) only enforces `length <= 31` and
+    /// rejects the explicit `default` entrypoint. The charset regex is
+    /// only applied to entrypoint annotations in script source.
+    ///
+    /// An empty suffix is treated as the implicit default entrypoint
+    /// (matching L1's behaviour when no `%` is present in the literal).
+    ///
+    /// Returns an error if the suffix is longer than 31 bytes, is not
+    /// valid UTF-8, or is literally `"default"`.
+    pub fn from_address_str(s: &str) -> Result<Self, ByteReprError> {
+        if s.is_empty() {
+            return Ok(Self::default());
+        }
+        check_ep_name_len(s.as_bytes())?;
+        if s == DEFAULT_EP_NAME {
+            return Err(ByteReprError::WrongFormat(
+                "explicit default entrypoint is forbidden in readable address literal".to_owned(),
+            ));
+        }
+        Ok(Self(s.to_owned()))
+    }
+
+    /// Build an [Entrypoint] from the entrypoint-suffix bytes of an
+    /// optimized (binary) `address` value, matching Tezos L1's rule.
+    ///
+    /// Unlike [`TryFrom<&[u8]>`], this does **not** apply the Michelson
+    /// entrypoint annotation charset. L1's `parse_address` decodes the
+    /// trailing bytes via `Entrypoint.value_encoding` whose underlying
+    /// `of_string_strict'` only enforces `length <= 31` and rejects the
+    /// explicit `default` entrypoint. The charset regex is only applied
+    /// to entrypoint annotations in script source.
+    ///
+    /// An empty byte slice is treated as the implicit default entrypoint
+    /// (matching L1's behaviour when no entrypoint bytes follow the
+    /// address hash).
+    ///
+    /// Returns an error if the bytes are longer than 31 bytes, are not
+    /// valid UTF-8, or spell exactly `"default"`.
+    pub fn from_address_bytes(s: &[u8]) -> Result<Self, ByteReprError> {
+        if s.is_empty() {
+            return Ok(Self::default());
+        }
+        check_ep_name_len(s)?;
+        let s = std::str::from_utf8(s).map_err(|_| {
+            ByteReprError::WrongFormat("entrypoint name in address must be valid UTF-8".to_owned())
+        })?;
+        if s == DEFAULT_EP_NAME {
+            return Err(ByteReprError::WrongFormat(
+                "explicit default entrypoint is forbidden in binary encoding".to_owned(),
+            ));
+        }
+        Ok(Self(s.to_owned()))
+    }
 }
 
 // Exposed only for `mir`.
@@ -357,6 +417,118 @@ mod tests {
         // forbidden character
         assert!(matches!(
             Entrypoint::try_from(b"!" as &[u8]),
+            Err(ByteReprError::WrongFormat(_))
+        ));
+    }
+
+    #[test]
+    fn test_from_address_str() {
+        // empty suffix is the implicit default entrypoint.
+        assert_eq!(Entrypoint::from_address_str(""), Ok(Entrypoint::default()));
+
+        // explicit "default" is rejected on the readable address path
+        // (matches L1 `of_string_strict`).
+        assert!(matches!(
+            Entrypoint::from_address_str("default"),
+            Err(ByteReprError::WrongFormat(_))
+        ));
+
+        // basic alphanumeric entrypoint round-trips.
+        assert_eq!(
+            Entrypoint::from_address_str("foo"),
+            Ok(Entrypoint("foo".to_owned()))
+        );
+
+        // maximum length (31 chars) is accepted.
+        assert_eq!(
+            Entrypoint::from_address_str("q".repeat(31).as_str()),
+            Ok(Entrypoint("q".repeat(31)))
+        );
+
+        // 32 chars is too long.
+        assert!(matches!(
+            Entrypoint::from_address_str("q".repeat(32).as_str()),
+            Err(ByteReprError::WrongFormat(_))
+        ));
+
+        // L2-1377: bytes outside the script-source charset are *accepted*
+        // here, matching L1's `parse_address`. They would be rejected by
+        // [`TryFrom<&str>`] (the script-source path).
+        assert_eq!(
+            Entrypoint::from_address_str("!"),
+            Ok(Entrypoint("!".to_owned()))
+        );
+        assert_eq!(
+            Entrypoint::from_address_str(".foo"),
+            Ok(Entrypoint(".foo".to_owned()))
+        );
+        assert_eq!(
+            Entrypoint::from_address_str("foo!"),
+            Ok(Entrypoint("foo!".to_owned()))
+        );
+
+        // Non-ASCII (multi-byte UTF-8) is also accepted as long as the
+        // byte length is <= 31: L1 only enforces the byte-length bound.
+        assert_eq!(
+            Entrypoint::from_address_str("é"),
+            Ok(Entrypoint("é".to_owned()))
+        );
+    }
+
+    #[test]
+    fn test_from_address_bytes() {
+        // empty bytes is the implicit default entrypoint.
+        assert_eq!(
+            Entrypoint::from_address_bytes(b"" as &[u8]),
+            Ok(Entrypoint::default())
+        );
+
+        // explicit "default" is rejected on the binary address path
+        // (matches L1 `value_encoding` / `of_string_strict'`).
+        assert!(matches!(
+            Entrypoint::from_address_bytes(b"default" as &[u8]),
+            Err(ByteReprError::WrongFormat(_))
+        ));
+
+        // basic alphanumeric entrypoint round-trips.
+        assert_eq!(
+            Entrypoint::from_address_bytes(b"foo" as &[u8]),
+            Ok(Entrypoint("foo".to_owned()))
+        );
+
+        // maximum length (31 bytes) is accepted.
+        assert_eq!(
+            Entrypoint::from_address_bytes("q".repeat(31).as_bytes()),
+            Ok(Entrypoint("q".repeat(31)))
+        );
+
+        // 32 bytes is too long.
+        assert!(matches!(
+            Entrypoint::from_address_bytes("q".repeat(32).as_bytes()),
+            Err(ByteReprError::WrongFormat(_))
+        ));
+
+        // L2-1377: the failing cases from the issue. L1 accepts these,
+        // MIR previously rejected them; they must now be accepted on
+        // the binary `UNPACK address` path.
+        assert_eq!(
+            Entrypoint::from_address_bytes(b"!" as &[u8]),
+            Ok(Entrypoint("!".to_owned()))
+        );
+        assert_eq!(
+            Entrypoint::from_address_bytes(b".foo" as &[u8]),
+            Ok(Entrypoint(".foo".to_owned()))
+        );
+
+        // Non-UTF-8 is still rejected: MIR represents an entrypoint as
+        // a Rust `String`, so the byte sequence must be valid UTF-8.
+        // L1 itself stores the entrypoint as a raw byte string and is
+        // strictly more permissive here; widening MIR's representation
+        // is left to a follow-up (the dominant DIVERGE cases —
+        // forbidden ASCII chars like `!` and dot-as-first — are fixed
+        // by this change).
+        assert!(matches!(
+            Entrypoint::from_address_bytes(&[0xff_u8] as &[u8]),
             Err(ByteReprError::WrongFormat(_))
         ));
     }
