@@ -9,6 +9,7 @@
 //! for a given [`Key`]. Kernels can create and delete [`KeySpace`] instances as required
 //! and can generate hashes representing the entire state of a [`KeySpace`].
 
+use std::borrow::Cow;
 use std::str::FromStr;
 
 #[cfg(feature = "irmin-compat")]
@@ -30,8 +31,13 @@ pub enum KeyError {
 }
 
 /// Key used to access data in a [`KeySpace`].
-#[repr(transparent)]
-pub struct Key([u8]);
+///
+/// A `Key` owns its validated bytes: borrowed for compile-time constants
+/// (see [`Key::from_static`]), owned for keys built dynamically (see
+/// [`Key::from_bytes`]). Being a sized, owned type, a key can be returned from
+/// a builder and passed by reference wherever a `&Key` is expected.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Key(Cow<'static, [u8]>);
 
 impl Key {
     // Fallback: when `irmin-compat` is not enabled, only a size check is performed.
@@ -44,38 +50,55 @@ impl Key {
         Ok(())
     }
 
-    /// Create a key from raw bytes.
+    /// Create a key from raw bytes, taking ownership of them.
     ///
-    /// Returns an error if `key` fails validation (see `Key::check_bytes` for rules).
-    pub fn from_bytes(key: &[u8]) -> Result<&Self, KeyError> {
-        Self::check_bytes(key)?;
-        // SAFETY: `Key` is `repr(transparent)` over `[u8]`, so `&[u8]` can be safely transmuted to `&Key`.
-        Ok(unsafe { std::mem::transmute::<&[u8], &Key>(key) })
+    /// Returns an error if `bytes` fails validation (see `Key::check_bytes`).
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, KeyError> {
+        Self::check_bytes(bytes)?;
+        Ok(Key(Cow::Owned(bytes.to_vec())))
     }
 
-    /// Create a key from raw bytes. Should only be used to create constant keys.
+    /// Create a key from static bytes without allocating. Should only be used
+    /// for constant keys.
     ///
-    /// Panics if `key` is an invalid set of bytes.
-    pub const fn from_static(key: &'static [u8]) -> &'static Self {
-        assert!(Self::check_bytes(key).is_ok(), "Invalid key");
-        // SAFETY: `Key` is `repr(transparent)` over `[u8]`, so `&[u8]` can be safely transmuted to `&Key`.
-        unsafe { std::mem::transmute(key) }
+    /// Panics if `bytes` is an invalid key.
+    pub const fn from_static(bytes: &'static [u8]) -> Self {
+        assert!(Self::check_bytes(bytes).is_ok(), "Invalid key");
+        Key(Cow::Borrowed(bytes))
+    }
+
+    /// The raw bytes of the key.
+    pub fn as_bytes(&self) -> &[u8] {
+        self.0.as_ref()
     }
 }
 
-impl core::fmt::Debug for Key {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Key({self})")
+impl TryFrom<Vec<u8>> for Key {
+    type Error = KeyError;
+
+    /// Create a key from owned bytes without reallocating.
+    fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
+        Self::check_bytes(&bytes)?;
+        Ok(Key(Cow::Owned(bytes)))
+    }
+}
+
+impl TryFrom<String> for Key {
+    type Error = KeyError;
+
+    /// Create a key from an owned string without reallocating.
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        Self::try_from(s.into_bytes())
     }
 }
 
 impl core::fmt::Display for Key {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        // SAFETY: with irmin-compat, Key bytes are valid ASCII path characters.
-        // Without irmin-compat, we print hex-encoded bytes directly.
-        match core::str::from_utf8(&self.0) {
+        // With irmin-compat, key bytes are valid ASCII path characters;
+        // otherwise we print the hex-encoded bytes.
+        match core::str::from_utf8(self.as_bytes()) {
             Ok(s) => f.write_str(s),
-            Err(_) => write!(f, "Key({:02x?})", &self.0),
+            Err(_) => write!(f, "{:02x?}", self.as_bytes()),
         }
     }
 }
@@ -93,14 +116,12 @@ pub enum NameError {
 }
 
 /// A validated keyspace name, used as a path prefix in durable storage.
+///
+/// Like [`Key`], a `Name` owns its validated bytes: borrowed for constants
+/// (see [`Name::from_static`]), owned when parsed at runtime (see its
+/// [`FromStr`] implementation).
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
-pub struct Name(String);
-
-impl core::fmt::Display for Name {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
+pub struct Name(Cow<'static, str>);
 
 impl Name {
     // Fallback: when `irmin-compat` is not enabled, no validation is performed.
@@ -109,11 +130,26 @@ impl Name {
     const fn check_bytes(_bytes: &[u8]) -> Result<(), NameError> {
         Ok(())
     }
+
+    /// Create a name from a static string without allocating. Should only be
+    /// used for constant names.
+    ///
+    /// Panics if `name` is an invalid keyspace name.
+    pub const fn from_static(name: &'static str) -> Self {
+        assert!(Self::check_bytes(name.as_bytes()).is_ok(), "Invalid name");
+        Name(Cow::Borrowed(name))
+    }
+}
+
+impl core::fmt::Display for Name {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(self.0.as_ref())
+    }
 }
 
 impl AsRef<str> for Name {
     fn as_ref(&self) -> &str {
-        &self.0
+        self.0.as_ref()
     }
 }
 
@@ -122,7 +158,17 @@ impl FromStr for Name {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::check_bytes(s.as_bytes())?;
-        Ok(Name(s.to_owned()))
+        Ok(Name(Cow::Owned(s.to_owned())))
+    }
+}
+
+impl TryFrom<String> for Name {
+    type Error = NameError;
+
+    /// Create a name from an owned string without reallocating.
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        Self::check_bytes(s.as_bytes())?;
+        Ok(Name(Cow::Owned(s)))
     }
 }
 
@@ -193,7 +239,9 @@ pub trait KeySpace {
 #[derive(Debug)]
 pub enum KeySpaceLoaderError {
     /// A key space whose name overlaps (is a prefix of, or has as prefix) the
-    /// requested name is already loaded.
+    /// requested name is already loaded. Only meaningful when names form a
+    /// hierarchical path, which is why this variant is gated on `irmin-compat`.
+    #[cfg(feature = "irmin-compat")]
     Overlapping,
     /// A key space with this exact name is already loaded and has not been
     /// dropped yet.

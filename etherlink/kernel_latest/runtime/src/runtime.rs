@@ -440,7 +440,7 @@ mod tests {
         Key, KeySpace, KeySpaceLoader, KeySpaceLoaderError,
     };
 
-    fn key(s: &[u8]) -> &Key {
+    fn key(s: &[u8]) -> Key {
         Key::from_bytes(s).unwrap()
     }
 
@@ -448,8 +448,8 @@ mod tests {
     fn load_or_create_returns_usable_keyspace() {
         let mut host = MockKernelHost::default();
         let mut ks = host.load_or_create("/test".parse().unwrap()).unwrap();
-        ks.set(key(b"/a"), b"hello").unwrap();
-        assert_eq!(ks.get(key(b"/a")), Some(b"hello".to_vec()));
+        ks.set(&key(b"/a"), b"hello").unwrap();
+        assert_eq!(ks.get(&key(b"/a")), Some(b"hello".to_vec()));
     }
 
     #[test]
@@ -458,12 +458,12 @@ mod tests {
 
         host.load_or_create("/test".parse().unwrap())
             .unwrap()
-            .set(key(b"/a"), b"v1")
+            .set(&key(b"/a"), b"v1")
             .unwrap();
         // keyspace dropped here, name released
 
         let ks = host.load_or_create("/test".parse().unwrap()).unwrap();
-        assert_eq!(ks.get(key(b"/a")), Some(b"v1".to_vec()));
+        assert_eq!(ks.get(&key(b"/a")), Some(b"v1".to_vec()));
     }
 
     #[test]
@@ -515,11 +515,11 @@ mod tests {
         let mut ks1 = host.load_or_create("/evm".parse().unwrap()).unwrap();
         let mut ks2 = host.load_or_create("/evm-stuff".parse().unwrap()).unwrap();
 
-        ks1.set(key(b"/a"), b"v1").unwrap();
-        ks2.set(key(b"/a"), b"v2").unwrap();
+        ks1.set(&key(b"/a"), b"v1").unwrap();
+        ks2.set(&key(b"/a"), b"v2").unwrap();
 
-        assert_eq!(ks1.get(key(b"/a")), Some(b"v1".to_vec()));
-        assert_eq!(ks2.get(key(b"/a")), Some(b"v2".to_vec()));
+        assert_eq!(ks1.get(&key(b"/a")), Some(b"v1".to_vec()));
+        assert_eq!(ks2.get(&key(b"/a")), Some(b"v2".to_vec()));
     }
 
     // Same as above with '.' (0x2E < '/').
@@ -529,11 +529,11 @@ mod tests {
         let mut ks1 = host.load_or_create("/evm".parse().unwrap()).unwrap();
         let mut ks2 = host.load_or_create("/evm.backup".parse().unwrap()).unwrap();
 
-        ks1.set(key(b"/a"), b"v1").unwrap();
-        ks2.set(key(b"/a"), b"v2").unwrap();
+        ks1.set(&key(b"/a"), b"v1").unwrap();
+        ks2.set(&key(b"/a"), b"v2").unwrap();
 
-        assert_eq!(ks1.get(key(b"/a")), Some(b"v1".to_vec()));
-        assert_eq!(ks2.get(key(b"/a")), Some(b"v2".to_vec()));
+        assert_eq!(ks1.get(&key(b"/a")), Some(b"v1".to_vec()));
+        assert_eq!(ks2.get(&key(b"/a")), Some(b"v2".to_vec()));
     }
 
     // Ancestor point lookup: `/a/b` in map, loading `/a/b/c` must detect
@@ -554,11 +554,11 @@ mod tests {
         let mut ks1 = host.load_or_create("/ks1".parse().unwrap()).unwrap();
         let mut ks2 = host.load_or_create("/ks2".parse().unwrap()).unwrap();
 
-        ks1.set(key(b"/a"), b"from_ks1").unwrap();
-        ks2.set(key(b"/a"), b"from_ks2").unwrap();
+        ks1.set(&key(b"/a"), b"from_ks1").unwrap();
+        ks2.set(&key(b"/a"), b"from_ks2").unwrap();
 
-        assert_eq!(ks1.get(key(b"/a")), Some(b"from_ks1".to_vec()));
-        assert_eq!(ks2.get(key(b"/a")), Some(b"from_ks2".to_vec()));
+        assert_eq!(ks1.get(&key(b"/a")), Some(b"from_ks1".to_vec()));
+        assert_eq!(ks2.get(&key(b"/a")), Some(b"from_ks2".to_vec()));
     }
 
     #[test]
@@ -567,11 +567,11 @@ mod tests {
         let mut src = host.load_or_create("/src".parse().unwrap()).unwrap();
         let mut dst = host.load_or_create("/dst".parse().unwrap()).unwrap();
 
-        src.set(key(b"/a"), b"v1").unwrap();
+        src.set(&key(b"/a"), b"v1").unwrap();
         dst.copy_from(&src);
 
-        assert_eq!(dst.get(key(b"/a")), Some(b"v1".to_vec()));
-        assert_eq!(src.get(key(b"/a")), Some(b"v1".to_vec()));
+        assert_eq!(dst.get(&key(b"/a")), Some(b"v1".to_vec()));
+        assert_eq!(src.get(&key(b"/a")), Some(b"v1".to_vec()));
     }
 
     #[test]
@@ -580,11 +580,11 @@ mod tests {
         let mut src = host.load_or_create("/src".parse().unwrap()).unwrap();
         let mut dst = host.load_or_create("/dst".parse().unwrap()).unwrap();
 
-        src.set(key(b"/a"), b"v1").unwrap();
+        src.set(&key(b"/a"), b"v1").unwrap();
         dst.move_from(&mut src);
 
-        assert_eq!(dst.get(key(b"/a")), Some(b"v1".to_vec()));
-        assert!(!src.contains(key(b"/a")));
+        assert_eq!(dst.get(&key(b"/a")), Some(b"v1".to_vec()));
+        assert!(!src.contains(&key(b"/a")));
     }
 
     #[test]
@@ -593,14 +593,14 @@ mod tests {
         let mut src = host.load_or_create("/src".parse().unwrap()).unwrap();
         let mut dst = host.load_or_create("/dst".parse().unwrap()).unwrap();
 
-        src.set(key(b"/a"), b"v1").unwrap();
-        dst.set(key(b"/x"), b"old").unwrap();
+        src.set(&key(b"/a"), b"v1").unwrap();
+        dst.set(&key(b"/x"), b"old").unwrap();
 
         dst.clear();
         dst.copy_from(&src);
 
-        assert_eq!(dst.get(key(b"/a")), Some(b"v1".to_vec()));
-        assert!(!dst.contains(key(b"/x")));
+        assert_eq!(dst.get(&key(b"/a")), Some(b"v1".to_vec()));
+        assert!(!dst.contains(&key(b"/x")));
     }
 
     #[test]
@@ -609,15 +609,15 @@ mod tests {
         let mut src = host.load_or_create("/src".parse().unwrap()).unwrap();
         let mut dst = host.load_or_create("/dst".parse().unwrap()).unwrap();
 
-        src.set(key(b"/a"), b"v1").unwrap();
-        dst.set(key(b"/x"), b"old").unwrap();
+        src.set(&key(b"/a"), b"v1").unwrap();
+        dst.set(&key(b"/x"), b"old").unwrap();
 
         dst.clear();
         dst.move_from(&mut src);
 
-        assert_eq!(dst.get(key(b"/a")), Some(b"v1".to_vec()));
-        assert!(!dst.contains(key(b"/x")));
-        assert!(!src.contains(key(b"/a")));
+        assert_eq!(dst.get(&key(b"/a")), Some(b"v1".to_vec()));
+        assert!(!dst.contains(&key(b"/x")));
+        assert!(!src.contains(&key(b"/a")));
     }
 
     #[test]
@@ -626,13 +626,13 @@ mod tests {
         let src = host.load_or_create("/src".parse().unwrap()).unwrap();
         let mut dst = host.load_or_create("/dst".parse().unwrap()).unwrap();
 
-        dst.set(key(b"/a"), b"v1").unwrap();
-        dst.set(key(b"/b"), b"v2").unwrap();
+        dst.set(&key(b"/a"), b"v1").unwrap();
+        dst.set(&key(b"/b"), b"v2").unwrap();
 
         // src is empty (never written to), dst should be cleared.
         dst.copy_from(&src);
-        assert!(!dst.contains(key(b"/a")));
-        assert!(!dst.contains(key(b"/b")));
+        assert!(!dst.contains(&key(b"/a")));
+        assert!(!dst.contains(&key(b"/b")));
     }
 
     #[test]
@@ -641,9 +641,9 @@ mod tests {
         let mut src = host.load_or_create("/src".parse().unwrap()).unwrap();
         let mut dst = host.load_or_create("/dst".parse().unwrap()).unwrap();
 
-        dst.set(key(b"/a"), b"v1").unwrap();
+        dst.set(&key(b"/a"), b"v1").unwrap();
 
         dst.move_from(&mut src);
-        assert!(!dst.contains(key(b"/a")));
+        assert!(!dst.contains(&key(b"/a")));
     }
 }
