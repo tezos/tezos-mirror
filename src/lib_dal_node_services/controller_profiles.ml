@@ -58,6 +58,9 @@ let observer_slot_out_of_bounds number_of_slots t =
 let is_observed_slot slot_index {observers; _} =
   Slot_set.mem slot_index observers
 
+let is_operator_slot slot_index {operators; _} =
+  Slot_set.mem slot_index operators
+
 let can_publish_on_slot_index slot_index {observers; operators; _} =
   Slot_set.mem slot_index observers || Slot_set.mem slot_index operators
 

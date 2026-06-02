@@ -74,5 +74,13 @@ Data Availability Layer (DAL)
 DAL node
 ~~~~~~~~
 
+- Decoupled the storage lifetimes of slot payloads and shards. Shards are now
+  always retained for a single, profile-independent period (about 150 levels);
+  slot payloads of slot indices in the node's operator profile are retained
+  according to ``--history-mode``, which defaults to the new ``archive`` mode
+  (keep slot payloads indefinitely). The previous ``--history-mode full`` value
+  remains accepted as a synonym for ``archive``, and the configuration file is
+  migrated to version 3. (MR :gl:`!21939`)
+
 Miscellaneous
 -------------

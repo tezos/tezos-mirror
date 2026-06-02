@@ -25,10 +25,9 @@
 
 module Profiler = (val Profiler.wrap Dal_profiler.dal_profiler)
 
-(* This function removes from the store the given slot and its
-   shards. In case of error, this function emits a warning instead
-   of failing. *)
-let remove_slots_and_shards (store : Store.t) (slot_id : Types.slot_id) =
+(* Removes the shards stored for [slot_id]. On error, emits a warning rather
+   than failing. *)
+let remove_shards (store : Store.t) (slot_id : Types.slot_id) =
   let open Lwt_result_syntax in
   let*! () =
     let shards_store = Store.shards store in
@@ -44,6 +43,12 @@ let remove_slots_and_shards (store : Store.t) (slot_id : Types.slot_id) =
           ~slot_index:slot_id.slot_index
           ~error
   in
+  return_unit
+
+(* Removes the slot stored for [slot_id]. On error, emits a warning rather
+   than failing. *)
+let remove_slot (store : Store.t) (slot_id : Types.slot_id) =
+  let open Lwt_result_syntax in
   let*! () =
     let slots_store = Store.slots store in
     let*! res = Store.Slots.remove_slot slots_store slot_id in
@@ -60,77 +65,125 @@ let remove_slots_and_shards (store : Store.t) (slot_id : Types.slot_id) =
   in
   return_unit
 
-(* This function removes, from the Store, slot data (slots, their shards, and
-   their status) for commitments published at level exactly
-   {!Node_context.level_to_gc ~current_level}. It also removes skip list cells
-   attested at that level. *)
+(* This function removes from the Store the data that should no longer be
+   retained as of [current_level]. It performs three independent passes:
+
+   1. Shard pass: drops shards for the level
+      {!Node_context.shard_level_to_gc ~current_level}. Shards have a single,
+      profile-independent retention.
+
+   2. Slot pass: for each slot index, drops the corresponding slot at the
+      level returned by either
+      {!Node_context.operator_slot_level_to_gc ~current_level} (operator
+      slot indices, retention driven by [history_mode], may be [None]
+      under [Archive]) or {!Node_context.shard_level_to_gc ~current_level}
+      (non-operator slot indices, sharing the shard retention).
+
+   3. Skip-list pass: drops skip-list cells at the level returned by
+      {!Node_context.skip_list_level_to_gc ~current_level}. Skip-list cells
+      are refutation-game evidence, useful only within the refutation
+      window, so they follow the bounded default store period regardless of
+      [history_mode] (in particular they remain bounded under [Archive]). *)
 let remove_old_level_stored_data proto_parameters ctxt current_level =
   let open Lwt_result_syntax in
   let store = Node_context.get_store ctxt in
-  let* level_to_gc =
-    Node_context.level_to_gc ctxt proto_parameters ~current_level
+  let clean_shards_at oldest_level =
+    let*? proto_parameters_at_level =
+      Node_context.get_proto_parameters ctxt ~level:(`Level oldest_level)
+    in
+    let number_of_slots = proto_parameters_at_level.Types.number_of_slots in
+    List.iter_es
+      (fun slot_index ->
+        let slot_id : Types.slot_id = {slot_level = oldest_level; slot_index} in
+        remove_shards store slot_id)
+      (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id)
   in
-  match level_to_gc with
-  | None -> return_unit
-  | Some oldest_level ->
-      (* The protocol parameters to consider when cleaning are the ones at the
-         time of the level we are cleaning. *)
-      let*? proto_parameters =
-        Node_context.get_proto_parameters ctxt ~level:(`Level oldest_level)
+  let clean_skip_list_at oldest_level =
+    let*? proto_parameters_at_level =
+      Node_context.get_proto_parameters ctxt ~level:(`Level oldest_level)
+    in
+    let current_lag = proto_parameters_at_level.Types.attestation_lag in
+    let clean_skip_list_cells lag =
+      let published_level = Int32.(sub oldest_level (of_int lag)) in
+      let*! res = Store.Skip_list_cells.remove store ~published_level in
+      let*! () =
+        match res with
+        | Ok () -> Event.emit_removed_skip_list_cells ~level:oldest_level
+        | Error error ->
+            Event.emit_removing_skip_list_cells_failed
+              ~level:oldest_level
+              ~error
       in
-      let current_lag = proto_parameters.attestation_lag in
-      (* This function removes from the skip-list all the cells for slots
-         published [lag] levels before the [oldest_level]. *)
-      let clean_skip_list_cells lag =
-        let published_level = Int32.(sub oldest_level (of_int lag)) in
-        let*! res = Store.Skip_list_cells.remove store ~published_level in
-        let*! () =
-          match res with
-          | Ok () -> Event.emit_removed_skip_list_cells ~level:oldest_level
-          | Error error ->
-              Event.emit_removing_skip_list_cells_failed
-                ~level:oldest_level
-                ~error
-        in
-        return_unit
-      in
+      return_unit
+    in
+    if Node_context.is_bootstrap_node ctxt then return_unit
+    else
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/8065
+         Remove after dynamic lag is active. *)
       let* () =
-        if not @@ Node_context.is_bootstrap_node ctxt then
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/8065
-             Remove after dynamic lag is active.
-             This code cleans the skip-list for the "orphan" levels which are
-             guaranteed to never be attested when a protocol migration reduces
-             the attestation lag. *)
-          let* () =
-            if oldest_level > 1l then
-              let*? prev_proto_parameters =
-                Node_context.get_proto_parameters
-                  ctxt
-                  ~level:(`Level (Int32.pred oldest_level))
-              in
-              let previous_lag = prev_proto_parameters.Types.attestation_lag in
-              if previous_lag > current_lag then
-                let rec loop lag =
-                  if lag = current_lag then return_unit
-                  else
-                    let* () = clean_skip_list_cells lag in
-                    loop (lag - 1)
-                in
-                loop previous_lag
-              else return_unit
-            else return_unit
+        if oldest_level > 1l then
+          let*? prev_proto_parameters =
+            Node_context.get_proto_parameters
+              ctxt
+              ~level:(`Level (Int32.pred oldest_level))
           in
-          clean_skip_list_cells current_lag
+          let previous_lag = prev_proto_parameters.Types.attestation_lag in
+          if previous_lag > current_lag then
+            let rec loop lag =
+              if lag = current_lag then return_unit
+              else
+                let* () = clean_skip_list_cells lag in
+                loop (lag - 1)
+            in
+            loop previous_lag
+          else return_unit
         else return_unit
       in
-      let number_of_slots = proto_parameters.Types.number_of_slots in
-      List.iter_es
-        (fun slot_index ->
-          let slot_id : Types.slot_id =
-            {slot_level = oldest_level; slot_index}
-          in
-          remove_slots_and_shards store slot_id)
-        (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id)
+      clean_skip_list_cells current_lag
+  in
+  (* === Shard pass === *)
+  let* shard_level_to_gc = Node_context.shard_level_to_gc ctxt ~current_level in
+  let* () =
+    match shard_level_to_gc with
+    | None -> return_unit
+    | Some oldest_level -> clean_shards_at oldest_level
+  in
+  (* === Slot pass === *)
+  (* There are only two possible slot-GC levels: non-operator slot indices
+     share the shard window (already computed above), and operator slot
+     indices share the operator-slot window (computed once here, since it
+     does not depend on the slot index). This avoids reading the global
+     [first_seen_level] from the KVS for every slot index on every
+     finalized block. *)
+  let* operator_slot_level_to_gc =
+    Node_context.operator_slot_level_to_gc ctxt proto_parameters ~current_level
+  in
+  let profile_ctxt = Node_context.get_profile_ctxt ctxt in
+  let number_of_slots = proto_parameters.Types.number_of_slots in
+  let* () =
+    List.iter_es
+      (fun slot_index ->
+        let level_opt =
+          if Profile_manager.is_operator_slot profile_ctxt ~slot_index then
+            operator_slot_level_to_gc
+          else shard_level_to_gc
+        in
+        match level_opt with
+        | None -> return_unit
+        | Some slot_oldest_level ->
+            let slot_id : Types.slot_id =
+              {slot_level = slot_oldest_level; slot_index}
+            in
+            remove_slot store slot_id)
+      (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id)
+  in
+  (* === Skip-list pass === *)
+  let* skip_list_level_to_gc =
+    Node_context.skip_list_level_to_gc ctxt proto_parameters ~current_level
+  in
+  match skip_list_level_to_gc with
+  | None -> return_unit
+  | Some oldest_level -> clean_skip_list_at oldest_level
 
 (* [attestation_lag] levels after the publication of a commitment,
    if it has not been attested it will never be so we can safely
@@ -156,6 +209,7 @@ let remove_unattested_slots_and_shards ~prev_prev_proto_parameters
      published [lag] levels before the [attested_level] and which are not
      attested. For that, we check the stored slot status for slots attested at
      earlier lags. *)
+  let profile_ctxt = Node_context.get_profile_ctxt ctxt in
   let remove_if_not_attested lag =
     let published_level = Int32.(sub attested_level (of_int lag)) in
     (* Do not try to remove slot that will never be stored. *)
@@ -169,8 +223,14 @@ let remove_unattested_slots_and_shards ~prev_prev_proto_parameters
           match status_result with
           | Ok (`Attested _) -> return_unit
           | Ok `Unattested ->
-              (* Slot exists but not attested, safe to delete *)
-              remove_slots_and_shards store slot_id
+              (* Slot exists but not attested. Drop shards immediately. Keep
+                 the slot for operator slot indices, so the operator can
+                 still inspect it; unattested slots at other slot indices
+                 are dropped with their shards. *)
+              let* () = remove_shards store slot_id in
+              if Profile_manager.is_operator_slot profile_ctxt ~slot_index then
+                return_unit
+              else remove_slot store slot_id
           | Ok `Unpublished | Error `Not_found ->
               (* Slot was never published/stored, nothing to clean up *)
               return_unit

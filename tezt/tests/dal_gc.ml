@@ -62,6 +62,26 @@ let get_shard_rpc_failure_expected ~slot_level ~slot_index node =
     ~error_msg:"Unexpected RPC response, expected: %R, actual: %L" ;
   unit
 
+(* Assert that the slot at [slot_level/slot_index] is still on disk by
+   asking the node for its content. *)
+let get_slot_content_rpc_success_expected ~slot_level ~slot_index node =
+  let* _content =
+    Dal_RPC.(call node @@ get_level_slot_content ~slot_level ~slot_index)
+  in
+  unit
+
+(* Assert that the slot at [slot_level/slot_index] is no longer on disk:
+   [GET .../content] should answer 404. *)
+let get_slot_content_rpc_failure_expected ~slot_level ~slot_index node =
+  let* response =
+    Dal_RPC.(call_raw node @@ get_level_slot_content ~slot_level ~slot_index)
+  in
+  Check.(response.code = 404)
+    ~__LOC__
+    Check.int
+    ~error_msg:"Unexpected slot-content RPC response, expected: %R, actual: %L" ;
+  unit
+
 (* This simple test checks the basic feature, with just a producer that
      produces shards & deletes them *)
 let test_gc_simple_producer _protocol dal_parameters _cryptobox node client
@@ -119,6 +139,18 @@ let test_gc_simple_producer _protocol dal_parameters _cryptobox node client
   Log.info "RPC deleted shard producer" ;
   let* () =
     get_shard_rpc_failure_expected
+      ~slot_level:published_level
+      ~slot_index
+      slot_producer
+  in
+
+  Log.info "Producer's own slot payload survives the unattested-cleanup pass" ;
+  (* With the slot/shard retention split, the slot at an operator slot
+     index is retained even when it goes unattested, so the operator can
+     still inspect what it published. Only the shards are dropped
+     immediately. *)
+  let* () =
+    get_slot_content_rpc_success_expected
       ~slot_level:published_level
       ~slot_index
       slot_producer
@@ -414,9 +446,13 @@ let test_gc_common ~include_observer _protocol dal_parameters _cryptobox node
     Log.info "Waiting for first shard to be removed by the attester" ;
     wait_remove_shards ~published_level ~slot_index attester
   in
+  let wait_remove_shards_producer_promise =
+    Log.info "Waiting for first shard to be removed by the producer" ;
+    wait_remove_shards ~published_level ~slot_index slot_producer
+  in
 
-  (* 150 because the default is to GC after 150 levels. Note that we already
-       have baked an additional [attestation_lag] blocks. *)
+  (* 150 because the shard retention period is 150 levels regardless of
+     profile. *)
   let blocks_to_bake = 150 in
   Log.info
     "All nodes received a shard, waiting for %d more blocks to be baked"
@@ -427,12 +463,43 @@ let test_gc_common ~include_observer _protocol dal_parameters _cryptobox node
         wait_for_layer1_head dal_node (published_level + blocks_to_bake))
       [attester; dal_bootstrap; slot_producer]
   in
-  let* () = bake_for ~count:blocks_to_bake client in
+  (* Bake in [blocks_per_cycle]-sized chunks, waiting for the DAL nodes to
+     catch up between chunks: a single [bake_for ~count:blocks_to_bake]
+     floods L1 across many cycles instantly, and a DAL node processing the
+     backlog then asks L1 for a committee whose cycle seed the protocol has
+     already cleared from its context, crashing it
+     ("Missing key 'cycle/N/random_seed'"). Capping each chunk at
+     [blocks_per_cycle] keeps the DAL nodes within ~one cycle of L1 — well
+     within the seed-retention window — while remaining much faster than
+     baking one block at a time. *)
+  let chunk =
+    8
+    (* = sandbox [blocks_per_cycle] *)
+  in
+  let dal_nodes = [attester; dal_bootstrap; slot_producer] in
+  let rec bake_in_chunks remaining =
+    if remaining <= 0 then unit
+    else
+      let n = min chunk remaining in
+      let* pre = Client.level client in
+      let target_final = pre + n - 2 in
+      let chunk_waits =
+        List.map
+          (fun dal_node -> wait_for_layer1_final_block dal_node target_final)
+          dal_nodes
+      in
+      let* () = bake_for ~count:n client in
+      let* () = Lwt.join chunk_waits in
+      bake_in_chunks (remaining - n)
+  in
+  let* () = bake_in_chunks blocks_to_bake in
   let* () = Lwt.join wait_block_p in
   Log.info "Blocks baked !" ;
 
   Log.info "Wait for shards to be removed by the attester" ;
   let* () = wait_remove_shards_attester_promise in
+  Log.info "Wait for shards to be removed by the producer" ;
+  let* () = wait_remove_shards_producer_promise in
 
   Log.info "RPC deleted shard attester" ;
   let* () =
@@ -452,12 +519,21 @@ let test_gc_common ~include_observer _protocol dal_parameters _cryptobox node
           observer
     | None -> unit
   in
-  Log.info "RPC shard still stored producer" ;
-  let* _shard_producer =
-    get_shard_rpc
+  Log.info "RPC deleted shard producer" ;
+  let* () =
+    get_shard_rpc_failure_expected
       ~slot_level:published_level
       ~slot_index
-      ~shard_index:0
+      slot_producer
+  in
+
+  (* The default history mode is [archive], so the producer's slot at an
+     operator slot index outlives its shards. *)
+  Log.info "RPC slot payload still stored by producer" ;
+  let* () =
+    get_slot_content_rpc_success_expected
+      ~slot_level:published_level
+      ~slot_index
       slot_producer
   in
 
@@ -495,6 +571,145 @@ let test_gc_with_all_profiles protocol parameters cryptobox node client dal_node
     node
     client
     dal_node
+
+(* Verifies that a slot at an operator slot index is GC'd once the rolling
+   retention (set via [--history-mode <n>]) elapses. Exercises the
+   slot-payload pass of [remove_old_level_stored_data]: once a finalized
+   block at level [published_level + slot_retention] is processed by the
+   DAL node, the slot at [published_level] for an operator-profile slot
+   index is removed.
+
+   This test deliberately does not assert anything about shard removal
+   timing; shard cleanup is already covered by {!test_gc_simple_producer}. *)
+let test_gc_slot_rolling ~__FILE__ ~protocols =
+  let title =
+    "garbage collection of operator slot payload under rolling history"
+  in
+  let tags = Tag.[tezos2; "dal"; "gc"; "history_mode"; "rolling"] in
+  Protocol.register_test
+    ~__FILE__
+    ~tags
+    ~uses:(fun _protocol -> [Constant.octez_dal_node])
+    ~title
+    ~supports:(Protocol.From_protocol 19)
+    (fun protocol ->
+      (* Pick small values for the refutation-related parameters so that the
+         operator's [storage_period = 2 * (challenge + commitment +
+         validity_lag) = 10] is small. The rolling slot retention must be at
+         least [storage_period], so [Custom 30] is allowed. *)
+      let a = 1 in
+      let b = 2 in
+      let c = 2 in
+      let slot_retention = 30 in
+      let parameter_overrides =
+        make_int_parameter ["smart_rollup_commitment_period_in_blocks"] (Some a)
+        @ make_int_parameter
+            ["smart_rollup_challenge_window_in_blocks"]
+            (Some b)
+        @ make_int_parameter
+            [
+              "smart_rollup_reveal_activation_level";
+              "dal_attested_slots_validity_lag";
+            ]
+            (Some c)
+      in
+      let* node, client, dal_parameters =
+        setup_node
+          ~parameter_overrides
+          ~protocol
+          ~l1_history_mode:Default_with_refutation
+          ()
+      in
+      let Dal.Parameters.{cryptobox = {Dal.Cryptobox.slot_size; _}; _} =
+        dal_parameters
+      in
+      let slot_index = 0 in
+      let dal_node = Dal_node.create ~name:"producer" ~node () in
+      let* () =
+        Dal_node.init_config
+          ~operator_profiles:[slot_index]
+          ~history_mode:(Dal_node.Custom slot_retention)
+          dal_node
+      in
+      let* () = Dal_node.run dal_node ~wait_ready:true in
+      Log.info
+        "Producer DAL node ready (history-mode = Custom %d)"
+        slot_retention ;
+
+      let* current_level = Client.level client in
+      let wait_for_producer =
+        wait_for_layer1_final_block dal_node (current_level + 1)
+      in
+      let* published_level, _commitment, () =
+        publish_store_and_wait_slot
+          node
+          client
+          dal_node
+          Constant.bootstrap1
+          ~index:slot_index
+          ~wait_slot:(fun ~published_level:_ ~slot_index:_ -> unit)
+          ~number_of_extra_blocks_to_bake:2
+        @@ Helpers.make_slot ~slot_size "content"
+      in
+      let* () = wait_for_producer in
+      Log.info "Slot published at level %d" published_level ;
+
+      (* Sanity: the slot payload is present right after publication. *)
+      let* () =
+        get_slot_content_rpc_success_expected
+          ~slot_level:published_level
+          ~slot_index
+          dal_node
+      in
+
+      (* For the slot-payload pass to fire at level [published_level] the
+         producer must process a finalized block at
+         [published_level + slot_retention]. Finalization lags head by 2,
+         so we need [head >= published_level + slot_retention + 2]. *)
+      let target_finalized = published_level + slot_retention in
+      let target_head = target_finalized + 2 in
+      let* current_level = Client.level client in
+      let blocks_to_bake = max 0 (target_head - current_level) in
+      Log.info
+        "Baking %d more blocks to reach finalized level %d (head %d)"
+        blocks_to_bake
+        target_finalized
+        target_head ;
+      let wait_for_target =
+        wait_for_layer1_final_block dal_node target_finalized
+      in
+      (* Bake in [blocks_per_cycle]-sized chunks so the producer DAL node
+         stays within ~one cycle of L1; otherwise a flooded backlog would
+         hit a cleared cycle seed and crash the node. *)
+      let chunk =
+        8
+        (* = sandbox [blocks_per_cycle] *)
+      in
+      let rec bake_in_chunks remaining =
+        if remaining <= 0 then unit
+        else
+          let n = min chunk remaining in
+          let* pre = Client.level client in
+          let target_chunk_final = pre + n - 2 in
+          let chunk_wait =
+            wait_for_layer1_final_block dal_node target_chunk_final
+          in
+          let* () = bake_for ~count:n client in
+          let* () = chunk_wait in
+          bake_in_chunks (remaining - n)
+      in
+      let* () = bake_in_chunks blocks_to_bake in
+      let* () = wait_for_target in
+
+      Log.info
+        "RPC slot payload should now be removed (rolling window of %d levels \
+         elapsed)"
+        slot_retention ;
+      get_slot_content_rpc_failure_expected
+        ~slot_level:published_level
+        ~slot_index
+        dal_node)
+    protocols
 
 let test_gc_skip_list_cells ~__FILE__ ~protocols =
   let title = "garbage collection of skip list cells" in
@@ -535,6 +750,9 @@ let test_gc_skip_list_cells ~__FILE__ ~protocols =
       let number_of_slots = dal_parameters.Dal.Parameters.number_of_slots in
       let lag = dal_parameters.attestation_lag in
       let dal_node = Dal_node.create ~node () in
+      (* Skip-list cell retention is the bounded default store period
+         regardless of [history_mode], so the default ([Archive]) is fine
+         here. *)
       let* () = Dal_node.init_config ~operator_profiles:[1] dal_node in
       let* () = Dal_node.run dal_node ~wait_ready:true in
       Log.info
@@ -613,4 +831,5 @@ let register ~__FILE__ ~protocols =
     "garbage collection of shards for all profiles"
     test_gc_with_all_profiles
     protocols ;
-  test_gc_skip_list_cells ~__FILE__ ~protocols
+  test_gc_skip_list_cells ~__FILE__ ~protocols ;
+  test_gc_slot_rolling ~__FILE__ ~protocols

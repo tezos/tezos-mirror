@@ -25,14 +25,17 @@
 
 type neighbor = {addr : string; port : int}
 
-(** The history mode decides for how long shards are kept in the store. *)
+(** The history mode decides for how long slot payloads are kept in the
+    store. Shards always follow their own (short) lifetime, given by
+    [Constants.shard_retention_period_in_levels], regardless of this
+    setting. *)
 type history_mode =
   | Rolling of {blocks : [`Auto | `Some of int]}
-      (** [Rolling {block = `Some n}] keeps the shards for about [n]
-          blocks. [Rolling {block = `Auto}] infers the number of
-          blocks depending on the L1 parametric constants and the
-          profile. *)
-  | Full  (** [Full] keeps the shards forever *)
+      (** [Rolling {blocks = `Some n}] keeps slot payloads for about [n]
+          blocks. [Rolling {blocks = `Auto}] infers the number of blocks
+          depending on the L1 parametric constants and the profile. *)
+  | Archive
+      (** [Archive] keeps slot payloads indefinitely. This is the default. *)
 
 (** The configuration of the validation of shards in batch mode.*)
 type batching_configuration =

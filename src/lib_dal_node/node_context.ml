@@ -207,9 +207,10 @@ let get_traps_fraction ctxt ~published_level ~default =
   | Ok params -> params.traps_fraction
   | Error _ -> default
 
-let storage_period ctxt proto_parameters =
+(* Retention for slots on operator slot indices, driven by [history_mode]. *)
+let operator_slot_storage_period ctxt proto_parameters =
   match ctxt.config.history_mode with
-  | Full -> `Always
+  | Archive -> `Always
   | Rolling {blocks = `Some n} -> `Finite n
   | Rolling {blocks = `Auto} ->
       let n =
@@ -219,11 +220,28 @@ let storage_period ctxt proto_parameters =
       in
       `Finite n
 
-let level_to_gc ctxt proto_parameters ~current_level =
-  let open Lwt_result_syntax in
-  match storage_period ctxt proto_parameters with
-  | `Always -> return_none
+(* Shards have a single, profile-independent retention. *)
+let shard_storage_period = `Finite Constants.shard_retention_period_in_levels
+
+(* Skip-list cells are refutation-game evidence (they encode attestation
+   status): they are only useful within the refutation window and serve no
+   purpose beyond it. Unlike slot payloads — which an operator may
+   legitimately keep longer, as the canonical source of pages — there is no
+   reason to retain skip-list cells past the refutation window. Their
+   retention is therefore the bounded default store period, *independent of*
+   [history_mode]: in particular it stays bounded even under [Archive],
+   which only governs slot retention. For non-operator profiles this default
+   is the (shorter) shard window. *)
+let skip_list_storage_period ctxt proto_parameters =
+  `Finite
+    (Profile_manager.get_attested_data_default_store_period
+       ctxt.profile_ctxt
+       proto_parameters)
+
+let level_to_gc ctxt ~current_level = function
+  | `Always -> Lwt_result_syntax.return_none
   | `Finite n -> (
+      let open Lwt_result_syntax in
       let level = Int32.(sub current_level (of_int n)) in
       if level < 1l then return_none
       else
@@ -234,6 +252,21 @@ let level_to_gc ctxt proto_parameters ~current_level =
         | None -> return_none
         | Some first_seen_level ->
             if level < first_seen_level then return_none else return_some level)
+
+let shard_level_to_gc ctxt ~current_level =
+  level_to_gc ctxt ~current_level shard_storage_period
+
+let operator_slot_level_to_gc ctxt proto_parameters ~current_level =
+  level_to_gc
+    ctxt
+    ~current_level
+    (operator_slot_storage_period ctxt proto_parameters)
+
+let skip_list_level_to_gc ctxt proto_parameters ~current_level =
+  level_to_gc
+    ctxt
+    ~current_level
+    (skip_list_storage_period ctxt proto_parameters)
 
 let get_profile_ctxt ctxt = ctxt.profile_ctxt
 

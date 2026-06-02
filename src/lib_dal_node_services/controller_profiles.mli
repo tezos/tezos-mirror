@@ -91,6 +91,10 @@ val observer_slot_out_of_bounds : int -> t -> int option
     observer for slot index [i] *)
 val is_observed_slot : int -> t -> bool
 
+(** [is_operator_slot i op] returns true if and only if [op] contains an
+    operator for slot index [i]. *)
+val is_operator_slot : int -> t -> bool
+
 (** [can_publish_on_slot_index slot_index op] returns true if and only
     if [op] contains an observer or an operator for slot index
     [slot_index] *)

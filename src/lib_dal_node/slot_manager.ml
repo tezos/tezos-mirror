@@ -293,6 +293,13 @@ let local_filename_from_kind backup_uri published_level slot_index slot_size
    - Remote (http[s]://): the fragment selects a server-side subtree.
      * #slots  -> <base>/v0/slots/by_published_level/<published_level>_<slot_index>_<slot_size>
      * #shards -> <base>/v0/shards/by_published_level/<published_level>_<slot_index>
+
+   TODO: the [#shards] variant has limited practical use since the
+   slot-payload / shard retention split: shard retention is now
+   uniformly bounded by [Constants.shard_retention_period_in_levels]
+   (~150 levels), no profile keeps a long-lived on-disk shard archive,
+   and within that window shards are reachable on the DAL P2P network.
+   Consider deprecating the [#shards] fragment in a follow-up.
 *)
 let fetch_slot_from_backup_uri ~slot_size ~published_level ~slot_index
     backup_uri =

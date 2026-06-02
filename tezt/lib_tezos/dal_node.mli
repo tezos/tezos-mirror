@@ -28,11 +28,15 @@
 (** DAL Node state *)
 type t
 
-(** Period for the shards to be kept in the storage
-    [Full] : never delete
-    [Auto] : period depending on the node profile
-    [Custom (i)] : keeps the shards during [i] blocks *)
-type history_mode = Full | Auto | Custom of int
+(** Period for which slot payloads are kept in the storage. Shards always
+    follow their own (shorter) lifetime regardless of this setting.
+    [Archive] : never delete slot payloads (default).
+    [Full] : deprecated alias for [Archive]; renders as the legacy
+             ["--history-mode full"] CLI value, which is still accepted by
+             the DAL node.
+    [Auto] : period depending on the node profile.
+    [Custom i] : keep slot payloads during [i] blocks. *)
+type history_mode = Archive | Full | Auto | Custom of int
 
 val disable_shard_validation_environment_variable : string
 

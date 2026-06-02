@@ -26,12 +26,24 @@
 (* Version history:
    - 0: initial version, comes with octez v20 release
    - 1: changed format of 'profile' field; added 'version' field
-   - 2: removed fields network_name and neighbors. *)
-let current_version = 2
+   - 2: removed fields network_name and neighbors.
+   - 3: renamed [history_mode] variant [Full] to [Archive] (with [Full] kept as
+        a read-only legacy alias); changed the default [history_mode] to
+        [Archive]. [history_mode] now governs slot retention only; shards
+        always follow [Constants.shard_retention_period_in_levels]. *)
+let current_version = 3
 
 type neighbor = {addr : string; port : int}
 
-type history_mode = Rolling of {blocks : [`Auto | `Some of int]} | Full
+(* The history mode controls slot retention only. Shards have their own
+   (short) lifetime, given by [Constants.shard_retention_period_in_levels],
+   regardless of this setting.
+
+   - [Archive] keeps slots indefinitely (default).
+   - [Rolling { blocks = `Some n }] keeps slots for about [n] levels.
+   - [Rolling { blocks = `Auto }] infers the number of levels depending on
+     the L1 parametric constants and the profile. *)
+type history_mode = Rolling of {blocks : [`Auto | `Some of int]} | Archive
 
 type batching_configuration = Disabled | Enabled of {time_interval : int}
 
@@ -59,17 +71,26 @@ let history_mode_encoding =
               match blocks with
               | `Auto -> Some ((), None)
               | `Some n -> Some ((), Some n))
-          | Full -> None)
+          | Archive -> None)
         (function
           | (), None -> Rolling {blocks = `Auto}
           | (), Some n -> Rolling {blocks = `Some n});
       case
-        ~title:"full"
-        ~description:""
+        ~title:"archive"
+        ~description:"Keep slot payloads indefinitely."
         (Tag 1)
+        (obj1 (req "kind" (Data_encoding.constant "archive")))
+        (function Archive -> Some () | _ -> None)
+        (fun () -> Archive);
+      (* Legacy alias for [archive], for reading v2 configuration files. Never
+         encoded. *)
+      case
+        ~title:"full"
+        ~description:"Deprecated alias for archive."
+        (Tag 2)
         (obj1 (req "kind" (Data_encoding.constant "full")))
-        (function Full -> Some () | _ -> None)
-        (fun () -> Full);
+        (fun _ -> None)
+        (fun () -> Archive);
     ]
 
 let batching_configuration_encoding =
@@ -161,7 +182,7 @@ let default_endpoint = Uri.of_string "http://localhost:8732"
 let default_metrics_port =
   Gossipsub.Transport_layer.Default_parameters.P2p_config.listening_port + 1
 
-let default_history_mode = Rolling {blocks = `Auto}
+let default_history_mode = Archive
 
 let default_service_name = "octez-dal-node"
 
@@ -529,31 +550,64 @@ let save ~allow_overwrite ~config_file config =
            @@ DAL_node_unable_to_write_configuration_file config_file)
          v)
 
+(* Whether the [history_mode] field is explicitly present in the raw
+   configuration JSON. The config encoding uses [merge_objs], which flattens
+   all fields to the top level of the JSON object, so the field (if set)
+   appears as a top-level key. Used to decide whether a default change to
+   [history_mode] silently affects this configuration. *)
+let history_mode_field_is_set json =
+  match json with
+  | `O fields -> List.mem_assoc ~equal:String.equal "history_mode" fields
+  | _ -> false
+
 let load =
   let open Lwt_result_syntax in
   let destruct = Data_encoding.Json.destruct in
   let config_versions =
     [
-      (2, destruct encoding);
-      (* We can add cases here of the form:
-
-         <version x>, fun json -> destruct Vx.encoding json |> Vx.to_latest_version)
-
-         If we need to migrate the configuration format. See how it was done for previous
-         migrations for more insight. *)
+      (current_version, destruct encoding);
+      (* The current encoding is backward compatible with v2 configuration
+         files: it accepts the legacy ["kind": "full"] history-mode and maps
+         it transparently to [Archive]. The [version] field stored in the
+         file is overridden to [current_version] after decoding (see
+         [try_decode] below). *)
     ]
   in
   let rec try_decode json = function
     | [] -> failwith "Unreachable. Expecting to have at least one version"
-    | (version, version_decoder) :: older_versions -> (
+    | (_version, version_decoder) :: older_versions -> (
         try
           let res = version_decoder json in
+          let stored_version = res.version in
+          (* Always set [version] to [current_version] so that the subsequent
+             [save] writes the latest version number. *)
+          let res = {res with version = current_version} in
           let*! () =
-            if version = current_version then Lwt.return_unit
+            if stored_version = current_version then Lwt.return_unit
             else
-              Event.emit_upgrading_configuration
-                ~from:version
-                ~into:current_version
+              let open Lwt_syntax in
+              let* () =
+                Event.emit_upgrading_configuration
+                  ~from:stored_version
+                  ~into:current_version
+              in
+              (* Version 3 changed the default [history_mode] from a bounded
+                 rolling window to [Archive]. Warn precisely when this
+                 actually affects the node: (1) upgrading from an earlier
+                 version, (2) with no explicit [history_mode] in the file (so
+                 the new default now applies), and (3) the node has an
+                 operator profile (only operator slots get the
+                 [history_mode]-driven retention; without one, every slot
+                 still follows the bounded shard window regardless). The
+                 configuration profile suffices for check (3): CLI arguments
+                 only ever add profiles, so a config without an operator
+                 profile cannot gain one that changes this. *)
+              if
+                stored_version < 3 && current_version >= 3
+                && (not (history_mode_field_is_set json))
+                && Profile_manager.unresolved_supports_refutations res.profile
+              then Event.emit_history_mode_default_changed ()
+              else Lwt.return_unit
           in
           return res
         with e ->
