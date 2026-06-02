@@ -29,7 +29,7 @@ use tezosx_interfaces::{
     AliasInfo, Classification, CrossRuntimeContext, Registry, RoutingDecision, RuntimeId,
     ALIAS_LOOKUP_MILLIGAS, ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT,
     X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT,
-    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
+    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME, X_TEZOS_TIMESTAMP,
 };
 use tezosx_journal::TezosXJournal;
 
@@ -739,6 +739,7 @@ fn inject_context_headers_raw(
     headers: &mut http::HeaderMap,
     sender_alias: &str,
     source_alias: &str,
+    source_runtime: RuntimeId,
     amount_mutez: u64,
     gas_limit: u64,
     timestamp: u64,
@@ -753,6 +754,12 @@ fn inject_context_headers_raw(
     };
     headers.insert(X_TEZOS_SENDER, parse_value(sender_alias)?);
     headers.insert(X_TEZOS_SOURCE, parse_value(source_alias)?);
+    // Numeric `RuntimeId` tag, same encoding as the `originOf` /
+    // `resolveAddress` ABI.
+    headers.insert(
+        X_TEZOS_SOURCE_RUNTIME,
+        parse_value(&u8::from(source_runtime).to_string())?,
+    );
     headers.insert(
         X_TEZOS_AMOUNT,
         parse_value(&format_tez_from_mutez(amount_mutez))?,
@@ -850,21 +857,28 @@ where
     // transfers), pass the source pubkey so the alias is created with
     // the credential attached.
     let sender_is_source = sender == source;
-    let sender_alias = 'sender: {
+    // Each alias resolution also yields the address's *native* runtime —
+    // `RoundTrip` resolves to an account native to the target runtime,
+    // `Transitive` to the runtime recorded in its alias info, and `Native`
+    // to Tezos (this runtime). The source's native runtime is forwarded as
+    // `X-Tezos-Source-Runtime` so the EVM side reports a self-consistent
+    // `(sourceRuntime, sourceAddress)` tuple.
+    let (sender_alias, sender_runtime) = 'sender: {
         if target_runtime == RuntimeId::Tezos {
             // Short-circuit for Tezos target: the alias is the sender's
             // base58-encoded address. This covers both implicit and
             // originated accounts since both fit the same pattern.
-            break 'sender sender.to_base58_check();
+            break 'sender (sender.to_base58_check(), RuntimeId::Tezos);
         }
         let alias_info = match read_and_resolve_routing(ctx, &sender, target_runtime)? {
-            RoutingDecision::RoundTrip(target) => break 'sender target,
+            RoutingDecision::RoundTrip(target) => break 'sender (target, target_runtime),
             RoutingDecision::Transitive(info) => info,
             RoutingDecision::Native => AliasInfo {
                 runtime: RuntimeId::Tezos,
                 native_address: sender.to_base58_check().into_bytes(),
             },
         };
+        let sender_runtime = alias_info.runtime;
         let remaining_milligas = ctx.gas().milligas().ok_or(OutOfGas)? as u64;
         // Convert remaining milligas to target runtime gas: this caps the budget
         // that ensure_alias may spend on alias generation.
@@ -897,15 +911,15 @@ where
         ctx.operation_gas()
             .cast_and_consume_milligas(sender_milligas)
             .map_err(TransferError::OutOfGas)?;
-        sender_alias
+        (sender_alias, sender_runtime)
     };
 
     // --- source alias ---
     // Fast path: when sender == source (a user's implicit account calling
     // the gateway directly), reuse the resolved alias and skip the second
     // origin read. This saves one ALIAS_LOOKUP_MILLIGAS charge.
-    let source_alias = if sender_is_source {
-        sender_alias.clone()
+    let (source_alias, source_runtime) = if sender_is_source {
+        (sender_alias.clone(), sender_runtime)
     } else {
         ctx.operation_gas()
             .cast_and_consume_milligas(ALIAS_LOOKUP_MILLIGAS)
@@ -914,18 +928,21 @@ where
             if target_runtime == RuntimeId::Tezos {
                 // Short-circuit for Tezos target: the alias is the source's
                 // base58-encoded address.
-                break 'source source.to_base58_check();
+                break 'source (source.to_base58_check(), RuntimeId::Tezos);
             }
 
             let alias_info = match read_and_resolve_routing(ctx, &source, target_runtime)?
             {
-                RoutingDecision::RoundTrip(target) => break 'source target,
+                RoutingDecision::RoundTrip(target) => {
+                    break 'source (target, target_runtime)
+                }
                 RoutingDecision::Transitive(info) => info,
                 RoutingDecision::Native => AliasInfo {
                     runtime: RuntimeId::Tezos,
                     native_address: source.to_base58_check().into_bytes(),
                 },
             };
+            let source_runtime = alias_info.runtime;
             let remaining_milligas = ctx.gas().milligas().ok_or(OutOfGas)? as u64;
             let target_budget =
                 convert_gas(RuntimeId::Tezos, target_runtime, remaining_milligas)
@@ -951,7 +968,7 @@ where
             ctx.operation_gas()
                 .cast_and_consume_milligas(source_milligas)
                 .map_err(TransferError::OutOfGas)?;
-            source_alias
+            (source_alias, source_runtime)
         }
     };
     // Convert remaining Tezos milligas to the target runtime's units.
@@ -971,6 +988,7 @@ where
         request.headers_mut(),
         &sender_alias,
         &source_alias,
+        source_runtime,
         amount_mutez,
         gas_limit,
         timestamp_u64,
@@ -2407,6 +2425,7 @@ mod tests {
             &mut headers,
             "sender_alias",
             "source_alias",
+            RuntimeId::Tezos,
             42u64, // 42 mutez = 0.000042 TEZ
             1000,
             1700000000u64,
@@ -2417,6 +2436,10 @@ mod tests {
         .unwrap();
         assert_eq!(headers.get("X-Tezos-Sender").unwrap(), "sender_alias");
         assert_eq!(headers.get("X-Tezos-Source").unwrap(), "source_alias");
+        assert_eq!(
+            headers.get("X-Tezos-Source-Runtime").unwrap(),
+            u8::from(RuntimeId::Tezos).to_string().as_str()
+        );
         assert_eq!(headers.get("X-Tezos-Amount").unwrap(), "0.000042");
         assert_eq!(headers.get("X-Tezos-Gas-Limit").unwrap(), "1000");
         assert_eq!(headers.get("X-Tezos-Timestamp").unwrap(), "1700000000");
@@ -2437,6 +2460,7 @@ mod tests {
             &mut headers,
             "sender_alias",
             "source_alias",
+            RuntimeId::Tezos,
             0u64,
             0,
             0,
@@ -2460,6 +2484,7 @@ mod tests {
             &mut headers,
             "new_alias",
             "source_alias",
+            RuntimeId::Tezos,
             0u64,
             0,
             0u64,
@@ -2897,6 +2922,7 @@ mod tests {
             &mut headers,
             "sender",
             "source",
+            RuntimeId::Tezos,
             0u64,
             0,
             0u64,
@@ -2919,6 +2945,7 @@ mod tests {
             &mut headers,
             "sender",
             "source",
+            RuntimeId::Tezos,
             u64::MAX,
             u64::MAX,
             u64::MAX,

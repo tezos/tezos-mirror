@@ -17,6 +17,15 @@ use thiserror::Error;
 
 pub const X_TEZOS_SENDER: &str = "X-Tezos-Sender";
 pub const X_TEZOS_SOURCE: &str = "X-Tezos-Source";
+/// Native runtime of the `X-Tezos-Source` address, encoded as the decimal
+/// [`RuntimeId`] tag — the same numeric encoding used by the `originOf` /
+/// `resolveAddress` ABI. Forwarded alongside `X-Tezos-Source` so the
+/// receiving runtime can report a self-consistent
+/// `(sourceRuntime, sourceAddress)` identity: on a nested
+/// `EVM -> Michelson -> EVM` CRAC the forwarded source is the transitive
+/// EVM origin, whose native runtime is Ethereum, not the immediate Tezos
+/// sender's.
+pub const X_TEZOS_SOURCE_RUNTIME: &str = "X-Tezos-Source-Runtime";
 pub const X_TEZOS_AMOUNT: &str = "X-Tezos-Amount";
 pub const X_TEZOS_GAS_LIMIT: &str = "X-Tezos-Gas-Limit";
 pub const X_TEZOS_GAS_CONSUMED: &str = "X-Tezos-Gas-Consumed";
@@ -279,6 +288,17 @@ impl RuntimeId {
             "tezos" => Some(RuntimeId::Tezos),
             "ethereum" => Some(RuntimeId::Ethereum),
             _ => None,
+        }
+    }
+
+    /// The URL host string identifying this runtime in cross-runtime HTTP
+    /// requests (e.g. `"tezos"`, `"ethereum"`). Inverse of [`from_host`].
+    ///
+    /// [`from_host`]: RuntimeId::from_host
+    pub fn as_host(&self) -> &'static str {
+        match self {
+            RuntimeId::Tezos => "tezos",
+            RuntimeId::Ethereum => "ethereum",
         }
     }
 }

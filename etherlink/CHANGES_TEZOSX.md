@@ -43,6 +43,13 @@
   address, so indexers correlating CRACs by `(targetRuntime,
   targetAddress)` no longer split one contract into two identities.
   (!22032)
+- The `CracReceived` event now reports `sourceRuntime` as the native
+  runtime of `sourceAddress` (carried in a new `X-Tezos-Source-Runtime`
+  context header) instead of a hardcoded `"tezos"`. On a nested
+  `EVM -> Michelson -> EVM` call the forwarded source is the transitive
+  EVM origin, so `sourceRuntime` is now `"ethereum"` and the
+  `(sourceRuntime, sourceAddress)` pair is self-consistent for event
+  consumers (indexers, monitors, bridges). (!22067)
 
 ### Michelson Runtime
 
