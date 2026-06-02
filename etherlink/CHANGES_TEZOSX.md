@@ -19,6 +19,13 @@
   silently bypassed by routing a call through the Michelson runtime.
   When the originator is the immediate caller (a direct EOA call),
   `tx.origin == msg.sender` as before. (!21981)
+- The first read-only gateway call (`callMichelsonView` or generic
+  `call(..., GET)`) from an inbound cross-runtime frame now forwards the
+  transitive originator as `X-Tezos-Source`, matching what the `ORIGIN`
+  opcode reports, while `X-Tezos-Sender` keeps the immediate caller
+  alias. Previously these selectors recaptured the source from the
+  immediate sender, so a Michelson -> EVM frame forwarded the wrong
+  identity to the read-only call. (!22033)
 
 ### Michelson Runtime
 
