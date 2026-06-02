@@ -48,6 +48,16 @@ module Memory_backend = struct
     r
 end
 
+module Memory_prove_backend = struct
+  let name = "memory_prove"
+
+  include Octez_riscv_nds_memory.Prove
+
+  let create_registry_with_dbs n =
+    let r = Memory_backend.create_registry_with_dbs n in
+    start_proof r
+end
+
 (** Create a fresh disk repo in a Tezt-managed temporary directory. *)
 let get_disk_repo () =
   let path = Tezt.Temp.dir "nds_disk_test" in
@@ -63,6 +73,16 @@ module Disk_backend = struct
     let r = Registry.create repo in
     grow_registry Registry.resize r n ;
     r
+end
+
+module Disk_prove_backend = struct
+  let name = "disk_prove"
+
+  include Octez_riscv_nds_disk.Prove
+
+  let create_registry_with_dbs n =
+    let r = Disk_backend.create_registry_with_dbs n in
+    start_proof r
 end
 
 (** Force finalization of Rust-side RocksDB handles at the end of the

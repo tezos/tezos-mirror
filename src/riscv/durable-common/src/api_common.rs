@@ -13,6 +13,7 @@ use octez_riscv_data::foldable::Foldable;
 use octez_riscv_data::hash::Hash;
 use octez_riscv_data::hash::HashFold;
 use octez_riscv_data::mode::Mode;
+use octez_riscv_data::mode::Normal;
 use octez_riscv_durable_storage::database::DatabaseMode;
 use octez_riscv_durable_storage::errors as ds_errors;
 use octez_riscv_durable_storage::errors::OperationalError;
@@ -26,6 +27,8 @@ use crate::BytesParam;
 use crate::KeyParam;
 use crate::SplitDsResult;
 use crate::map_fallible;
+use crate::registry::DsProveRegistry;
+use crate::registry::GcNames;
 use crate::split_ds_errors;
 
 trait_set! {
@@ -42,14 +45,14 @@ pub trait RegistryApply<KV: KeyValueStore, M: Mode> {
     /// will result in the underlying state being cloned, which may fail.
     fn apply<F, R>(&self, fun: F) -> Result<R, OperationalError>
     where
-        F: FnOnce(&mut Registry<KV, M>) -> R,
+        F: FnOnce(&mut Registry<KV, M>) -> R + Send + 'static,
         R: Send + 'static,
         KV::Repo: Clone;
 
     /// Apply a readonly operation over the contained registry.
     fn apply_ro<F, R>(&self, fun: F) -> Result<R, OperationalError>
     where
-        F: FnOnce(&Registry<KV, M>) -> R,
+        F: FnOnce(&Registry<KV, M>) -> R + Send + 'static,
         R: Send + 'static;
 }
 
@@ -376,4 +379,18 @@ where
 
     let res = split_ds_errors(res)?.map(BytesWrapper::from);
     Ok(res)
+}
+
+/// Convert a normal mode registry into a proof mode one
+pub fn start_proof<KV, GcProve>(
+    state: &impl RegistryApply<KV, Normal>,
+) -> OcamlFallible<DsProveRegistry<KV, GcProve>>
+where
+    KV: BackgroundKeyValueStore,
+    KV::Repo: Clone + Send + Sync,
+    GcProve: GcNames,
+{
+    let prove = state.apply_ro(|registry| DsProveRegistry::try_from(registry))??;
+
+    Ok(prove)
 }
