@@ -105,6 +105,46 @@ pub enum InterpretError<'a> {
     InternalError(InterpretInvariant),
 }
 
+/// `FAILWITH` embeds its popped argument directly in
+/// `InterpretError::FailedWith(_, TypedValue<'a>)`. A deep runtime-built
+/// value -- e.g. a `LOOP`-built right-comb of `PAIR` cells -- would
+/// otherwise overflow the kernel's ~1 MiB Rust stack on the auto-derived
+/// `TypedValue` destructor when the error is dropped (L2-1446). Draining
+/// here, at the last drop point, lets the kernel's `#[error]` formatter
+/// observe the value's original structural shape (matching L1 protocol
+/// observability and the TZT `expectation` matcher) before the children
+/// are flattened to unit sentinels by [`drain_deep_typed_value`].
+///
+/// The `Drop` impl forbids partial-move destructuring of `InterpretError`
+/// anywhere in the workspace. Existing match sites all consume the error
+/// by *reference*: `tzt/expectation.rs::unify_interpreter_error` takes
+/// `err: &InterpretError`, and the kernel's
+/// `tezosx-tezos-runtime::view::classify_interpret_error` matches on
+/// `&e`. Both use match-ergonomics auto-borrow on the inner fields, so
+/// `Drop` is irrelevant to their soundness.
+///
+/// Scope note: this `Drop` closes the *drop-time* overflow on a deep
+/// `FailedWith` payload. The *observation-time* overflow via the auto-
+/// derived `Debug` walk on `TypedValue` (reached by the kernel's
+/// `BadRequest(format!("{e:?}"))` and the `#[error("…{1:?}…")]` derive)
+/// is independent and is closed by !21988 (iterative `Debug for
+/// TypedValue`, Linear L2-1436). The two MRs are conjugate: this MR
+/// makes the drop safe; !21988 makes the observation safe.
+impl<'a> Drop for InterpretError<'a> {
+    fn drop(&mut self) {
+        // Only `FailedWith` currently carries a `TypedValue` payload that
+        // can be deep at runtime. If a future variant gains an owned
+        // `TypedValue` / `Rc<TypedValue>` reachable from attacker input
+        // (e.g. a richer FAILWITH-with-context variant, or a Closure-
+        // returning error), extend this match — otherwise its
+        // auto-derived destructor would re-introduce the L2-1446
+        // overflow on `Drop` of the `Err`.
+        if let InterpretError::FailedWith(_, ref mut v) = self {
+            crate::ast::drain_deep_typed_value(v);
+        }
+    }
+}
+
 /// Categorises invariant violations reachable only on a typechecker bug or
 /// malformed Micheline that bypassed typechecking. Mirrors
 /// [`crate::typechecker::TcInvariant`] on the interpreter side: variants
@@ -214,6 +254,10 @@ impl<'a> ContractScript<'a> {
 
         let tc_val = TypedValue::new_pair(wrapped_parameter, storage);
         let mut stack = stk![tc_val];
+        // The interpreter has already drained the restored caller stack
+        // and the embedded `FailedWith` value on the error path (see
+        // `fn interpret`), so the `?` propagation here is safe regardless
+        // of how deep the runtime-built values were (L2-1446).
         self.code.interpret(ctx, arena, &mut stack)?;
 
         use TypedValue as V;
@@ -517,16 +561,42 @@ fn interpret<'a, 'b>(
     // `restore_pending_view_context`.
     if outcome.is_err() {
         restore_pending_view_context(ctx, &frames);
+        // A pending control-flow frame may itself hold a deep runtime-built
+        // value (a `DIP`-protected comb, or the not-yet-consumed elements /
+        // accumulator of an `ITER`/`MAP` over a deep collection). Drain those
+        // before `frames` is dropped, for the same reason the sub-stacks below
+        // are drained. On success `frames` is empty, so this never runs.
+        drain_value_frames(frames);
     }
 
-    // Restore the caller's stack from the bottom of the stack of stacks.
-    // On the error path the driver may have left EXEC/View sub-stacks above
-    // it; `pop()` would hand the caller an inner sub-stack, so take the
-    // bottom (the caller's own) explicitly. On success there is exactly one
-    // entry, so this is equivalent to `pop()`.
-    *stack = stacks.into_iter().next().ok_or(InterpretError::InternalError(
+    // Restore the caller's stack from the bottom of the stack of stacks, and
+    // drain any EXEC/View sub-stacks left above it on the error path before
+    // they are dropped. `pop()` would hand the caller an inner sub-stack, so
+    // take the bottom (the caller's own) explicitly. A leftover sub-stack may
+    // hold a deep runtime-built value (e.g. a LOOP-built PAIR comb); draining
+    // it iteratively keeps the recursive `Rc<TypedValue>` destructor from
+    // overflowing the kernel's ~1 MiB Rust stack (L2-1446). On success there is
+    // exactly one entry, so the drain loop is a no-op.
+    let mut stacks = stacks.into_iter();
+    let mut bottom = stacks.next().ok_or(InterpretError::InternalError(
         InterpretInvariant::UnreachableState,
     ))?;
+    for mut sub in stacks {
+        drain_value_stack(&mut sub);
+    }
+    // On the error-unwind path the caller's restored stack may still carry a
+    // deep value pushed before the error (e.g. `PUSH int 0 ; LOOP { PAIR } ;
+    // DUP ; FAILWITH` — DUP leaves a deep comb on the stack, FAILWITH pops
+    // the other copy). Drain in place here so every caller of
+    // `Instruction::interpret` / `fn interpret` (including the EVM gateway's
+    // per-instruction view loop in `tezosx-tezos-runtime/src/view.rs`) is
+    // protected without needing per-call-site boilerplate, AND the stack
+    // shape the caller observes (length and atomic values) is preserved —
+    // only the deep composite spine inside any leftover value is severed.
+    if outcome.is_err() {
+        drain_value_stack_in_place(&mut bottom);
+    }
+    *stack = bottom;
     outcome
 }
 
@@ -555,6 +625,129 @@ fn restore_pending_view_context<'a>(
             *saved_amount,
             *saved_balance,
         );
+    }
+}
+
+/// Drain every value left on a value stack iteratively before it is dropped,
+/// so a deep runtime-built value (e.g. a `LOOP`-built `PAIR` comb) does not
+/// overflow the kernel's ~1 MiB Rust stack via the recursive `Rc<TypedValue>`
+/// destructor. Uniquely-owned values are flattened with
+/// [`crate::ast::drain_deep_typed_value`]; shared values are left to their
+/// other owners -- only their `Rc` refcount is decremented, which does not
+/// recurse. L2-1446.
+fn drain_value_stack(stack: &mut IStack<'_>) {
+    while let Some(rc) = stack.pop() {
+        if let Ok(mut v) = Rc::try_unwrap(rc) {
+            crate::ast::drain_deep_typed_value(&mut v);
+        }
+    }
+}
+
+/// In-place sibling of [`drain_value_stack`] for value stacks that the
+/// caller still observes after the drain runs. Walks the stack twice:
+///
+/// 1. First pass: every `Rc<TypedValue>` that is *aliased* on the same
+///    stack (e.g. via `DUP` on a runtime-built deep value, leaving two
+///    `Rc::clone` siblings of the same inner tree at refcount ≥ 2) is
+///    replaced in place by a shallow `Rc<TypedValue::Unit>` sentinel.
+///    Each replacement decrements the original `Rc`'s strong count; once
+///    only one alias remains on the stack the surviving slot becomes
+///    uniquely-owned.
+/// 2. Second pass: every now-uniquely-owned `Rc<TypedValue>` is drained
+///    in place via [`crate::ast::drain_deep_typed_value`], flattening the
+///    deep composite spine while preserving the variant tag.
+///
+/// Atomic variants (`Int`, `Nat`, `Unit`, …) survive both passes
+/// untouched — `drain_deep_typed_value` is a no-op on them, and they are
+/// never aliased deeply enough to trigger the sentinel replacement (the
+/// recursive `Rc<TypedValue>` destructor only overflows on deep
+/// composites). The first-pass sentinel replacement loses the original
+/// value at *aliased* slots; this is the documented in-place-drain
+/// contract for error-path teardown: callers on the Err path must not
+/// rely on aliased slots preserving their original deep content. The
+/// existing `error_inside_exec_preserves_caller_stack` test (which uses
+/// distinct atomic markers, never aliased deep values) is unaffected.
+fn drain_value_stack_in_place(stack: &mut IStack<'_>) {
+    // Pass 1: sentinel-replace every aliased Rc so the survivor becomes
+    // unique. Atomic values are sometimes aliased too (e.g. a constant
+    // pushed via `DUP`), but their shared destructor is shallow — the
+    // replacement is harmless on them and necessary on the deep case
+    // because we cannot distinguish "shared atom" from "shared deep" at
+    // this layer without a recursive walk.
+    for i in 0..stack.len() {
+        if let Ok(rc) = stack.get_mut(i) {
+            if Rc::strong_count(rc) > 1 {
+                *rc = Rc::new(TypedValue::Unit);
+            }
+        }
+    }
+    // Pass 2: every Rc is now uniquely-owned on this stack (modulo
+    // external aliases the kernel cannot enumerate, which the caller's
+    // own Drop will handle). Drain the composite spine.
+    for i in 0..stack.len() {
+        if let Ok(rc) = stack.get_mut(i) {
+            if let Some(v) = Rc::get_mut(rc) {
+                crate::ast::drain_deep_typed_value(v);
+            }
+        }
+    }
+}
+
+/// Drain every `Rc<TypedValue>` still held by the control-flow worklist before
+/// the frames are dropped, mirroring [`drain_value_stack`]. On the error-unwind
+/// path a frame may carry a deep runtime-built value -- a `DIP`-protected comb,
+/// or the not-yet-consumed elements / accumulator of an `ITER`/`MAP` over a
+/// deep collection -- whose recursive `Rc<TypedValue>` destructor would
+/// overflow the kernel's ~1 MiB Rust stack. Control-only frames (`NextInstr`,
+/// `LoopBody`, `AfterExec`, `AfterView`, ...) hold no values and are skipped.
+/// L2-1446.
+fn drain_value_frames(frames: Vec<InterpFrame<'_, '_>>) {
+    let mut pending: Vec<Rc<TypedValue<'_>>> = Vec::new();
+    for frame in frames {
+        match frame {
+            InterpFrame::AfterDip { protected, .. } => pending.extend(protected),
+            InterpFrame::IterList { remaining, .. } => pending.extend(remaining),
+            InterpFrame::IterSet { remaining, .. } => pending.extend(remaining),
+            InterpFrame::IterMap { remaining, .. } => {
+                for (k, v) in remaining {
+                    pending.push(k);
+                    pending.push(v);
+                }
+            }
+            InterpFrame::MapListAccum {
+                remaining, acc, ..
+            } => {
+                pending.extend(remaining);
+                pending.extend(acc);
+            }
+            InterpFrame::MapMapAccum {
+                remaining,
+                acc,
+                current_key,
+                ..
+            } => {
+                for (k, v) in remaining {
+                    pending.push(k);
+                    pending.push(v);
+                }
+                for (k, v) in acc {
+                    pending.push(k);
+                    pending.push(v);
+                }
+                pending.extend(current_key);
+            }
+            InterpFrame::NextInstr { .. }
+            | InterpFrame::LoopBody { .. }
+            | InterpFrame::LoopLeftBody { .. }
+            | InterpFrame::MapOptionAfter
+            | InterpFrame::AfterExec
+            | InterpFrame::AfterView { .. } => {}
+        }
+    }
+    for rc in pending {
+        if let Ok(mut v) = Rc::try_unwrap(rc) {
+            crate::ast::drain_deep_typed_value(&mut v);
+        }
     }
 }
 
@@ -3145,6 +3338,200 @@ mod interpreter_tests {
         let r2 = interpret(&[Exec], &mut Ctx::default(), &mut nested);
         assert!(matches!(r2, Err(InterpretError::FailedWith(..))));
         assert_eq!(nested, stk![marker]);
+    }
+
+    /// L2-1446: a deep runtime-built value (e.g. a `LOOP`/`PAIR`-built comb)
+    /// left on a value stack at interpreter teardown must be flattened
+    /// iteratively, not recursed through the `Rc<TypedValue>` destructor. This
+    /// exercises `drain_value_stack`, which the driver (for EXEC/View
+    /// sub-stacks) and `ContractScript::interpret` (for the caller stack) call
+    /// on their error paths. Runs on a 1 MiB worker thread matching the kernel
+    /// budget; without the iterative drain it overflows.
+    #[test]
+    fn drain_deep_value_stack_does_not_overflow() {
+        const DEPTH: usize = 100_000;
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let mut deep = V::int(0);
+                for _ in 0..DEPTH {
+                    deep = V::new_pair(V::int(0), deep);
+                }
+                let mut stack = stk![deep];
+                drain_value_stack(&mut stack);
+                assert!(stack.pop().is_none());
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
+    }
+
+    /// Regression for round-2 BLOCKER (shared-Rc evasion of
+    /// `drain_value_stack_in_place`): `DUP` of a deep value bumps the Rc
+    /// refcount; both copies on the stack see `Rc::get_mut == None`. Pre-
+    /// fix the in-place drain skipped both; the last one to drop hit
+    /// refcount=1 and recursed through the deep spine -> SIGABRT. Post-
+    /// fix the in-place drain has a sentinel-replacement first pass that
+    /// breaks aliased Rcs so the second pass can drain the survivor.
+    /// Builds the shape directly via shared `Rc::clone` (matches the
+    /// runtime shape of `PUSH ; LOOP { PAIR } ; DUP ; PUSH 42 ; FAILWITH`).
+    #[test]
+    fn dup_deep_value_then_failwith_does_not_overflow_on_drop() {
+        const DEPTH: usize = 100_000;
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let mut deep = V::int(0);
+                for _ in 0..DEPTH {
+                    deep = V::new_pair(V::int(0), deep);
+                }
+                let shared = Rc::new(deep);
+                // Two Rc::clone siblings (refcount=2) plus a shallow marker
+                // on top — matches the runtime shape of `PUSH ; LOOP { PAIR }
+                // ; DUP ; PUSH 1 ; FAILWITH`. FAILWITH pops the marker, the
+                // shared deep value stays on bottom twice.
+                let mut stack: IStack = Stack::new();
+                stack.push(Rc::clone(&shared));
+                stack.push(shared);
+                stack.push(Rc::new(V::int(42)));
+                let outcome = interpret(&[Failwith(Type::Int)], &mut Ctx::default(), &mut stack);
+                assert!(matches!(outcome, Err(InterpretError::FailedWith(..))));
+                drop(outcome);
+                drop(stack);
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
+    }
+
+    /// Regression: on the error path the caller's restored stack may still
+    /// carry a deep runtime-built value pushed before the error -- e.g. a
+    /// `LOOP`-built right-comb DUP'd onto the stack and then a separate
+    /// FAILWITH on the duplicate copy leaves the original on `bottom`. Pre-
+    /// fix, only `ContractScript::interpret` drained the caller stack via
+    /// `drain_value_stack` (pop-based), so any direct caller of
+    /// `Instruction::interpret` / `fn interpret` -- notably the EVM
+    /// gateway's per-instruction view loop in
+    /// `etherlink/.../tezosx-tezos-runtime/src/view.rs` -- inherited a stack
+    /// whose drop overflowed the kernel ~1 MiB Rust stack. Now the in-place
+    /// drain runs in `fn interpret` so every caller is covered AND the
+    /// existing "Err preserves caller stack" contract is honored: the stack
+    /// length and atomic values are unchanged; only the deep composite spine
+    /// inside any leftover value is severed.
+    #[test]
+    fn interpret_err_drains_leftover_caller_stack_in_place() {
+        const DEPTH: usize = 100_000;
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let mut deep = V::int(0);
+                for _ in 0..DEPTH {
+                    deep = V::new_pair(V::int(0), deep);
+                }
+                let marker = V::int(42);
+                // deep at bottom, marker on top. FAILWITH pops marker; deep
+                // stays on the bottom across the unwind. Without the
+                // bottom-stack drain in `fn interpret`, dropping the caller's
+                // `stack` here would overflow.
+                let mut stack: IStack = stk![deep, marker.clone()];
+                let outcome = interpret(&[Failwith(Type::Int)], &mut Ctx::default(), &mut stack);
+                assert!(matches!(outcome, Err(InterpretError::FailedWith(..))));
+                // In-place drain preserves stack length and atomic values;
+                // the marker is still observable post-Err. The deep value
+                // is structurally flattened; only its variant tag remains.
+                assert_eq!(stack.len(), 1, "bottom stack length preserved post-Err");
+                drop(outcome);
+                drop(stack);
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
+    }
+
+    /// Regression: `FAILWITH` of a deep runtime-built value embeds the value
+    /// in `InterpretError::FailedWith(_, TypedValue<'a>)`. Pre-fix the
+    /// resulting `Err` propagates through `fn interpret`'s leftover-stack /
+    /// frame drain — both of which target the value *stack*, not the error
+    /// variant — and lands at the caller's `drop` site with the deep value
+    /// still recursive. The auto-derived `TypedValue` destructor overflows
+    /// the kernel's ~1 MiB Rust stack. Drain the embedded value at the
+    /// driver-error boundary so `Err` propagation is safe for any caller
+    /// (L2-1446 + the multi-agent review BLOCKER).
+    #[test]
+    fn failwith_with_deep_value_does_not_overflow_on_drop() {
+        const DEPTH: usize = 100_000;
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let mut deep = V::int(0);
+                for _ in 0..DEPTH {
+                    deep = V::new_pair(V::int(0), deep);
+                }
+                let mut stack: IStack = stk![deep];
+                let outcome = interpret(&[Failwith(Type::Int)], &mut Ctx::default(), &mut stack);
+                assert!(matches!(outcome, Err(InterpretError::FailedWith(..))));
+                drop(outcome);
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
+    }
+
+    /// Companion to [`drain_deep_value_stack_does_not_overflow`] for the
+    /// control-flow worklist: every `InterpFrame` variant that owns runtime
+    /// values is given a deep one, then `drain_value_frames` must flatten them
+    /// all without the recursive `Rc<TypedValue>` destructor overflowing the
+    /// ~1 MiB worker stack. This is the value carried on the error-unwind path
+    /// by a `DIP`-protected comb or an in-flight `ITER`/`MAP` (L2-1446).
+    #[test]
+    fn drain_deep_value_frames_does_not_overflow() {
+        const DEPTH: usize = 100_000;
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let deep = || {
+                    let mut d = V::int(0);
+                    for _ in 0..DEPTH {
+                        d = V::new_pair(V::int(0), d);
+                    }
+                    Rc::new(d)
+                };
+                let empty: &[Instruction] = &[];
+                let body = || CodeRef::Borrowed(empty);
+                let frames: Vec<InterpFrame> = vec![
+                    InterpFrame::AfterDip {
+                        protected: stk![(*deep()).clone()],
+                        opt_height: None,
+                    },
+                    InterpFrame::IterList {
+                        body: body(),
+                        remaining: vec![deep()].into_iter(),
+                    },
+                    InterpFrame::IterSet {
+                        body: body(),
+                        remaining: BTreeSet::from([deep()]).into_iter(),
+                    },
+                    InterpFrame::IterMap {
+                        body: body(),
+                        remaining: BTreeMap::from([(Rc::new(V::int(0)), deep())]).into_iter(),
+                    },
+                    InterpFrame::MapListAccum {
+                        body: body(),
+                        remaining: vec![deep()].into_iter(),
+                        acc: vec![deep()],
+                    },
+                    InterpFrame::MapMapAccum {
+                        body: body(),
+                        remaining: BTreeMap::from([(Rc::new(V::int(0)), deep())]).into_iter(),
+                        acc: BTreeMap::from([(Rc::new(V::int(0)), deep())]),
+                        current_key: Some(deep()),
+                    },
+                ];
+                drain_value_frames(frames);
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
     }
 
     /// Zero-copy bodies: a control-flow body borrowed from the (arena-lived)

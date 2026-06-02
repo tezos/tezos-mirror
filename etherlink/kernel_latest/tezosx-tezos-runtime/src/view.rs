@@ -105,7 +105,14 @@ fn classify_tc_error(e: TcError) -> TezosXRuntimeError {
 /// [`TezosXRuntimeError::BadRequest`].
 fn classify_interpret_error(e: InterpretError) -> TezosXRuntimeError {
     use mir::gas::CompareError;
-    match e {
+    // Match by reference: `InterpretError` implements `Drop` (a deep
+    // `FailedWith` payload is flattened iteratively when the error is
+    // finally dropped — see L2-1446 + !22025), so Rust forbids partial-move
+    // destructuring. The arms borrow the variant fields and observe the
+    // original payload; `e` falls out of scope at function end and its
+    // `Drop` runs then, after any `format!("{other:?}")` above has already
+    // serialised the value into the response body.
+    match &e {
         // All flavours of resource exhaustion → OutOfGas: direct
         // interpreter budget exhaustion, a cost helper overflowing, the
         // comparison-cost path, and the nested-`TcError` forms (routed
@@ -117,7 +124,7 @@ fn classify_interpret_error(e: InterpretError) -> TezosXRuntimeError {
         | InterpretError::CompareError(CompareError::Cost(_)) => {
             TezosXRuntimeError::OutOfGas
         }
-        InterpretError::TcError(ref tc) if tc_error_is_oog(tc) => {
+        InterpretError::TcError(tc) if tc_error_is_oog(tc) => {
             TezosXRuntimeError::OutOfGas
         }
         InterpretError::EnshrinedViewDispatch(
@@ -532,6 +539,59 @@ mod tests {
                 classify_interpret_error(InterpretError::InternalError(inv)),
                 TezosXRuntimeError::BadRequest(_)
             ));
+        }
+    }
+
+    /// `EnshrinedViewDispatchError::InvalidDestination` carries caller-
+    /// supplied data (the destination URL the Michelson program passed)
+    /// — caller-controllable malformed input must route to
+    /// [`TezosXRuntimeError::BadRequest`] (4xx, catchable revert) so the
+    /// caller can recover. The other four `EnshrinedViewDispatchError`
+    /// variants (`AliasResolution`, `BudgetOverflow`, `DispatchSetup`,
+    /// `UnclassifiableResponse`) represent kernel-side brokenness
+    /// reachable from a MIR `VIEW staticcall_evm` and must route to
+    /// [`TezosXRuntimeError::Custom`], which the gateway maps to a 5xx
+    /// blueprint-abort. Pin every routing so a future arm reorder or
+    /// guard typo cannot silently flip them; the inline `match` over
+    /// every variant is exhaustive, so a future 6th variant fails to
+    /// compile until its expected routing is decided here.
+    #[test]
+    fn classify_interpret_error_enshrined_view_dispatch_routing() {
+        use EnshrinedViewDispatchError::*;
+        let cases = [
+            InvalidDestination {
+                destination: "not-a-url".to_owned(),
+            },
+            AliasResolution,
+            BudgetOverflow,
+            DispatchSetup,
+            UnclassifiableResponse { status: 599 },
+        ];
+        for case in cases {
+            // Exhaustive match: a future variant must add its routing
+            // decision here AND to `cases` above, or this test fails to
+            // compile.
+            let expected_is_bad_request = match &case {
+                InvalidDestination { .. } => true,
+                AliasResolution
+                | BudgetOverflow
+                | DispatchSetup
+                | UnclassifiableResponse { .. } => false,
+            };
+            let actual = classify_interpret_error(InterpretError::EnshrinedViewDispatch(
+                case.clone(),
+            ));
+            if expected_is_bad_request {
+                assert!(
+                    matches!(actual, TezosXRuntimeError::BadRequest(_)),
+                    "expected BadRequest for {case:?}, got {actual:?}",
+                );
+            } else {
+                assert!(
+                    matches!(actual, TezosXRuntimeError::Custom(_)),
+                    "expected Custom for {case:?}, got {actual:?}",
+                );
+            }
         }
     }
 }
