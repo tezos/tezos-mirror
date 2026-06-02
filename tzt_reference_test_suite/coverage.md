@@ -1064,6 +1064,7 @@ Among tests on values serialization:
 - [unpack_address_01.tzt](unpack_address_01.tzt)
 - [unpack_address_02.tzt](unpack_address_02.tzt)
 - [unpack_address_03.tzt](unpack_address_03.tzt)
+- [unpack_address_04.tzt](unpack_address_04.tzt)
 - [unpack_string_00.tzt](unpack_string_00.tzt)
 - [unpack_string_01.tzt](unpack_string_01.tzt)
 - [unpack_string_02.tzt](unpack_string_02.tzt)
