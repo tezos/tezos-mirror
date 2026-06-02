@@ -4984,7 +4984,7 @@ mod typecheck_tests {
             .into_micheline_optimized_legacy(&arena, &mut Gas::new(u32::MAX))
             .expect("into_micheline succeeds");
         let _bytes = mich
-            .encode_for_pack(&mut Gas::default())
+            .encode_for_pack()
             .expect("gas suffices")
             .expect("pack succeeds");
     }

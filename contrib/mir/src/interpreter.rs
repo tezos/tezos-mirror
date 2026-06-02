@@ -402,7 +402,7 @@ enum InterpFrame<'a, 'b> {
     MapOptionAfter,
     MapMapAccum {
         body: CodeRef<'a, 'b>,
-        remaining: std::vec::IntoIter<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)>,
+        remaining: std::collections::btree_map::IntoIter<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
         acc: BTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
         current_key: Option<Rc<TypedValue<'a>>>,
     },
@@ -452,7 +452,7 @@ enum StepResult<'a, 'b> {
     OpenMapOption(CodeRef<'a, 'b>),
     OpenMapMap {
         body: CodeRef<'a, 'b>,
-        iter: std::vec::IntoIter<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)>,
+        iter: std::collections::btree_map::IntoIter<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
         first_key: Rc<TypedValue<'a>>,
     },
     /// EXEC: enter a lambda body on a fresh sub stack containing args.
@@ -1137,9 +1137,10 @@ fn interpret_step<'a, 'b, 'c>(
             overloads::Map::Map => {
                 ctx.gas().consume(interpret_cost::MAP_MAP)?;
                 let map = pop_v!(V::Map);
-                let entries: Vec<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)> =
-                    map.into_iter().collect();
-                let mut iter = entries.into_iter();
+                // Iterate the map's entries directly: unlike L1, which folds the
+                // map into a list first, MIR walks the `BTreeMap` in place, so
+                // there is no O(n) materialisation step to charge for.
+                let mut iter = map.into_iter();
                 if let Some((k, v)) = iter.next() {
                     ctx.gas().consume(interpret_cost::PUSH)?;
                     stack.push(TypedValue::Pair(k.clone(), v));
@@ -2495,10 +2496,8 @@ fn interpret_one<'a>(
             ctx.gas().consume(interpret_cost::PACK)?;
             let v = pop!();
             let arena = Arena::new();
-            // In the Tezos implementation they also charge gas for the pass
-            // that strips locations. We don't have it.
             let mich = v.into_micheline_optimized_legacy(&arena, ctx.gas())?;
-            let encoded = mich.encode_for_pack(ctx.gas())??;
+            let encoded = mich.encode_for_pack()??;
             stack.push(V::Bytes(encoded));
         }
         I::Unpack(ty) => {
@@ -6005,6 +6004,22 @@ mod interpreter_tests {
     }
 
     #[test]
+    fn pack_charges_serialization_once() {
+        // Regression for the PACK ~2x overcharge: PACK bills only the
+        // unparsing pass (~10 mg/byte for a string), not unparsing +
+        // serialization (~20 mg/byte). Comparing two payloads isolates the
+        // per-byte slope from the fixed node/instruction overhead.
+        fn pack_gas(len: usize) -> u32 {
+            let mut ctx = Ctx::default();
+            let mut stack = stk![V::String("a".repeat(len))];
+            interpret_one(&Pack, &mut ctx, &mut stack).unwrap();
+            Ctx::default().gas.milligas().unwrap() - ctx.gas().milligas().unwrap()
+        }
+        let (n1, n2) = (100usize, 1100usize);
+        assert_eq!(pack_gas(n2) - pack_gas(n1), 10 * (n2 - n1) as u32);
+    }
+
+    #[test]
     fn self_instr() {
         let mut stk = Stack::new();
         let ctx = &mut Ctx::default();
@@ -8233,7 +8248,7 @@ mod interpreter_tests {
                     &mut gas,
                 )
                 .unwrap();
-            lambda.encode_for_pack(&mut gas).unwrap().unwrap()
+            lambda.encode_for_pack().unwrap().unwrap()
         }
 
         // 255-byte annotation token: decodes and typechecks -> Some.

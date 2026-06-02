@@ -360,6 +360,10 @@ pub mod interpret_cost {
     pub const IF_CONS: u32 = 10;
     pub const IF_LEFT: u32 = 10;
     pub const LOOP: u32 = 10;
+    // Iteration cost (`cost_N_IList_iter` / `cost_N_ISet_iter` /
+    // `cost_N_IMap_iter`). L1's `set`/`map` variants are size-dependent
+    // because L1 first materialises the collection into a list; MIR iterates
+    // the entries directly (no such setup), so a flat cost matches MIR's work.
     pub const ITER: u32 = 20;
     pub const SWAP: u32 = 10;
     pub const ABS: u32 = 10;
@@ -414,10 +418,10 @@ pub mod interpret_cost {
     // See `cost_N_IOpt_map` in the Tezos protocol
     pub const MAP_OPTION: u32 = 10;
     // See `cost_N_IList_map` in the Tezos protocol
-    pub const MAP_LIST: u32 = 10;
-    // In the Tezos protocol, the cost of `MAP` over a `map k v` is a function of its size (see `cost_N_IMap_map`)
-    // because it needs to fold the map into a list of key-value pairs first.
-    // We don't do that in this interpreter, therefore the cost here is a constant and not a function.
+    pub const MAP_LIST: u32 = 20;
+    // L1's `cost_N_IMap_map` is size-dependent because it folds the `map` into
+    // a list of key-value pairs first. MIR iterates the map's entries directly
+    // (no such setup), so a flat cost matches MIR's actual work.
     pub const MAP_MAP: u32 = 20;
 
     // Gas costs obtained from https://gitlab.com/tezos/tezos/-/blob/9875fbebe032a8c5ce62b3b3cb1588ca9855a37e/src/proto_017_PtNairob/lib_protocol/michelson_v1_gas_costs_generated.ml
