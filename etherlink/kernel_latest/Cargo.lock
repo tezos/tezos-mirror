@@ -3423,6 +3423,7 @@ dependencies = [
  "sha3",
  "tezos-evm-runtime-latest",
  "tezos-smart-rollup-host",
+ "tezos-smart-rollup-keyspace",
  "tezos-smart-rollup-storage",
  "tezos_crypto_rs",
  "tezos_data_encoding",
