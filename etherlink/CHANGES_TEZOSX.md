@@ -50,6 +50,13 @@
   EVM origin, so `sourceRuntime` is now `"ethereum"` and the
   `(sourceRuntime, sourceAddress)` pair is self-consistent for event
   consumers (indexers, monitors, bridges). (!22067)
+- The synthetic EVM receipt produced for a Michelson -> EVM
+  cross-runtime call now reports the post-transaction block gas
+  accumulator in `cumulativeGasUsed`, as required by EIP-658.
+  Previously the receipt was stamped with the pre-transaction value
+  (excluding the call's own `gasUsed`), so block-gas cross-checks and
+  consecutive-receipt differencing reported wrong per-transaction gas
+  for every cross-runtime-originated receipt. (!22049)
 
 ### Michelson Runtime
 
