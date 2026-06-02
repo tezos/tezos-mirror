@@ -1,0 +1,8 @@
+# UNPACK address whose optimized binary suffix is the literal bytes
+# "default". Both L1 (Entrypoint.value_encoding via of_string_strict')
+# and the Michelson interface reject this — an explicit default
+# entrypoint must not appear in the binary encoding (it is the implicit
+# default and must be encoded as the empty suffix). UNPACK pushes None.
+code { UNPACK address } ;
+input { Stack_elt bytes 0x050a0000001d00007b09f782e0bcd67739510afa819d85976119d5ef64656661756c74 } ;
+output { Stack_elt (option address) None }

@@ -1,0 +1,6 @@
+# UNPACK address on the canonical encoding of a vanilla
+# tz1...%(implicit default) address. Control case for the entrypoint
+# byte cases in unpack_address_01..03.
+code { UNPACK address } ;
+input { Stack_elt bytes 0x050a0000001600007b09f782e0bcd67739510afa819d85976119d5ef } ;
+output { Stack_elt (option address) (Some "tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j") }

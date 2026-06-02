@@ -1060,6 +1060,10 @@ Among tests on values serialization:
 - [packunpack_nat_00.tzt](packunpack_nat_00.tzt)
 - [packunpack_string_00.tzt](packunpack_string_00.tzt)
 - [packunpack_timestamp_00.tzt](packunpack_timestamp_00.tzt)
+- [unpack_address_00.tzt](unpack_address_00.tzt)
+- [unpack_address_01.tzt](unpack_address_01.tzt)
+- [unpack_address_02.tzt](unpack_address_02.tzt)
+- [unpack_address_03.tzt](unpack_address_03.tzt)
 - [unpack_string_00.tzt](unpack_string_00.tzt)
 - [unpack_string_01.tzt](unpack_string_01.tzt)
 - [unpack_string_02.tzt](unpack_string_02.tzt)
@@ -1077,7 +1081,10 @@ Among tests on values serialization:
 - [unpack_timestamp_00.tzt](unpack_timestamp_00.tzt)
 - [unpack_timestamp_01.tzt](unpack_timestamp_01.tzt)
 
-The `unpack_*_*` tests cover standalone `UNPACK` on canonical and
+The `unpack_address_*` tests cover standalone `UNPACK address` and the
+readable `address`-literal path on entrypoint suffixes that use bytes
+outside the Michelson script-source annotation charset; the other
+`unpack_*_*` tests cover standalone `UNPACK` on canonical and
 non-canonical zarith encodings for `int`, `nat`, `mutez`, and
 `timestamp`; the `packunpack_*` tests cover roundtrips through `PACK`.
 

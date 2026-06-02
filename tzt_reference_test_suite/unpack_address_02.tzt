@@ -1,0 +1,8 @@
+# UNPACK address whose optimized binary suffix starts with "." (0x2e):
+# ".foo". L1 accepts this (the dot-as-first-char restriction only
+# applies to entrypoint annotations in script source, not to address
+# values), but MIR used to reject it (L2-1377). UNPACK must now push
+# Some "tz1...%.foo".
+code { UNPACK address } ;
+input { Stack_elt bytes 0x050a0000001a00007b09f782e0bcd67739510afa819d85976119d5ef2e666f6f } ;
+output { Stack_elt (option address) (Some "tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%.foo") }

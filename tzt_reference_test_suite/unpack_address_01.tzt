@@ -1,0 +1,9 @@
+# UNPACK address whose optimized binary suffix is "!" (0x21). L1's
+# parse_address validates the trailing entrypoint bytes with
+# Entrypoint.value_encoding (length <= 31, not "default") and accepts
+# this; MIR used to additionally enforce the Michelson script-source
+# annotation charset and rejected it as a forbidden byte (L2-1377). The
+# Michelson interface must now match L1 and push Some "tz1...%!".
+code { UNPACK address } ;
+input { Stack_elt bytes 0x050a0000001700007b09f782e0bcd67739510afa819d85976119d5ef21 } ;
+output { Stack_elt (option address) (Some "tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%!") }

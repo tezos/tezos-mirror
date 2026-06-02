@@ -9008,6 +9008,84 @@ mod typecheck_tests {
         );
     }
 
+    /// L2-1377: `PUSH address "...%<ep>"` and `PUSH address 0x...<ep>` must
+    /// typecheck with entrypoint bytes outside the Michelson script-source
+    /// charset, matching Tezos L1's `parse_address`.
+    #[test]
+    fn test_push_address_l2_1377_relaxed_entrypoint() {
+        #[track_caller]
+        fn assert_ok(lit: &str, bytes: &str, ep: &str) {
+            let exp_addr = addr::Address::from_base58_check(lit).unwrap();
+            assert_eq!(exp_addr.entrypoint.as_str(), ep);
+            let exp = Ok(Push(Rc::new(TypedValue::Address(exp_addr))));
+            assert_eq!(
+                &typecheck_instruction(
+                    &parse(&format!("PUSH address \"{lit}\"")).unwrap(),
+                    &mut Gas::default(),
+                    &mut tc_stk![],
+                ),
+                &exp
+            );
+            assert_eq!(
+                &typecheck_instruction(
+                    &parse(&format!("PUSH address {bytes}")).unwrap(),
+                    &mut Gas::default(),
+                    &mut tc_stk![],
+                ),
+                &exp
+            );
+        }
+        // Single non-charset ASCII byte (issue's `ep_bang` case).
+        assert_ok(
+            "tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%!",
+            "0x00007b09f782e0bcd67739510afa819d85976119d5ef21",
+            "!",
+        );
+        // Dot as first character (issue's `ep_dotfirst` case).
+        assert_ok(
+            "tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%.foo",
+            "0x00007b09f782e0bcd67739510afa819d85976119d5ef2e666f6f",
+            ".foo",
+        );
+
+        macro_rules! assert_matches {
+            ($e:expr, $p:pat $(if $cond:expr)?) => {
+                match $e {
+                    $p $(if $cond)? => (),
+                    _ => panic!("expected {:?} to match {}", $e, stringify!($p)),
+                }
+            };
+        }
+
+        // Sanity: too-long entrypoint is still rejected (shared bound).
+        assert_matches!(
+            typecheck_instruction(
+                &parse(
+                    "PUSH address \"tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq\""
+                )
+                .unwrap(),
+                &mut Gas::default(),
+                &mut tc_stk![],
+            ),
+            Err(TcError::ByteReprError(
+                Type::Address,
+                ByteReprError::WrongFormat(_)
+            ))
+        );
+        // Sanity: explicit "default" in readable form still rejected.
+        assert_matches!(
+            typecheck_instruction(
+                &parse("PUSH address \"tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%default\"").unwrap(),
+                &mut Gas::default(),
+                &mut tc_stk![],
+            ),
+            Err(TcError::ByteReprError(
+                Type::Address,
+                ByteReprError::WrongFormat(_)
+            ))
+        );
+    }
+
     #[test]
     fn test_push_chain_id() {
         let bytes = "f3d48554";
