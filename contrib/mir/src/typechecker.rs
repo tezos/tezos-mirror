@@ -9016,7 +9016,7 @@ mod typecheck_tests {
         #[track_caller]
         fn assert_ok(lit: &str, bytes: &str, ep: &str) {
             let exp_addr = addr::Address::from_base58_check(lit).unwrap();
-            assert_eq!(exp_addr.entrypoint.as_str(), ep);
+            assert_eq!(exp_addr.entrypoint.as_str(), Some(ep));
             let exp = Ok(Push(Rc::new(TypedValue::Address(exp_addr))));
             assert_eq!(
                 &typecheck_instruction(
@@ -9047,6 +9047,27 @@ mod typecheck_tests {
             "0x00007b09f782e0bcd67739510afa819d85976119d5ef2e666f6f",
             ".foo",
         );
+
+        // Non-UTF-8 entrypoint byte (issue's `ep_nonascii` case): only
+        // expressible via the optimized bytes form, since a readable string
+        // literal is always valid UTF-8. L1 accepts it; MIR must too.
+        {
+            let exp_addr = addr::Address::from_bytes(
+                &hex::decode("00007b09f782e0bcd67739510afa819d85976119d5efff").unwrap(),
+            )
+            .unwrap();
+            assert_eq!(exp_addr.entrypoint.as_bytes(), &[0xff_u8]);
+            let exp = Ok(Push(Rc::new(TypedValue::Address(exp_addr))));
+            assert_eq!(
+                &typecheck_instruction(
+                    &parse("PUSH address 0x00007b09f782e0bcd67739510afa819d85976119d5efff")
+                        .unwrap(),
+                    &mut Gas::default(),
+                    &mut tc_stk![],
+                ),
+                &exp
+            );
+        }
 
         macro_rules! assert_matches {
             ($e:expr, $p:pat $(if $cond:expr)?) => {

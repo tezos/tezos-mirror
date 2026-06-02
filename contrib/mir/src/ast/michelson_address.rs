@@ -77,10 +77,16 @@ impl ByteReprTrait for Address {
         if self.is_default_ep() {
             self.hash.to_base58_check()
         } else {
+            // The entrypoint name is raw bytes (see `Entrypoint`); it is valid
+            // UTF-8 for every entrypoint expressible as a Michelson string
+            // literal. A non-UTF-8 entrypoint can only be produced by `UNPACK
+            // address` on crafted bytes and has no readable Michelson form, so
+            // the lossy conversion here is never observed for a printable
+            // value.
             format!(
                 "{}%{}",
                 self.hash.to_base58_check(),
-                self.entrypoint.as_str()
+                String::from_utf8_lossy(self.entrypoint.as_bytes())
             )
         }
     }
@@ -182,17 +188,17 @@ mod tests {
         // Single non-charset ASCII byte ("!", 0x21).
         let addr = Address::from_base58_check("tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%!")
             .expect("L1 accepts %!, MIR must too");
-        assert_eq!(addr.entrypoint.as_str(), "!");
+        assert_eq!(addr.entrypoint.as_str(), Some("!"));
 
         // Forbidden-as-first-char byte (".") used as first char.
         let addr = Address::from_base58_check("tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%.foo")
             .expect("L1 accepts %.foo, MIR must too");
-        assert_eq!(addr.entrypoint.as_str(), ".foo");
+        assert_eq!(addr.entrypoint.as_str(), Some(".foo"));
 
         // Trailing non-charset byte ("foo!").
         let addr = Address::from_base58_check("tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%foo!")
             .expect("L1 accepts %foo!, MIR must too");
-        assert_eq!(addr.entrypoint.as_str(), "foo!");
+        assert_eq!(addr.entrypoint.as_str(), Some("foo!"));
 
         // -- Binary path (UNPACK address). --
 
@@ -204,7 +210,7 @@ mod tests {
             .expect("L1 accepts 0x21 as ep, MIR must too")
             .entrypoint
             .as_str(),
-            "!",
+            Some("!"),
         );
 
         // address hash + ".foo".
@@ -215,8 +221,19 @@ mod tests {
             .expect("L1 accepts .foo as ep, MIR must too")
             .entrypoint
             .as_str(),
-            ".foo",
+            Some(".foo"),
         );
+
+        // address hash + 0xff: a non-UTF-8 entrypoint byte (`ep_nonascii`
+        // from the issue). L1 stores the entrypoint name as a raw byte
+        // string and accepts this; MIR must too. There is no readable
+        // Michelson form, so it is only reachable on the binary path.
+        let addr = Address::from_bytes(
+            &hex::decode("00007b09f782e0bcd67739510afa819d85976119d5efff").unwrap(),
+        )
+        .expect("L1 accepts a 0xff entrypoint byte, MIR must too");
+        assert_eq!(addr.entrypoint.as_bytes(), &[0xff_u8]);
+        assert_eq!(addr.entrypoint.as_str(), None);
 
         // Max-length (31) "weird" entrypoint round-trips on both paths.
         let mut hex_with_bang = String::from("00007b09f782e0bcd67739510afa819d85976119d5ef");
@@ -225,7 +242,7 @@ mod tests {
         }
         let addr = Address::from_bytes(&hex::decode(&hex_with_bang).unwrap())
             .expect("31 bytes of '!' is at the length bound and must be accepted");
-        assert_eq!(addr.entrypoint.as_str(), "!".repeat(31));
+        assert_eq!(addr.entrypoint.as_str(), Some("!".repeat(31).as_str()));
     }
 
     /// L2-1377: the address-value path must keep enforcing the L1 rules

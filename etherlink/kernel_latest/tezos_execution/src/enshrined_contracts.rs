@@ -223,7 +223,7 @@ where
                 let request = build_ethereum_request(&dest, &[])?;
                 dispatch_crac_call(ctx, request)?;
                 Ok(vec![])
-            } else if entrypoint.as_str() == "call_evm" {
+            } else if entrypoint.as_str() == Some("call_evm") {
                 charge_gateway_base_cost(ctx)?;
                 let (dest, method_sig, abi_params, callback) =
                     extract_call_params(typed)?;
@@ -241,7 +241,7 @@ where
                 let response_body = dispatch_crac_call(ctx, request)?;
                 charge_gateway_payload(ctx, response_body.len())?;
                 dispatch_callback(ctx, callback, response_body).map_err(Into::into)
-            } else if entrypoint.as_str() == "call" {
+            } else if entrypoint.as_str() == Some("call") {
                 charge_gateway_base_cost(ctx)?;
                 let (request, callback) = extract_http_call_request(typed)?;
                 // Per-byte surcharge: outgoing HTTP body.
@@ -256,7 +256,7 @@ where
                 let body = dispatch_crac_call(ctx, request)?;
                 charge_gateway_payload(ctx, body.len())?;
                 dispatch_callback(ctx, callback, body).map_err(Into::into)
-            } else if entrypoint.as_str() == "collect_result" {
+            } else if entrypoint.as_str() == Some("collect_result") {
                 // %collect_result lets a Michelson adapter deposit a
                 // result payload on the current dispatch slot so the
                 // kernel can later surface it as the HTTP response body
@@ -307,8 +307,8 @@ where
         EnshrinedContracts::ERC20Wrapper => {
             let ep = entrypoint.as_str();
             let method_sig = match ep {
-                "transfer" => "transfer(address,uint256)",
-                "approve" => "approve(address,uint256)",
+                Some("transfer") => "transfer(address,uint256)",
+                Some("approve") => "approve(address,uint256)",
                 _ => {
                     return Err(TransferError::GatewayError(format!(
                         "Unknown ERC-20 wrapper entrypoint: {entrypoint}"
@@ -499,7 +499,7 @@ pub fn is_synthetic_crac_event(iop: &InternalOperationSum) -> bool {
                 && e.content
                     .tag
                     .as_ref()
-                    .is_some_and(|t| t.as_str() == SYNTHETIC_CRAC_EVENT_TAG)
+                    .is_some_and(|t| t.as_str() == Some(SYNTHETIC_CRAC_EVENT_TAG))
         }
         _ => false,
     }

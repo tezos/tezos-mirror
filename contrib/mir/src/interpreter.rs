@@ -8563,6 +8563,25 @@ mod interpreter_tests {
             )))]
         );
 
+        // hash + 0xff (non-UTF-8 ep byte, the issue's `ep_nonascii` case).
+        // L1 stores the entrypoint name as a raw byte string and accepts
+        // this; MIR now matches. The decoded address is built via
+        // `from_bytes` because a non-UTF-8 entrypoint has no readable
+        // base58 form.
+        let payload =
+            hex::decode("050a0000001700007b09f782e0bcd67739510afa819d85976119d5efff").unwrap();
+        let mut stack = stk![V::Bytes(payload)];
+        let ctx = &mut Ctx::default();
+        assert_eq!(
+            interpret_one(&Unpack(Type::Address), ctx, &mut stack),
+            Ok(())
+        );
+        let expected = Address::from_bytes(
+            &hex::decode("00007b09f782e0bcd67739510afa819d85976119d5efff").unwrap(),
+        )
+        .unwrap();
+        assert_eq!(stack, stk![V::new_option(Some(V::Address(expected)))]);
+
         // Control: explicit "default" remains forbidden -> None.
         let payload =
             hex::decode("050a0000001d00007b09f782e0bcd67739510afa819d85976119d5ef64656661756c74")
