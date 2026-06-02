@@ -70,6 +70,14 @@ pub enum TransactionOrigin {
     /// Cross-runtime call: do NOT commit the journal.
     /// If `credit` is `Some`, inject a balance credit into the REVM journal
     /// before executing the transaction.
+    ///
+    /// Note: the credit lives behind a `journaled_state.checkpoint()`,
+    /// which increments REVM's call depth. That's safe for cross-runtime
+    /// calls (already nested below a real top-level frame) but would
+    /// shift the top-level call off depth 0 for a `UserInput` caller —
+    /// breaking the `CallTracer` whose flush hook keys on `depth == 0`.
+    /// Top-level callers that need a prefund (e.g. the XTZ-deposit
+    /// feeder) must do it out-of-band on `StorageAccount` instead.
     CrossRuntime { credit: Option<(Address, U256)> },
     /// Read-only cross-runtime call: no balance credit, no journal
     /// commit, and the top-level frame runs with `is_static = true`
