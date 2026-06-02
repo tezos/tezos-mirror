@@ -16,6 +16,9 @@ use inspectors::{
     EtherlinkHandler, EvmInspection, TracerInput,
 };
 pub use michelson_types::Withdrawal;
+use precompiles::constants::{
+    alias_forwarder_delegation, alias_forwarder_delegation_code_hash,
+};
 use precompiles::provider::EtherlinkPrecompiles;
 use revm::{
     context::{
@@ -386,7 +389,8 @@ fn build_evm_inspector_context<
     inspector: INSP,
     is_simulation: bool,
     is_cross_runtime: bool,
-) -> EvmInspection<'a, Host, INSP, R>
+    alias_delegation: Option<Address>,
+) -> Result<EvmInspection<'a, Host, INSP, R>, EvmRunError>
 where
     Host: StorageV1,
 {
@@ -428,7 +432,8 @@ where
     if is_cross_runtime {
         install_etherlink_gasprice(&mut evm);
     }
-    evm
+    install_alias_delegation(&mut evm.ctx.journaled_state, alias_delegation)?;
+    Ok(evm)
 }
 
 #[instrument(skip_all)]
@@ -444,7 +449,8 @@ fn build_evm_context<'a, Host, R: Registry>(
     spec_id: SpecId,
     is_simulation: bool,
     is_cross_runtime: bool,
-) -> EvmContext<'a, Host, R>
+    alias_delegation: Option<Address>,
+) -> Result<EvmContext<'a, Host, R>, EvmRunError>
 where
     Host: StorageV1,
 {
@@ -479,7 +485,8 @@ where
     if is_cross_runtime {
         install_etherlink_gasprice(&mut evm);
     }
-    evm
+    install_alias_delegation(&mut evm.ctx.journaled_state, alias_delegation)?;
+    Ok(evm)
 }
 
 /// Run the EVM transaction. Routes through [`EtherlinkHandler`]
@@ -527,6 +534,26 @@ where
     })
 }
 
+/// Install the alias delegation designator in the journaled state so the
+/// alias-init sub-call resolves it. The write commits with the
+/// transaction and reverts with the frame.
+fn install_alias_delegation<Host: StorageV1, R: Registry>(
+    journaled_state: &mut Journal<'_, Host, R>,
+    alias: Option<Address>,
+) -> Result<(), EvmRunError> {
+    if let Some(alias) = alias {
+        journaled_state
+            .load_account(alias)
+            .map_err(EVMError::Database)?;
+        journaled_state.set_code_with_hash(
+            alias,
+            alias_forwarder_delegation(),
+            alias_forwarder_delegation_code_hash(),
+        );
+    }
+    Ok(())
+}
+
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
 pub fn run_transaction<'a, Host, R: Registry>(
@@ -549,6 +576,10 @@ pub fn run_transaction<'a, Host, R: Registry>(
 where
     Host: StorageV1,
 {
+    // Consume the pending alias delegation before any fallible step
+    // so an early return cannot leave it dangling for the next
+    // run transaction of the same operation.
+    let alias_delegation = journal.evm.take_pending_alias_delegation();
     let block_env = block_env(block_constants)?;
     let call_depth = journal.evm.revm_call_depth().unwrap_or(0) as usize;
     let tx = tx_env(
@@ -605,7 +636,8 @@ where
             ),
             is_simulation,
             is_cross_runtime,
-        );
+            alias_delegation,
+        )?;
 
         let credit_checkpoint = match origin {
             TransactionOrigin::CrossRuntime {
@@ -680,7 +712,8 @@ where
             spec_id,
             is_simulation,
             is_cross_runtime,
-        );
+            alias_delegation,
+        )?;
 
         let credit_checkpoint = match origin {
             TransactionOrigin::CrossRuntime {
@@ -4175,6 +4208,18 @@ mod test {
         let alias_hex = alias_bytes.strip_prefix("0x").unwrap_or(&alias_bytes);
         let alias = Address::from_slice(&hex::decode(alias_hex).unwrap());
 
+        // Materialization is staged in the journal and written to durable
+        // storage only at commit; flush it as the kernel does on a
+        // successful parent operation.
+        let block_constants = BlockConstants::test_block_with_no_fees();
+        crate::journal::commit_evm_journal_from_external(
+            &mut host,
+            &registry,
+            &block_constants,
+            &mut journal,
+        )
+        .expect("flush evm journal");
+
         // Verify the alias has code (delegation bytecode)
         let alias_account = StorageAccount::from_address(&alias).unwrap();
         let alias_info = alias_account.info(&mut host).unwrap();
@@ -4204,6 +4249,238 @@ mod test {
             revm::primitives::KECCAK_EMPTY,
             "AliasForwarder precompile should have code"
         );
+    }
+
+    /// Branch 2: a legacy forwarder already has the delegation code but no
+    /// Origin classification. ensure_alias stages the classification and
+    /// commits it durably without re-running init.
+    #[test]
+    fn test_alias_forwarder_branch2_classification_persists_on_commit() {
+        use crate::precompiles::constants::{
+            alias_forwarder_delegation, alias_forwarder_delegation_code_hash,
+        };
+
+        let mut host = MockKernelHost::default();
+        init_precompile_bytecodes(&mut host, true).unwrap();
+
+        let native_address = "tz1Branch2Forwarder";
+        let alias = {
+            let hash = bytes_hash(native_address.as_bytes());
+            Address::from_slice(&hash.0[0..20])
+        };
+
+        // Branch 2 precondition: delegation code present, classification empty.
+        CodeStorage::add(
+            &mut host,
+            alias_forwarder_delegation().original_byte_slice(),
+            Some(alias_forwarder_delegation_code_hash()),
+        )
+        .unwrap();
+        let mut alias_account = StorageAccount::from_address(&alias).unwrap();
+        let mut info = alias_account.info(&mut host).unwrap();
+        info.code_hash = alias_forwarder_delegation_code_hash();
+        alias_account
+            .set_info_without_code(&mut host, info)
+            .unwrap();
+        assert!(
+            alias_account.get_origin(&host).unwrap().is_none(),
+            "precondition: alias must have no classification yet"
+        );
+
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::default();
+        registry
+            .ensure_alias(
+                &mut host,
+                &mut journal,
+                AliasInfo {
+                    runtime: tezosx_interfaces::RuntimeId::Tezos,
+                    native_address: native_address.as_bytes().to_vec(),
+                },
+                None,
+                tezosx_interfaces::RuntimeId::Ethereum,
+                test_alias_creation_context(),
+                1_000_000,
+            )
+            .expect("Branch 2 ensure_alias should succeed");
+
+        // The classification is staged, not yet durable.
+        assert!(
+            StorageAccount::from_address(&alias)
+                .unwrap()
+                .get_origin(&host)
+                .unwrap()
+                .is_none(),
+            "classification must be deferred until commit"
+        );
+
+        let block_constants = BlockConstants::test_block_with_no_fees();
+        crate::journal::commit_evm_journal_from_external(
+            &mut host,
+            &registry,
+            &block_constants,
+            &mut journal,
+        )
+        .expect("flush evm journal");
+
+        match StorageAccount::from_address(&alias)
+            .unwrap()
+            .get_origin(&host)
+            .unwrap()
+        {
+            Some(tezosx_interfaces::Origin::Alias(info)) => assert_eq!(
+                info.native_address,
+                native_address.as_bytes().to_vec(),
+                "classification must record the native address"
+            ),
+            other => panic!("expected Origin::Alias after commit, got {other:?}"),
+        }
+    }
+
+    /// Cross-frame atomicity: a successful Branch 3 materialization that is
+    /// then discarded by an outer-frame revert must leave no durable alias,
+    /// even when the enclosing operation goes on to commit other work.
+    #[test]
+    fn test_alias_materialization_dropped_on_outer_frame_revert() {
+        use crate::precompiles::constants::alias_forwarder_delegation_code_hash;
+
+        let mut host = MockKernelHost::default();
+        init_precompile_bytecodes(&mut host, true).unwrap();
+
+        let native_address = "tz1OuterRevertForwarder";
+        let alias = {
+            let hash = bytes_hash(native_address.as_bytes());
+            Address::from_slice(&hash.0[0..20])
+        };
+
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::default();
+
+        // Mirror the gateway-precompile frame checkpoint: the layered_state
+        // overlay and the revm inner journal are checkpointed together.
+        journal.evm.layered_state.checkpoint();
+        let inner_cp = journal.evm.inner.checkpoint();
+
+        // Branch 3: full materialization of a fresh alias.
+        registry
+            .ensure_alias(
+                &mut host,
+                &mut journal,
+                AliasInfo {
+                    runtime: tezosx_interfaces::RuntimeId::Tezos,
+                    native_address: native_address.as_bytes().to_vec(),
+                },
+                None,
+                tezosx_interfaces::RuntimeId::Ethereum,
+                test_alias_creation_context(),
+                1_000_000,
+            )
+            .expect("Branch 3 ensure_alias should succeed");
+
+        // Staged in the overlay, nothing durable yet.
+        assert!(journal
+            .evm
+            .layered_state
+            .pending_alias_origin(&alias)
+            .is_some());
+        assert!(StorageAccount::from_address(&alias)
+            .unwrap()
+            .get_origin(&host)
+            .unwrap()
+            .is_none());
+
+        // Outer frame reverts: unwind both layers, as checkpoint_revert does.
+        journal.evm.layered_state.checkpoint_revert();
+        journal.evm.inner.checkpoint_revert(inner_cp);
+        assert!(
+            journal
+                .evm
+                .layered_state
+                .pending_alias_origin(&alias)
+                .is_none(),
+            "the staged alias must be dropped when its frame reverts"
+        );
+
+        // The enclosing operation still commits; the reverted alias must
+        // contribute nothing durable.
+        let block_constants = BlockConstants::test_block_with_no_fees();
+        crate::journal::commit_evm_journal_from_external(
+            &mut host,
+            &registry,
+            &block_constants,
+            &mut journal,
+        )
+        .expect("flush evm journal");
+
+        let alias_account = StorageAccount::from_address(&alias).unwrap();
+        assert_ne!(
+            alias_account.info(&mut host).unwrap().code_hash,
+            alias_forwarder_delegation_code_hash(),
+            "no delegation code_hash may survive an outer-frame revert"
+        );
+        assert!(
+            alias_account.get_origin(&host).unwrap().is_none(),
+            "no Origin classification may survive an outer-frame revert"
+        );
+    }
+
+    /// Round-trip resolution must read a same-operation staged alias from the
+    /// overlay before durable storage, and fall back to durable after the
+    /// staging frame reverts.
+    #[test]
+    fn test_readonly_resolve_consults_staged_alias_overlay() {
+        use crate::database::EtherlinkVMDB;
+        use crate::journal::{CrossRuntimeCall, Journal};
+        use tezosx_interfaces::{Origin, RuntimeId};
+
+        let mut host = MockKernelHost::default();
+        let source = Address::from_slice(&[0xab; 20]);
+
+        // Durable fallback classification: a distinct native address.
+        StorageAccount::from_address(&source)
+            .unwrap()
+            .set_origin(
+                &mut host,
+                &Origin::Alias(AliasInfo {
+                    runtime: RuntimeId::Tezos,
+                    native_address: b"tz1durable".to_vec(),
+                }),
+            )
+            .unwrap();
+
+        let mut tj = TezosXJournal::default();
+        tj.evm.layered_state.checkpoint();
+        tj.evm.layered_state.create_alias(
+            source,
+            Origin::Alias(AliasInfo {
+                runtime: RuntimeId::Tezos,
+                native_address: b"tz1staged".to_vec(),
+            }),
+        );
+
+        let registry = Registry::new();
+        let block = BlockConstants::test_block_with_no_fees();
+
+        // Overlay hit: resolves to the staged native, not the durable one.
+        {
+            let db = EtherlinkVMDB::new(&mut host, &registry, &block).unwrap();
+            let journal = Journal::new_with_inner(db, &mut tj);
+            let target = journal
+                .tezosx_resolve_source_alias_readonly(source, RuntimeId::Tezos, 1_000_000)
+                .unwrap();
+            assert_eq!(target, "tz1staged");
+        }
+
+        // Frame revert drops the staging; the same call falls back to durable.
+        tj.evm.layered_state.checkpoint_revert();
+        {
+            let db = EtherlinkVMDB::new(&mut host, &registry, &block).unwrap();
+            let journal = Journal::new_with_inner(db, &mut tj);
+            let target = journal
+                .tezosx_resolve_source_alias_readonly(source, RuntimeId::Tezos, 1_000_000)
+                .unwrap();
+            assert_eq!(target, "tz1durable");
+        }
     }
 
     /// Test that pre-existing balance at the alias address is forwarded to the
@@ -4321,6 +4598,17 @@ mod test {
         let alias_bytes = alias_bytes.0;
         let alias_hex = alias_bytes.strip_prefix("0x").unwrap_or(&alias_bytes);
         let alias = Address::from_slice(&hex::decode(alias_hex).unwrap());
+
+        // Materialization is staged in the journal and written to durable
+        // storage only at commit; flush it as the kernel does on a
+        // successful parent operation.
+        crate::journal::commit_evm_journal_from_external(
+            &mut host,
+            &registry,
+            &block_constants,
+            &mut journal,
+        )
+        .expect("flush evm journal");
 
         // Verify the alias has code (EIP-7702 delegation bytecode)
         let alias_account = StorageAccount::from_address(&alias).unwrap();

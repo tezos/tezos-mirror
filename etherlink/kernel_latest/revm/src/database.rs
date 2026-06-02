@@ -339,6 +339,27 @@ where
                 "DatabaseCommitPrecompileStateChanges `remove_deposit_from_queue`"
             );
         }
+        // Flush deferred alias classifications before the account commit
+        // runs, so update_account sees the existing origin and keeps it
+        // instead of overwriting with Native.
+        for (address, origin) in etherlink_data.created_aliases {
+            match StorageAccount::from_address(&address) {
+                Ok(mut storage_account) => {
+                    abort_on_error!(
+                        self,
+                        storage_account.set_origin(self.host, &origin),
+                        "DatabaseCommitPrecompileStateChanges `set_origin`"
+                    );
+                }
+                error => {
+                    abort_on_error!(
+                        self,
+                        error,
+                        "DatabaseCommitPrecompileStateChanges `StorageAccount::from_address`"
+                    )
+                }
+            }
+        }
     }
 }
 

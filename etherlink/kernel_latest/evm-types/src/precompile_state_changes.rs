@@ -6,6 +6,7 @@
 use alloy_primitives::map::{HashMap, HashSet};
 use alloy_primitives::{Address, U256};
 use michelson_types::Withdrawal;
+use tezosx_types::Origin;
 
 use crate::{FaDepositWithProxy, SequencerKeyChange};
 
@@ -19,4 +20,5 @@ pub struct PrecompileStateChanges {
     pub withdrawals: Vec<Withdrawal>,
     pub global_counter: Option<U256>,
     pub sequencer_key_change: Option<SequencerKeyChange>,
+    pub created_aliases: HashMap<Address, Origin>,
 }
