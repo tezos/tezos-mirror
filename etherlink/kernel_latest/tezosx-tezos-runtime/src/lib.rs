@@ -1055,6 +1055,16 @@ impl RuntimeInterface for TezosRuntime {
             None => {}
         }
 
+        let world_state = context.path();
+        journal
+            .michelson
+            .checkpoint(host, &world_state)
+            .map_err(|e| {
+                TezosXRuntimeError::Custom(format!(
+                    "Failed to snapshot world state for alias: {e:?}"
+                ))
+            })?;
+
         // Branch 2: a forwarder is already deployed but the
         // classification path is empty. Write the classification only
         // and skip the redeploy. The patch costs one durable write.
@@ -1568,9 +1578,23 @@ mod tests {
         }
     }
 
+    // Seed the Michelson world state so the alias snapshot has a subtree
+    // to copy, as in production where migration creates it.
+    fn test_host() -> MockKernelHost {
+        use tezos_execution::account_storage::TezosImplicitAccount;
+        let mut host = MockKernelHost::default();
+        let context =
+            TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+                .unwrap();
+        let null_pkh = PublicKeyHash::from_b58check(NULL_PKH).unwrap();
+        let account = context.implicit_from_public_key_hash(&null_pkh).unwrap();
+        account.allocate(&mut host).unwrap();
+        host
+    }
+
     #[test]
     fn ensure_alias_returns_valid_kt1_string() {
-        let mut host = MockKernelHost::default();
+        let mut host = test_host();
         let mut journal = TezosXJournal::default();
         let runtime = test_runtime();
 
@@ -1596,7 +1620,7 @@ mod tests {
 
     #[test]
     fn ensure_alias_deploys_forwarder_code() {
-        let mut host = MockKernelHost::default();
+        let mut host = test_host();
         let mut journal = TezosXJournal::default();
         let runtime = test_runtime();
         let evm_address = "0x1234567890abcdef1234567890abcdef12345678";
@@ -1634,7 +1658,7 @@ mod tests {
 
     #[test]
     fn ensure_alias_stores_evm_address_in_storage() {
-        let mut host = MockKernelHost::default();
+        let mut host = test_host();
         let mut journal = TezosXJournal::default();
         let runtime = test_runtime();
         let evm_address = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
@@ -1667,7 +1691,7 @@ mod tests {
 
     #[test]
     fn ensure_alias_sets_zero_balance() {
-        let mut host = MockKernelHost::default();
+        let mut host = test_host();
         let mut journal = TezosXJournal::default();
         let runtime = test_runtime();
         let evm_address = "0xabcdef";
@@ -1692,8 +1716,8 @@ mod tests {
 
     #[test]
     fn ensure_alias_is_deterministic() {
-        let mut host1 = MockKernelHost::default();
-        let mut host2 = MockKernelHost::default();
+        let mut host1 = test_host();
+        let mut host2 = test_host();
         let mut journal = TezosXJournal::default();
         let runtime = test_runtime();
         let evm_address = "0x1111111111111111111111111111111111111111";
@@ -1726,7 +1750,7 @@ mod tests {
 
     #[test]
     fn ensure_alias_different_addresses_produce_different_aliases() {
-        let mut host = MockKernelHost::default();
+        let mut host = test_host();
         let mut journal = TezosXJournal::default();
         let runtime = test_runtime();
 
@@ -1762,7 +1786,7 @@ mod tests {
         // input must return the same address with the gas budget
         // unchanged. The first call deploys; the second is just a
         // read of the classification path.
-        let mut host = MockKernelHost::default();
+        let mut host = test_host();
         let mut journal = TezosXJournal::default();
         let runtime = test_runtime();
         let evm_address = "0x3333333333333333333333333333333333333333";
@@ -1815,7 +1839,7 @@ mod tests {
         use crate::account::{get_origin_at, ORIGIN_PATH};
         use tezos_smart_rollup_host::path::concat;
 
-        let mut host = MockKernelHost::default();
+        let mut host = test_host();
         let mut journal = TezosXJournal::default();
         let runtime = test_runtime();
         let evm_address = "0x4444444444444444444444444444444444444444";

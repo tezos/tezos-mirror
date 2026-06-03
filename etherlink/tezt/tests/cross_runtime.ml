@@ -3268,6 +3268,73 @@ let test_crac_evm_to_tez_reverts =
   in
   unit
 
+(** A first-interaction EVM to TEZ call materializes the forwarder KT1
+ *  of the EVM sender and source in durable storage. *)
+let test_crac_evm_to_tez_materializes_alias =
+  register_crac_runner_test
+    ~title:"CRAC: EVM to TEZ materializes alias forwarders"
+    ~tags:["alias"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let contracts () =
+    Delayed_inbox.subkeys
+      TezContract.tezosx_michelson_contracts_index
+      (Delayed_inbox.Sc_rollup_node sc_rollup_node)
+  in
+  let* tez_runner = TezMultiRunCaller.originate () in
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_runner in
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge, false)] ()
+  in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  let* before = contracts () in
+  let* _ = EvmRunner.call_run evm_main in
+  let* after = contracts () in
+  let created = List.filter (fun c -> not (List.mem c before)) after in
+  (match created with
+  | [] ->
+      Test.fail
+        "Expected the successful CRAC to materialize alias forwarders, but \
+         none were created"
+  | _ -> ()) ;
+  unit
+
+(** Regression: a reverted first-interaction EVM to TEZ call must leave
+ *  no new forwarder KT1 on durable storage. *)
+let test_crac_evm_to_tez_revert_drops_alias =
+  register_crac_runner_test
+    ~title:"CRAC: EVM to TEZ revert drops alias forwarders"
+    ~tags:["revert"; "alias"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let contracts () =
+    Delayed_inbox.subkeys
+      TezContract.tezosx_michelson_contracts_index
+      (Delayed_inbox.Sc_rollup_node sc_rollup_node)
+  in
+  let* tez_reverter = TezMultiRunCaller.originate ~revert:true () in
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_reverter in
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge, false)] ()
+  in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  let* before = contracts () in
+  let* _ = EvmRunner.call_run ~expected_status:false evm_main in
+  let* after = contracts () in
+  let created = List.filter (fun c -> not (List.mem c before)) after in
+  (match created with
+  | [] -> ()
+  | _ ->
+      Test.fail
+        "Expected the reverted CRAC to leave no new forwarder KT1, but %d were \
+         persisted"
+        (List.length created)) ;
+  unit
+
 (** EVM CRAC target reverts.
  *
  *    TEZ[tez_main]
@@ -12330,6 +12397,8 @@ let () =
   test_crac_tez_5_crossing_chain [Alpha] ;
   test_crac_access_list_preserved [Alpha] ;
   test_crac_evm_to_tez_reverts [Alpha] ;
+  test_crac_evm_to_tez_materializes_alias [Alpha] ;
+  test_crac_evm_to_tez_revert_drops_alias [Alpha] ;
   test_crac_tez_to_evm_reverts [Alpha] ;
   test_crac_tez_to_evm_fake_tx_in_block [Alpha] ;
   test_crac_tez_to_evm_fake_tx_unique_hash_across_blocks [Alpha] ;
