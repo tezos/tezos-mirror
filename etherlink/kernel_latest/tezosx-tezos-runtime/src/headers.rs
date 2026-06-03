@@ -13,7 +13,6 @@ pub use tezosx_interfaces::{
     X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
 };
 
-use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
 use tezos_data_encoding::types::Narith;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::Timestamp;
@@ -41,9 +40,11 @@ pub struct MichelsonHeaders {
     /// is reachable when an implicit account calls the gateway directly
     /// and through the EVM gateway's same-runtime round-trip (cf. !21963).
     pub sender: Contract,
-    /// CRAC origin KT1 contract address parsed from `X-Tezos-Source`.
-    /// Used for CRAC receipt construction (alias of E_0).
-    pub crac_origin_contract: Option<ContractKt1Hash>,
+    /// CRAC origin contract address parsed from `X-Tezos-Source`.
+    /// May be an implicit `tz1`/`tz2`/`tz3` (native Michelson origin) or an
+    /// originated `KT1` (EVM alias origin). Used for CRAC receipt construction.
+    /// `None` only when the header is absent or unparseable (non-CRAC request).
+    pub crac_origin_contract: Option<Contract>,
     /// Propagated CRAC-ID string from an incoming cross-runtime call.
     /// Kept as a raw string; verified by `journal.verify_crac_id()`.
     /// `None` if the header is absent (non-CRAC request).
@@ -61,14 +62,17 @@ pub struct MichelsonHeaders {
 pub fn parse_request_headers(
     headers: &http::HeaderMap,
 ) -> Result<MichelsonHeaders, TezosXRuntimeError> {
-    // Parse X-Tezos-Source as a KT1 if present (for CRAC receipt construction).
-    // The EVM gateway sends the source alias as a KT1 string. If the value
-    // is a tz1/tz2/tz3 (non-CRAC case), the KT1 parse will fail and we
-    // set crac_origin_contract to None.
+    // Parse X-Tezos-Source as a general Tezos Contract if present (for CRAC
+    // receipt construction). The value is a base58check-encoded address: a
+    // `KT1` (EVM alias origin) or a `tz1`/`tz2`/`tz3` (native implicit
+    // origin, e.g. a Michelson-originated chain re-entering Michelson via
+    // EVM). Both forms participate in CRAC receipt folding. The header is
+    // absent for genuine non-CRAC (direct Tezos L1) requests; absent or
+    // unparseable → `None` → `is_crac = false`.
     let source_str = parse_str(headers, X_TEZOS_SOURCE)?;
     let crac_origin_contract = source_str
         .as_deref()
-        .and_then(|s| ContractKt1Hash::from_b58check(s).ok());
+        .and_then(|s| Contract::from_b58check(s).ok());
 
     let crac_id = parse_str(headers, X_TEZOS_CRAC_ID)?;
     let crac_depth = parse_u32_default(headers, X_TEZOS_CRAC_DEPTH, 0)?;
@@ -142,25 +146,32 @@ mod tests {
     }
 
     #[test]
-    fn source_optional_tz1() {
-        // tz1 source (non-CRAC): source_contract and crac_id should be None
+    fn source_tz1_sets_crac_origin() {
+        // tz1 source (native implicit origin, e.g. re-entrant Michelson leg):
+        // crac_origin_contract is now Some(Implicit(…)) so `is_crac` will be
+        // true and the re-entrant receipt can be recorded.
         let mut hdrs = required_headers();
         hdrs.push((X_TEZOS_SOURCE, TZ1));
         let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
-        assert!(parsed.crac_origin_contract.is_none());
+        assert_eq!(
+            parsed.crac_origin_contract,
+            Some(Contract::from_b58check(TZ1).unwrap()),
+            "tz1 source must set crac_origin_contract to Some(Implicit(…))"
+        );
         assert!(parsed.crac_id.is_none());
     }
 
     #[test]
     fn source_kt1_with_crac_id() {
-        // KT1 source (CRAC): crac_origin_contract and crac_id should be set
+        // KT1 source (EVM alias origin, CRAC): crac_origin_contract and crac_id
+        // should be set. Behavior is unchanged from before the fix.
         let mut hdrs: Vec<(&str, &str)> = required_headers();
         hdrs.push((X_TEZOS_SOURCE, KT1));
         hdrs.push((X_TEZOS_CRAC_ID, "0-5"));
         let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
         assert_eq!(
             parsed.crac_origin_contract,
-            Some(ContractKt1Hash::from_b58check(KT1).unwrap())
+            Some(Contract::from_b58check(KT1).unwrap())
         );
         assert_eq!(parsed.crac_id, Some("0-5".to_string()));
     }

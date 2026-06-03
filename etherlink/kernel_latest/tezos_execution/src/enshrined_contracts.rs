@@ -20,6 +20,7 @@ use sha3::{Digest, Keccak256};
 use std::collections::HashMap;
 use std::rc::Rc;
 use tezos_crypto_rs::hash::ContractKt1Hash;
+use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::block::AppliedOperation;
 use tezos_tezlink::operation_result::{InternalOperationSum, TransferError};
@@ -809,7 +810,8 @@ where
     // instead of collapsing onto this runtime's null source (L2-1363).
     // Mirrors the EVM side's `origin = hdrs.source.unwrap_or(hdrs.sender)`.
     let source = match ctx.crac_origin() {
-        Some(origin_alias) => AddressHash::Kt1(origin_alias),
+        Some(Contract::Originated(kt1)) => AddressHash::Kt1(kt1),
+        Some(Contract::Implicit(pkh)) => AddressHash::Implicit(pkh),
         None => AddressHash::from(ctx.source()),
     };
     let amount_mutez: u64 = ctx
@@ -2055,7 +2057,7 @@ mod tests {
 
         // Immediate caller (sender), distinct from the originator.
         let sender = AddressHash::Kt1(ContractKt1Hash::from([0xAA; 20]));
-        // Originator alias carried on the inbound CRAC (`alias(E_0)`).
+        // Originator alias carried on the inbound CRAC (`alias(E_0)`): a KT1.
         let crac_origin_kt1 = ContractKt1Hash::from([0x42; 20]);
 
         let mut journal = TezosXJournal::new(
@@ -2064,7 +2066,9 @@ mod tests {
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, sender, 0);
-        ctx.crac_origin = Some(crac_origin_kt1.clone());
+        ctx.crac_origin = Some(tezos_protocol::contract::Contract::Originated(
+            crac_origin_kt1.clone(),
+        ));
 
         let dest = "0x1234567890123456789012345678901234567890";
         dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap()).unwrap();
