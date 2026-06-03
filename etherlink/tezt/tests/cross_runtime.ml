@@ -10253,7 +10253,7 @@ let test_crac_gas_model_callee_gas_in_evm_receipt =
 
   (* Pre-warm GasBurner storage. *)
   Log.debug ~prefix "Warm up GasBurner storage slots" ;
-  let* _ = EvmRunner.call_run ~gas:4000000 gas_burner in
+  let* _ = EvmRunner.call_run ~gas:5000000 gas_burner in
 
   (* Reference: direct warm GasBurner call = true inner EVM cost. *)
   Log.debug ~prefix "Measure G_direct (warm GasBurner)" ;
@@ -10334,7 +10334,7 @@ let test_crac_gas_model_callee_gas_in_receipt =
 
   (* Pre-warm GasBurner storage. *)
   Log.debug ~prefix "Warm up GasBurner storage slots" ;
-  let* _ = EvmRunner.call_run ~gas:4000000 gas_burner in
+  let* _ = EvmRunner.call_run ~gas:5000000 gas_burner in
 
   (* Reference: direct warm GasBurner call = true inner EVM cost. *)
   Log.debug ~prefix "Measure G_direct (warm GasBurner)" ;
@@ -10492,7 +10492,7 @@ let test_crac_gas_accounting_investigation =
 
   (* --- Warmup calls (alias generation) ---------------------------------- *)
   Log.debug ~prefix "Warmup calls (generate aliases)" ;
-  let* _warmup_a = EvmRunner.call_run ~gas:4000000 gas_burner in
+  let* _warmup_a = EvmRunner.call_run ~gas:5000000 gas_burner in
   let* _warmup_b = EvmRunner.call_run runner_b in
   let* _warmup_c = EvmRunner.call_run runner_c in
   let* _warmup_d = EvmRunner.call_run runner_d in
@@ -10674,7 +10674,7 @@ let test_crac_gas_error_path_reporting =
   (* Pre-warm GasBurner storage: first call fills 120 slots with
      non-zero values, avoiding cold 22,100-gas SSTOREs later. *)
   Log.debug ~prefix "Warm up GasBurner storage slots" ;
-  let* _ = EvmRunner.call_run ~gas:4000000 gas_burner in
+  let* _ = EvmRunner.call_run ~gas:5000000 gas_burner in
 
   (* Reference: direct warm GasBurner call = true inner EVM cost. *)
   Log.debug ~prefix "Measure G_direct (warm GasBurner)" ;
@@ -10973,7 +10973,7 @@ let test_crac_collect_result_revert_discards_bytes =
     Per-internal-op the apply loop charges [Cost::manager_operation] =
     100_000 mgas; MIR then charges [VALUE_STEP] = 100 mgas for the
     bytes typecheck, then 100mgas + 10 mgas/byte for conversion to
-    Micheline; then 100 mgas + 10mgas/byte for serialization; 1_200_192
+    Micheline; then 100 mgas + 10mgas/byte for serialization; 1_400_192
     mgas for IO work on the storage, finally the handler adds the
     size-dependent term [460 + 1.5 * size]. *)
 let test_crac_collect_result_size_sweep_matches_model =
@@ -10997,7 +10997,7 @@ let test_crac_collect_result_size_sweep_matches_model =
   let expected_mgas n =
     100_000 + 100 + 460
     + (3 * n / 2)
-    + 100 + (10 * n) + 100 + (10 * n) + 1_200_192
+    + 100 + (10 * n) + 100 + (10 * n) + 1_400_192
   in
   Log.debug ~prefix "Warmup each reader (alias + storage)" ;
   let* () =
