@@ -732,9 +732,21 @@ where
             let code = dest_account
                 .code(tc_ctx.host)
                 .map_err(|_| TransferError::FailedToFetchContractCode)?;
+            let (code_read_count, code_size) = match &code {
+                Code::Code(code_bytes) => (1, code_bytes.len() as u64),
+                Code::Enshrined(_) => (0, 0),
+            };
+            consume_storage_read_milligas(
+                tc_ctx.operation_gas,
+                code_read_count,
+                code_size,
+            )
+            .map_err(TransferError::OutOfGas)?;
             let storage = dest_account
                 .storage(tc_ctx.host)
                 .map_err(|_| TransferError::FailedToFetchContractStorage)?;
+            consume_storage_read_milligas(tc_ctx.operation_gas, 1, storage.len() as u64)
+                .map_err(TransferError::OutOfGas)?;
             let exec_ctx =
                 ExecCtx::create(tc_ctx.host, sender_account, &dest_account, amount)?;
 
