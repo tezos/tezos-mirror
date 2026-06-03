@@ -3391,7 +3391,7 @@ mod test {
         //! selector is overkill; we test two selectors (one mutating,
         //! one view) to confirm the guard fires before dispatch.
 
-        use alloy_sol_types::{sol, SolCall, SolInterface};
+        use alloy_sol_types::{sol, SolCall, SolEvent, SolInterface};
         use revm::{
             context::{
                 result::{ExecutionResult, Output},
@@ -3407,9 +3407,12 @@ mod test {
         use crate::{
             precompiles::{
                 constants::RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
-                runtime_gateway::RuntimeGateway::{
-                    callCall, callMichelsonCall, callMichelsonViewCall, transferCall,
-                    RuntimeGatewayCalls,
+                runtime_gateway::{
+                    CracSent,
+                    RuntimeGateway::{
+                        callCall, callMichelsonCall, callMichelsonViewCall, transferCall,
+                        RuntimeGatewayCalls,
+                    },
                 },
             },
             run_transaction,
@@ -3968,6 +3971,94 @@ mod test {
             assert!(
                 view_slope > 0,
                 "payload slope must be strictly positive, got {view_slope}"
+            );
+        }
+
+        // --- CracSent.targetAddress normalization (L2-1456) ------------------
+
+        /// Decode the single `CracSent` event emitted by the gateway
+        /// precompile in `outcome` and return its `targetAddress`.
+        fn cracsent_target_address(outcome: &ExecutionOutcome) -> String {
+            let log = outcome
+                .result
+                .logs()
+                .iter()
+                .find(|l| l.address == RUNTIME_GATEWAY_PRECOMPILE_ADDRESS)
+                .expect("expected a CracSent log from the gateway precompile");
+            CracSent::decode_log_data(&log.data)
+                .expect("gateway log must decode as CracSent")
+                .targetAddress
+        }
+
+        /// `CracSent.targetAddress` must identify the *contract*, not the
+        /// contract+entrypoint, and must be identical across the typed
+        /// `callMichelson` and the generic `call(POST)` surfaces for the
+        /// same target. Before the L2-1456 fix the generic POST reported
+        /// the full URL path (`KT1abc/foo`) while the typed entry reported
+        /// the bare `KT1abc`, splitting one contract into two indexer
+        /// identities depending on the ABI surface.
+        #[test]
+        fn cracsent_target_address_is_contract_only_across_surfaces() {
+            const DESTINATION: &str = "KT1abc";
+            const ENTRYPOINT: &str = "foo";
+
+            // Typed surface: callMichelson(destination, entrypoint, params).
+            let mut host = MockKernelHost::default();
+            let caller = Address::from([1u8; 20]);
+            fund_caller(&mut host, caller);
+            let typed = call_into(
+                &mut host,
+                caller,
+                RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                RuntimeGatewayCalls::callMichelson(callMichelsonCall {
+                    destination: DESTINATION.to_string(),
+                    entrypoint: ENTRYPOINT.to_string(),
+                    parameters: vec![].into(),
+                })
+                .abi_encode()
+                .into(),
+            );
+            assert!(
+                typed.result.is_success(),
+                "typed callMichelson failed: {:?}",
+                typed.result
+            );
+            let typed_target = cracsent_target_address(&typed);
+
+            // Generic surface: call(POST) to the same contract+entrypoint.
+            let mut host = MockKernelHost::default();
+            fund_caller(&mut host, caller);
+            let generic = call_into(
+                &mut host,
+                caller,
+                RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                RuntimeGatewayCalls::call(callCall {
+                    url: format!("http://tezos/{DESTINATION}/{ENTRYPOINT}"),
+                    headers: vec![],
+                    body: vec![].into(),
+                    method: 1, // POST
+                })
+                .abi_encode()
+                .into(),
+            );
+            assert!(
+                generic.result.is_success(),
+                "generic call(POST) failed: {:?}",
+                generic.result
+            );
+            let generic_target = cracsent_target_address(&generic);
+
+            assert_eq!(
+                typed_target, DESTINATION,
+                "typed surface must report the bare contract address"
+            );
+            assert_eq!(
+                generic_target, DESTINATION,
+                "generic POST must strip the entrypoint from targetAddress"
+            );
+            assert_eq!(
+                typed_target, generic_target,
+                "targetAddress must not depend on the ABI surface"
             );
         }
     }
