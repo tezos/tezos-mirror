@@ -8,6 +8,8 @@ use tezos_data_encoding::enc::BinError;
 use tezos_data_encoding::nom::error::DecodeError;
 use tezos_smart_rollup_host::path::PathError;
 use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_smart_rollup_host::Error as HostError;
+use tezos_smart_rollup_keyspace::KeySpaceWriteError;
 use thiserror::Error;
 
 #[derive(Error, Debug, Eq, PartialEq)]
@@ -70,5 +72,22 @@ impl From<BinError> for Error {
     fn from(value: BinError) -> Self {
         let msg = format!("{value}");
         Self::BinWriteError(msg)
+    }
+}
+
+// KeySpace write failures are surfaced through the existing `Runtime`
+// representation so the KeySpace-based helpers stay error-compatible with the
+// StorageV1-based ones: the irmin-backed KeySpace produces these from the very
+// same host errors.
+impl From<KeySpaceWriteError> for Error {
+    fn from(value: KeySpaceWriteError) -> Self {
+        match value {
+            KeySpaceWriteError::ValueSizeExceeded => {
+                Self::Runtime(RuntimeError::HostErr(HostError::StoreValueSizeExceeded))
+            }
+            KeySpaceWriteError::InvalidOffset => {
+                Self::Runtime(RuntimeError::HostErr(HostError::StoreInvalidAccess))
+            }
+        }
     }
 }
