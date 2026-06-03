@@ -5073,6 +5073,17 @@ let deep_if_depth = 1300
 
 let deep_or_depth = 8100
 
+(* Smaller depth used by [test_deep_type_in_invalid_arg_error]. The deep
+   parameter type is decoded once at typecheck_value time (the
+   non-recursive walk handles 8100), then rejected and embedded in a
+   [TcError] whose error-body formatter walks the type via the (formerly)
+   recursive [Type] [Debug]. ~2500 layers of [pair int (pair int ...)]
+   suffice to overflow the kernel's ~1 MiB WASM stack along that
+   [Debug] path: per-frame growth on the [Debug] walk is roughly twice
+   that of the [decode] walk, so the safe depth is correspondingly
+   smaller than [deep_pair_depth]. *)
+let deep_pair_invalid_arg_error_depth = 2500
+
 let test_deep_pair_param =
   register_tezosx_test
     ~title:"Deep nested pair parameter type is accepted"
@@ -5250,11 +5261,10 @@ let test_deep_type_in_invalid_arg_error =
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
   let endpoint = tezlink_endpoint_from_evm_node sequencer in
-  let depth = 2500 in
   let path =
     write_temp_michelson
       ~name:"deep_pair_param_wrong_arg"
-      ~contents:(nested_pair_param_script depth)
+      ~contents:(nested_pair_param_script deep_pair_invalid_arg_error_depth)
   in
   let* _alias =
     Client.originate_contract
