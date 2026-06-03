@@ -737,6 +737,38 @@ mod test {
             }
             assert!(matches!(node, Micheline::Seq([])));
         }
+
+        /// L2-1413 / TZX-42 regression: a deeply nested `Some` chain (App
+        /// nodes with a single argument) overflowed the old recursive decoder
+        /// and crashed the kernel (sequencer DoS via `callMichelson`); the
+        /// worklist driver must decode it iteratively. Binary per `Some` layer
+        /// is `0x05 0x09` = App(Some, [1 arg]); innermost `0x03 0x0b` =
+        /// App(Unit, []), so the full payload is `0509`*DEPTH ++ `030b`.
+        #[test]
+        fn deeply_nested_some_decodes_without_overflow() {
+            const DEPTH: usize = 100_000;
+            let mut bytes: Vec<u8> = Vec::with_capacity(DEPTH * 2 + 2);
+            for _ in 0..DEPTH {
+                bytes.push(0x05);
+                bytes.push(0x09);
+            }
+            bytes.push(0x03);
+            bytes.push(0x0b);
+
+            let arena: Arena<Micheline<'_>> = Arena::new();
+            let result = Micheline::decode_raw(&arena, &bytes, &mut crate::gas::Gas::default())
+                .expect("gas suffices")
+                .expect("deep Some decodes");
+            // peel off DEPTH `Some` layers
+            let mut node = &result;
+            for _ in 0..DEPTH {
+                match node {
+                    Micheline::App(_, [only], _) => node = only,
+                    _ => panic!("expected deeply nested Some App at this level"),
+                }
+            }
+            assert!(matches!(node, Micheline::App(_, [], _))); // innermost Unit
+        }
     }
 
     mod annotations {
