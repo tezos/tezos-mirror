@@ -108,6 +108,8 @@ let conf_libev = opam_only "conf-libev" V.True
 
 let conf_rust = opam_only "conf-rust" V.True
 
+let conf_zstd = opam_only "conf-zstd" V.(at_least "1.3.8")
+
 let crunch = opam_only "crunch" V.(at_least "3.3.0")
 
 let ctypes = external_lib "ctypes" V.(at_least "0.18.0")
@@ -298,9 +300,11 @@ let seqes = external_lib "seqes" V.(at_least "0.2")
 
 let sexplib = external_lib "sexplib" V.True
 
-(* WARNING: SQLite extension in etherlink/bin_node/lib_dev/sqlite_receipt_bloom
-   re-export some types of the ocaml sqlite3 interface which is not guaranteed
-   to be stable. Verify compatibility before updating sqlite3 dependency. *)
+(* WARNING: SQLite extensions in [etherlink/bin_node/lib_dev/sqlite_receipt_bloom]
+   and [src/lib_sqlite_zstd] re-export / depend on the C-level [db_wrap] layout
+   of the ocaml sqlite3 binding, which is not guaranteed to be stable. Verify
+   compatibility (in particular [src/lib_sqlite_zstd/sqlite3_ocaml_stubs.h])
+   before updating the sqlite3 dependency. *)
 let sqlite3 = external_lib "sqlite3" V.(exactly "5.3.1")
 
 let stdint = external_lib "stdint" V.True

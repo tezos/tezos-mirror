@@ -5655,6 +5655,75 @@ let octez_sqlite =
     ~linkall:true
     ~conflicts:[Conflicts.checkseum]
 
+let octez_sqlite_zstd =
+  octez_l2_lib
+    "sqlite_zstd"
+    ~path:"src/lib_sqlite_zstd"
+    ~synopsis:
+      "SQLite static extension exposing zstd_compress / zstd_decompress scalar \
+       functions"
+    ~deps:[sqlite3; conf_zstd]
+    ~c_library_flags:["-lzstd"]
+    ~foreign_stubs:
+      {
+        language = C;
+        flags =
+          [
+            S "-Wall";
+            S "-Wextra";
+            S ":standard";
+            [S ":include"; S "c_flags_zstd.sexp"];
+          ];
+        include_dirs = [];
+        names = ["zstd"; "zstd_stub"];
+      }
+    ~c_library_flags_include:"c_libs_zstd.sexp"
+    ~dune:
+      Dune.
+        [
+          [
+            S "rule";
+            [S "targets"; S "c_flags_zstd.sexp"; S "c_libs_zstd.sexp"];
+            [
+              S "action";
+              [
+                S "progn";
+                [
+                  S "with-stdout-to";
+                  S "c_flags_zstd.sexp";
+                  [
+                    S "system";
+                    S "echo \"($(pkg-config --cflags libzstd 2>/dev/null))\"";
+                  ];
+                ];
+                [
+                  S "with-stdout-to";
+                  S "c_libs_zstd.sexp";
+                  [
+                    S "system";
+                    S
+                      "echo \"($(pkg-config --libs-only-L libzstd \
+                       2>/dev/null))\"";
+                  ];
+                ];
+              ];
+            ];
+          ];
+        ]
+
+let _octez_sqlite_zstd_tests =
+  tezt
+    ~path:"src/lib_sqlite_zstd/test"
+    ~opam:"octez-l2-libs"
+    ~with_macos_security_framework:true
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        tezt_lib |> open_ |> open_ ~m:"Base";
+        octez_sqlite_zstd;
+      ]
+    ["test_sqlite_zstd"]
+
 let _gen_migrations =
   public_exe
     "gen-migrations"

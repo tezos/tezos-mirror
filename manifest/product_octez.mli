@@ -57,6 +57,8 @@ val octez_openapi : Manifest.target
 
 val octez_sqlite : Manifest.target
 
+val octez_sqlite_zstd : Manifest.target
+
 val octez_connpool : Manifest.target
 
 val octez_rpc_http_client_unix : Manifest.target

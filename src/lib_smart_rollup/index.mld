@@ -8,6 +8,7 @@ It contains the following libraries:
 - {{!module-Octez_smart_rollup_wasm_benchmark_lib}Octez_smart_rollup_wasm_benchmark_lib}: Smart Rollup WASM benchmark library
 - {{!module-Octez_sqlite}Octez_sqlite}: SQLite wrappers and helpers
 - {{!module-Rollup_node_sqlite_migrations}Rollup_node_sqlite_migrations}: SQL migrations for the Rollup node store
+- {{!module-Sqlite_zstd}Sqlite_zstd}: SQLite static extension exposing zstd_compress / zstd_decompress scalar functions
 - {{!module-Tezos_layer2_irmin_context}Tezos_layer2_irmin_context}: Irmin context for the smart rollup PVMs
 - {{!module-Tezos_layer2_riscv_context}Tezos_layer2_riscv_context}: RiscV implementation of the context for Layer2
 - {{!module-Tezos_layer2_shell}Tezos_layer2_shell}

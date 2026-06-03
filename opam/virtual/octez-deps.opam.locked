@@ -73,6 +73,7 @@ depends: [
   "conf-sqlite3" {= "1"}
   "conf-which" {= "1"}
   "conf-zlib" {= "1"}
+  "conf-zstd" {= "1.3.8"}
   "cppo" {= "1.8.0"}
   "crowbar" {= "0.2.1"}
   "crunch" {= "4.0.0"}
