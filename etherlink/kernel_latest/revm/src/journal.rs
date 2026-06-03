@@ -318,32 +318,26 @@ impl<'a, Host: StorageV1, R: Registry> JournalTr for Journal<'a, Host, R> {
 
     #[inline]
     fn checkpoint(&mut self) -> JournalCheckpoint {
-        self.journal.michelson.push_external_checkpoint();
-        self.journal.evm.layered_state.checkpoint();
+        self.journal.global_checkpoint();
         self.journal.evm.inner.checkpoint()
     }
 
     #[inline]
     fn checkpoint_commit(&mut self) {
-        self.journal.evm.layered_state.checkpoint_commit();
         self.journal.evm.inner.checkpoint_commit();
-        if let Err(e) = self.journal.michelson.commit_frame(self.database.host) {
+        if let Err(e) = self.journal.global_commit(self.database.host) {
             self.deferred_error.get_or_insert(e);
         }
     }
 
     #[inline]
     fn checkpoint_revert(&mut self, checkpoint: JournalCheckpoint) {
-        self.journal.evm.layered_state.checkpoint_revert();
         self.journal.evm.inner.checkpoint_revert(checkpoint);
-        // The Michelson journal recovers each snapshot's revert target
-        // from the snapshot itself, so no path is supplied here. CRACs
-        // may snapshot subtrees other than `/evm/world_state` (e.g.
-        // `/tez/tez_accounts` for the Michelson), and hard-coding
-        // `/evm/world_state` here would store_move a Tezlink snapshot onto
-        // the EVM world state and wipe out kernel-managed paths like
-        // `/evm/world_state/fees/da_fee_per_byte`.
-        if let Err(e) = self.journal.michelson.revert_frame(self.database.host) {
+        // `global_revert` rolls back every runtime's durable overlay. The
+        // Michelson side recovers each snapshot's revert target from the
+        // snapshot itself (see `MichelsonJournal`), so no path is supplied
+        // — CRACs may snapshot subtrees other than `/evm/world_state`.
+        if let Err(e) = self.journal.global_revert(self.database.host) {
             self.deferred_error.get_or_insert(e);
         }
     }
@@ -370,18 +364,16 @@ impl<'a, Host: StorageV1, R: Registry> JournalTr for Journal<'a, Host, R> {
             .inner
             .create_account_checkpoint(caller, address, balance, spec_id)?;
         // A CREATE frame is closed by revm's `return_create` through
-        // `checkpoint_commit` / `checkpoint_revert`, both of which pop the
-        // Michelson external checkpoint and the layered-state checkpoint.
-        // The plain `checkpoint` path (CALL frames) pushes them on open; this
-        // path must do the same so the frame stack stays balanced. Otherwise a
-        // committed CRAC's world-state snapshot is dropped at the sub-call
-        // commit and the enclosing CREATE revert cannot restore it — e.g. an
-        // alias forwarder materialized by a CRAC inside a constructor survives
-        // the constructor's revert. Pushed only after the inner checkpoint
-        // succeeds, so a failed account creation (which does not enter the
-        // frame) leaves the stack untouched.
-        self.journal.michelson.push_external_checkpoint();
-        self.journal.evm.layered_state.checkpoint();
+        // `checkpoint_commit` / `checkpoint_revert`, i.e. `global_commit` /
+        // `global_revert`. Open the matching global checkpoint here so the
+        // frame stack stays balanced (the `checkpoint` path does the same for
+        // CALL frames); otherwise a committed CRAC's world-state snapshot is
+        // dropped at the sub-call commit and the enclosing CREATE revert
+        // cannot restore it — e.g. an alias forwarder materialized by a CRAC
+        // inside a constructor survives the constructor's revert. Done only
+        // after the inner checkpoint succeeds, so a failed account creation
+        // (which never enters the frame) leaves the stack untouched.
+        self.journal.global_checkpoint();
         Ok(checkpoint)
     }
 
