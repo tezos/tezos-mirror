@@ -835,6 +835,18 @@ module type COMPONENT_API = sig
     ?legacy_jobs:Tezos_ci.tezos_job list ->
     (trigger * job) list ->
     unit
+
+  val register_dedicated_prerelease_pipeline :
+    ?tag_rex:string ->
+    ?legacy_jobs:Tezos_ci.tezos_job list ->
+    (trigger * job) list ->
+    unit
+
+  val register_dedicated_test_prerelease_pipeline :
+    ?tag_rex:string ->
+    ?legacy_jobs:Tezos_ci.tezos_job list ->
+    (trigger * job) list ->
+    unit
 end
 
 type global_pipeline =
@@ -1384,6 +1396,32 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     register_pipeline
       "test_release"
       ~description:(sf "Release %s (test)." component_name)
+      ~jobs:(legacy_jobs @ convert_jobs ~with_condition:false jobs)
+      Tezos_ci.Rules.(
+        Gitlab_ci.If.(
+          not_on_tezos_namespace && push && has_tag_match release_tag_rex))
+
+  let register_dedicated_prerelease_pipeline ?tag_rex ?(legacy_jobs = []) =
+    only_once "register_dedicated_prerelease_pipeline" @@ fun jobs ->
+    component_must_not_be_shared "register_dedicated_prerelease_pipeline"
+    @@ fun component_name ->
+    let release_tag_rex = get_release_tag_rex component_name tag_rex in
+    register_pipeline
+      "prerelease"
+      ~description:(sf "Prerelease %s." component_name)
+      ~jobs:(legacy_jobs @ convert_jobs ~with_condition:false jobs)
+      Tezos_ci.Rules.(
+        Gitlab_ci.If.(
+          on_tezos_namespace && push && has_tag_match release_tag_rex))
+
+  let register_dedicated_test_prerelease_pipeline ?tag_rex ?(legacy_jobs = []) =
+    only_once "register_dedicated_test_prerelease_pipeline" @@ fun jobs ->
+    component_must_not_be_shared "register_dedicated_test_prerelease_pipeline"
+    @@ fun component_name ->
+    let release_tag_rex = get_release_tag_rex component_name tag_rex in
+    register_pipeline
+      "test_prerelease"
+      ~description:(sf "Prerelease %s (test)." component_name)
       ~jobs:(legacy_jobs @ convert_jobs ~with_condition:false jobs)
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
