@@ -105,7 +105,8 @@ module Operation_metadata = struct
 
   let hard_gas_limit_per_operation =
     Gas.Arith.integral_to_z
-      Tezlink_constants.all_constants.parametric.hard_gas_limit_per_operation
+      (Tezlink_constants.all_constants ()).parametric
+        .hard_gas_limit_per_operation
 
   (** A safe value of gas to return after simulation: almost the hard cap, with
       a little of room because client add a little extra to be safe *)

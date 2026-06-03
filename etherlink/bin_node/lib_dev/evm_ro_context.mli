@@ -16,6 +16,7 @@ type t = {
   finalized_view : bool;
   execution_pool : Lwt_domain.pool;
   trace_host_funs : bool;
+  michelson_hard_gas_limit_per_block : int option;
 }
 
 (** [load configuration] creates a new read-only handler on the
@@ -31,6 +32,7 @@ val load :
   pool:Lwt_domain.pool ->
   ?network:Configuration.supported_network ->
   ?smart_rollup_address:Address.t ->
+  ?michelson_hard_gas_limit_per_block:int ->
   Configuration.t ->
   t tzresult Lwt.t
 

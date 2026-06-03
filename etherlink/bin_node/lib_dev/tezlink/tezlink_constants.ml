@@ -9,7 +9,15 @@ open Tezlink_imports
 
 type t = Imported_context.Constants.t
 
-let parametric_repr : Imported_protocol.Constants_parametric_repr.t =
+(* L1-aligned default per-block Michelson gas cap, kept equal to
+   [hard_gas_limit_per_operation] (also 3M) so the validation invariant
+   exercised by [michelson_runtime.ml] "Test michelson runtime validation of
+   block gas limit" holds. Sandbox callers can override via the optional
+   [?hard_gas_limit_per_block] argument; production paths leave it at None
+   and observe the default. *)
+let default_hard_gas_limit_per_block = 3_000_000
+
+let base_parametric_repr : Imported_protocol.Constants_parametric_repr.t =
   match
     Tezos_types.convert_using_serialization
       ~name:"parametric_constants"
@@ -20,9 +28,15 @@ let parametric_repr : Imported_protocol.Constants_parametric_repr.t =
   | Ok param -> param
   | Error _ -> assert false
 
-let parametric_repr =
+let parametric_repr ?hard_gas_limit_per_block () :
+    Imported_protocol.Constants_parametric_repr.t =
+  let hard_gas_limit_per_block =
+    Option.value
+      hard_gas_limit_per_block
+      ~default:default_hard_gas_limit_per_block
+  in
   {
-    parametric_repr with
+    base_parametric_repr with
     (* This is a small patch to trick tzkt into indexing asap. We can't do
        less than 1sec though, as [Period_repr] is in seconds. *)
     minimal_block_delay = Imported_protocol.Period_repr.one_second;
@@ -36,29 +50,23 @@ let parametric_repr =
        ~10.4M gas left. *)
     hard_gas_limit_per_operation =
       Imported_protocol.Gas_limit_repr.Arith.integral_of_int_exn 3_000_000;
-    (* Kept equal to [hard_gas_limit_per_operation] for now even though
-       there is no architectural reason for the per-block cap to track
-       the per-op cap once the per-op cap has been decoupled from L1
-       mainnet. Making it effectively unbounded would silence the
-       prevalidation batch-sum check at [tezlink_prevalidation.ml] and
-       drop the assertion exercised by [michelson_runtime.ml] "Test
-       michelson runtime validation of block gas limit", which is built
-       on [per_block == per_op]. To be revisited together with that test
-       in a follow-up. *)
     hard_gas_limit_per_block =
-      Imported_protocol.Gas_limit_repr.Arith.integral_of_int_exn 3_000_000;
+      Imported_protocol.Gas_limit_repr.Arith.integral_of_int_exn
+        hard_gas_limit_per_block;
   }
 
-let all_constants_repr : Imported_protocol.Constants_repr.t =
-  Imported_protocol.Constants_repr.all_of_parametric parametric_repr
+let all_constants_repr ?hard_gas_limit_per_block () :
+    Imported_protocol.Constants_repr.t =
+  Imported_protocol.Constants_repr.all_of_parametric
+    (parametric_repr ?hard_gas_limit_per_block ())
 
-let all_constants : Imported_context.Constants.t =
+let all_constants ?hard_gas_limit_per_block () : Imported_context.Constants.t =
   match
     Tezos_types.convert_using_serialization
       ~name:"all_constants"
       ~dst:Imported_context.Constants.encoding
       ~src:Imported_protocol.Constants_repr.encoding
-      all_constants_repr
+      (all_constants_repr ?hard_gas_limit_per_block ())
   with
   | Ok param -> param
   | Error _ -> assert false

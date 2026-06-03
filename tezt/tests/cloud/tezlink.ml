@@ -781,7 +781,13 @@ let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
     }
   in
   let mode =
-    Evm_node.Tezlink_sandbox {sequencer_config; funded_addresses = []; verbose}
+    Evm_node.Tezlink_sandbox
+      {
+        sequencer_config;
+        funded_addresses = [];
+        verbose;
+        michelson_hard_gas_limit_per_block = None;
+      }
   in
   let () = toplog "Launching the sandbox L2 node" in
   let rpc_port = proxy_internal_port sequencer_proxy in

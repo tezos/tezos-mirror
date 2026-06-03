@@ -212,6 +212,10 @@ type batch_validation_context = {
   fee_sum : Tez.t;
   gas_limit_sum : Z.t;
   signature_check_cost : Gas.cost;
+  constants : Tezlink_constants.t;
+      (* Michelson runtime constants, resolved once when the context is
+         built (honoring the sandbox-only [hard_gas_limit_per_block]
+         override). *)
 }
 
 let is_tz4 pkh =
@@ -301,13 +305,13 @@ let validate_counter ~ctxt counter =
            construction. *)
         failwith "unreachable"
 
-let hard_gas_limit_per_operation =
+let hard_gas_limit_per_operation (constants : Tezlink_constants.t) =
   Tezos_types.Operation.gas_limit_to_z
-    Tezlink_constants.all_constants.parametric.hard_gas_limit_per_operation
+    constants.parametric.hard_gas_limit_per_operation
 
-let hard_gas_limit_per_block =
+let hard_gas_limit_per_block (constants : Tezlink_constants.t) =
   Tezos_types.Operation.gas_limit_to_z
-    Tezlink_constants.all_constants.parametric.hard_gas_limit_per_block
+    constants.parametric.hard_gas_limit_per_block
 
 let consume_decoding_gas gas_limit expr =
   let open Result_syntax in
@@ -346,8 +350,8 @@ let validate_gas_limit ~ctxt gas_limit operation =
   if
     not
       Z.Compare.(
-        hard_gas_limit_per_operation >= gas_limit_z
-        && hard_gas_limit_per_block >= overall_gas_limit
+        hard_gas_limit_per_operation ctxt.constants >= gas_limit_z
+        && hard_gas_limit_per_block ctxt.constants >= overall_gas_limit
         && gas_limit_z >= Z.zero)
   then tzfail_p @@ Imported_protocol.Gas_limit_repr.Gas_limit_too_high
   else
@@ -374,7 +378,7 @@ let validate_storage_limit storage_limit =
   error_unless
     Compare.Z.(
       storage_limit
-      <= Tezlink_constants.all_constants.parametric
+      <= (Tezlink_constants.all_constants ()).parametric
            .hard_storage_limit_per_operation
       && storage_limit >= Z.zero)
     (Imported_env.wrap_tzerror Fees.Storage_limit_too_high)
@@ -511,8 +515,8 @@ let compute_minimal_fees ~(op_raw_size : int) ~(op_gas_limit : Z.t)
   let* execution_fees = of_nanotez_ceil execution_fees in
   Imported_env.wrap_tzresult @@ Tezos_types.Tez.(da_fees +? execution_fees)
 
-let parse_and_validate_for_queue ~simulator_mode ~nanotez_per_michelson_gas
-    ~state raw =
+let parse_and_validate_for_queue ?michelson_hard_gas_limit_per_block
+    ~simulator_mode ~nanotez_per_michelson_gas ~state raw =
   let open Lwt_result_syntax in
   let raw = Bytes.of_string raw in
   let op_raw_size = Bytes.length raw in
@@ -561,6 +565,10 @@ let parse_and_validate_for_queue ~simulator_mode ~nanotez_per_michelson_gas
       fee_sum = Tez.zero;
       gas_limit_sum = Z.zero;
       signature_check_cost;
+      constants =
+        Tezlink_constants.all_constants
+          ?hard_gas_limit_per_block:michelson_hard_gas_limit_per_block
+          ();
     }
   in
   let** ctxt = validate_batch ~ctxt:initial_context (first :: rest) in
@@ -601,24 +609,27 @@ let parse_and_validate_for_queue ~simulator_mode ~nanotez_per_michelson_gas
     in
     return (Ok operation)
 
-let init_blueprint_validation state () =
+let init_blueprint_validation ?michelson_hard_gas_limit_per_block state () =
   let get_counter pkh = Tezlink_durable_storage.counter state pkh in
   let get_balance pkh =
     Tezlink_durable_storage.balance_z
       state
       (Tezos_types.Contract.of_implicit pkh)
   in
-  let michelson_config = {get_balance; get_counter} in
+  let constants =
+    Tezlink_constants.all_constants
+      ?hard_gas_limit_per_block:michelson_hard_gas_limit_per_block
+      ()
+  in
+  let michelson_config = {get_balance; get_counter; constants} in
   empty_validation_state
     ~michelson_config
     ~evm_config:Validation_types.dummy_evm_config
 
-let maximum_gas_per_block =
-  Tezos_types.Operation.gas_limit_to_z
-    Tezlink_constants.all_constants.parametric.hard_gas_limit_per_block
-
 let gas_limit_could_fit state (operation : Tezos_types.Operation.t) =
-  Z.(state.gas + operation.gas_limit <= maximum_gas_per_block)
+  Z.(
+    state.gas + operation.gas_limit
+    <= hard_gas_limit_per_block state.michelson_config.constants)
 
 let add_ source cache =
   String.Map.add (Signature.V2.Public_key_hash.to_b58check source) cache

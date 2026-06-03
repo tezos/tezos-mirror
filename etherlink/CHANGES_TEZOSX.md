@@ -150,6 +150,10 @@
   entrypoint name is now stored as a raw byte string, as on L1. The same
   Michelson source or packed payload now produces the same `address`
   value on L1 and the Michelson runtime. (!22013)
+- The `run sandbox` and `run tezlink sandbox` commands accept
+  `--michelson-hard-gas-limit-per-block` to raise the Michelson per-block
+  gas cap (default 3M). Sandbox-only; intended for capacity benchmarking.
+  (!21968)
 
 ### Native Atomic Composability
 

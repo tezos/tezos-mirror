@@ -10,6 +10,7 @@ type parameters = {
   maximum_number_of_chunks : int;
   sequencer_sunset_sec : int64;
   preconfirmation_stream_enabled : bool;
+  michelson_hard_gas_limit_per_block : int option;
 }
 
 (** [force] defines if the block producer should force the creation of

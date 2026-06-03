@@ -99,11 +99,17 @@ type mode =
       network : string option;
       funded_addresses : string list;
       sequencer_keys : string list;
+      michelson_hard_gas_limit_per_block : int option;
+          (** Override [hard_gas_limit_per_block] in the sandbox's Michelson
+              runtime constants. None keeps the L1-aligned default (3M). *)
     }
   | Tezlink_sandbox of {
       sequencer_config : sequencer_config;
       funded_addresses : string list;
       verbose : bool;
+      michelson_hard_gas_limit_per_block : int option;
+          (** Override [hard_gas_limit_per_block] in the sandbox's Michelson
+              runtime constants. None keeps the L1-aligned default (3M). *)
     }
   | Rpc of mode
 

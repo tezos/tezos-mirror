@@ -86,6 +86,7 @@
     (one, unless it's a batch) etc. Therefore, any {!Tezos_types.Operation.t}
     value should be created and validated at the same time. *)
 val parse_and_validate_for_queue :
+  ?michelson_hard_gas_limit_per_block:int ->
   simulator_mode:Tezlink_backend_sig.simulator_mode ->
   nanotez_per_michelson_gas:Tezos_types.Tez.nanotez ->
   state:Evm_state.t ->
@@ -93,14 +94,20 @@ val parse_and_validate_for_queue :
   (Tezos_types.Operation.t, string) result tzresult Lwt.t
 
 (** [gas_limit_could_fit state operation] returns [true] if the operationb,
-    fits into the blueprint being created. Can lead to a new blueprint. *)
+    fits into the blueprint being created. Can lead to a new blueprint. The
+    per-block cap is read from [state]'s Michelson constants. *)
 val gas_limit_could_fit :
   Validation_types.validation_state -> Tezos_types.Operation.t -> bool
 
-(** [init_blueprint_validation state ()] creates an empty
-    validation state, from the EVM [state]. *)
+(** [init_blueprint_validation ?michelson_hard_gas_limit_per_block state ()]
+    creates an empty validation state, from the EVM [state].
+    [michelson_hard_gas_limit_per_block] overrides the per-block Michelson
+    gas cap (sandbox only). *)
 val init_blueprint_validation :
-  Evm_state.t -> unit -> Validation_types.validation_state
+  ?michelson_hard_gas_limit_per_block:int ->
+  Evm_state.t ->
+  unit ->
+  Validation_types.validation_state
 
 (** [validate_for_blueprint state operation] finishes the validation of
     [operation] and checks that it can it be added to the blueprint. Returns

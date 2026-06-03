@@ -190,6 +190,7 @@ let setup_sandbox cloud agent ~local_kernel ~local_preimages_dir
             max_number_of_chunks = None;
             wallet_dir = Some remote_wallet_dir;
           };
+        michelson_hard_gas_limit_per_block = None;
       }
   in
   Evm_node_cloud.Agent.init

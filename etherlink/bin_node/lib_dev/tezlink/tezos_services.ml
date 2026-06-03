@@ -238,7 +238,7 @@ module Tezlink_SeouLo_protocol = struct
         ~amount
     in
 
-    let constant = Tezlink_constants.all_constants.parametric in
+    let constant = (Tezlink_constants.all_constants ()).parametric in
     let* voting_period_info =
       let* imported_protocol_period_info =
         voting_period_info
@@ -317,7 +317,7 @@ module Tezlink_TALLiN_protocol = struct
         ~amount
     in
 
-    let constant = Tezlink_constants.all_constants.parametric in
+    let constant = (Tezlink_constants.all_constants ()).parametric in
     let* voting_period_info =
       voting_period_info
         ~block_per_cycle:constant.blocks_per_cycle
@@ -605,7 +605,7 @@ module Tezlink_genesis_protocol = struct
     let parameter =
       Imported_protocol_parameters.Default_parameters.parameters_of_constants
         ~bootstrap_accounts:[bootstrap_account]
-        Tezlink_constants.all_constants.parametric
+        (Tezlink_constants.all_constants ()).parametric
     in
     let parameter_format_json =
       Imported_protocol_parameters.Default_parameters.json_of_parameters
@@ -680,7 +680,7 @@ module Adaptive_issuance_services = struct
     }
 
   let consensus_rights_delay =
-    Tezlink_constants.all_constants.parametric.consensus_rights_delay
+    (Tezlink_constants.all_constants ()).parametric.consensus_rights_delay
 
   let dummy_rewards current_cycle =
     List.init ~when_negative_length:[] (consensus_rights_delay + 1) (fun i ->

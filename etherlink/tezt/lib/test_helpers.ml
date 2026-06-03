@@ -585,7 +585,8 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
         (fun account -> account.Eth_account.address)
         (Array.to_list Eth_account.bootstrap_accounts))
     ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
-    ?(sequencer_keys = []) ?with_runtimes ?enable_michelson_gas_refund () =
+    ?(sequencer_keys = []) ?with_runtimes ?enable_michelson_gas_refund
+    ?michelson_hard_gas_limit_per_block () =
   let patch_config =
     Option.map
       (fun input_patch json ->
@@ -652,6 +653,7 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
           List.map
             (fun k -> Account.uri_of_secret_key k.Account.secret_key)
             sequencer_keys;
+        michelson_hard_gas_limit_per_block;
       }
   in
   let node_setup =
