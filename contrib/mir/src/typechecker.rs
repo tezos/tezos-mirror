@@ -4017,9 +4017,11 @@ fn step_typecheck_value<'a, 'b>(
                 }
                 _ => Err(TcError::InvalidValueForType(
                     // Format via the same synthetic App the recursive
-                    // typecheck_value built; auto-derived Debug on
-                    // Micheline keeps the format stable as Annotations'
-                    // Debug evolves.
+                    // typecheck_value built. `Micheline`'s manual,
+                    // iterative `Debug` (L2-1436) is the contract that
+                    // keeps this rendering stable as `Annotations`' Debug
+                    // evolves — and that does not overflow the kernel
+                    // stack on adversarially deep payloads.
                     format!("{:?}", Micheline::App(Prim::Pair, vs, NO_ANNS)),
                     t,
                 )),
