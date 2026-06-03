@@ -47,6 +47,7 @@ type kernel =
   | Previewnet02
   | Previewnet04
   | Previewnet05
+  | Previewnet06
   | Latest
 
 let kernel_from_string = function
@@ -65,6 +66,7 @@ let kernel_from_string = function
   | "previewnet-0.2" -> Some Previewnet02
   | "previewnet-0.4" -> Some Previewnet04
   | "previewnet-0.5" -> Some Previewnet05
+  | "previewnet-0.6" -> Some Previewnet06
   | "latest" -> Some Latest
   | _ -> None
 
@@ -84,6 +86,7 @@ let kernel_to_ordinal = function
   | Previewnet02 -> 12
   | Previewnet04 -> 13
   | Previewnet05 -> 14
+  | Previewnet06 -> 15
   | Latest -> Int.max_int
 
 let compare_kernel a b = Int.compare (kernel_to_ordinal a) (kernel_to_ordinal b)
@@ -141,4 +144,4 @@ let root_hash_from_released_kernel = function
       Some
         (`Hex
            "0005d2c53f57df68b2027ecf592169cf8ce0ee7b3a6ecc215d58e42733c6eed131")
-  | Previewnet02 | Previewnet04 | Previewnet05 | Latest -> None
+  | Previewnet02 | Previewnet04 | Previewnet05 | Previewnet06 | Latest -> None

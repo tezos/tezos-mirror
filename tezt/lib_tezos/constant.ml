@@ -244,7 +244,7 @@ module WASM = struct
         "etherlink/kernel_latest/kernel/tests/resources/previewnet_kernel.wasm"
       ()
 
-  let previewnet_commit = "3038e37e7cfca6f6930dce8375fc97d3917e0518"
+  let previewnet_commit = "ae3d731879b9443f52dc14de64e3208ab256d7a0"
 
   let tx_kernel = Uses.make ~tag:"tx_kernel" ~path:"tx_kernel.wasm" ()
 
