@@ -26,9 +26,7 @@ module Repo : sig
   val create : string -> t
 end
 
-(** Proof objects for the on-disk durable storage.
-
-    {b Note}: Currently a stub (TZX-113). *)
+(** Proof objects for the on-disk durable storage. *)
 module Proof : PROOF
 
 (** Normal mode: registry and database operations. *)
@@ -51,10 +49,7 @@ module Normal : sig
   include NORMAL with module Registry := Registry
 end
 
-(** Prove mode: registry, database, and proof lifecycle.
-
-    {b Note}: Currently a stub (TZX-113). All operations will raise a
-    runtime error if called. *)
+(** Prove mode: registry, database, and proof lifecycle. *)
 module Prove :
   PROVE
     with type normal_registry := Normal.Registry.t

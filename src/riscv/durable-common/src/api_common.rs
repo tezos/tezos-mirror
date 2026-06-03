@@ -12,8 +12,10 @@ use octez_riscv_data::components::vector::VectorMode;
 use octez_riscv_data::foldable::Foldable;
 use octez_riscv_data::hash::Hash;
 use octez_riscv_data::hash::HashFold;
+use octez_riscv_data::merkle_proof::proof::Proof;
 use octez_riscv_data::mode::Mode;
 use octez_riscv_data::mode::Normal;
+use octez_riscv_data::mode::Prove;
 use octez_riscv_durable_storage::database::DatabaseMode;
 use octez_riscv_durable_storage::errors as ds_errors;
 use octez_riscv_durable_storage::errors::OperationalError;
@@ -393,4 +395,14 @@ where
     let prove = state.apply_ro(|registry| DsProveRegistry::try_from(registry))??;
 
     Ok(prove)
+}
+
+/// Produce a proof from the current state of a prove mode registry
+pub fn produce_proof<KV>(state: &impl RegistryApply<KV, Prove<'static>>) -> OcamlFallible<Proof>
+where
+    KV: BackgroundKeyValueStore,
+{
+    let proof = state.apply_ro(|registry| registry.produce_proof())?;
+
+    Ok(proof)
 }

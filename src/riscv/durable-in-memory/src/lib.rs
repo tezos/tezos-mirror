@@ -31,6 +31,8 @@ use octez_riscv_api_common::bytes::BytesWrapper;
 use octez_riscv_api_common::move_semantics::MutableState;
 use octez_riscv_api_common::safe_pointer::SafePointer;
 use octez_riscv_data::hash::Hash;
+use octez_riscv_data::merkle_proof::proof::Proof as NdsProof;
+use octez_riscv_data::merkle_proof::proof::serialise_proof;
 use octez_riscv_data::mode::Prove;
 use octez_riscv_data::mode::utils::NotFound;
 use octez_riscv_durable_storage::errors as ds_errors;
@@ -74,10 +76,9 @@ pub type RegistryProve =
 pub struct RegistryVerify;
 ocaml::custom!(RegistryVerify);
 
-/// Stub proof value. See TZX-113.
-// TODO (TZX-113): implement proof
+/// Proof produced by prove mode, can be used to construct the verify state.
 #[ocaml::sig]
-pub struct Proof;
+pub struct Proof(NdsProof);
 ocaml::custom!(Proof);
 
 /// Deterministic errors arising from logically invalid arguments.
@@ -584,37 +585,38 @@ pub fn octez_riscv_durable_in_memory_start_proof(
 #[ocaml::func]
 #[ocaml::sig("registry_prove -> proof")]
 pub fn octez_riscv_durable_in_memory_produce_proof(
-    _state: SafePointer<RegistryProve>,
-) -> SafePointer<Proof> {
-    // TODO (TZX-113): wire-up proof mode
-    SafePointer::from(Proof)
+    state: SafePointer<RegistryProve>,
+) -> OcamlFallible<SafePointer<Proof>> {
+    api_common::produce_proof(&*state)
+        .map(Proof)
+        .map(SafePointer::from)
 }
 
 #[ocaml::func]
 #[ocaml::sig("proof -> bytes")]
 pub fn octez_riscv_durable_in_memory_proof_start_state(
-    _state: SafePointer<Proof>,
+    state: SafePointer<Proof>,
 ) -> BytesWrapper<Hash> {
-    // TODO (TZX-113): wire-up proof mode
-    BytesWrapper::from(Hash::hash_bytes(&[]))
+    let hash = state.0.initial_state_hash();
+    BytesWrapper::from(hash)
 }
 
 #[ocaml::func]
 #[ocaml::sig("proof -> bytes")]
 pub fn octez_riscv_durable_in_memory_proof_stop_state(
-    _state: SafePointer<Proof>,
+    state: SafePointer<Proof>,
 ) -> BytesWrapper<Hash> {
-    // TODO (TZX-113): wire-up proof mode
-    BytesWrapper::from(Hash::hash_bytes(&[]))
+    let hash = state.0.final_state_hash();
+    BytesWrapper::from(hash)
 }
 
 #[ocaml::func]
 #[ocaml::sig("proof -> bytes")]
 pub fn octez_riscv_durable_in_memory_serialise_proof(
-    _state: SafePointer<Proof>,
+    state: SafePointer<Proof>,
 ) -> BytesWrapper<Vec<u8>> {
-    // TODO (TZX-113): wire-up proof mode
-    BytesWrapper::from(vec![])
+    let bytes = serialise_proof(&state.0);
+    BytesWrapper::from(bytes)
 }
 
 #[ocaml::func]

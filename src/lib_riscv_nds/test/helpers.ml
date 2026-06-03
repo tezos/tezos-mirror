@@ -3,6 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* SPDX-FileCopyrightText: 2026 Functori <contact@functori.com>              *)
 (* SPDX-FileCopyrightText: 2026 Nomadic Labs <contact@nomadic-labs.com>      *)
+(* SPDX-FileCopyrightText: 2026 Trilitech <contact@trili.tech>               *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -83,6 +84,49 @@ module Disk_prove_backend = struct
   let create_registry_with_dbs n =
     let r = Disk_backend.create_registry_with_dbs n in
     start_proof r
+end
+
+(** Backend abstraction for proof-API tests.  Unlike {!BACKEND}, which
+    only exposes a single mode, this bundles the whole prove-mode
+    lifecycle: a Normal-mode registry to set up and hash the state right
+    before it is wrapped into prove mode, the {!Intf.PROVE.start_proof}
+    /{!Intf.PROVE.produce_proof} transitions, and the resulting
+    {!Intf.PROOF}.  It lets the proof tests run against both the memory
+    and disk backends. *)
+module type PROOF_LIFECYCLE_BACKEND = sig
+  val name : string
+
+  module Normal : NORMAL
+
+  module Prove : PROVE with type normal_registry := Normal.Registry.t
+
+  (** Create a fresh Normal-mode registry with [n] databases. *)
+  val create_normal_with_dbs : int -> Normal.Registry.t
+end
+
+module Memory_proof_lifecycle : PROOF_LIFECYCLE_BACKEND = struct
+  let name = "memory_proof_lifecycle"
+
+  module Normal = Octez_riscv_nds_memory.Normal
+  module Prove = Octez_riscv_nds_memory.Prove
+
+  let create_normal_with_dbs n =
+    let r = Normal.Registry.create () in
+    grow_registry Normal.Registry.resize r n ;
+    r
+end
+
+module Disk_proof_lifecycle : PROOF_LIFECYCLE_BACKEND = struct
+  let name = "disk_proof_lifecycle"
+
+  module Normal = Octez_riscv_nds_disk.Normal
+  module Prove = Octez_riscv_nds_disk.Prove
+
+  let create_normal_with_dbs n =
+    let repo = get_disk_repo () in
+    let r = Normal.Registry.create repo in
+    grow_registry Normal.Registry.resize r n ;
+    r
 end
 
 (** Force finalization of Rust-side RocksDB handles at the end of the
@@ -295,6 +339,38 @@ let apply_op (type r) (type a) (module B : BACKEND with type Registry.t = r)
 let apply_ops (type r) (module B : BACKEND with type Registry.t = r) (r : r) ops
     =
   List.iter (fun (Any op) -> ignore (apply_op (module B) r op)) ops
+
+(** Apply operations on a Normal-mode registry of a {!PROOF_LIFECYCLE_BACKEND},
+    ignoring results and errors. *)
+let apply_normal_ops (type r)
+    (module B : PROOF_LIFECYCLE_BACKEND with type Normal.Registry.t = r) (r : r)
+    ops =
+  let module Backend : BACKEND with type Registry.t = B.Normal.Registry.t =
+  struct
+    let name = B.name
+
+    module Registry = B.Normal.Registry
+    module Database = B.Normal.Database
+
+    let create_registry_with_dbs _ = assert false
+  end in
+  apply_ops (module Backend) r ops
+
+(** Apply operations on a Prove-mode registry of a {!PROOF_LIFECYCLE_BACKEND},
+    ignoring results and errors. *)
+let apply_prove_ops (type r)
+    (module B : PROOF_LIFECYCLE_BACKEND with type Prove.Registry.t = r) (r : r)
+    ops =
+  let module Backend : BACKEND with type Registry.t = B.Prove.Registry.t =
+  struct
+    let name = B.name
+
+    module Registry = B.Prove.Registry
+    module Database = B.Prove.Database
+
+    let create_registry_with_dbs _ = assert false
+  end in
+  apply_ops (module Backend) r ops
 
 (** Pretty-print a [result] for bisimulation violation messages. *)
 let pp_result (type a) (op : a op)
