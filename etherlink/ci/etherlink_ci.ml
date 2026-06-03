@@ -56,9 +56,6 @@ end)
 
 type purpose = Release | Test
 
-let octez_evm_node_release_tag_re =
-  "/^octez-evm-node-v\\d+\\.\\d+(?:\\-rc\\d+)?$/"
-
 (** Creates a Docker build job of the given [arch]. *)
 let job_docker_build =
   Cacio.parameterize @@ fun arch ->
@@ -462,12 +459,22 @@ let register () =
       (Manual, job_tezt_extra `merge_request);
       (Manual, job_tezt_flaky `merge_request);
     ] ;
+  let octez_evm_node_release_tag_re = "/^octez-evm-node-v\\d+\\.\\d+$/" in
+  let octez_evm_node_prerelease_tag_re =
+    "/^octez-evm-node-v\\d+\\.\\d+-rc\\d+$/"
+  in
   CI.register_dedicated_release_pipeline
     ~tag_rex:octez_evm_node_release_tag_re
     [(Auto, job_docker_promote_to_latest `real); (Auto, job_gitlab_release)] ;
   CI.register_dedicated_test_release_pipeline
     ~tag_rex:octez_evm_node_release_tag_re
     [(Auto, job_docker_promote_to_latest `test); (Auto, job_gitlab_release)] ;
+  CI.register_dedicated_prerelease_pipeline
+    ~tag_rex:octez_evm_node_prerelease_tag_re
+    [(Auto, job_docker_merge `real); (Auto, job_gitlab_release)] ;
+  CI.register_dedicated_test_prerelease_pipeline
+    ~tag_rex:octez_evm_node_prerelease_tag_re
+    [(Auto, job_docker_merge `test); (Auto, job_gitlab_release)] ;
   CI.register_scheduled_pipeline
     "daily"
     ~description:"Daily tests to run for Etherlink."
