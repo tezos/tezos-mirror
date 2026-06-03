@@ -4,21 +4,6 @@
 
 ### EVM Runtime
 
-- Alias materialization is now atomic: if the forwarder initialization
-  fails (revert, halt, or a gas budget below the intrinsic cost), the
-  delegation `code_hash` write is rolled back instead of being left
-  behind. Previously a failed init left a half-materialized account that
-  a later call would bless without re-running initialization,
-  permanently bricking the alias (uninitialized forwarder). (!21978)
-- On an inbound cross-runtime call (a Michelson contract calling an EVM
-  contract), the EVM `ORIGIN` opcode (`tx.origin`) now returns the
-  transaction originator (`X-Tezos-Source`) instead of the immediate
-  caller, while `msg.sender` keeps returning the immediate caller
-  (`X-Tezos-Sender`). Previously both returned the immediate caller, so
-  the Ethereum `require(tx.origin == msg.sender)` EOA-only guard was
-  silently bypassed by routing a call through the Michelson runtime.
-  When the originator is the immediate caller (a direct EOA call),
-  `tx.origin == msg.sender` as before. (!21981)
 - The first read-only gateway call (`callMichelsonView` or generic
   `call(..., GET)`) from an inbound cross-runtime frame now forwards the
   transitive originator as `X-Tezos-Source`, matching what the `ORIGIN`
@@ -45,12 +30,6 @@
 
 ### Michelson Runtime
 
-- The `monitor/heads/main` RPC now honors the `protocol` and
-  `next_protocol` query filters and emits the current head immediately as
-  the first element of the stream, matching the L1 `monitor_heads`
-  behavior. Previously the filters were ignored (clients could receive
-  heads they had filtered out) and the current head was never sent on
-  subscription, blocking wait-for-head flows until the next block. (!22023)
 - A cross-runtime call or `staticcall_evm` view whose EVM target
   exhausts the forwarded gas (HTTP 429) now fails closed with an
   out-of-gas error instead of being collapsed onto a generic 4xx
@@ -58,6 +37,81 @@
   out-of-gas, indistinguishable from an absent/no-result view, so a
   caller treating `None` as a default/allow/fallback branch could be
   driven there by a gas-exhausting EVM target. (!22035)
+- MIR: prevent kernel stack overflow on deeply nested Michelson —
+  Runtime-built deep `TypedValue`s left on a value stack, in a
+  control-flow worklist frame, or inside `InterpretError::FailedWith`
+  are flattened iteratively on the interpreter's *drop / error-unwind*
+  path so their `Rc<TypedValue>` destructor cannot overflow when the
+  kernel drops the error or the caller-restored stack. The COMPARE
+  gas-cost computation and the `Ord` impl for `TypedValue` — reached by
+  both the `COMPARE` instruction and `BTreeSet`/`BTreeMap` key ordering —
+  also run on iterative worklists so deep `pair`/`option`/`or` values can
+  no longer overflow the kernel stack inside the cost pre-charge (which
+  previously ran before any gas could gate it).
+  (!22024, !22025)
+- MIR's `address` decoder now matches L1's `parse_address` on the
+  trailing entrypoint name: it is validated only by L1's address-value
+  rule (length ≤ 31 and not the explicit `default`), not the Michelson
+  script-source annotation charset. Entrypoint names containing bytes
+  outside `[_0-9a-zA-Z]` (e.g. `%!`), a leading `.`/`%`/`@` (e.g.
+  `%.foo`), or non-UTF-8 bytes (e.g. a trailing `0xff`) are now accepted
+  on both the binary (`UNPACK address`) and readable (`PUSH address
+  "tz1…%…"`) paths, matching L1; previously they were rejected (`UNPACK`
+  returned `None` and the literal was ill-typed), diverging from L1. The
+  entrypoint name is now stored as a raw byte string, as on L1. The same
+  Michelson source or packed payload now produces the same `address`
+  value on L1 and the Michelson runtime. (!22013)
+- MIR's `address` decoder now matches L1's `parse_address` on the
+  trailing entrypoint name: it is validated only by L1's address-value
+  rule (length ≤ 31 and not the explicit `default`), not the Michelson
+  script-source annotation charset. Entrypoint names containing bytes
+  outside `[_0-9a-zA-Z]` (e.g. `%!`), a leading `.`/`%`/`@` (e.g.
+  `%.foo`), or non-UTF-8 bytes (e.g. a trailing `0xff`) are now accepted
+  on both the binary (`UNPACK address`) and readable (`PUSH address
+  "tz1…%…"`) paths, matching L1; previously they were rejected (`UNPACK`
+  returned `None` and the literal was ill-typed), diverging from L1. The
+  entrypoint name is now stored as a raw byte string, as on L1. The same
+  Michelson source or packed payload now produces the same `address`
+  value on L1 and the Michelson runtime. (!22013)
+- The `run sandbox` and `run tezlink sandbox` commands accept
+  `--michelson-hard-gas-limit-per-block` to raise the Michelson per-block
+  gas cap (default 3M). Sandbox-only; intended for capacity benchmarking.
+  (!21968)
+
+### Native Atomic Composability
+
+### Storage versions
+
+### Internals
+
+## Version 0.6 (ae3d731879b9443f52dc14de64e3208ab256d7a0)
+
+### EVM Runtime
+
+- Alias materialization is now atomic: if the forwarder initialization
+  fails (revert, halt, or a gas budget below the intrinsic cost), the
+  delegation `code_hash` write is rolled back instead of being left
+  behind. Previously a failed init left a half-materialized account that
+  a later call would bless without re-running initialization,
+  permanently bricking the alias (uninitialized forwarder). (!21978)
+- On an inbound cross-runtime call (a Michelson contract calling an EVM
+  contract), the EVM `ORIGIN` opcode (`tx.origin`) now returns the
+  transaction originator (`X-Tezos-Source`) instead of the immediate
+  caller, while `msg.sender` keeps returning the immediate caller
+  (`X-Tezos-Sender`). Previously both returned the immediate caller, so
+  the Ethereum `require(tx.origin == msg.sender)` EOA-only guard was
+  silently bypassed by routing a call through the Michelson runtime.
+  When the originator is the immediate caller (a direct EOA call),
+  `tx.origin == msg.sender` as before. (!21981)
+
+### Michelson Runtime
+
+- The `monitor/heads/main` RPC now honors the `protocol` and
+  `next_protocol` query filters and emits the current head immediately as
+  the first element of the stream, matching the L1 `monitor_heads`
+  behavior. Previously the filters were ignored (clients could receive
+  heads they had filtered out) and the current head was never sent on
+  subscription, blocking wait-for-head flows until the next block. (!22023)
 - When the Michelson runtime services an inbound cross-runtime call, the
   gateway now forwards the call's originator (the alias carried in
   `X-Tezos-Source`) as the outbound `X-Tezos-Source`, instead of this
@@ -142,22 +196,7 @@
   out completely and returns empty bytes, matching L1's
   `Script_bytes.bytes_lsr`. Shift counts that fit in `usize` and are
   below the operand's bit width are unaffected. (!22011)
-- MIR's `address` decoder now matches L1's `parse_address` on the
-  trailing entrypoint name: it is validated only by L1's address-value
-  rule (length ≤ 31 and not the explicit `default`), not the Michelson
-  script-source annotation charset. Entrypoint names containing bytes
-  outside `[_0-9a-zA-Z]` (e.g. `%!`), a leading `.`/`%`/`@` (e.g.
-  `%.foo`), or non-UTF-8 bytes (e.g. a trailing `0xff`) are now accepted
-  on both the binary (`UNPACK address`) and readable (`PUSH address
-  "tz1…%…"`) paths, matching L1; previously they were rejected (`UNPACK`
-  returned `None` and the literal was ill-typed), diverging from L1. The
-  entrypoint name is now stored as a raw byte string, as on L1. The same
-  Michelson source or packed payload now produces the same `address`
-  value on L1 and the Michelson runtime. (!22013)
-- The `run sandbox` and `run tezlink sandbox` commands accept
-  `--michelson-hard-gas-limit-per-block` to raise the Michelson per-block
-  gas cap (default 3M). Sandbox-only; intended for capacity benchmarking.
-  (!21968)
+
 
 ### Native Atomic Composability
 

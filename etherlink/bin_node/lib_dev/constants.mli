@@ -35,6 +35,7 @@ type kernel =
   | Previewnet02
   | Previewnet04
   | Previewnet05
+  | Previewnet06
   | Latest
 
 val kernel_from_string : string -> kernel option
