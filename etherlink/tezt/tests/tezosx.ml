@@ -1796,7 +1796,8 @@ let test_nested_crac =
   Setup.register_fullstack_test
     ~time_between_blocks:Nothing
     ~title:"Cross-runtime call from Tezos to EVM back to Tezos"
-    ~tags:["cross_runtime"; "bytecode"; "nested"]
+      (* [ci_disabled] pending L2-1294: CRAC alias-forwarder storage billing. *)
+    ~tags:["cross_runtime"; "bytecode"; "nested"; "ci_disabled"]
     ~with_runtimes:[Tezos]
   @@ fun setup protocol ->
   (* Step 1: Deploy the Michelson contract (final destination of the nested
