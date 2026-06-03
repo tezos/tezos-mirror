@@ -133,6 +133,18 @@
   out completely and returns empty bytes, matching L1's
   `Script_bytes.bytes_lsr`. Shift counts that fit in `usize` and are
   below the operand's bit width are unaffected. (!22011)
+- MIR's `address` decoder now matches L1's `parse_address` on the
+  trailing entrypoint name: it is validated only by L1's address-value
+  rule (length ≤ 31 and not the explicit `default`), not the Michelson
+  script-source annotation charset. Entrypoint names containing bytes
+  outside `[_0-9a-zA-Z]` (e.g. `%!`), a leading `.`/`%`/`@` (e.g.
+  `%.foo`), or non-UTF-8 bytes (e.g. a trailing `0xff`) are now accepted
+  on both the binary (`UNPACK address`) and readable (`PUSH address
+  "tz1…%…"`) paths, matching L1; previously they were rejected (`UNPACK`
+  returned `None` and the literal was ill-typed), diverging from L1. The
+  entrypoint name is now stored as a raw byte string, as on L1. The same
+  Michelson source or packed payload now produces the same `address`
+  value on L1 and the Michelson runtime. (!22013)
 
 ### Native Atomic Composability
 

@@ -2004,7 +2004,7 @@ mod tests {
             );
         };
         assert_eq!(
-            event.content.tag.as_ref().map(|e| e.as_str()),
+            event.content.tag.as_ref().and_then(|e| e.as_str()),
             Some("crac"),
             "event tag must be 'crac'"
         );
@@ -2378,7 +2378,7 @@ mod tests {
             panic!("expected synthetic CRAC event as first internal op");
         };
         assert_eq!(
-            event.content.tag.as_ref().map(|e| e.as_str()),
+            event.content.tag.as_ref().and_then(|e| e.as_str()),
             Some("crac"),
             "first internal op must be the synthetic CRAC-ID event"
         );

@@ -1,0 +1,12 @@
+# UNPACK address whose optimized binary entrypoint suffix is a single
+# non-UTF-8 byte (0xff): the issue's `ep_nonascii` case. L1 stores the
+# entrypoint name as a raw byte string (Entrypoint.value_encoding /
+# Non_empty_string: length <= 31, not "default") with no UTF-8 check and
+# accepts this; MIR used to represent the entrypoint as a UTF-8 string and
+# rejected it (L2-1377). The Michelson interface now matches L1 and pushes
+# Some. The decoded address has a non-UTF-8 entrypoint, which is not
+# expressible as a Michelson string literal, so the result is mapped to a
+# bool via IF_NONE (the same differential method used to find the divergence).
+code { UNPACK address ; IF_NONE { PUSH bool False } { DROP ; PUSH bool True } } ;
+input { Stack_elt bytes 0x050a0000001700007b09f782e0bcd67739510afa819d85976119d5efff } ;
+output { Stack_elt bool True }

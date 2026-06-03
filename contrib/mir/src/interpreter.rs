@@ -8521,6 +8521,95 @@ mod interpreter_tests {
         assert!(ctx.gas().milligas().unwrap() < Ctx::default().gas.milligas().unwrap());
     }
 
+    /// L2-1377: `UNPACK address` must accept entrypoint bytes outside
+    /// the Michelson script-source charset, matching Tezos L1. Each
+    /// payload below is the optimized PACK of a `tz1...%<ep>` address:
+    /// 0x05 (watermark) || 0x0a (Bytes tag) || u32-BE length || 22-byte
+    /// address hash || entrypoint bytes.
+    #[test]
+    fn unpack_address_l2_1377_relaxed_entrypoint() {
+        use crate::ast::michelson_address::Address;
+
+        // hash + "!" (one byte ep), L1 accepts; MIR used to reject.
+        let payload =
+            hex::decode("050a0000001700007b09f782e0bcd67739510afa819d85976119d5ef21").unwrap();
+        let mut stack = stk![V::Bytes(payload)];
+        let ctx = &mut Ctx::default();
+        assert_eq!(
+            interpret_one(&Unpack(Type::Address), ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(
+            stack,
+            stk![V::new_option(Some(V::Address(
+                Address::from_base58_check("tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%!").unwrap()
+            )))]
+        );
+
+        // hash + ".foo" (first-char dot, L1 accepts; MIR used to reject).
+        let payload =
+            hex::decode("050a0000001a00007b09f782e0bcd67739510afa819d85976119d5ef2e666f6f")
+                .unwrap();
+        let mut stack = stk![V::Bytes(payload)];
+        let ctx = &mut Ctx::default();
+        assert_eq!(
+            interpret_one(&Unpack(Type::Address), ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(
+            stack,
+            stk![V::new_option(Some(V::Address(
+                Address::from_base58_check("tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%.foo").unwrap()
+            )))]
+        );
+
+        // hash + 0xff (non-UTF-8 ep byte, the issue's `ep_nonascii` case).
+        // L1 stores the entrypoint name as a raw byte string and accepts
+        // this; MIR now matches. The decoded address is built via
+        // `from_bytes` because a non-UTF-8 entrypoint has no readable
+        // base58 form.
+        let payload =
+            hex::decode("050a0000001700007b09f782e0bcd67739510afa819d85976119d5efff").unwrap();
+        let mut stack = stk![V::Bytes(payload)];
+        let ctx = &mut Ctx::default();
+        assert_eq!(
+            interpret_one(&Unpack(Type::Address), ctx, &mut stack),
+            Ok(())
+        );
+        let expected = Address::from_bytes(
+            &hex::decode("00007b09f782e0bcd67739510afa819d85976119d5efff").unwrap(),
+        )
+        .unwrap();
+        assert_eq!(stack, stk![V::new_option(Some(V::Address(expected)))]);
+
+        // Control: explicit "default" remains forbidden -> None.
+        let payload =
+            hex::decode("050a0000001d00007b09f782e0bcd67739510afa819d85976119d5ef64656661756c74")
+                .unwrap();
+        let mut stack = stk![V::Bytes(payload)];
+        let ctx = &mut Ctx::default();
+        assert_eq!(
+            interpret_one(&Unpack(Type::Address), ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(stack, stk![V::new_option(None)]);
+
+        // Control: > 31 entrypoint bytes is still rejected -> None
+        // (shared length bound with L1).
+        let mut hex = String::from("050a0000003600007b09f782e0bcd67739510afa819d85976119d5ef");
+        for _ in 0..32 {
+            hex.push_str("71"); // 'q' x 32
+        }
+        let payload = hex::decode(&hex).unwrap();
+        let mut stack = stk![V::Bytes(payload)];
+        let ctx = &mut Ctx::default();
+        assert_eq!(
+            interpret_one(&Unpack(Type::Address), ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(stack, stk![V::new_option(None)]);
+    }
+
     #[test]
     fn unpack_bad_input() {
         let mut stack = stk![V::Bytes(hex::decode("05ffff").unwrap())];
