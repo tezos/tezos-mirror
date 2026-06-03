@@ -153,6 +153,10 @@
 - EVM alias creation is now tied to the transaction outcome: the forwarder
   code and classification are staged in the journal and flushed only when
   the enclosing operation commits, so a revert leaves no durable alias. (!22046)
+- An alias forwarder the Michelson runtime creates for a cross-runtime
+  call is now reverted with the parent operation. Previously it was
+  written to durable storage during gateway resolution and survived a
+  failed parent unburned, allowing storage growth at no cost. (!22056)
 
 ### Storage versions
 
