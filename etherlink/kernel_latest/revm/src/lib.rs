@@ -4483,6 +4483,104 @@ mod test {
         }
     }
 
+    /// Reproduction for the CREATE-frame checkpoint imbalance (MR !22056
+    /// blocker). A CREATE frame opens via `create_account_checkpoint`,
+    /// which — unlike `checkpoint` — does NOT push a Michelson
+    /// `external_checkpoint` (nor a `layered_state` checkpoint), yet revm's
+    /// `return_create` still closes the frame with `checkpoint_commit` /
+    /// `checkpoint_revert`, both of which pop one. So a durable Michelson
+    /// write performed inside a nested-and-committed CRAC sub-call is
+    /// dropped from the snapshot stack at the sub-call's commit (it looks
+    /// "outermost") and is therefore NOT restored when the enclosing CREATE
+    /// frame reverts — exactly the alias-forwarder leak the Michelson-alias
+    /// journaling work is meant to prevent.
+    ///
+    /// Sequence modeled — a top-level contract-creation tx whose constructor
+    /// triggers an EVM->TEZ CRAC and then reverts:
+    ///   CREATE open            (create_account_checkpoint — no external push)
+    ///     gateway CALL open    (checkpoint — pushes external)
+    ///       ensure_alias       (michelson snapshot of world state, write fwd)
+    ///     gateway CALL commit  (checkpoint_commit — CRAC succeeds)
+    ///   CREATE revert          (checkpoint_revert — constructor reverts)
+    ///
+    /// The forwarder write must be rolled back. This test asserts that and
+    /// currently FAILS (the write survives), pinning the blocker. It will
+    /// PASS once `create_account_checkpoint` also pushes the external /
+    /// layered-state checkpoint so CREATE frames are balanced.
+    #[test]
+    fn create_frame_revert_drops_michelson_alias_snapshot() {
+        use revm::context_interface::journaled_state::JournalTr;
+        use revm::primitives::U256;
+        use tezos_smart_rollup_host::path::OwnedPath;
+        use tezos_smart_rollup_host::storage::StorageV1;
+
+        let mut host = MockKernelHost::default();
+        let registry = Registry::new();
+        let block_constants = BlockConstants::test_block_with_no_fees();
+
+        // A durable Michelson path standing in for the alias forwarder
+        // under /tez/tez_accounts. v0 = pre-forwarder state.
+        let world =
+            OwnedPath::try_from("/tez/tez_accounts/forwarder".to_string()).unwrap();
+        host.store_write_all(&world, b"v0").unwrap();
+
+        let mut tjournal = TezosXJournal::default();
+        let db =
+            crate::database::EtherlinkVMDB::new(&mut host, &registry, &block_constants)
+                .unwrap();
+        let mut journal = crate::journal::Journal::new_with_inner(db, &mut tjournal);
+
+        // 1) Constructor (CREATE) frame opens. revm uses
+        //    create_account_checkpoint for CREATE frames.
+        let caller = Address::from_slice(&[0x11; 20]);
+        let created = Address::from_slice(&[0x22; 20]);
+        journal.load_account(caller).unwrap();
+        journal.load_account(created).unwrap();
+        let create_cp = journal
+            .create_account_checkpoint(caller, created, U256::ZERO, DEFAULT_SPEC_ID)
+            .expect("create_account_checkpoint");
+
+        // 2) Constructor CALLs the gateway precompile: CALL frame opens.
+        let _gateway_call_cp = journal.checkpoint();
+
+        // 3) The gateway resolves an alias: ensure_alias snapshots the
+        //    world state, then writes the forwarder (v1).
+        journal
+            .journal
+            .michelson
+            .checkpoint(journal.database.host, &world)
+            .expect("michelson world-state snapshot");
+        journal
+            .database
+            .host
+            .store_write_all(&world, b"v1")
+            .unwrap();
+
+        // 4) The CRAC and the gateway CALL frame commit successfully.
+        journal.checkpoint_commit();
+        assert!(
+            journal.take_deferred_error().is_none(),
+            "commit_frame surfaced a deferred error"
+        );
+
+        // 5) The constructor reverts: the CREATE frame reverts.
+        journal.checkpoint_revert(create_cp);
+        assert!(
+            journal.take_deferred_error().is_none(),
+            "revert_frame surfaced a deferred error"
+        );
+
+        // The forwarder write MUST be rolled back with the reverted
+        // constructor.
+        let after = journal.database.host.store_read_all(&world).unwrap();
+        assert_eq!(
+            after, b"v0",
+            "BLOCKER: alias forwarder write survived the enclosing CREATE-frame \
+             revert — create_account_checkpoint omits push_external_checkpoint, \
+             so the nested CRAC commit prematurely drops the snapshot"
+        );
+    }
+
     /// Test that pre-existing balance at the alias address is forwarded to the
     /// native Tezos address when the alias is created.
     #[test]
