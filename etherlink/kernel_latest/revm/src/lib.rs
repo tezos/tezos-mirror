@@ -1049,6 +1049,16 @@ mod test {
             where
                 Host: StorageV1,
             {
+                // Read-only GET requests (Michelson view / EVM
+                // STATICCALL shape) echo their request body back as the
+                // CRAC response body. This lets gas tests exercise the
+                // returned-body payload surcharge; state-mutating POSTs
+                // keep returning an empty body.
+                let response_body = if request.method() == http::Method::GET {
+                    request.body().clone()
+                } else {
+                    Vec::new()
+                };
                 // Parse the destination address from the URL path
                 let path = request.uri().path();
                 let address_str = path
@@ -1107,7 +1117,7 @@ mod test {
                         tezosx_interfaces::X_TEZOS_GAS_CONSUMED,
                         MOCK_TEZOS_GAS_CONSUMED.to_string(),
                     )
-                    .body(Vec::new())
+                    .body(response_body)
                     .unwrap()
             }
 
@@ -3873,6 +3883,91 @@ mod test {
                 last_recorded_sender(&host).as_deref(),
                 Some(expected_sender.as_str()),
                 "X-Tezos-Sender must stay on the immediate sender alias"
+            );
+        }
+
+        // --- payload surcharge parity ------------------------------
+
+        /// Regression: the typed `callMichelsonView` selector
+        /// must charge the same per-word payload surcharge as the generic
+        /// `call(GET)` path, on all three metered components — inbound
+        /// calldata, outgoing input body, and the returned response body.
+        ///
+        /// The mock Tezos runtime echoes a GET request body back as the
+        /// CRAC response body, so growing the payload by one 32-byte word
+        /// grows every metered component by one word. We measure the gas
+        /// slope (33-byte payload minus 32-byte payload) for each selector
+        /// and assert they match. Before the fix `callMichelsonView`
+        /// omitted every gateway payload charge, so its slope fell short of
+        /// `call(GET)`'s by three words (the witness in the issue observed
+        /// the +9 gas gap), and this assertion fails.
+        #[test]
+        fn call_michelson_view_matches_call_get_payload_slope() {
+            fn view_gas(input_len: usize) -> u64 {
+                let mut host = MockKernelHost::default();
+                let caller = Address::from([1u8; 20]);
+                fund_caller(&mut host, caller);
+                let payload =
+                    RuntimeGatewayCalls::callMichelsonView(callMichelsonViewCall {
+                        destination: "KT1abc".to_string(),
+                        viewName: "balanceOf".to_string(),
+                        input: vec![0u8; input_len].into(),
+                    })
+                    .abi_encode()
+                    .into();
+                let res = call_into(
+                    &mut host,
+                    caller,
+                    RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                    payload,
+                );
+                assert!(
+                    res.result.is_success(),
+                    "callMichelsonView should succeed, got {:?}",
+                    res.result
+                );
+                res.result.gas_used()
+            }
+
+            fn get_gas(body_len: usize) -> u64 {
+                let mut host = MockKernelHost::default();
+                let caller = Address::from([1u8; 20]);
+                fund_caller(&mut host, caller);
+                let payload = RuntimeGatewayCalls::call(callCall {
+                    url: "http://tezos/KT1abc/balanceOf".to_string(),
+                    headers: vec![],
+                    body: vec![0u8; body_len].into(),
+                    method: 0, // GET
+                })
+                .abi_encode()
+                .into();
+                let res = call_into(
+                    &mut host,
+                    caller,
+                    RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                    payload,
+                );
+                assert!(
+                    res.result.is_success(),
+                    "call(GET) should succeed, got {:?}",
+                    res.result
+                );
+                res.result.gas_used()
+            }
+
+            let view_slope = view_gas(33) - view_gas(32);
+            let get_slope = get_gas(33) - get_gas(32);
+            assert_eq!(
+                view_slope, get_slope,
+                "typed callMichelsonView and generic call(GET) must share \
+                 the per-word payload gas slope (view={view_slope}, \
+                 get={get_slope})"
+            );
+            // Guard against the slope collapsing to a no-op that would make
+            // the equality vacuously true.
+            assert!(
+                view_slope > 0,
+                "payload slope must be strictly positive, got {view_slope}"
             );
         }
     }

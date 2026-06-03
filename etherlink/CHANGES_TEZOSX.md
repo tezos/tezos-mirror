@@ -4,6 +4,14 @@
 
 ### EVM Runtime
 
+- The runtime gateway's typed `callMichelsonView` selector now charges
+  the same per-word payload surcharge as the generic `call(GET)` path,
+  on the inbound calldata, the outgoing view input body, and the
+  returned response body. Previously it only charged the flat base cost
+  plus the converted Michelson runtime gas, so a caller could use the
+  typed selector instead of `call(GET)` to avoid the gateway-internal
+  payload surcharge. The per-word gas-charging logic is now shared
+  across every gateway entrypoint. (!22044)
 - The first read-only gateway call (`callMichelsonView` or generic
   `call(..., GET)`) from an inbound cross-runtime frame now forwards the
   transitive originator as `X-Tezos-Source`, matching what the `ORIGIN`
