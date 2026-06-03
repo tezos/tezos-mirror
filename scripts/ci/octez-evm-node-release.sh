@@ -7,7 +7,7 @@ architectures='x86_64 arm64'
 
 # Full octez release tag
 # octez-evm-node-vX.Y, octez-evm-node-vX.Y-rcZ or octez-evm-node-vX.Y-betaZ
-gitlab_release=$(echo "${CI_COMMIT_TAG}" | grep -oE '^octez-evm-node-v([0-9]+)\.([0-9]+)$' || :)
+gitlab_release=$(echo "${CI_COMMIT_TAG}" | grep -oE '^octez-evm-node-v([0-9]+)\.([0-9]+)(-(rc|beta)?([0-9]+))?$' || :)
 
 # Strips the leading 'octez-evm-node-v'
 # X.Y, X.Y-rcZ or X.Y-betaZ
@@ -43,8 +43,13 @@ fi
 
 ### Compute GitLab generic package names
 
-suffix="${gitlab_release_no_v}"
-gitlab_octez_binaries_package_name="octez-evm-node-${suffix}"
+if [ -n "${gitlab_release_no_v}" ]; then
+  suffix="${gitlab_release_no_v}"
+  gitlab_octez_binaries_package_name="octez-evm-node-${suffix}"
+else
+  suffix=$(date +'%Y%m%d%H%M')+$CI_COMMIT_SHORT_SHA
+  gitlab_octez_binaries_package_name="octez-evm-node-${suffix}"
+fi
 
 # X.Y or X.Y-rcZ
 gitlab_package_version="${suffix}"
