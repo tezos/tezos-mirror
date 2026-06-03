@@ -746,16 +746,18 @@ let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
     (time_between_blocks : Evm_node.time_between_blocks) agent =
   let chain_id = 1 in
   let () = toplog "Initializing the tezlink scenario" in
-  let tezlink_config = Temp.file "l2-tezlink-config.yaml" in
+  let tezlink_config = Temp.file "tezlink-config.yaml" in
   let tez_bootstrap_accounts = Account.Bootstrap.keys |> Array.to_list in
-  let*! () =
-    Evm_node.make_l2_kernel_installer_config
+  let kernel_setup =
+    Evm_node.make_kernel_setup
       ~chain_id
-      ~chain_family:"Michelson"
       ~eth_bootstrap_accounts:[]
       ~tez_bootstrap_accounts
-      ~output:tezlink_config
+      ~with_runtimes:[Tezos]
       ()
+  in
+  let*! () =
+    Evm_node.make_kernel_installer_config kernel_setup ~output:tezlink_config ()
   in
   let* () = Process.spawn "cat" [tezlink_config] |> Process.check in
   let () = toplog "Configuring the kernel" in
@@ -781,21 +783,24 @@ let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
     }
   in
   let mode =
-    Evm_node.Tezlink_sandbox
+    Evm_node.Sandbox
       {
         sequencer_config;
+        network = None;
         funded_addresses = [];
-        verbose;
+        sequencer_keys = [];
         michelson_hard_gas_limit_per_block = None;
       }
   in
-  let () = toplog "Launching the sandbox L2 node" in
+  let () = toplog "Launching the TezosX sandbox node with Michelson runtime" in
   let rpc_port = proxy_internal_port sequencer_proxy in
+  let extra_arguments = if verbose then ["--verbose"] else [] in
   let* evm_node =
     Tezos.Evm_node.Agent.init
       ~initial_kernel:output
       ~preimages_dir
       ~private_rpc_port
+      ~extra_arguments
       ~patch_config:(fun json ->
         JSON.update
           "public_rpc"
@@ -815,14 +820,6 @@ let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
              ~blueprints_publisher_order_enabled:true
              ~rpc_server:Resto
              ~spawn_rpc
-             ~l2_chains:
-               [
-                 {
-                   (Evm_node.default_l2_setup ~l2_chain_id:chain_id) with
-                   l2_chain_family = "Michelson";
-                   tez_bootstrap_accounts = Some tez_bootstrap_accounts;
-                 };
-               ]
              ())
       ~name:"tezlink-sandboxed-sequencer"
       ~mode
