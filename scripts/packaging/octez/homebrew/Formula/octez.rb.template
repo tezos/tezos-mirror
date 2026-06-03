@@ -33,6 +33,10 @@ class Octez < Formula
     ENV["BLST_PORTABLE"]="yes"
     ENV["LDFLAGS"] = "-L#{HOMEBREW_PREFIX}/lib"
     ENV["DUNE_BUILD_JOBS"]="-j 12"
+    # opam tarballs embed uid/gid from their build machines; when tar runs as
+    # root it tries to chown extracted files to those non-existent ids and
+    # exits with code 2, causing opam install to fail depending on cache state.
+    ENV["TAR_OPTIONS"] = "--no-same-owner"
     if OS.mac?
       sdk_path = Utils.safe_popen_read("xcrun", "--show-sdk-path").chomp
       ENV["CPLUS_INCLUDE_PATH"] = "#{sdk_path}/usr/include/c++/v1" unless sdk_path.empty?
