@@ -7687,6 +7687,202 @@ let test_crac_receipt_tez_evm_tez =
     (List.nth internals 8) ;
   unit
 
+(* CRAC receipt — direct top-level gateway %call_evm that re-enters Michelson.
+ *
+ *  Unlike test_crac_receipt_tez_evm_tez, the top-level manager operation
+ *  targets the enshrined gateway's %call_evm entrypoint DIRECTLY, with no
+ *  intermediate Michelson contract.  The EVM contract it dispatches into
+ *  performs a nested EVM->Michelson CRAC back into [tez_inner]:
+ *
+ *    manager op --%call_evm--> EVM[evm_bridge] ~CRAC~> TEZ[tez_inner]
+ *
+ *  The nested EVM->Michelson leg is folded into the gateway op's
+ *  internal_operation_results (one top-level op per runtime per CRAC), and
+ *  tez_inner's witness counter is bumped.
+ *
+ *  This is the shape no other receipt test exercises (all others reach the
+ *  gateway through an intermediate Michelson contract, i.e. as an internal
+ *  op).  L2-1450. *)
+let test_crac_receipt_tez_gateway_direct_evm_tez =
+  register_crac_runner_test
+    ~title:"CRAC: TEZ direct gateway %call_evm -> EVM -> TEZ receipts"
+    ~tags:["crac_receipt"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "RCPT-GWDIRECT" in
+  let* tez_inner = TezMultiRunCaller.originate () in
+  let (`Tez_runner (_, tez_inner_kt1)) = tez_inner in
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_inner in
+  let (`Evm_runner evm_bridge_addr) = evm_bridge in
+  let*@ evm_bridge_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress evm_bridge_addr sequencer
+  in
+  (* Top-level manager op = the gateway's %call_evm, targeting
+     evm_bridge.run() which CRACs back into tez_inner. *)
+  let* () =
+    Gateway.call_evm
+      ~evm_target:evm_bridge
+      ~method_sig:"run()"
+      ~abi_params:""
+      ()
+  in
+  (* Durable execution is correct regardless of the receipt bug: the nested
+     EVM->Michelson leg bumps tez_inner's witness counter. *)
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_inner in
+  (* ── EVM side: the TEZ->EVM leg surfaces as one synthetic CRAC tx ── *)
+  let* _block =
+    check_evm_block_tx_count ~prefix ~expected_tx_count:1 sequencer
+  in
+  (* ── Michelson side: the gateway op and the folded nested leg ── *)
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  let op_list = JSON.(ops |> as_list) in
+  Log.info
+    "%s: Michelson runtime has %d manager op(s)"
+    prefix
+    (List.length op_list) ;
+  Check.(
+    (List.length op_list = 1) int ~error_msg:"Expected 1 Michelson op, got %L") ;
+  let top = JSON.(ops |=> 0 |-> "contents" |=> 0) in
+  Check.(
+    (JSON.(top |-> "destination" |> as_string) = gateway_address)
+      string
+      ~error_msg:"Expected top-level destination = gateway %R, got %L") ;
+  Check.(
+    (JSON.(top |-> "parameters" |-> "entrypoint" |> as_string) = "call_evm")
+      string
+      ~error_msg:"Expected top-level entrypoint %R, got %L") ;
+  let metadata = JSON.(top |-> "metadata") in
+  Check.(
+    (JSON.(metadata |-> "operation_result" |-> "status" |> as_string)
+    = "applied")
+      string
+      ~error_msg:"Expected top-level status %R, got %L") ;
+  let internals = JSON.(metadata |-> "internal_operation_results" |> as_list) in
+  Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
+  (* The nested EVM->Michelson leg is folded into the gateway op's internals.
+     Origin runtime is TEZ, so no synthetic CRAC event is emitted; the leg
+     surfaces as the re-entrant EVM->TEZ sub-sequence:
+       #0: origination alias(evm_bridge)            (re-entrant materialization)
+       #1: alias(evm_bridge) -> tez_inner (%run)
+       #2: tez_inner -> tez_inner (%_incrementWitness) *)
+  Check.(
+    (List.length internals = 3)
+      int
+      ~error_msg:
+        "Expected 3 internal ops (the nested EVM->Michelson leg), got %L") ;
+  check_crac_internal_alias_origination
+    ~prefix:(prefix ^ "#0")
+    ~expected_nonce:0
+    ~expected_alias_kt1:evm_bridge_alias
+    ~expected_status:"applied"
+    (List.nth internals 0) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#1")
+    ~expected_nonce:1
+    ~expected_source:evm_bridge_alias
+    ~expected_destination:tez_inner_kt1
+    ~expected_entrypoint:"run"
+    ~expected_status:"applied"
+    (List.nth internals 1) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#2")
+    ~expected_nonce:2
+    ~expected_source:tez_inner_kt1
+    ~expected_destination:tez_inner_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 2) ;
+  unit
+
+(* CRAC receipt — direct top-level gateway %call_evm whose nested Michelson
+ *  leg REVERTS.  Negative-path counterpart of
+ *  test_crac_receipt_tez_gateway_direct_evm_tez.
+ *
+ *    manager op --%call_evm--> EVM[evm_bridge] ~CRAC~> TEZ[tez_reverter] (revert)
+ *
+ *  The failed nested leg is folded into the gateway op's internals with
+ *  failed / backtracked statuses, and the top-level op fails.  L2-1450. *)
+let test_crac_receipt_tez_gateway_direct_evm_tez_revert =
+  register_crac_runner_test
+    ~title:"CRAC: TEZ direct gateway %call_evm -> EVM -> TEZ revert receipts"
+    ~tags:["crac_receipt"; "revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "RCPT-GWDIRECT-REV" in
+  let* tez_reverter = TezMultiRunCaller.originate ~revert:true () in
+  let (`Tez_runner (_, tez_reverter_kt1)) = tez_reverter in
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_reverter in
+  let (`Evm_runner evm_bridge_addr) = evm_bridge in
+  let*@ evm_bridge_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress evm_bridge_addr sequencer
+  in
+  (* Top-level manager op = the gateway's %call_evm targeting
+     evm_bridge.run(), whose nested CRAC into tez_reverter reverts. *)
+  let* () =
+    Gateway.call_evm
+      ~evm_target:evm_bridge
+      ~method_sig:"run()"
+      ~abi_params:""
+      ()
+  in
+  (* Reverted: tez_reverter's witness counter stays at 0. *)
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_reverter in
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  let op_list = JSON.(ops |> as_list) in
+  Check.(
+    (List.length op_list = 1) int ~error_msg:"Expected 1 Michelson op, got %L") ;
+  let top = JSON.(ops |=> 0 |-> "contents" |=> 0) in
+  Check.(
+    (JSON.(top |-> "destination" |> as_string) = gateway_address)
+      string
+      ~error_msg:"Expected top-level destination = gateway %R, got %L") ;
+  Check.(
+    (JSON.(top |-> "parameters" |-> "entrypoint" |> as_string) = "call_evm")
+      string
+      ~error_msg:"Expected top-level entrypoint %R, got %L") ;
+  let metadata = JSON.(top |-> "metadata") in
+  let internals = JSON.(metadata |-> "internal_operation_results" |> as_list) in
+  Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
+  (* The failed nested EVM->Michelson leg is folded into the gateway op's
+     internals.  Origin runtime is TEZ, so no synthetic CRAC event is
+     emitted; the leg surfaces as the re-entrant EVM->TEZ sub-sequence:
+       #0: origination alias(evm_bridge)            -- backtracked
+       #1: alias(evm_bridge) -> tez_reverter (%run) -- failed
+       #2: tez_reverter -> tez_reverter (%_revert)  -- failed
+     The alias materialization is backtracked (applied then rolled back when
+     the leg reverts); the top-level gateway op fails. *)
+  Check.(
+    (JSON.(metadata |-> "operation_result" |-> "status" |> as_string) = "failed")
+      string
+      ~error_msg:"Expected top-level status %R, got %L") ;
+  Check.(
+    (List.length internals = 3)
+      int
+      ~error_msg:"Expected 3 internal ops for the failed nested leg, got %L") ;
+  check_crac_internal_alias_origination
+    ~prefix:(prefix ^ "#0")
+    ~expected_nonce:0
+    ~expected_alias_kt1:evm_bridge_alias
+    ~expected_status:"backtracked"
+    (List.nth internals 0) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#1")
+    ~expected_nonce:1
+    ~expected_source:evm_bridge_alias
+    ~expected_destination:tez_reverter_kt1
+    ~expected_entrypoint:"run"
+    ~expected_status:"failed"
+    (List.nth internals 1) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#2")
+    ~expected_nonce:2
+    ~expected_source:tez_reverter_kt1
+    ~expected_destination:tez_reverter_kt1
+    ~expected_entrypoint:"_revert"
+    ~expected_status:"failed"
+    (List.nth internals 2) ;
+  unit
+
 (* EVM→TEZ→EVM→TEZ triple crossing — nested CRAC that re-enters TEZ.
  * Mirrors test_crac_receipt_tez_evm_tez but starts from EVM, exercising
  * a nested CRAC within the same runtime (TEZ appears twice).
@@ -12022,6 +12218,8 @@ let () =
   test_crac_receipt_separate_tx_two_cracs [Alpha] ;
   test_crac_receipt_evm_tez_evm [Alpha] ;
   test_crac_receipt_tez_evm_tez [Alpha] ;
+  test_crac_receipt_tez_gateway_direct_evm_tez [Alpha] ;
+  test_crac_receipt_tez_gateway_direct_evm_tez_revert [Alpha] ;
   test_crac_receipt_evm_tez_evm_tez [Alpha] ;
   test_crac_receipt_evm_to_tez_revert [Alpha] ;
   test_crac_receipt_two_failed_independent [Alpha] ;
