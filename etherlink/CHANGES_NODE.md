@@ -8,6 +8,12 @@
 
 ### RPCs changes
 
+- `eth_sendRawTransaction` now rejects EIP-7702 (type-4) transactions that have
+  no destination address (`to = null`). Contract creation is forbidden for
+  type-4 transactions per EIP-7702; such a transaction was previously admitted
+  and could later invalidate the whole produced blueprint instead of being
+  rejected at submission. (!XXXXX)
+
 ### Monitoring changes
 
 ### Command-line interface changes

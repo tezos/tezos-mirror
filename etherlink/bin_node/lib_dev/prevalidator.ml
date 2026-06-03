@@ -349,6 +349,15 @@ let validate_authorizations txn =
   let open Lwt_result_syntax in
   let authorization_list = Transaction_object.authorization_list txn in
   if not (Transaction_object.is_eip7702 txn) then return (Ok ())
+  else if Option.is_none (Transaction_object.to_ txn) then
+    (* EIP-7702 type-4 transactions cannot create contracts: a destination
+       address is mandatory. A type-4 transaction with [to = null] is rejected
+       by the kernel as a block-level error (revm fails to derive the
+       transaction type, "missing target for EIP-7702"), which invalidates the
+       whole blueprint instead of being recorded as a failed transaction.
+       Reject it at admission so it never enters the tx pool or a produced
+       blueprint. *)
+    return (Error "EIP-7702 transaction must have a destination address.")
   else if List.is_empty authorization_list then
     return (Error "Authorization list cannot be empty per EIP-7702.")
   else
