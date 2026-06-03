@@ -28,9 +28,6 @@ use octez_riscv::pvm::outbox::OutboxMessage;
 use octez_riscv::pvm::outbox::OutboxProof;
 use octez_riscv::pvm::outbox::Output as PvmOutput;
 use octez_riscv::pvm::outbox::OutputInfo as PvmOutputInfo;
-use octez_riscv::state_backend::proof_backend::proof::Proof as PvmProof;
-use octez_riscv::state_backend::proof_backend::proof::deserialise_proof;
-use octez_riscv::state_backend::proof_backend::proof::serialise_proof;
 use octez_riscv::stepper::pvm::verify_outbox_proof;
 use octez_riscv::storage::StorageError;
 use octez_riscv::storage::Store;
@@ -42,6 +39,9 @@ use octez_riscv_api_common::move_semantics::MutableState;
 use octez_riscv_api_common::safe_pointer::SafePointer;
 use octez_riscv_api_common::try_clone::TryClone;
 use octez_riscv_data::hash;
+use octez_riscv_data::merkle_proof::proof::Proof as PvmProof;
+use octez_riscv_data::merkle_proof::proof::deserialise_proof;
+use octez_riscv_data::merkle_proof::proof::serialise_proof;
 use octez_riscv_data::merkle_proof::proof_tree::MerkleProof;
 use octez_riscv_data::mode::Normal;
 use octez_riscv_data::mode::Verify;
@@ -602,8 +602,10 @@ impl Proof {
     ) -> Result<R, String> {
         let mut guard = self.verifier.lock();
         if guard.is_none() {
-            let (proof, node_pvm) = deserialise_proof(self.serialised_proof.iter().copied())
+            let (proof, node_pvm_state) = deserialise_proof(self.serialised_proof.iter().copied())
                 .map_err(|e| e.to_string())?;
+            let node_pvm = NodePvm::wrap(node_pvm_state);
+
             *guard = Some((node_pvm, proof.into_tree()));
         }
         Ok(f(guard.as_ref().expect(
@@ -621,8 +623,10 @@ impl Proof {
             return Ok(verifier);
         }
 
-        let (proof, node_pvm) =
+        let (proof, node_pvm_state) =
             deserialise_proof(self.serialised_proof.iter().copied()).map_err(|e| e.to_string())?;
+        let node_pvm = NodePvm::wrap(node_pvm_state);
+
         Ok((node_pvm, proof.into_tree()))
     }
 }
@@ -688,8 +692,9 @@ pub unsafe fn octez_riscv_serialise_proof(proof: SafePointer<Proof>) -> BytesWra
 pub fn octez_riscv_deserialise_proof(bytes: &[u8]) -> Result<SafePointer<Proof>, String> {
     let iter = bytes.iter().copied();
 
-    let (proof, node_pvm): (PvmProof, NodePvm<Verify, EmptyPageCache>) =
-        deserialise_proof(iter).map_err(|e| e.to_string())?;
+    let (proof, node_pvm_state) = deserialise_proof(iter).map_err(|e| e.to_string())?;
+    let node_pvm = NodePvm::wrap(node_pvm_state);
+
     let final_state_hash = proof.final_state_hash();
     let merkle_tree = proof.into_tree();
 
