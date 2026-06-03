@@ -5304,8 +5304,8 @@ let test_deep_type_in_invalid_arg_error =
   if not (stderr =~ rex "Pair\\(Int") then
     Test.fail
       ~__LOC__
-      "expected the rejection to carry the deep parameter type \
-       (Pair(Int, ...)); the deep-Type Debug formatting path was not exercised" ;
+      "expected the rejection to carry the deep parameter type (Pair(Int, \
+       ...)); the deep-Type Debug formatting path was not exercised" ;
   let*@ _ = produce_block sequencer in
   unit
 
