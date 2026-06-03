@@ -85,7 +85,7 @@ oc.docker:rust-sdk-bindings:amd64:
   variables:
     DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "false"
-    IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-05e36a5c
+    IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
   artifacts:
     reports:
       dotenv: rust_sdk_bindings_image_tag.env
@@ -2708,7 +2708,7 @@ test_sdk_rust:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 oc.compile_sources_doc:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-build:trixie-master-05e36a5c
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-build:trixie-master-100afa6d
   stage: test
   tags:
   - gcp_very_high_cpu_ramfs
@@ -3785,7 +3785,7 @@ documentation.linkcheck:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.install_python_trixie:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-05e36a5c
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
   stage: test
   tags:
   - gcp
