@@ -16,6 +16,13 @@
   `--michelson-hard-gas-limit-per-block` to raise the Michelson per-block
   gas cap (default 3M). Sandbox-only; intended for capacity benchmarking.
   (!21968)
+- Add a `compress store` command that compresses the legacy uncompressed rows of
+  the SQLite store with zstd and reclaims disk space via `VACUUM INTO`. The
+  migration is incremental and resumable: it persists its progress and resumes
+  where it left off if interrupted, and is a no-op once the store is fully
+  compressed. The node must not be running, and
+  `experimental_features.sqlite_compression` must be set in the configuration
+  file. (!21776)
 
 ### Execution changes
 
@@ -29,6 +36,15 @@
 features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
+
+- Add an opt-in `experimental_features.sqlite_compression` option enabling
+  column-level zstd compression of the SQLite store's largest BLOB columns
+  (block payloads, transaction receipts and objects). New writes are compressed
+  inline, both compressed and legacy uncompressed rows are read transparently,
+  and the legacy rows can be migrated incrementally with the `compress store`
+  command. Set it to `true` for the defaults, or to an object with explicit
+  `compression_level` and `batch_size` to tune it. On a full mainnet database
+  this yields an ~82% size reduction. (!21775, !21776, !22043)
 
 ## Version 0.60 (2026-06-01)
 

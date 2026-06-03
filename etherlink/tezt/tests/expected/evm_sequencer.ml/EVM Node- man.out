@@ -711,6 +711,17 @@ Snapshots commands:
 
 Storage commands:
 
+  compress store [--data-dir <data-dir>] [--config-file <path>]
+    Compress legacy uncompressed rows in the SQLite store using zstd. Requires
+    experimental_features.sqlite_compression to be set in the configuration file. The node
+    must not be running.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default is
+      $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`.
+    --config-file <path>: Path to a configuration file. Defaults to `config.json` inside the
+      data directory of the node.
+      If set, defaults to the value of the environment variable `$EVM_NODE_CONFIG_FILE`.
+  
   switch history to <history> [--data-dir <data-dir>] [--config-file <path>]
     Switch history mode of the node.
     <history>: History mode for the EVM node. `archive`: keeps all data indefinitely.

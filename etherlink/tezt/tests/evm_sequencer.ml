@@ -16290,6 +16290,402 @@ let test_fa_withdrawal_eip7702_eoa =
     ~error_msg:"After both withdrawals we expect %L ticket balance, got %R" ;
   unit
 
+let patch_config_sqlite_compression value =
+  JSON.update
+    "experimental_features"
+    (JSON.put
+       ("sqlite_compression", JSON.annotate ~origin:"sqlite_compression" value))
+
+let compression_check_rpcs sequencer ~tx_hash =
+  let*@! receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
+  Check.((receipt.transactionHash = tx_hash) string)
+    ~error_msg:"eth_getTransactionReceipt hash mismatch: %L vs %R" ;
+  let*@ block_obj =
+    Rpc.get_block_by_number
+      ~block:(Int32.to_string receipt.blockNumber)
+      ~full_tx_objects:true
+      sequencer
+  in
+  Check.((block_obj.number = receipt.blockNumber) int32)
+    ~error_msg:"eth_getBlockByNumber: expected %R, got %L" ;
+  let* block_receipts =
+    Evm_node.(
+      jsonrpc
+        sequencer
+        {
+          method_ = "eth_getBlockReceipts";
+          parameters = `A [`String (Format.sprintf "%#lx" block_obj.number)];
+        })
+  in
+  Check.is_true
+    ~__LOC__
+    (JSON.(block_receipts |-> "result" |> as_list) <> [])
+    ~error_msg:"eth_getBlockReceipts should return non-empty receipts" ;
+  unit
+
+(* keccak256("LogValue(uint256)") — topic 0 emitted by [SimpleLogger] for the
+   single indexed [value] argument. Matches the contract at
+   [etherlink/kernel_latest/solidity_examples/simple_logger.sol]. *)
+let log_value_event_topic =
+  let h =
+    Tezos_crypto.Hacl.Hash.Keccak_256.digest
+      (Bytes.of_string "LogValue(uint256)")
+  in
+  "0x" ^ Hex.show (Hex.of_bytes h)
+
+let hex_256_of_int n = Printf.sprintf "0x%064x" n
+
+(* Deploys [SimpleLogger] from [bootstrap_accounts.(0)] and registers its
+   ABI with eth-cli. Returns the deployed address and the ABI label, both
+   needed by [send_compression_test_logvalue] below. The deployment is
+   itself a transaction whose receipt-fields/object-fields BLOBs are
+   wide enough to be a representative compression workload. *)
+let setup_simple_logger sequencer =
+  let* simple_logger = Solidity_contracts.simple_logger Evm_version.Cancun in
+  let* () =
+    Eth_cli.add_abi ~label:simple_logger.label ~abi:simple_logger.abi ()
+  in
+  let* address, _deploy_tx =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:simple_logger.label
+         ~bin:simple_logger.bin)
+      sequencer
+  in
+  return (address, simple_logger.label)
+
+(* Calls [SimpleLogger.logValue(value)] from [bootstrap_accounts.(0)]. The
+   resulting receipt has one [LogValue(uint256)] log entry with [value] as
+   its second indexed topic — both the receipt and the bloom filter are
+   non-trivial, so the [transactions.{receipt,object}_fields] BLOBs are
+   meaningfully compressible. *)
+let send_compression_test_logvalue ~logger:(address, abi_label) ~value sequencer
+    =
+  send_transaction_to_sequencer
+    (Eth_cli.contract_send
+       ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+       ~endpoint:(Evm_node.endpoint sequencer)
+       ~abi_label
+       ~address
+       ~method_call:(Format.sprintf "logValue(%d)" value))
+    sequencer
+
+(* Plain ETH transfer: receipt has no logs and an all-zero bloom. Used in
+   the [eth_getLogs] test alongside [send_compression_test_logvalue] so
+   the [transactions] table contains both log-bearing and zero-bloom rows
+   under the bloom prefilter. *)
+let send_compression_test_transfer sequencer =
+  send_transaction_to_sequencer
+    (Eth_cli.transaction_send
+       ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+       ~to_public_key:"0xB7A97043983f24991398E5a82f63F4C58a417185"
+       ~value:(Wei.of_eth_int 10)
+       ~endpoint:(Evm_node.endpoint sequencer))
+    sequencer
+
+(* Read the first [n] bytes of [column] for the row at [rowid] in
+   [table], returned as an upper-case hex string (no [0x] prefix). Used
+   to peek at storage-class-and-compression metadata of EVM-store rows
+   without going through the node's RPCs. *)
+let read_first_bytes_hex ~data_dir ~table ~column ~rowid ~n =
+  let db = Filename.concat data_dir "store.sqlite" in
+  let sql =
+    Format.sprintf
+      "SELECT hex(substr(%s, 1, %d)) FROM %s WHERE rowid = %d"
+      column
+      n
+      table
+      rowid
+  in
+  let* output = Process.run_and_read_stdout "sqlite3" [db; sql] in
+  Lwt.return (String.trim output)
+
+let test_sqlite_compression_migration () =
+  Test.register
+    ~__FILE__
+    ~title:"SQLite compression migration end-to-end"
+    ~tags:["evm"; "sequencer"; "sqlite_compression"]
+    ~uses_admin_client:false
+    ~uses_client:false
+    ~uses_node:false
+    ~uses:
+      [
+        Constant.octez_evm_node;
+        Constant.WASM.evm_kernel;
+        Constant.smart_rollup_installer;
+      ]
+  @@ fun () ->
+  Log.info "Starting sequencer without compression" ;
+  let* sequencer = init_sequencer_sandbox () in
+  let*@ _ = produce_block sequencer in
+  Log.info "Deploy SimpleLogger so subsequent transactions emit real logs" ;
+  let* logger = setup_simple_logger sequencer in
+  Log.info "Sending transaction on uncompressed database" ;
+  let* tx_hash_before =
+    send_compression_test_logvalue ~logger ~value:0 sequencer
+  in
+  let* () = compression_check_rpcs sequencer ~tx_hash:tx_hash_before in
+
+  Log.info "Stop, enable compression, run 'compress store' command" ;
+  let* () = Evm_node.terminate sequencer in
+  let* () =
+    Evm_node.Config_file.update
+      sequencer
+      (patch_config_sqlite_compression (`Bool true))
+  in
+  let* () = Evm_node.compress_store sequencer in
+
+  Log.info "Start node — pre-migration data still readable after the wrap" ;
+  let* () = Evm_node.run sequencer in
+  let* () = compression_check_rpcs sequencer ~tx_hash:tx_hash_before in
+  Log.info "New transaction is written through zstd_compress" ;
+  let* tx_hash_after =
+    send_compression_test_logvalue ~logger ~value:1 sequencer
+  in
+  let* () = compression_check_rpcs sequencer ~tx_hash:tx_hash_after in
+
+  Log.info
+    "Stop, run 'compress store' again — fully-migrated DB should be a no-op" ;
+  let* () = Evm_node.terminate sequencer in
+  let* () = Evm_node.compress_store sequencer in
+
+  Log.info "Both pre- and post-migration rows survive a clean restart" ;
+  let* () = Evm_node.run sequencer in
+  let* () = compression_check_rpcs sequencer ~tx_hash:tx_hash_before in
+  let* () = compression_check_rpcs sequencer ~tx_hash:tx_hash_after in
+  unit
+
+let test_sqlite_compression_migration_resume () =
+  Test.register
+    ~__FILE__
+    ~title:"SQLite compression migration resumes after crash"
+    ~tags:["evm"; "sequencer"; "sqlite_compression"]
+    ~uses_admin_client:false
+    ~uses_client:false
+    ~uses_node:false
+    ~uses:
+      [
+        Constant.octez_evm_node;
+        Constant.WASM.evm_kernel;
+        Constant.smart_rollup_installer;
+      ]
+  @@ fun () ->
+  Log.info "Pre-populate uncompressed DB with several blocks/txs" ;
+  let* sequencer = init_sequencer_sandbox () in
+  let* logger = setup_simple_logger sequencer in
+  let* first_tx_hash =
+    send_compression_test_logvalue ~logger ~value:0 sequencer
+  in
+  let* () =
+    Lwt_list.iter_s
+      (fun i ->
+        let* _ =
+          send_compression_test_logvalue ~logger ~value:(i + 1) sequencer
+        in
+        unit)
+      (List.init 5 Fun.id)
+  in
+  let* () = Evm_node.terminate sequencer in
+
+  Log.info "Enable compression with batch_size=1 to maximise progress events" ;
+  let* () =
+    Evm_node.Config_file.update
+      sequencer
+      (patch_config_sqlite_compression (`O [("batch_size", `Float 1.)]))
+  in
+
+  Log.info
+    "Spawn 'compress store', kill it after a short delay to simulate a crash" ;
+  let proc = Evm_node.spawn_compress_store sequencer in
+  let* () = Lwt_unix.sleep 0.5 in
+  Process.kill proc ;
+  let* _status = Process.wait proc in
+
+  Log.info "Run 'compress store' again — should resume and complete" ;
+  let* () = Evm_node.compress_store sequencer in
+
+  Log.info "Verify a pre-crash transaction is still readable" ;
+  let* () = Evm_node.run sequencer in
+  let* () = compression_check_rpcs sequencer ~tx_hash:first_tx_hash in
+  unit
+
+let test_sqlite_compression_disable_on_partial_db () =
+  Test.register
+    ~__FILE__
+    ~title:"SQLite compression disabled on a partially-compressed DB"
+    ~tags:["evm"; "sequencer"; "sqlite_compression"]
+    ~uses_admin_client:false
+    ~uses_client:false
+    ~uses_node:false
+    ~uses:
+      [
+        Constant.octez_evm_node;
+        Constant.WASM.evm_kernel;
+        Constant.smart_rollup_installer;
+      ]
+  @@ fun () ->
+  Log.info "Start with compression enabled" ;
+  let* sequencer =
+    init_sequencer_sandbox
+      ~patch_config:(patch_config_sqlite_compression (`Bool true))
+      ()
+  in
+  let* logger = setup_simple_logger sequencer in
+  let* tx_hash_compressed =
+    send_compression_test_logvalue ~logger ~value:0 sequencer
+  in
+
+  Log.info "Stop, disable compression, restart" ;
+  let* () = Evm_node.terminate sequencer in
+  let* () =
+    Evm_node.Config_file.update
+      sequencer
+      (patch_config_sqlite_compression (`Bool false))
+  in
+  let* () = Evm_node.run sequencer in
+  (* Produce one empty block first: this settles the post-restart chain
+     state and lets the tx pool catch up before we submit a transaction
+     through eth-cli (which would otherwise race the produceBlock call). *)
+  let*@ _ = produce_block sequencer in
+  let* tx_hash_uncompressed =
+    send_compression_test_logvalue ~logger ~value:1 sequencer
+  in
+
+  Log.info "Inspect on-disk receipt_fields for log-bearing rows" ;
+  let* () = Evm_node.terminate sequencer in
+  let data_dir = Evm_node.data_dir sequencer in
+  let zstd_magic = "28B52FFD" in
+  (* Row 1 is the [SimpleLogger] deployment from [setup_simple_logger];
+     row 2 is the compressed [logValue] write before the flag flip;
+     row 3 is the uncompressed [logValue] write after the flag flip. *)
+  let* prefix_compressed =
+    read_first_bytes_hex
+      ~data_dir
+      ~table:"transactions"
+      ~column:"receipt_fields"
+      ~rowid:2
+      ~n:4
+  in
+  Check.((prefix_compressed = zstd_magic) string)
+    ~error_msg:
+      "row 2 (compressed write) should start with the zstd magic %R, got %L" ;
+  let* prefix_uncompressed =
+    read_first_bytes_hex
+      ~data_dir
+      ~table:"transactions"
+      ~column:"receipt_fields"
+      ~rowid:3
+      ~n:4
+  in
+  Check.((prefix_uncompressed <> zstd_magic) string)
+    ~error_msg:
+      "row 3 (compression disabled) should not start with the zstd magic, got \
+       %L" ;
+
+  Log.info "Restart still disabled — both rows must read fine" ;
+  let* () = Evm_node.run sequencer in
+  let* () = compression_check_rpcs sequencer ~tx_hash:tx_hash_compressed in
+  let* () = compression_check_rpcs sequencer ~tx_hash:tx_hash_uncompressed in
+  unit
+
+(* Exercises the SQL composition
+   [receipt_contains_bloom_filter(zstd_decompress(...), ?)] from
+   [Evm_store.Q.Transactions.receipts_of_block_range]: an [eth_getLogs]
+   query goes through both extensions in order, so a wrong wiring (e.g.
+   bloom filter applied to compressed bytes, or decompression bypassed
+   for compressed rows) would either return zero results, return wrong
+   results, or crash when the bloom UDF reads zstd-framed bytes as a
+   bitmap. *)
+let test_sqlite_compression_eth_get_logs () =
+  Test.register
+    ~__FILE__
+    ~title:
+      "SQLite compression: eth_getLogs with bloom filter on compressed receipts"
+    ~tags:["evm"; "sequencer"; "sqlite_compression"; "bloom"; "eth_get_logs"]
+    ~uses_admin_client:false
+    ~uses_client:false
+    ~uses_node:false
+    ~uses:
+      [
+        Constant.octez_evm_node;
+        Constant.WASM.evm_kernel;
+        Constant.smart_rollup_installer;
+      ]
+  @@ fun () ->
+  Log.info "Start sequencer with compression enabled from the start" ;
+  let* sequencer =
+    init_sequencer_sandbox
+      ~patch_config:(patch_config_sqlite_compression (`Bool true))
+      ()
+  in
+  let* ((logger_address, _) as logger) = setup_simple_logger sequencer in
+
+  Log.info
+    "Emit %d distinct LogValue events, interleaved with plain transfers"
+    10 ;
+  let log_values = List.init 10 Fun.id in
+  let* () =
+    Lwt_list.iter_s
+      (fun i ->
+        let* _ = send_compression_test_logvalue ~logger ~value:i sequencer in
+        let* _ = send_compression_test_transfer sequencer in
+        unit)
+      log_values
+  in
+
+  Log.info "eth_getLogs with topic filter for value=5 returns exactly one log" ;
+  let target_value = 5 in
+  let*@ matched_logs =
+    Rpc.get_logs
+      ~from_block:(Number 0)
+      ~address:(Single logger_address)
+      ~topics:[[log_value_event_topic]; [hex_256_of_int target_value]]
+      sequencer
+  in
+  (match matched_logs with
+  | [log] ->
+      let topics = log.Transaction.topics in
+      Check.((List.length topics = 2) int ~__LOC__)
+        ~error_msg:"expected 2 topics on the matched log, got %L" ;
+      Check.((List.nth topics 0 = log_value_event_topic) string ~__LOC__)
+        ~error_msg:"expected event-signature topic %R, got %L" ;
+      Check.((List.nth topics 1 = hex_256_of_int target_value) string ~__LOC__)
+        ~error_msg:"expected indexed value %R, got %L"
+  | _ ->
+      Test.fail
+        "eth_getLogs with topic [LogValue, value=%d] should return exactly one \
+         log, got %d"
+        target_value
+        (List.length matched_logs)) ;
+
+  Log.info "eth_getLogs with a topic that no transaction emitted returns []" ;
+  let absent_value = 999 in
+  let*@ no_logs =
+    Rpc.get_logs
+      ~from_block:(Number 0)
+      ~address:(Single logger_address)
+      ~topics:[[log_value_event_topic]; [hex_256_of_int absent_value]]
+      sequencer
+  in
+  Check.((List.length no_logs = 0) int ~__LOC__)
+    ~error_msg:"eth_getLogs for an unemitted topic should be empty, got %L" ;
+
+  Log.info "eth_getLogs across all topics returns one log per logValue call" ;
+  let*@ all_logs =
+    Rpc.get_logs
+      ~from_block:(Number 0)
+      ~address:(Single logger_address)
+      ~topics:[[log_value_event_topic]]
+      sequencer
+  in
+  Check.((List.length all_logs = List.length log_values) int ~__LOC__)
+    ~error_msg:
+      "eth_getLogs across the whole address+topic-0 filter should return %R \
+       logs (one per logValue call), got %L" ;
+  unit
+
 let protocols = [Protocol.Alpha]
 
 let () =
@@ -16491,4 +16887,8 @@ let () =
   test_locked_tx_queue_timestamp () ;
   test_next_block_info_ic_reset () ;
   test_eip7702_stale_auth_is_skipped [Alpha] ;
-  test_tezosx_single_tx_execution_input ()
+  test_tezosx_single_tx_execution_input () ;
+  test_sqlite_compression_migration () ;
+  test_sqlite_compression_migration_resume () ;
+  test_sqlite_compression_disable_on_partial_db () ;
+  test_sqlite_compression_eth_get_logs ()

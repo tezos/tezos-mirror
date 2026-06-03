@@ -122,6 +122,25 @@ type websockets_config = {
   rate_limit : websocket_rate_limit option;
 }
 
+(** Optional zstd compression of the large BLOB columns in
+    {!val:Evm_store.Transactions.store}, {!val:Evm_store.Blocks.store},
+    and {!val:Evm_store.Blueprints.store}. All fields have sensible
+    defaults. Because this sits under {!type:experimental_features}
+    the shape is allowed to evolve without a backward-compatibility
+    promise.
+
+    Note: a disable→re-enable cycle does not re-migrate. Any rows
+    written while the flag was off remain uncompressed, the cursor
+    table's fast path skips the migration on next startup, and the
+    storage savings on those rows are only realized when they are
+    rewritten. *)
+type sqlite_compression_config = {
+  compression_level : int;  (** zstd compression level used at INSERT time. *)
+  batch_size : int;
+      (** Maximum number of rows processed in a single migration batch
+          UPDATE. *)
+}
+
 (** Configuration settings for experimental features, with no backward
     compatibility guarantees. *)
 type experimental_features = {
@@ -135,7 +154,12 @@ type experimental_features = {
   periodic_snapshot_path : string option;
   preconfirmation_stream_enabled : bool;
   compact_receipt_encoding : bool;
+  sqlite_compression : sqlite_compression_config option;
 }
+
+(** Default zstd compression configuration (compression level 3,
+    10000-row batch size). *)
+val default_sqlite_compression_config : sqlite_compression_config
 
 type gcp_key = {
   project : string;

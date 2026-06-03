@@ -20,7 +20,7 @@ class Octez < Formula
     depends_on dependency => :build
   end
 
-  dependencies = %w[gmp hidapi libev libffi libpq]
+  dependencies = %w[gmp hidapi libev libffi libpq zstd]
   dependencies.each do |dependency|
     depends_on dependency
   end

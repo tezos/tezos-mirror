@@ -1606,6 +1606,11 @@ let reset evm_node ~l2_level =
   let process = Process.spawn evm_node.path @@ args in
   Process.check process
 
+let spawn_compress_store evm_node =
+  spawn_command evm_node (["compress"; "store"] @ data_dir_arg evm_node)
+
+let compress_store evm_node = Process.check (spawn_compress_store evm_node)
+
 let sequencer_upgrade_payload ?client ~public_key ~pool_address
     ~activation_timestamp () =
   let args =

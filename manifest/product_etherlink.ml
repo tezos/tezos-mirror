@@ -382,6 +382,7 @@ let evm_node_lib_dev =
         lwt_domain;
         octez_layer2_shell;
         evm_node_sqlite_receipt_bloom;
+        octez_sqlite_zstd;
       ]
 
 let floodgate_lib =

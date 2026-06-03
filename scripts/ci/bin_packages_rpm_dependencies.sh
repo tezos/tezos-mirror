@@ -23,4 +23,4 @@ dnf install -y \
   python3-setuptools wget rsync which cargo autoconf mock \
   systemd systemd-rpm-macros cmake python3-wheel \
   python3-tox-current-env gcc-c++ protobuf-compiler protobuf-devel \
-  sqlite-devel jq openssl-devel
+  sqlite-devel libzstd-devel jq openssl-devel

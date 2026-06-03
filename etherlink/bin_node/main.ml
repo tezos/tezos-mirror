@@ -3804,6 +3804,37 @@ let desync_import_snapshot_command =
       in
       return_unit)
 
+let compress_store_command =
+  let open Tezos_clic in
+  command
+    ~group:Groups.storage
+    ~desc:
+      "Compress legacy uncompressed rows in the SQLite store using zstd. \
+       Requires experimental_features.sqlite_compression to be set in the \
+       configuration file. The node must not be running."
+    (args2 data_dir_arg config_path_arg)
+    (prefixes ["compress"; "store"] @@ stop)
+    (fun (data_dir, config_file) () ->
+      let open Lwt_result_syntax in
+      let open Evm_node_lib_dev in
+      let config_file =
+        Configuration.config_filename ~data_dir ?config_file ()
+      in
+      let* config = load_file config_file in
+      let*! () = init_logs ~daily_logs:false config in
+      match config.experimental_features.sqlite_compression with
+      | None ->
+          failwith
+            "experimental_features.sqlite_compression is not set in the \
+             configuration file. Please enable it before running 'compress \
+             store'."
+      | Some sqlite_compression ->
+          Evm_store.compress_store
+            ~sqlite_compression
+            ~chain_family:Evm_node_lib_dev_encoding.L2_types.EVM
+            ~data_dir:config.data_dir
+            ())
+
 let switch_history_mode_command =
   let open Tezos_clic in
   command
@@ -4137,6 +4168,7 @@ let commands =
     desync_snapshot_info_command;
     desync_export_snapshot_command;
     desync_import_snapshot_command;
+    compress_store_command;
     switch_history_mode_command;
     show_kms_key_info_command;
     chunker_command;
