@@ -774,151 +774,225 @@ pub enum TypedValue<'a> {
 /// error messages; no consumer parses it.
 impl<'a> std::fmt::Debug for TypedValue<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        enum Frame<'b, 'a: 'b> {
-            Visit(&'b TypedValue<'a>),
-            Str(&'static str),
-            // Iterate over a Map's (key, value) pairs without recursing
-            // into the BTreeMap's auto Debug (which would walk values
-            // recursively).
-            // The `bool` is `first`: whether the next entry is the first in
-            // the container, so the ", " separator is emitted *before* every
-            // non-first entry (no trailing comma).
-            MapEntries(
-                std::collections::btree_map::Iter<'b, Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
-                bool,
-            ),
-            SetEntries(std::collections::btree_set::Iter<'b, Rc<TypedValue<'a>>>, bool),
-            ListEntries(crate::ast::michelson_list::Iter<'b, Rc<TypedValue<'a>>>, bool),
-        }
-        use TypedValue as TV;
-        let mut stack: Vec<Frame> = vec![Frame::Visit(self)];
-        while let Some(frame) = stack.pop() {
-            match frame {
-                Frame::Str(s) => f.write_str(s)?,
-                Frame::MapEntries(mut it, first) => {
-                    if let Some((k, v)) = it.next() {
-                        // Re-push the iterator so further entries follow this
-                        // key/value pair; emit ", " before this pair unless it
-                        // is the first (so there is no trailing comma).
-                        stack.push(Frame::MapEntries(it, false));
-                        stack.push(Frame::Visit(v.as_ref()));
-                        stack.push(Frame::Str(" -> "));
-                        stack.push(Frame::Visit(k.as_ref()));
-                        if !first {
-                            stack.push(Frame::Str(", "));
-                        }
+        debug_fmt_walk(DebugFrame::VisitTv(self), f)
+    }
+}
+
+/// Frames shared between [`TypedValue::fmt`] and [`Closure::fmt`].
+///
+/// `VisitTv` and `VisitCl` are pushed onto the same worklist so that the
+/// alternating `TypedValue::Lambda(Closure)` /
+/// `Closure::Apply { arg_val: TypedValue, .. }` cycle is unwound on the
+/// heap instead of the call stack. An attacker can chain
+/// `Lambda(Apply { arg_val: Lambda(Apply { arg_val: … }), .. })` to any
+/// depth (via repeated `APPLY` of lambda values), and a recursive Debug
+/// would burn two real frames per nesting level. Routing both sides
+/// through a single loop bounds the real stack to a constant.
+pub(crate) enum DebugFrame<'b, 'a: 'b> {
+    VisitTv(&'b TypedValue<'a>),
+    VisitCl(&'b Closure<'a>),
+    Str(&'static str),
+    // Iterate over a Map's (key, value) pairs without recursing
+    // into the BTreeMap's auto Debug (which would walk values
+    // recursively).
+    // The `bool` is `first`: whether the next entry is the first in
+    // the container, so the ", " separator is emitted *before* every
+    // non-first entry (no trailing comma).
+    MapEntries(
+        std::collections::btree_map::Iter<'b, Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+        bool,
+    ),
+    SetEntries(std::collections::btree_set::Iter<'b, Rc<TypedValue<'a>>>, bool),
+    ListEntries(crate::ast::michelson_list::Iter<'b, Rc<TypedValue<'a>>>, bool),
+}
+
+pub(crate) fn debug_fmt_walk<'a, 'b>(
+    seed: DebugFrame<'b, 'a>,
+    f: &mut std::fmt::Formatter<'_>,
+) -> std::fmt::Result {
+    use TypedValue as TV;
+    let mut stack: Vec<DebugFrame<'b, 'a>> = vec![seed];
+    while let Some(frame) = stack.pop() {
+        match frame {
+            DebugFrame::Str(s) => f.write_str(s)?,
+            DebugFrame::MapEntries(mut it, first) => {
+                if let Some((k, v)) = it.next() {
+                    // Re-push the iterator so further entries follow this
+                    // key/value pair; emit ", " before this pair unless it
+                    // is the first (so there is no trailing comma).
+                    stack.push(DebugFrame::MapEntries(it, false));
+                    stack.push(DebugFrame::VisitTv(v.as_ref()));
+                    stack.push(DebugFrame::Str(" -> "));
+                    stack.push(DebugFrame::VisitTv(k.as_ref()));
+                    if !first {
+                        stack.push(DebugFrame::Str(", "));
                     }
                 }
-                Frame::SetEntries(mut it, first) => {
-                    if let Some(e) = it.next() {
-                        stack.push(Frame::SetEntries(it, false));
-                        stack.push(Frame::Visit(e.as_ref()));
-                        if !first {
-                            stack.push(Frame::Str(", "));
-                        }
+            }
+            DebugFrame::SetEntries(mut it, first) => {
+                if let Some(e) = it.next() {
+                    stack.push(DebugFrame::SetEntries(it, false));
+                    stack.push(DebugFrame::VisitTv(e.as_ref()));
+                    if !first {
+                        stack.push(DebugFrame::Str(", "));
                     }
                 }
-                Frame::ListEntries(mut it, first) => {
-                    if let Some(e) = it.next() {
-                        stack.push(Frame::ListEntries(it, false));
-                        stack.push(Frame::Visit(e.as_ref()));
-                        if !first {
-                            stack.push(Frame::Str(", "));
-                        }
+            }
+            DebugFrame::ListEntries(mut it, first) => {
+                if let Some(e) = it.next() {
+                    stack.push(DebugFrame::ListEntries(it, false));
+                    stack.push(DebugFrame::VisitTv(e.as_ref()));
+                    if !first {
+                        stack.push(DebugFrame::Str(", "));
                     }
                 }
-                Frame::Visit(v) => match v {
-                    // Leaves: format directly. None of these inner Debug
-                    // impls walk a `TypedValue` themselves, so they are
-                    // iteratively safe.
-                    TV::Int(n) => write!(f, "Int({:?})", n)?,
-                    TV::Nat(n) => write!(f, "Nat({:?})", n)?,
-                    TV::Mutez(m) => write!(f, "Mutez({:?})", m)?,
-                    TV::Bool(b) => write!(f, "Bool({:?})", b)?,
-                    TV::String(s) => write!(f, "String({:?})", s)?,
-                    TV::Unit => f.write_str("Unit")?,
-                    TV::Bytes(b) => write!(f, "Bytes({:?})", b)?,
-                    TV::Address(a) => write!(f, "Address({:?})", a)?,
-                    TV::ChainId(c) => write!(f, "ChainId({:?})", c)?,
-                    TV::Contract(a) => write!(f, "Contract({:?})", a)?,
-                    TV::Key(k) => write!(f, "Key({:?})", k)?,
-                    TV::Signature(s) => write!(f, "Signature({:?})", s)?,
-                    TV::KeyHash(h) => write!(f, "KeyHash({:?})", h)?,
-                    TV::Timestamp(t) => write!(f, "Timestamp({:?})", t)?,
-                    TV::Operation(op) => write!(f, "Operation({:?})", op)?,
-                    TV::BigMap(bm) => write!(f, "BigMap({:?})", bm)?,
-                    #[cfg(feature = "bls")]
-                    TV::Bls12381Fr(x) => write!(f, "Bls12381Fr({:?})", x)?,
-                    #[cfg(feature = "bls")]
-                    TV::Bls12381G1(x) => write!(f, "Bls12381G1({:?})", x)?,
-                    #[cfg(feature = "bls")]
-                    TV::Bls12381G2(x) => write!(f, "Bls12381G2({:?})", x)?,
-                    // Lambda: delegate to Closure's iterative Debug.
-                    TV::Lambda(c) => write!(f, "Lambda({:?})", c)?,
-                    // Ticket: payload's type and content can be deep.
-                    // Format manually so the inner TypedValue goes through
-                    // this iterative walker.
-                    TV::Ticket(t) => {
-                        // Re-push the closer and an enumerated visit for
-                        // the ticket content. Ticketer/amount/content_type
-                        // are leaves and can be formatted inline up front.
-                        f.write_str("Ticket(")?;
-                        write!(
-                            f,
-                            "ticketer: {:?}, content_type: {:?}, amount: {:?}, content: ",
-                            t.ticketer, t.content_type, t.amount
-                        )?;
-                        stack.push(Frame::Str(")"));
-                        stack.push(Frame::Visit(&t.content));
-                    }
-                    // Recursive variants.
-                    TV::Pair(l, r) => {
-                        f.write_str("Pair(")?;
-                        stack.push(Frame::Str(")"));
-                        stack.push(Frame::Visit(r.as_ref()));
-                        stack.push(Frame::Str(", "));
-                        stack.push(Frame::Visit(l.as_ref()));
-                    }
-                    TV::Option(opt) => match opt {
-                        None => f.write_str("Option(None)")?,
-                        Some(inner) => {
-                            f.write_str("Option(Some(")?;
-                            stack.push(Frame::Str("))"));
-                            stack.push(Frame::Visit(inner.as_ref()));
+            }
+            DebugFrame::VisitCl(c) => match c {
+                Closure::Lambda(lam) => {
+                    // Terminal Lambda: emit inline. `micheline_code` goes
+                    // through the iterative `Micheline` Debug; the
+                    // typechecked `code` is elided as `code: ..` (its
+                    // `Instruction` Debug is still recursive). `in_ty` /
+                    // `out_ty` use `Type`'s iterative Debug. None of these
+                    // walks any further `TypedValue`/`Closure`.
+                    f.write_str("Lambda(")?;
+                    match lam {
+                        Lambda::Lambda { micheline_code, .. } => {
+                            write!(
+                                f,
+                                "Lambda {{ micheline_code: {micheline_code:?}, code: .. }}"
+                            )?;
                         }
-                    },
-                    TV::Or(or) => match or {
-                        Or::Left(x) => {
-                            f.write_str("Or(Left(")?;
-                            stack.push(Frame::Str("))"));
-                            stack.push(Frame::Visit(x.as_ref()));
+                        Lambda::LambdaRec {
+                            in_ty,
+                            out_ty,
+                            micheline_code,
+                            ..
+                        } => {
+                            write!(
+                                f,
+                                "LambdaRec {{ in_ty: {in_ty:?}, out_ty: {out_ty:?}, \
+                                 micheline_code: {micheline_code:?}, code: .. }}"
+                            )?;
                         }
-                        Or::Right(x) => {
-                            f.write_str("Or(Right(")?;
-                            stack.push(Frame::Str("))"));
-                            stack.push(Frame::Visit(x.as_ref()));
-                        }
-                    },
-                    TV::List(lst) => {
-                        f.write_str("List([")?;
-                        stack.push(Frame::Str("])"));
-                        stack.push(Frame::ListEntries(lst.iter(), true));
                     }
-                    TV::Set(set) => {
-                        f.write_str("Set({")?;
-                        stack.push(Frame::Str("})"));
-                        stack.push(Frame::SetEntries(set.iter(), true));
-                    }
-                    TV::Map(map) => {
-                        f.write_str("Map({")?;
-                        stack.push(Frame::Str("})"));
-                        stack.push(Frame::MapEntries(map.iter(), true));
+                    f.write_str(")")?;
+                }
+                Closure::Apply {
+                    arg_ty,
+                    arg_val,
+                    closure,
+                } => {
+                    // `arg_ty` is rendered inline (iterative `Type` Debug).
+                    // `arg_val` may itself be `Lambda(Apply { … })`, and
+                    // `closure` may chain further `Apply` spines — both go
+                    // back through the worklist so neither path burns a
+                    // real stack frame.
+                    write!(f, "Apply {{ arg_ty: {arg_ty:?}, arg_val: ")?;
+                    stack.push(DebugFrame::Str(" }"));
+                    stack.push(DebugFrame::VisitCl(closure.as_ref()));
+                    stack.push(DebugFrame::Str(", closure: "));
+                    stack.push(DebugFrame::VisitTv(arg_val.as_ref()));
+                }
+            },
+            DebugFrame::VisitTv(v) => match v {
+                // Leaves: format directly. None of these inner Debug
+                // impls walk a `TypedValue` themselves, so they are
+                // iteratively safe.
+                TV::Int(n) => write!(f, "Int({:?})", n)?,
+                TV::Nat(n) => write!(f, "Nat({:?})", n)?,
+                TV::Mutez(m) => write!(f, "Mutez({:?})", m)?,
+                TV::Bool(b) => write!(f, "Bool({:?})", b)?,
+                TV::String(s) => write!(f, "String({:?})", s)?,
+                TV::Unit => f.write_str("Unit")?,
+                TV::Bytes(b) => write!(f, "Bytes({:?})", b)?,
+                TV::Address(a) => write!(f, "Address({:?})", a)?,
+                TV::ChainId(c) => write!(f, "ChainId({:?})", c)?,
+                TV::Contract(a) => write!(f, "Contract({:?})", a)?,
+                TV::Key(k) => write!(f, "Key({:?})", k)?,
+                TV::Signature(s) => write!(f, "Signature({:?})", s)?,
+                TV::KeyHash(h) => write!(f, "KeyHash({:?})", h)?,
+                TV::Timestamp(t) => write!(f, "Timestamp({:?})", t)?,
+                TV::Operation(op) => write!(f, "Operation({:?})", op)?,
+                TV::BigMap(bm) => write!(f, "BigMap({:?})", bm)?,
+                #[cfg(feature = "bls")]
+                TV::Bls12381Fr(x) => write!(f, "Bls12381Fr({:?})", x)?,
+                #[cfg(feature = "bls")]
+                TV::Bls12381G1(x) => write!(f, "Bls12381G1({:?})", x)?,
+                #[cfg(feature = "bls")]
+                TV::Bls12381G2(x) => write!(f, "Bls12381G2({:?})", x)?,
+                // Lambda: enqueue the closure on the shared worklist so the
+                // alternating `arg_val: TypedValue` / `closure: Closure`
+                // chain (reachable via `APPLY` of lambda values) never
+                // burns a real stack frame.
+                TV::Lambda(c) => {
+                    f.write_str("Lambda(")?;
+                    stack.push(DebugFrame::Str(")"));
+                    stack.push(DebugFrame::VisitCl(c));
+                }
+                // Ticket: payload's type and content can be deep.
+                // Format manually so the inner TypedValue goes through
+                // this iterative walker.
+                TV::Ticket(t) => {
+                    // Re-push the closer and an enumerated visit for
+                    // the ticket content. Ticketer/amount/content_type
+                    // are leaves and can be formatted inline up front.
+                    f.write_str("Ticket(")?;
+                    write!(
+                        f,
+                        "ticketer: {:?}, content_type: {:?}, amount: {:?}, content: ",
+                        t.ticketer, t.content_type, t.amount
+                    )?;
+                    stack.push(DebugFrame::Str(")"));
+                    stack.push(DebugFrame::VisitTv(&t.content));
+                }
+                // Recursive variants.
+                TV::Pair(l, r) => {
+                    f.write_str("Pair(")?;
+                    stack.push(DebugFrame::Str(")"));
+                    stack.push(DebugFrame::VisitTv(r.as_ref()));
+                    stack.push(DebugFrame::Str(", "));
+                    stack.push(DebugFrame::VisitTv(l.as_ref()));
+                }
+                TV::Option(opt) => match opt {
+                    None => f.write_str("Option(None)")?,
+                    Some(inner) => {
+                        f.write_str("Option(Some(")?;
+                        stack.push(DebugFrame::Str("))"));
+                        stack.push(DebugFrame::VisitTv(inner.as_ref()));
                     }
                 },
-            }
+                TV::Or(or) => match or {
+                    Or::Left(x) => {
+                        f.write_str("Or(Left(")?;
+                        stack.push(DebugFrame::Str("))"));
+                        stack.push(DebugFrame::VisitTv(x.as_ref()));
+                    }
+                    Or::Right(x) => {
+                        f.write_str("Or(Right(")?;
+                        stack.push(DebugFrame::Str("))"));
+                        stack.push(DebugFrame::VisitTv(x.as_ref()));
+                    }
+                },
+                TV::List(lst) => {
+                    f.write_str("List([")?;
+                    stack.push(DebugFrame::Str("])"));
+                    stack.push(DebugFrame::ListEntries(lst.iter(), true));
+                }
+                TV::Set(set) => {
+                    f.write_str("Set({")?;
+                    stack.push(DebugFrame::Str("})"));
+                    stack.push(DebugFrame::SetEntries(set.iter(), true));
+                }
+                TV::Map(map) => {
+                    f.write_str("Map({")?;
+                    stack.push(DebugFrame::Str("})"));
+                    stack.push(DebugFrame::MapEntries(map.iter(), true));
+                }
+            },
         }
-        Ok(())
     }
+    Ok(())
 }
 
 impl<'a> IntoMicheline<'a> for TypedValue<'a> {
