@@ -28,6 +28,9 @@ use tezosx_journal::{LayeredStateError, OriginalSource, TezosXJournal};
 
 use crate::database::EtherlinkVMDB;
 use crate::error::{EvmDbError, EvmRunError};
+use crate::precompiles::send_outbox_message::{
+    check_outbox_message_size, SendOutboxRevertReason,
+};
 use crate::storage::world_state_handler::StorageAccount;
 use evm_types::{
     CustomPrecompileError, DatabaseCommitPrecompileStateChanges,
@@ -557,8 +560,18 @@ impl<Host: StorageV1, R: Registry> Journal<'_, Host, R> {
             .queue_deposit(deposit, deposit_id)
     }
 
-    pub fn push_withdrawal(&mut self, withdrawal: Withdrawal) {
-        self.journal.evm.layered_state.push_withdrawal(withdrawal)
+    pub(crate) fn push_withdrawal(
+        &mut self,
+        withdrawal: Withdrawal,
+    ) -> Result<(), SendOutboxRevertReason> {
+        // Reject any withdrawal whose serialized outbox message would exceed
+        // the outbox size limit, before it is accepted. Otherwise the failure
+        // surfaces only later, at queueing time, after the EVM transaction has
+        // already succeeded -- which for a forced (delayed-inbox) transaction
+        // aborts block production and wedges the sequencer.
+        check_outbox_message_size(&withdrawal)?;
+        self.journal.evm.layered_state.push_withdrawal(withdrawal);
+        Ok(())
     }
 
     pub fn find_deposit_in_queue(
