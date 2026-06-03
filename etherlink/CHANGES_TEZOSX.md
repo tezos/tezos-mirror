@@ -116,7 +116,12 @@
   `Debug` walk on a deep `TypedValue` invoked by the kernel's error-body
   formatter — is closed separately by the iterative `Debug` rewrite
   (tracked under !21988).
-  (!21982, !21983, !21984, !21985, !21986, !22025)
+  The COMPARE gas-cost computation and the `Ord` impl for `TypedValue` —
+  reached by both the `COMPARE` instruction and `BTreeSet`/`BTreeMap` key
+  ordering — also run on iterative worklists so deep `pair`/`option`/`or`
+  values can no longer overflow the kernel stack inside the cost pre-charge
+  (which previously ran before any gas could gate it).
+  (!21982, !21983, !21984, !21985, !21986, !22024, !22025)
 - MIR: `UNPACK string` now rejects carriage return (`0x0d`) — and any
   other byte outside L1's permitted set of newline (`0x0a`) plus
   printable ASCII (`0x20..=0x7e`) — by returning `None` instead of
