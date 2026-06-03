@@ -12,6 +12,10 @@
   typed selector instead of `call(GET)` to avoid the gateway-internal
   payload surcharge. The per-word gas-charging logic is now shared
   across every gateway entrypoint. (!22044)
+- A cross-runtime call (CRAC) made inside a contract constructor is now
+  rolled back when the constructor reverts. Previously the durable state
+  it produced — for example an alias forwarder — survived the revert.
+  (!22062)
 - The first read-only gateway call (`callMichelsonView` or generic
   `call(..., GET)`) from an inbound cross-runtime frame now forwards the
   transitive originator as `X-Tezos-Source`, matching what the `ORIGIN`
