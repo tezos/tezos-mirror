@@ -75,6 +75,23 @@ module type S = sig
     Tezos_types.Contract.t ->
     Z.t option tzresult Lwt.t
 
+  (** [used_storage_space _ block contract] / [paid_storage_space _ block
+      contract] read [contract]'s storage-space watermarks. Mirroring L1,
+      an implicit account returns [None]; an originated contract returns
+      [Some] of the stored value, defaulting to [Z.zero] when the counter
+      has not been written. *)
+  val used_storage_space :
+    [`Main] ->
+    block_param ->
+    Tezos_types.Contract.t ->
+    Z.t option tzresult Lwt.t
+
+  val paid_storage_space :
+    [`Main] ->
+    block_param ->
+    Tezos_types.Contract.t ->
+    Z.t option tzresult Lwt.t
+
   val big_map_get :
     [`Main] ->
     block_param ->

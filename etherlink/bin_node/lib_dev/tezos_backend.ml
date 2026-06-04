@@ -314,6 +314,36 @@ let make (ctxt : Evm_ro_context.t) =
           | Some info -> return_some (Z.of_int64 info.nonce)
           | None -> return_none)
 
+    let used_storage_space _chain block (contract : Tezos_types.Contract.t) =
+      let open Lwt_result_syntax in
+      match contract with
+      | Implicit _ -> return_none
+      | Originated _ ->
+          let* block = shell_block_param_to_eth_block_param block in
+          let* state = Evm_ro_context.get_state ctxt ~block () in
+          let* used =
+            Durable_storage.read_or_default
+              ~default:Z.zero
+              (Tezos_contract_used_bytes contract)
+              state
+          in
+          return_some used
+
+    let paid_storage_space _chain block (contract : Tezos_types.Contract.t) =
+      let open Lwt_result_syntax in
+      match contract with
+      | Implicit _ -> return_none
+      | Originated _ ->
+          let* block = shell_block_param_to_eth_block_param block in
+          let* state = Evm_ro_context.get_state ctxt ~block () in
+          let* paid =
+            Durable_storage.read_or_default
+              ~default:Z.zero
+              (Tezos_contract_paid_bytes contract)
+              state
+          in
+          return_some paid
+
     let big_map_get chain block id key_hash =
       let open Lwt_result_syntax in
       let `Main = chain in
