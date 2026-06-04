@@ -157,6 +157,7 @@ module Action : sig
     ?ignore_topics:Signature.public_key_hash list ->
     ?batching_configuration:Configuration_file.batching_configuration ->
     ?publish_slots_regularly:Configuration_file.publish_slots_regularly ->
+    ?ignore_l1_history_check:bool ->
     unit ->
     (unit, Error_monad.tztrace) result Lwt.t
 

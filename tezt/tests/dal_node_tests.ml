@@ -2763,6 +2763,40 @@ let test_ignore_topics_wrong_env _protocol _parameters _cryptobox _node _client
             variable to ignore topics %s was not set.*"
            Dal_node.ignore_topics_environment_variable)
 
+(* Tests for the --ignore-l1-history-check flag. The surrounding scenario
+   configures the L1 node with a minimal rolling history (only
+   [blocks_preservation_cycles = 1] cycle) while the DAL node runs with an
+   operator profile, which supports refutations and hence requires several
+   cycles of L1 history. The DAL node's startup L1-history check is therefore
+   not satisfied: without the flag the node must refuse to start, and with the
+   flag it must start while emitting a warning. *)
+let test_ignore_l1_history_check _protocol _parameters _cryptobox l1_node
+    _client =
+  let make_node ~name () =
+    let dal_node = Dal_node.create ~name ~node:l1_node () in
+    let* () = Dal_node.init_config ~operator_profiles:[0] dal_node in
+    return dal_node
+  in
+  Log.info "Without --ignore-l1-history-check, the DAL node refuses to start." ;
+  let* strict_node = make_node ~name:"strict" () in
+  let* () = Dal_node.run ~wait_ready:false strict_node in
+  let* () =
+    Dal_node.check_error
+      strict_node
+      ~msg:(rex ".*minimum required by the DAL node is.*")
+  in
+  Log.info "With --ignore-l1-history-check, the DAL node starts and warns." ;
+  let* lenient_node = make_node ~name:"lenient" () in
+  let wait_for_warning =
+    Dal_node.wait_for lenient_node "dal_l1_history_check_bypassed.v0"
+    @@ fun _json -> Some ()
+  in
+  let* () =
+    Dal_node.run ~ignore_l1_history_check:true ~wait_ready:true lenient_node
+  in
+  let* () = wait_for_warning in
+  Dal_node.terminate lenient_node
+
 let test_statuses_backfill_at_restart _protocol dal_parameters _cryptobox
     _l1_node client dal_node =
   let index = 0 in
@@ -3277,4 +3311,23 @@ let register ~__FILE__ ~protocols =
       ]
     "DAL node ignore topics wrong env"
     test_ignore_topics_wrong_env
+    protocols ;
+  (* Scenario for --ignore-l1-history-check. The L1 node is configured with a
+     minimal rolling history so that an operator DAL node's startup L1-history
+     check is not satisfied. *)
+  test
+    ~__FILE__
+    ~uses:(fun _protocol -> [Constant.octez_dal_node])
+    ~tags:["history_mode"]
+    "DAL node ignore L1 history check"
+    (fun protocol ->
+      with_layer1
+        ~prover:false
+          (* The mainnet guard would otherwise refuse the bypass: the default
+             sandbox network has the mainnet chain id. *)
+        ~use_ghostnet_sandbox_network:true
+        ~l1_history_mode:(Custom (Node.Rolling (Some 0)))
+        ~protocol
+      @@ fun parameters cryptobox node client _key ->
+      test_ignore_l1_history_check protocol parameters cryptobox node client)
     protocols

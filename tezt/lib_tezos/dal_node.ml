@@ -521,16 +521,17 @@ let do_runlike_command ?env ?(event_level = `Info) node arguments =
     arguments
     ~on_terminate
 
-let run ?env ?event_level node =
+let run ?env ?event_level ?(ignore_l1_history_check = false) node =
   do_runlike_command
     ?env
     ?event_level
     node
     ((if use_baker_to_start_dal_node then ["dal"; "run"] else ["run"])
-    @ ["--verbose"; "--data-dir"; node.persistent_state.data_dir])
+    @ ["--verbose"; "--data-dir"; node.persistent_state.data_dir]
+    @ if ignore_l1_history_check then ["--ignore-l1-history-check"] else [])
 
-let run ?(wait_ready = true) ?env ?event_level node =
-  let* () = run ?env ?event_level node in
+let run ?(wait_ready = true) ?env ?event_level ?ignore_l1_history_check node =
+  let* () = run ?env ?event_level ?ignore_l1_history_check node in
   let* () = if wait_ready then wait_for_ready node else Lwt.return_unit in
   return ()
 

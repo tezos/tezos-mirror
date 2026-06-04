@@ -477,7 +477,7 @@ let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
     ~parameter_overrides ~protocol ?activation_timestamp
     ?(event_sections_levels = []) ?(node_arguments = [])
     ?(dal_bootstrap_peers = []) ?(l1_history_mode = Default_without_refutation)
-    () =
+    ?(use_ghostnet_sandbox_network = false) () =
   let base = Either.right (protocol, custom_constants) in
   let* proto_parameters =
     generate_protocol_parameters base protocol parameter_overrides
@@ -506,7 +506,16 @@ let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
   let config : Cryptobox.Config.t =
     {activated = true; bootstrap_peers = dal_bootstrap_peers}
   in
-  let* () = Node.Config_file.update node Node.Config_file.set_sandbox_network in
+  (* The default sandbox network uses the mainnet genesis block, hence the
+     mainnet chain id. Tests that need a non-mainnet chain id (e.g. to exercise
+     behaviour that is disabled on mainnet) use the ghostnet sandbox network
+     instead, which has a different genesis block. *)
+  let set_network =
+    if use_ghostnet_sandbox_network then
+      Node.Config_file.set_ghostnet_sandbox_network ()
+    else Node.Config_file.set_sandbox_network
+  in
+  let* () = Node.Config_file.update node set_network in
   let* () =
     Node.Config_file.update
       node
@@ -549,7 +558,8 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     ?activation_timestamp ?dal_bootstrap_peers ?(parameters = [])
     ?(prover = true) ?smart_rollup_timeout_period_in_blocks ?l1_history_mode
     ?blocks_per_cycle ?blocks_per_commitment
-    ?all_bakers_attest_activation_threshold f ~protocol =
+    ?all_bakers_attest_activation_threshold ?use_ghostnet_sandbox_network f
+    ~protocol =
   let parameter_overrides =
     make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
     @ (match attestation_lag with
@@ -635,6 +645,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
       ?activation_timestamp
       ?dal_bootstrap_peers
       ?l1_history_mode
+      ?use_ghostnet_sandbox_network
       ~parameter_overrides
       ~protocol
       ()

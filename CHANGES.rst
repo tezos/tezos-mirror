@@ -82,5 +82,12 @@ DAL node
   remains accepted as a synonym for ``archive``, and the configuration file is
   migrated to version 3. (MR :gl:`!21939`)
 
+- Added a ``--ignore-l1-history-check`` flag to the ``run`` command, which
+  downgrades the startup check that the L1 node retains enough block history
+  from an error to a warning. This is intended for test networks where the
+  operator does not control the L1 node and cannot recompile the DAL node. The
+  flag is not honored on mainnet, where the check is always enforced. (MR
+  :gl:`!21934`)
+
 Miscellaneous
 -------------
