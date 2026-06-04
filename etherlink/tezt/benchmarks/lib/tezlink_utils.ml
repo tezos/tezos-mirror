@@ -328,12 +328,14 @@ let check_levels_applied ~client ~endpoint levels =
     levels
 
 (** Capacity summary for one gas metric (raw Michelson gas, or EVM-equivalent
-    weighted total). Mirrors [Benchmark_utils.monitor_result] but is reported
-    twice — once per metric — by [monitor_michelson_gasometer]. *)
-type capacity_summary = {
+    weighted total). Same shape as the EVM-side result, but reported twice —
+    once per metric — by [monitor_michelson_gasometer]. *)
+type capacity_summary = Benchmark_utils.monitor_result = {
   median : float;
   p90 : float;
   wall : float;
+  tps : float;  (** Transactions per second over block application time. *)
+  wall_tps : float;  (** Transactions per second over wall-clock time. *)
   gasometer : Benchmark_utils.gasometer;
 }
 
@@ -370,6 +372,7 @@ let install_michelson_gasometer ~sequencer =
           |> Z.of_string
         in
         let total_gas = value |-> "execution_gas" |> as_string |> Z.of_string in
+        let txs = value |-> "txs_nb" |> as_int in
         let ignored = Z.lt total_gas (Z.of_int 100_000) in
         let michelson_capacity =
           capacity_mgas_sec ~gas:michelson_gas ~time:process_time
@@ -395,24 +398,28 @@ let install_michelson_gasometer ~sequencer =
             if i then Format.pp_print_string fmt "(ignored)"
             else pp_capacity fmt c)
           (ignored, total_capacity) ;
-        if not ignored then (
+        if ignored then warn_ignored_txs ~level ~txs
+        else
           let michelson_info =
             {
               level;
               gas = michelson_gas;
               timestamp;
               gas_per_sec = michelson_capacity;
+              txs;
             }
           in
           let total_info =
-            {level; gas = total_gas; timestamp; gas_per_sec = total_capacity}
+            {
+              level;
+              gas = total_gas;
+              timestamp;
+              gas_per_sec = total_capacity;
+              txs;
+            }
           in
-          michelson_gasometer.datapoints <-
-            michelson_info :: michelson_gasometer.datapoints ;
-          michelson_gasometer.total_gas <-
-            Z.add michelson_gasometer.total_gas michelson_gas ;
-          total_gasometer.datapoints <- total_info :: total_gasometer.datapoints ;
-          total_gasometer.total_gas <- Z.add total_gasometer.total_gas total_gas ;
+          record_datapoint michelson_gasometer michelson_info ~process_time ;
+          record_datapoint total_gasometer total_info ~process_time ;
           visited_levels := level :: !visited_levels ;
           let running_median g =
             let capacities =
@@ -434,7 +441,7 @@ let install_michelson_gasometer ~sequencer =
             ~prefix:"Current median total capacity"
             "%a"
             pp_capacity
-            total_median))) ;
+            total_median)) ;
   (michelson_gasometer, total_gasometer, visited_levels)
 
 (** Run [f], capturing every [blueprint_application.v0] event emitted by
@@ -451,26 +458,16 @@ let monitor_michelson_gasometer ~sequencer f =
   let* () = f () in
   let end_time = Ptime_clock.now () in
   let wall_time = Ptime.diff end_time start_time in
-  let summarize gasometer : capacity_summary =
-    let capacities =
-      List.map
-        (fun ({gas_per_sec; _} : gas_info) -> gas_per_sec)
-        gasometer.datapoints
-    in
-    let median = get_capacity_percentile 50. capacities in
-    let p90 = get_capacity_percentile 90. capacities in
-    let wall = capacity_mgas_sec ~gas:gasometer.total_gas ~time:wall_time in
-    {median; p90; wall; gasometer}
-  in
-  let michelson = summarize michelson_gasometer in
-  let total = summarize total_gasometer in
+  let michelson = summarize_gasometer michelson_gasometer ~wall_time in
+  let total = summarize_gasometer total_gasometer ~wall_time in
   Log.report
-    "%d non-trivial block(s); michelson %a gas, total %a gas"
+    "%d non-trivial block(s); michelson %a gas, total %a gas, %d transactions"
     (List.length michelson_gasometer.datapoints)
     Z.pp_print
     michelson_gasometer.total_gas
     Z.pp_print
-    total_gasometer.total_gas ;
+    total_gasometer.total_gas
+    total_gasometer.total_txs ;
   let log_michelson prefix c = Log.report ~prefix "%a" pp_capacity c in
   let log_total prefix c =
     let color = capacity_color ~bg:true c in
@@ -482,4 +479,11 @@ let monitor_michelson_gasometer ~sequencer f =
   log_total "90th percentile total capacity" total.p90 ;
   log_michelson "Wall-clock michelson capacity" michelson.wall ;
   log_total "Wall-clock total capacity" total.wall ;
+  Log.report
+    ~prefix:"Transaction throughput"
+    "%a application / %a wall clock"
+    pp_tps
+    total.tps
+    pp_tps
+    total.wall_tps ;
   return ({michelson; total}, List.rev !visited_levels)

@@ -493,11 +493,49 @@ let call infos rpc_node contract sender ?gas_limit ?nonce ?total_confirmed
   in
   confirmed
 
-type gas_info = {level : int; timestamp : float; gas : Z.t; gas_per_sec : float}
+type gas_info = {
+  level : int;
+  timestamp : float;
+  gas : Z.t;
+  gas_per_sec : float;
+  txs : int;
+}
 
-type gasometer = {mutable datapoints : gas_info list; mutable total_gas : Z.t}
+type gasometer = {
+  mutable datapoints : gas_info list;
+  mutable total_gas : Z.t;
+  mutable total_txs : int;
+  mutable total_time : Ptime.Span.t;
+}
 
-let empty_gasometer () = {datapoints = []; total_gas = Z.zero}
+let empty_gasometer () =
+  {
+    datapoints = [];
+    total_gas = Z.zero;
+    total_txs = 0;
+    total_time = Ptime.Span.zero;
+  }
+
+(** Record a non-trivial block into [gasometer]: prepend the datapoint and
+    accumulate its gas, transaction count and application time into the
+    running totals. *)
+let record_datapoint gasometer (info : gas_info) ~process_time =
+  gasometer.datapoints <- info :: gasometer.datapoints ;
+  gasometer.total_gas <- Z.add gasometer.total_gas info.gas ;
+  gasometer.total_txs <- gasometer.total_txs + info.txs ;
+  gasometer.total_time <- Ptime.Span.add gasometer.total_time process_time
+
+(** Warn when a block below the gasometer's non-trivial gas threshold still
+    carries transactions: its transactions and application time are excluded
+    from the TPS figures, which silently skews them when the benchmark's
+    per-block load is too small. *)
+let warn_ignored_txs ~level ~txs =
+  if txs > 0 then
+    Log.warn
+      "Level %d: %d transaction(s) in a block below the gasometer's gas \
+       threshold — excluded from the TPS figures"
+      level
+      txs
 
 let capacity_mgas_sec ~gas ~time =
   let s = Ptime.Span.to_float_s time in
@@ -506,7 +544,15 @@ let capacity_mgas_sec ~gas ~time =
     mega_gas /. s
   else 0.
 
+(** Transactions per second: [txs] transactions applied over block
+    application [time]. *)
+let tps ~txs ~time =
+  let s = Ptime.Span.to_float_s time in
+  if s > 0. then float_of_int txs /. s else 0.
+
 let pp_capacity fmt capacity = Format.fprintf fmt "%.3f MGas/s" capacity
+
+let pp_tps fmt tps = Format.fprintf fmt "%.3f TPS" tps
 
 let current_target =
   (* Use max int to always get the latest gas constants independently of what is
@@ -554,6 +600,7 @@ let install_gasometer evm_node =
       let execution_gas =
         value |-> "execution_gas" |> as_string |> Z.of_string
       in
+      let txs = value |-> "txs_nb" |> as_int in
       let ignored = execution_gas < Z.of_int 100_000 in
       let block_capacity =
         capacity_mgas_sec ~gas:execution_gas ~time:process_time
@@ -569,13 +616,19 @@ let install_gasometer evm_node =
           if ignored then Format.pp_print_string fmt "(ignored)"
           else pp_capacity fmt capacity)
         (ignored, block_capacity) ;
-      if not ignored then (
+      if ignored then warn_ignored_txs ~level:(int_of_string level_str) ~txs
+      else
         let level = int_of_string level_str in
         let info =
-          {level; gas = execution_gas; timestamp; gas_per_sec = block_capacity}
+          {
+            level;
+            gas = execution_gas;
+            timestamp;
+            gas_per_sec = block_capacity;
+            txs;
+          }
         in
-        gasometer.datapoints <- info :: gasometer.datapoints ;
-        gasometer.total_gas <- Z.add gasometer.total_gas execution_gas ;
+        record_datapoint gasometer info ~process_time ;
         let capacities =
           List.map (fun {gas_per_sec; _} -> gas_per_sec) gasometer.datapoints
         in
@@ -586,7 +639,7 @@ let install_gasometer evm_node =
           ~prefix:"Current median capacity"
           "%a"
           pp_capacity
-          median))
+          median)
   in
   gasometer
 
@@ -603,8 +656,26 @@ type monitor_result = {
   median : float;
   p90 : float;
   wall : float;
+  tps : float;  (** Transactions per second over block application time. *)
+  wall_tps : float;  (** Transactions per second over wall-clock time. *)
   gasometer : gasometer;
 }
+
+(** Summarise [gasometer]'s datapoints into a [monitor_result]:
+    median/p90/wall-clock gas capacity plus transaction throughput over
+    block-application and wall-clock time. *)
+let summarize_gasometer gasometer ~wall_time =
+  let capacities =
+    List.map (fun {gas_per_sec; _} -> gas_per_sec) gasometer.datapoints
+  in
+  {
+    median = get_capacity_percentile 50. capacities;
+    p90 = get_capacity_percentile 90. capacities;
+    wall = capacity_mgas_sec ~gas:gasometer.total_gas ~time:wall_time;
+    tps = tps ~txs:gasometer.total_txs ~time:gasometer.total_time;
+    wall_tps = tps ~txs:gasometer.total_txs ~time:wall_time;
+    gasometer;
+  }
 
 let monitor_gasometer evm_node f =
   let gasometer = install_gasometer evm_node in
@@ -612,18 +683,20 @@ let monitor_gasometer evm_node f =
   let* () = f () in
   let end_time = Ptime_clock.now () in
   let wall_time = Ptime.diff end_time start_time in
-  let capacities =
-    List.map (fun {gas_per_sec; _} -> gas_per_sec) gasometer.datapoints
-  in
-  let median = get_capacity_percentile 50. capacities in
-  let p90 = get_capacity_percentile 90. capacities in
-  let wall_clock_capacity =
-    capacity_mgas_sec ~gas:gasometer.total_gas ~time:wall_time
-  in
-  log_capcity evm_node "Median" median ;
-  log_capcity evm_node "90th percentile" p90 ;
-  log_capcity evm_node "Wall clock" wall_clock_capacity ;
-  return {median; p90; wall = wall_clock_capacity; gasometer}
+  let result = summarize_gasometer gasometer ~wall_time in
+  log_capcity evm_node "Median" result.median ;
+  log_capcity evm_node "90th percentile" result.p90 ;
+  log_capcity evm_node "Wall clock" result.wall ;
+  Log.report
+    ~prefix:
+      (Format.sprintf "Transaction throughput of %s" (Evm_node.name evm_node))
+    "%a application / %a wall clock (%d transactions)"
+    pp_tps
+    result.tps
+    pp_tps
+    result.wall_tps
+    gasometer.total_txs ;
+  return result
 
 let save_capacity ~csv_filename capacity =
   let y, m, d = Ptime.to_date @@ Ptime_clock.now () in
