@@ -12,6 +12,7 @@ let () =
   Snailtracer.register () ;
   Uniswap.register () ;
   Michelson_call.register () ;
-  Fa_transfer.register ()
+  Fa_transfer.register () ;
+  Native_transfer_capacity.register ()
 
 let () = Test.run ()

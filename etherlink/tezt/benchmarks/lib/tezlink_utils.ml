@@ -185,6 +185,43 @@ let batch_calls ~client ~tezlink_endpoint ~branch ~counter ~signer ~receiver
       ~signer
       (make_manager_ops ~counter payloads)
 
+(** Native-tez transfer counterpart of [batch_calls]: sends [lanes]
+    transfers of [amount] mutez from [signer] to the implicit account
+    [dest]. Same counter / branch / signing discipline and same
+    [~individual_signatures] ([--batch]) behaviour as [batch_calls]; the
+    only difference is that each content is a plain [transfer] (no
+    entrypoint, no Michelson argument) instead of a contract call. *)
+let batch_transfers ~client ~tezlink_endpoint ~branch ~counter ~signer ~dest
+    ?(fee = 1_000) ?(storage_limit = 0)
+    ?(individual_signatures = not Benchmark_utils.parameters.batch) ~gas_limit
+    ~amount ~lanes () =
+  let make_transfer () = Operation_core.Manager.transfer ~dest ~amount () in
+  let make_manager_ops ~counter payloads =
+    Operation_core.Manager.make_batch
+      ~source:signer
+      ~counter
+      ~fee
+      ~gas_limit
+      ~storage_limit
+      payloads
+  in
+  if individual_signatures then
+    Lwt_list.iter_s
+      (fun i ->
+        let manager_ops =
+          make_manager_ops ~counter:(counter + i) [make_transfer ()]
+        in
+        inject_manager_op ~client ~tezlink_endpoint ~branch ~signer manager_ops)
+      (List.init lanes Fun.id)
+  else
+    let payloads = List.init lanes (fun _ -> make_transfer ()) in
+    inject_manager_op
+      ~client
+      ~tezlink_endpoint
+      ~branch
+      ~signer
+      (make_manager_ops ~counter payloads)
+
 (** Helper: fetch the current head level via the Tezlink endpoint. *)
 let head_level ~client ~endpoint () =
   let* head =
@@ -198,8 +235,8 @@ let head_level ~client ~endpoint () =
     default), wait for the operation to be applied, then return the
     [consumed_milligas] reported in its receipt. *)
 let estimate_consumed_milligas ~client ~endpoint ~sequencer ~giver ~receiver
-    ?entrypoint ?arg ?(gas_limit = 1_000_000_000) ?(max_wait_blocks = 30)
-    ?(poll_interval_s = 0.5) ?(drive_block = false) () =
+    ?entrypoint ?arg ?(amount = Tez.zero) ?(gas_limit = 1_000_000_000)
+    ?(max_wait_blocks = 30) ?(poll_interval_s = 0.5) ?(drive_block = false) () =
   let* pre_level = head_level ~client ~endpoint () in
   let* () =
     Client.transfer
@@ -207,7 +244,7 @@ let estimate_consumed_milligas ~client ~endpoint ~sequencer ~giver ~receiver
       ~burn_cap:Tez.one
       ~fee_cap:(Tez.of_int 10)
       ~gas_limit
-      ~amount:Tez.zero
+      ~amount
       ~giver
       ~receiver
       ?entrypoint
