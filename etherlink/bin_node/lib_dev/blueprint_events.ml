@@ -199,7 +199,7 @@ let blueprint_injection_failed level trace =
   emit blueprint_injection_failure (level, trace)
 
 let blueprint_applied block execution_gas ~evm_execution_gas
-    ~michelson_execution_gas process_time =
+    ~michelson_execution_gas ~tezos_nb_operations process_time =
   let open Ethereum_types in
   let runtime_execution_gas = (evm_execution_gas, michelson_execution_gas) in
   match block with
@@ -212,7 +212,7 @@ let blueprint_applied block execution_gas ~evm_execution_gas
         blueprint_application
         ( Qty.to_z block.number,
           block.timestamp |> Qty.to_z |> Z.to_int64 |> Time.Protocol.of_seconds,
-          count_txs block.transactions,
+          count_txs block.transactions + tezos_nb_operations,
           Qty.to_z block.gasUsed,
           block.hash,
           execution_gas,
@@ -224,7 +224,7 @@ let blueprint_applied block execution_gas ~evm_execution_gas
         blueprint_application
         ( Z.of_int32 block.level,
           block.timestamp,
-          0,
+          tezos_nb_operations,
           Z.zero,
           block.hash,
           execution_gas,

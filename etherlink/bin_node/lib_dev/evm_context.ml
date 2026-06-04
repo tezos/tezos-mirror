@@ -1313,7 +1313,8 @@ module State = struct
            receipts,
            execution_gas,
            evm_execution_gas,
-           michelson_execution_gas ) =
+           michelson_execution_gas,
+           tezos_nb_operations ) =
       let* receipts, evm_breakdown, michelson_breakdown =
         match block with
         | Eth block ->
@@ -1383,7 +1384,8 @@ module State = struct
           receipts,
           execution_gas,
           evm_execution_gas,
-          michelson_execution_gas )
+          michelson_execution_gas,
+          michelson_breakdown.nb_operations )
     in
 
     List.iter (Lwt_watcher.notify receipt_watcher) receipts ;
@@ -1424,7 +1426,8 @@ module State = struct
         split_info,
         execution_gas,
         evm_execution_gas,
-        michelson_execution_gas )
+        michelson_execution_gas,
+        tezos_nb_operations )
 
   (* Helper to find Divergence or Unsync in error trace.
     The exception emitted by `apply_blueprint_store_unsafe` is caught by
@@ -1549,7 +1552,8 @@ module State = struct
                    split_info,
                    execution_gas,
                    evm_execution_gas,
-                   michelson_execution_gas ) =
+                   michelson_execution_gas,
+                   tezos_nb_operations ) =
               commit_application_result
                 ~ctxt
                 ~conn
@@ -1570,7 +1574,8 @@ module State = struct
                 split_info,
                 execution_gas,
                 evm_execution_gas,
-                michelson_execution_gas ))
+                michelson_execution_gas,
+                tezos_nb_operations ))
     | Apply_failure (* Did not produce a block *) ->
         let*! () =
           if is_sequencer ctxt then
@@ -1698,20 +1703,23 @@ module State = struct
            current_tezos_block,
            _execution_gas,
            _evm_execution_gas,
-           _michelson_execution_gas ) =
+           _michelson_execution_gas,
+           _tezos_nb_operations ) =
       Misc.with_timing_f_e
         (fun
           ( block,
             _tezos_block,
             execution_gas,
             evm_execution_gas,
-            michelson_execution_gas )
+            michelson_execution_gas,
+            tezos_nb_operations )
         ->
           Blueprint_events.blueprint_applied
             block
             execution_gas
             ~evm_execution_gas
-            ~michelson_execution_gas)
+            ~michelson_execution_gas
+            ~tezos_nb_operations)
       @@ fun () ->
       let* ( evm_state,
              context,
@@ -1722,7 +1730,8 @@ module State = struct
              split_info,
              execution_gas,
              evm_execution_gas,
-             michelson_execution_gas ) =
+             michelson_execution_gas,
+             tezos_nb_operations ) =
         let* () = apply_evm_events conn ctxt events in
         apply_blueprint_store_unsafe
           ctxt
@@ -1789,7 +1798,8 @@ module State = struct
           current_tezos_block,
           execution_gas,
           evm_execution_gas,
-          michelson_execution_gas )
+          michelson_execution_gas,
+          tezos_nb_operations )
     in
     (current_block, current_tezos_block)
 

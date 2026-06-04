@@ -97,7 +97,7 @@ module type Tezlink_protocol = sig
     Tezos_types.level -> block_header_metadata tzresult
 end
 
-(** Milligas split for a Tez (sub-)block.
+(** Summary of a Tez (sub-)block's operation receipts.
 
     Direction: this record lives on the {b Michelson side}.
     - [top_level]: milligas consumed by real Michelson operations.
@@ -106,13 +106,24 @@ end
       is already billed to the initiating EVM transaction, so it must be
       subtracted from the EVM-side total to keep the per-runtime breakdown
       additive.
+    - [nb_operations]: number of manager-operation contents carried by the
+      block, excluding the synthetic CRAC contents (those are internal
+      sub-operations of an EVM transaction, already counted on the EVM
+      side — exactly like internal EVM calls, which are not counted
+      either). A batch operation contributes one per content, so this
+      matches the number of operations actually applied — unlike the
+      number of (injected) operation groups.
 
     See {!evm_execution_gas_breakdown} in [evm_context.ml] for the
     symmetric EVM-side record. *)
-type consumed_milligas_breakdown = {top_level : Z.t; crac_from_evm : Z.t}
+type consumed_milligas_breakdown = {
+  top_level : Z.t;
+  crac_from_evm : Z.t;
+  nb_operations : int;
+}
 
 let empty_consumed_milligas_breakdown =
-  {top_level = Z.zero; crac_from_evm = Z.zero}
+  {top_level = Z.zero; crac_from_evm = Z.zero; nb_operations = 0}
 
 module type Tezlink_block_service = sig
   module Tezlink_proto : Tezlink_protocol
@@ -136,9 +147,11 @@ module type Tezlink_block_service = sig
   val deserialize_operations_header :
     bytes -> (Operation_hash.t * Operation.shell_header * bytes) list tzresult
 
-  (** [consumed_milligas_breakdown bytes] sums the [consumed_milligas]
-      leaves of the operation receipts in [bytes] into the two buckets
-      of [consumed_milligas_breakdown]. *)
+  (** [consumed_milligas_breakdown bytes] walks the operation receipts in
+      [bytes] once, summing the [consumed_milligas] leaves into the two
+      milligas buckets of [consumed_milligas_breakdown] and counting the
+      non-CRAC manager-operation contents into its [nb_operations]
+      field. *)
   val consumed_milligas_breakdown :
     bytes -> consumed_milligas_breakdown tzresult
 end
@@ -509,13 +522,19 @@ module Make_block_service
      [source] is the synthetic CRAC marker, [top_level] otherwise.
      The merged [operation_data_and_receipt_encoding] JSON carries
      both [source] and (recursively) [consumed_milligas] inside the
-     same content object. *)
+     same content object.
+
+     Only non-CRAC contents bump [nb_operations]: a CRAC content is an
+     internal sub-operation of an EVM transaction already counted on the
+     EVM side. *)
   let attribute_content breakdown content =
     let g = sum_consumed_milligas content in
     match source_of_content content with
     | Some s when String.equal s crac_source_marker ->
         add_crac_from_evm breakdown g
-    | _ -> add_top_level breakdown g
+    | _ ->
+        let breakdown = add_top_level breakdown g in
+        {breakdown with nb_operations = breakdown.nb_operations + 1}
 
   let consumed_milligas_breakdown bytes =
     let open Result_syntax in
