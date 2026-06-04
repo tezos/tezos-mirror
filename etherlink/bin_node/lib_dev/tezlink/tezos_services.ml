@@ -816,6 +816,28 @@ let counter :
     Tezos_rpc.Service.t =
   import_service_with_arg Imported_protocol_plugin.Contract_services.S.counter
 
+let used_storage_space :
+    ( [`GET],
+      tezlink_rpc_context,
+      tezlink_rpc_context * Tezos_types.Contract.t,
+      unit,
+      unit,
+      Z.t option )
+    Tezos_rpc.Service.t =
+  import_service_with_arg
+    Imported_protocol_plugin.RPC.Contract.S.get_used_storage_space
+
+let paid_storage_space :
+    ( [`GET],
+      tezlink_rpc_context,
+      tezlink_rpc_context * Tezos_types.Contract.t,
+      unit,
+      unit,
+      Z.t option )
+    Tezos_rpc.Service.t =
+  import_service_with_arg
+    Imported_protocol_plugin.RPC.Contract.S.get_paid_storage_space
+
 let constants :
     ( [`GET],
       tezlink_rpc_context,
