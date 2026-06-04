@@ -771,6 +771,46 @@ fn pop_value<'a>(stk: &mut IStack<'a>) -> Result<Rc<TypedValue<'a>>, InterpretEr
     ))
 }
 
+/// Gas-charging wrapper for [`Vec::push`] on the interpreter's frame
+/// worklist. Replaces every `frames.push(...)` site in the iterative
+/// driver so each pending control-flow frame is paid for in Michelson
+/// gas. MIR holds the worklist on the heap; L1's OCaml interpreter holds
+/// the equivalent on the runtime stack and benefits from automatic
+/// tail-call elimination — for L1 the per-frame cost is ≈ 0, for MIR it
+/// is `O(InterpFrame size)`. Charging here converts that latent host-
+/// memory consumption into a gas-priced resource so a divergent
+/// `LAMBDA_REC int int { EXEC }` (or any other unbounded recursion
+/// through `IF`/`LOOP`/`ITER`/`MAP`/`VIEW`/`DIP`) hits a clean
+/// `OutOfGas` instead of allocating gigabytes and aborting the WASM
+/// module with `unreachable`.
+fn push_frame<'a, 'b>(
+    frames: &mut Vec<InterpFrame<'a, 'b>>,
+    ctx: &mut impl CtxTrait<'a>,
+    frame: InterpFrame<'a, 'b>,
+) -> Result<(), OutOfGas> {
+    ctx.gas().consume(interpret_cost::FRAME_PUSH)?;
+    frames.push(frame);
+    Ok(())
+}
+
+/// Gas-charging wrapper for [`Vec::push`] on the per-EXEC/per-VIEW
+/// substack worklist. Each push materializes a fresh `IStack`
+/// (`Vec<TypedValue>` with its initial entries — lambda+arg for
+/// `EXEC`, view-arg for `VIEW`), so the per-push memory footprint is
+/// larger than a single [`InterpFrame`]; the gas charge is sized
+/// accordingly via [`interpret_cost::STACK_PUSH`]. Together with
+/// [`push_frame`] this bounds the iterative driver's heap by the
+/// caller's Michelson gas budget.
+fn push_stack<'a>(
+    stacks: &mut Vec<IStack<'a>>,
+    ctx: &mut impl CtxTrait<'a>,
+    stack: IStack<'a>,
+) -> Result<(), OutOfGas> {
+    ctx.gas().consume(interpret_cost::STACK_PUSH)?;
+    stacks.push(stack);
+    Ok(())
+}
+
 fn run_interp_driver<'a, 'b>(
     ctx: &mut impl CtxTrait<'a>,
     arena: &'a Arena<Micheline<'a>>,
@@ -1039,92 +1079,92 @@ fn handle_step<'a, 'b>(
     match step {
         StepResult::Done => {}
         StepResult::OpenBlock(body) => {
-            frames.push(InterpFrame::NextInstr {
+            push_frame(frames, ctx, InterpFrame::NextInstr {
                 block: body,
                 idx: 0,
-            });
+            })?;
         }
         StepResult::OpenDip {
             body,
             protected,
             opt_height,
         } => {
-            frames.push(InterpFrame::AfterDip {
+            push_frame(frames, ctx, InterpFrame::AfterDip {
                 protected,
                 opt_height,
-            });
-            frames.push(InterpFrame::NextInstr {
+            })?;
+            push_frame(frames, ctx, InterpFrame::NextInstr {
                 block: body,
                 idx: 0,
-            });
+            })?;
         }
         StepResult::OpenLoop(body) => {
-            frames.push(InterpFrame::LoopBody { body });
+            push_frame(frames, ctx, InterpFrame::LoopBody { body })?;
         }
         StepResult::OpenLoopLeft(body) => {
-            frames.push(InterpFrame::LoopLeftBody { body });
+            push_frame(frames, ctx, InterpFrame::LoopLeftBody { body })?;
         }
         StepResult::OpenIterList { body, iter } => {
-            frames.push(InterpFrame::IterList {
+            push_frame(frames, ctx, InterpFrame::IterList {
                 body,
                 remaining: iter,
-            });
+            })?;
         }
         StepResult::OpenIterSet { body, iter } => {
-            frames.push(InterpFrame::IterSet {
+            push_frame(frames, ctx, InterpFrame::IterSet {
                 body,
                 remaining: iter,
-            });
+            })?;
         }
         StepResult::OpenIterMap { body, iter } => {
-            frames.push(InterpFrame::IterMap {
+            push_frame(frames, ctx, InterpFrame::IterMap {
                 body,
                 remaining: iter,
-            });
+            })?;
         }
         StepResult::OpenMapList { body, iter } => {
             // First element was already pushed by interpret_step; run the
             // body and then collect from MapListAccum.
-            frames.push(InterpFrame::MapListAccum {
+            push_frame(frames, ctx, InterpFrame::MapListAccum {
                 body: body.clone(),
                 remaining: iter,
                 acc: Vec::new(),
-            });
-            frames.push(InterpFrame::NextInstr {
+            })?;
+            push_frame(frames, ctx, InterpFrame::NextInstr {
                 block: body,
                 idx: 0,
-            });
+            })?;
         }
         StepResult::OpenMapOption(body) => {
-            frames.push(InterpFrame::MapOptionAfter);
-            frames.push(InterpFrame::NextInstr {
+            push_frame(frames, ctx, InterpFrame::MapOptionAfter)?;
+            push_frame(frames, ctx, InterpFrame::NextInstr {
                 block: body,
                 idx: 0,
-            });
+            })?;
         }
         StepResult::OpenMapMap {
             body,
             iter,
             first_key,
         } => {
-            frames.push(InterpFrame::MapMapAccum {
+            push_frame(frames, ctx, InterpFrame::MapMapAccum {
                 body: body.clone(),
                 remaining: iter,
                 acc: BTreeMap::new(),
                 current_key: Some(first_key),
-            });
-            frames.push(InterpFrame::NextInstr {
+            })?;
+            push_frame(frames, ctx, InterpFrame::NextInstr {
                 block: body,
                 idx: 0,
-            });
+            })?;
         }
         StepResult::OpenExec { code, initial } => {
-            stacks.push(initial);
-            frames.push(InterpFrame::AfterExec);
-            frames.push(InterpFrame::NextInstr {
+            push_stack(stacks, ctx, initial)?;
+            push_frame(frames, ctx, InterpFrame::AfterExec)?;
+            push_frame(frames, ctx, InterpFrame::NextInstr {
                 block: CodeRef::Owned(code),
                 idx: 0,
-            });
+            })?;
         }
         StepResult::OpenView {
             code,
@@ -1138,18 +1178,25 @@ fn handle_step<'a, 'b>(
             let saved_sender = ctx.sender().clone();
             let saved_amount = ctx.amount();
             let saved_balance = ctx.balance();
-            ctx.set_view_context(new_self_address, new_sender, new_amount, new_balance);
-            stacks.push(initial);
-            frames.push(InterpFrame::AfterView {
+            // Queue the `AfterView` restore frame first so that, if any
+            // subsequent `push_*` returns `OutOfGas`, the unwind path's
+            // `restore_pending_view_context` (which scans `frames` for the
+            // first `AfterView`) sees the pre-VIEW save and rolls `ctx`
+            // back to it. Mutating `ctx` first and then pushing would
+            // leave a window where `ctx` is in the inner-view state
+            // without any restore frame on the worklist.
+            push_frame(frames, ctx, InterpFrame::AfterView {
                 saved_self_address,
                 saved_sender,
                 saved_amount,
                 saved_balance,
-            });
-            frames.push(InterpFrame::NextInstr {
+            })?;
+            ctx.set_view_context(new_self_address, new_sender, new_amount, new_balance);
+            push_stack(stacks, ctx, initial)?;
+            push_frame(frames, ctx, InterpFrame::NextInstr {
                 block: CodeRef::Owned(code),
                 idx: 0,
-            });
+            })?;
         }
     }
     Ok(())
@@ -4632,6 +4679,12 @@ mod interpreter_tests {
                     // of `interpret_one` charges one extra INTERPRET_RET for the
                     // outer top-level block.
                     - interpret_cost::INTERPRET_RET
+                    // The driver's `OpenMap*` arms push the accumulator
+                    // frame and the body's `NextInstr` (the per-iteration
+                    // re-push is done inside `run_interp_driver` and is
+                    // not gas-charged — only growth pushes in `handle_step`
+                    // are).
+                    - interpret_cost::FRAME_PUSH * 2
             );
         }
 
@@ -5065,6 +5118,7 @@ mod interpreter_tests {
             ctx.gas().milligas().unwrap(),
             Gas::default().milligas().unwrap()
                 - interpret_cost::IF_NONE
+                - interpret_cost::FRAME_PUSH
                 - interpret_cost::INTERPRET_RET * 2
         );
     }
@@ -5082,6 +5136,7 @@ mod interpreter_tests {
             Gas::default().milligas().unwrap()
                 - interpret_cost::IF_NONE
                 - interpret_cost::PUSH
+                - interpret_cost::FRAME_PUSH
                 - interpret_cost::INTERPRET_RET * 2
         );
     }
@@ -5102,6 +5157,7 @@ mod interpreter_tests {
                 - interpret_cost::IF_CONS
                 - interpret_cost::SWAP
                 - interpret_cost::DROP
+                - interpret_cost::FRAME_PUSH
                 - interpret_cost::INTERPRET_RET * 2
         );
     }
@@ -5121,6 +5177,7 @@ mod interpreter_tests {
             Gas::default().milligas().unwrap()
                 - interpret_cost::IF_CONS
                 - interpret_cost::PUSH
+                - interpret_cost::FRAME_PUSH
                 - interpret_cost::INTERPRET_RET * 2
         );
     }
@@ -5136,6 +5193,7 @@ mod interpreter_tests {
             ctx.gas().milligas().unwrap(),
             Gas::default().milligas().unwrap()
                 - interpret_cost::IF_LEFT
+                - interpret_cost::FRAME_PUSH
                 - interpret_cost::INTERPRET_RET * 2
         );
     }
@@ -5153,6 +5211,7 @@ mod interpreter_tests {
                 - interpret_cost::IF_LEFT
                 - interpret_cost::DROP
                 - interpret_cost::PUSH
+                - interpret_cost::FRAME_PUSH
                 - interpret_cost::INTERPRET_RET * 2
         );
     }

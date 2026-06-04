@@ -450,6 +450,69 @@ pub mod interpret_cost {
     pub const EMIT: u32 = 30;
 
     pub const INTERPRET_RET: u32 = 15; // corresponds to KNil in the Tezos protocol
+
+    /// Per-frame charge deducted at every worklist-growth push onto
+    /// `frames: Vec<InterpFrame>`. Layered *on top of* L1's existing
+    /// per-continuation costs (`cost_N_KCons = cost_N_KLoop_in =
+    /// cost_N_KIter = cost_N_KReturn = 10` milligas in
+    /// `src/proto_alpha/lib_protocol/michelson_v1_gas_costs_generated.ml`,
+    /// consumed once per continuation step in L1's `next`), which MIR
+    /// already mirrors as [`INTERPRET_RET`] (`KNil`),
+    /// [`LOOP_ENTER`] (`KLoop_in`), [`LOOP_LEFT_ENTER`]
+    /// (`KLoop_in_left`), etc. The motivation for the surcharge is not
+    /// continuation accounting — L1 has that — it is *host memory*:
+    /// L1's recursive OCaml interpreter holds the continuation chain
+    /// on the runtime stack under automatic tail-call elimination, so
+    /// each pending frame costs ≈ 0 bytes; MIR's iterative driver
+    /// allocates each frame on the heap (an `InterpFrame` enum
+    /// variant plus `Vec` growth), so each pending frame costs O(frame
+    /// size) of host RAM. The surcharge converts host-memory
+    /// consumption into a gas-priced resource so a divergent
+    /// `LAMBDA_REC int int { EXEC }` — the only Michelson shape that
+    /// grows the worklist without bound at constant per-iteration gas
+    /// cost — hits a clean `OutOfGas` before the worklist exhausts
+    /// host memory and the kernel WASM module aborts.
+    ///
+    /// `IF`/`DIP` are bounded by source size; `LOOP`/`LOOP_LEFT`/
+    /// `ITER`/`MAP` unwind their per-iteration bodies before the next
+    /// iteration starts (so don't accumulate worklist depth);
+    /// `VIEW` is single-shot. The charge fires at every
+    /// `handle_step::Open*` arm uniformly even so, which is what
+    /// makes the per-call gas profile diverge from L1's.
+    ///
+    /// Per-instruction net delta vs. L1 (i.e. ignoring per-iteration
+    /// continuation pops both interpreters already charge for):
+    ///   - `OpenBlock` (`IF*`): + `FRAME_PUSH` (no L1 equivalent for
+    ///     the branch-arm push since L1 uses direct dispatch);
+    ///   - `OpenDip`, `OpenMapList`, `OpenMapOption`, `OpenMapMap`:
+    ///     + 2 × `FRAME_PUSH`;
+    ///   - `OpenLoop*`, `OpenIter*`: + `FRAME_PUSH` − (existing
+    ///     `LOOP_ENTER` / `ITER` charge MIR already paid);
+    ///   - `OpenExec`, `OpenView`: + `STACK_PUSH + 2 × FRAME_PUSH` =
+    ///     700 milligas, against L1's `cost_N_KReturn + cost_N_KCons`
+    ///     ≈ 20 milligas equivalent — net per-iteration surcharge
+    ///     of 680 milligas for a divergent recursive lambda.
+    ///
+    /// Observable on receipts and `eth_estimateGas` for code with
+    /// deeply-nested control flow or large `ITER`/`MAP` collections.
+    /// Tracked separately for tuning; see
+    /// `contrib/mir/docs/frame_gas_calibration.md` (when present).
+    pub const FRAME_PUSH: u32 = 100;
+
+    /// Sibling charge for pushes onto the per-EXEC/per-VIEW substack
+    /// (`stacks: Vec<IStack>`). Same layered-on-top-of-L1 framing as
+    /// [`FRAME_PUSH`]: L1 has no analogue because its recursive OCaml
+    /// interpreter does not materialize a fresh sub-stack per `Apply`
+    /// invocation — the OCaml runtime stack absorbs the inner frame
+    /// under TCE. MIR allocates a `Vec<Rc<TypedValue>>` per push
+    /// (`Vec` header + initial allocation + initial entries: lambda
+    /// + arg for `EXEC`, view arg for `VIEW`), so the host-memory
+    /// footprint per push is ~5 × that of a bare [`FRAME_PUSH`];
+    /// `STACK_PUSH` is sized accordingly. Pushed only by `OpenExec`
+    /// / `OpenView` in `handle_step`, so on a divergent recursive
+    /// lambda this fires once per iteration and is the single
+    /// biggest source of bounded host-memory cost.
+    pub const STACK_PUSH: u32 = 500;
     pub const LOOP_ENTER: u32 = 10; // corresponds to KLoop_in in the Tezos protocol
     pub const LOOP_LEFT_ENTER: u32 = 10; // corresponds to KLoop_in_left in the Tezos protocol
     pub const LOOP_EXIT: u32 = 10;

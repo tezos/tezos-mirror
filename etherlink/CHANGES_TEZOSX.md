@@ -79,6 +79,37 @@
   no longer overflow the kernel stack inside the cost pre-charge (which
   previously ran before any gas could gate it).
   (!22024, !22025)
+- MIR: charge Michelson gas for each pending frame on the iterative
+  interpreter's worklist. L1's protocol Alpha already prices
+  continuation pushes (`KCons`/`KLoop_in`/`KIter`/`KReturn` at 10
+  milligas each), and MIR mirrors those constants for their own gas
+  accounting purposes. The new charge is a *host-memory-protection
+  surcharge layered on top* of that: L1's recursive OCaml
+  interpreter holds the continuation chain on the runtime stack
+  under automatic tail-call elimination so per-frame *memory* is
+  ≈ 0, while MIR's iterative driver allocates each pending frame on
+  the heap. Without per-push gas, a divergent
+  `LAMBDA_REC int int { EXEC }` only paid `EXEC`'s ~10-milligas
+  per-call constant and could grow the worklist into the multi-GB
+  range under a single Michelson budget — long before Michelson gas
+  exhausted — and abort the kernel WASM module with `unreachable`.
+  Two new gas costs — `FRAME_PUSH = 100` and `STACK_PUSH = 500` —
+  are now deducted at every worklist-growth push in `handle_step`
+  (`OpenBlock` from `IF*`, `OpenDip`, `OpenLoop*`, `OpenIter*`,
+  `OpenMap*`, `OpenExec`, `OpenView`).
+  Concrete surcharges per affected Michelson instruction:
+  `IF*` / single-arm `OpenBlock`: +100 milligas; `DIP`, the three
+  `MAP` variants: +200 milligas; `LOOP*`, `ITER` (non-empty),
+  `VIEW`: +100 milligas plus the `STACK_PUSH` for `VIEW` (=600
+  milligas total); `EXEC`: +700 milligas per call (one
+  `STACK_PUSH = 500` + two `FRAME_PUSH = 100`).
+  Per-call gas profile therefore diverges from L1's by `+100
+  × N_handle_step_pushes + 500 × N_OpenExec_OpenView` milligas —
+  visible on receipts and `eth_estimateGas` for control-flow-heavy
+  contracts. Clients with cached gas estimates should refresh after
+  this release; static estimators tracking L1 must adjust their
+  per-instruction tables accordingly.
+  (!22071)
 - MIR's `address` decoder now matches L1's `parse_address` on the
   trailing entrypoint name: it is validated only by L1's address-value
   rule (length ≤ 31 and not the explicit `default`), not the Michelson
