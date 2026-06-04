@@ -737,6 +737,18 @@ fn migrate_to<Host: Runtime>(
                 Ok(MigrationStatus::None)
             }
         }
+        StorageVersion::V47 => {
+            if is_etherlink_network(host, MAINNET_CHAIN_ID)? {
+                const SEQUENCER_GOVERNANCE_KT: &[u8] =
+                    b"KT1DkQFmACvsUtnx8B4jirnp2CRi1cWSiELw";
+
+                host.store_write_all(&SEQUENCER_GOVERNANCE, SEQUENCER_GOVERNANCE_KT)?;
+
+                Ok(MigrationStatus::Done)
+            } else {
+                Ok(MigrationStatus::None)
+            }
+        }
     }
 }
 
