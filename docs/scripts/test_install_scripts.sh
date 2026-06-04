@@ -40,10 +40,6 @@ where <test-name> can be:
 * install-bin-bookworm
 * install-bin-trixie
 * install-bin-rc-bookworm
-* install-opam-scratch
-* install-opam-22.04
-* install-opam-24.04
-* install-opam-26.04
 * compile-release-sources-bookworm
 * compile-sources-bookworm
 * compile-sources-oracular
@@ -89,18 +85,6 @@ for test_case in "$@"; do
     ;;
   "install-bin-rc-bookworm")
     docker run --rm -i -e RELEASETYPE=ReleaseCandidate -e GCP_LINUX_PACKAGES_BUCKET=tezos-linux-repo -v "$DOCS_DIR/..":/Tezos "$DEBIAN_BOOKWORM" /bin/sh -c "cd Tezos; ./docs/introduction/install-bin-deb.sh debian bookworm rc"
-    ;;
-  "install-opam-scratch")
-    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts --privileged "$UBUNTU_24_04" /Scripts/install-opam-scratch.sh
-    ;;
-  "install-opam-22.04")
-    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:ubuntu-22.04 /Scripts/install-opam.sh
-    ;;
-  "install-opam-24.04")
-    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:ubuntu-24.04 /Scripts/install-opam.sh
-    ;;
-  "install-opam-26.04")
-    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:ubuntu-26.04 /Scripts/install-opam.sh
     ;;
   "compile-release-sources-bookworm")
     docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:debian-12 /Scripts/compile-sources.sh tezos/tezos latest-release
