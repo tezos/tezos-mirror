@@ -4347,6 +4347,33 @@ etherlink.build_evm_node_static_x86_64:
     - octez-binaries/$ARCH/*
     when: on_success
 
+npm_audit:
+  image: node:22-alpine
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - '**/package-lock.json'
+    - '**/package.json'
+    when: on_success
+  needs: []
+  dependencies: []
+  allow_failure: true
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - apk add --no-cache git jq
+  - ./scripts/ci/npm_audit.sh
+  - ./scripts/ci/npm_stale_lockfile_check.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
 oc.misc_checks:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci/test:amd64--master
   stage: sanity

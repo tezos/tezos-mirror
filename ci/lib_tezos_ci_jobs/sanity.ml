@@ -218,6 +218,37 @@ let job_commit_titles =
         "./scripts/ci/check_commit_messages.sh || exit $?";
       ]
 
+(* TODO: Remove [~allow_failure] once existing critical npm
+   vulnerabilities have been fixed in all package-lock.json files.
+
+   In MR pipelines, the script audits only directories whose
+   package-lock.json was modified.  In scheduled pipelines, [--all]
+   makes it discover and audit every package-lock.json in the tree. *)
+let job_npm_audit =
+  Cacio.parameterize @@ fun mode ->
+  CI.job
+    "npm_audit"
+    ~__POS__
+    ~description:
+      "Run npm audit on package-lock.json files to detect critical \
+       vulnerabilities."
+    ~image:Tezos_ci.Images.node_alpine
+    ~stage:Test
+    ~allow_failure:Yes
+    ~only_if_changed:["**/package-lock.json"; "**/package.json"]
+    ~script:
+      (List.flatten
+         [
+           ["apk add --no-cache git jq"];
+           (match mode with
+           | `mr ->
+               [
+                 "./scripts/ci/npm_audit.sh";
+                 "./scripts/ci/npm_stale_lockfile_check.sh";
+               ]
+           | `all -> ["./scripts/ci/npm_audit.sh --all"]);
+         ])
+
 let register () =
   Cacio.register_merge_request_jobs
     [
@@ -229,6 +260,7 @@ let register () =
       (Immediate, job_check_jsonnet);
       (Immediate, job_check_rust_fmt);
       (Immediate, job_nix);
+      (Immediate, job_npm_audit `mr);
     ] ;
   Cacio.register_jobs Before_merging [(Immediate, job_commit_titles `lenient)] ;
   Cacio.register_jobs Merge_train [(Immediate, job_commit_titles `strict)] ;
@@ -243,5 +275,6 @@ let register () =
       (Immediate, job_check_jsonnet);
       (Immediate, job_check_rust_fmt);
       (Immediate, job_nix);
+      (Immediate, job_npm_audit `all);
     ] ;
   ()

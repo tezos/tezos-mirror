@@ -562,6 +562,8 @@ module Images_external : sig
       for the [alpine-docker-ci] base image (e.g. ["docker:28.5.1"]).
       Pinned by SHA digest. *)
   val upstream_docker : Image.t
+
+  val node_alpine : Image.t
 end
 
 module Images : sig
@@ -582,6 +584,8 @@ module Images : sig
   val rust_sdk_bindings : Image.t
 
   val trivy : Image.t
+
+  val node_alpine : Image.t
 
   module CI : sig
     val job_docker_ci :
