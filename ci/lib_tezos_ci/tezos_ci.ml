@@ -1459,7 +1459,8 @@ module Images_external = struct
       ~image_path:
         "aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c"
 
-  (* TODO: Add npm to the base images and the datadog CI image
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/8325
+     Add npm to the base images and the datadog CI image
      so that we can use those instead of this external image. *)
   let node_alpine = Image.mk_external ~image_path:"node:22-alpine"
 end
