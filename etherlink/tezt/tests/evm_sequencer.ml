@@ -6695,6 +6695,13 @@ let test_sequencer_dont_read_level_twice =
       chain_id = None;
     }
   in
+  (* The deposit reaches the sequencer asynchronously: it is read from
+     *finalized* L1 levels through the rollup node and applied to the
+     sequencer's local state by a background worker. Set up the watcher
+     before sending the deposit. *)
+  let delayed_transaction_seen =
+    Evm_node.wait_for_evm_event New_delayed_transaction sequencer
+  in
   let* () =
     send_deposit_to_delayed_inbox
       ~amount:Tez.(of_int 16)
@@ -6706,10 +6713,15 @@ let test_sequencer_dont_read_level_twice =
       client
   in
 
-  (* We bake two blocks, so that the EVM node can process the deposit and
-     create a blueprint with it. *)
-  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
-  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  (* Bake the 2 extra L1 levels that make the deposit's level final, then
+     wait for the sequencer to have seen the deposit, so that the block
+     produced below is guaranteed to contain it. *)
+  let* _ =
+    repeat 2 (fun () ->
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  let* _ = delayed_transaction_seen in
 
   (* We expect the deposit to be in this block. *)
   let* _ = produce_block sequencer in
