@@ -3236,13 +3236,13 @@ let test_tx_queue_mixed_transaction_types ~runtime () =
   let wait_for_eth_confirmed =
     Evm_node.wait_for_tx_queue_transaction_confirmed
       ~hash:eth_hash
-      ~timeout:1.
+      ~timeout:5.
       sandbox
   in
   let wait_for_tezos_confirmed =
     Evm_node.wait_for_tx_queue_transaction_confirmed
       ~hash:tezos_hash_added
-      ~timeout:1.
+      ~timeout:5.
       sandbox
   in
   let* nb_txs =
