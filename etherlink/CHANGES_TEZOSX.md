@@ -60,6 +60,12 @@
 
 ### Michelson Runtime
 
+- Expose a contract's storage-space watermarks through two read-only
+  RPCs, `GET .../contracts/<id>/storage/used_space` and `.../paid_space`,
+  mirroring L1's `get_used_storage_space` / `get_paid_storage_space`
+  (same URL shape and `Z`/`null` response). An originated contract
+  returns the stored value (`0` when unwritten); an implicit account
+  returns `null`. (!22083)
 - The `big_maps/index/<id>` raw-info RPC now returns the big-map's actual
   `total_bytes`, read from the kernel-maintained per-big-map size counter
   in durable storage, instead of a hardcoded zero. (!22080)
