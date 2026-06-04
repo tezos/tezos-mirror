@@ -44,6 +44,7 @@ type kernel =
   | FarfadetR1
   | FarfadetR2
   | FarfadetR3
+  | FarfadetR4
   | Previewnet02
   | Previewnet04
   | Previewnet05
@@ -63,6 +64,7 @@ let kernel_from_string = function
   | "farfadet-r1" -> Some FarfadetR1
   | "farfadet-r2" -> Some FarfadetR2
   | "farfadet-r3" -> Some FarfadetR3
+  | "farfadet-r4" -> Some FarfadetR4
   | "previewnet-0.2" -> Some Previewnet02
   | "previewnet-0.4" -> Some Previewnet04
   | "previewnet-0.5" -> Some Previewnet05
@@ -83,10 +85,11 @@ let kernel_to_ordinal = function
   | FarfadetR1 -> 9
   | FarfadetR2 -> 10
   | FarfadetR3 -> 11
-  | Previewnet02 -> 12
-  | Previewnet04 -> 13
-  | Previewnet05 -> 14
-  | Previewnet06 -> 15
+  | FarfadetR4 -> 12
+  | Previewnet02 -> 13
+  | Previewnet04 -> 14
+  | Previewnet05 -> 15
+  | Previewnet06 -> 16
   | Latest -> Int.max_int
 
 let compare_kernel a b = Int.compare (kernel_to_ordinal a) (kernel_to_ordinal b)
@@ -144,4 +147,8 @@ let root_hash_from_released_kernel = function
       Some
         (`Hex
            "0005d2c53f57df68b2027ecf592169cf8ce0ee7b3a6ecc215d58e42733c6eed131")
+  | FarfadetR4 ->
+      Some
+        (`Hex
+           "00625d22abf10a520cae5489b7e19df70219a150d336ee6dc0a8eb4c21eca43c1b")
   | Previewnet02 | Previewnet04 | Previewnet05 | Previewnet06 | Latest -> None
