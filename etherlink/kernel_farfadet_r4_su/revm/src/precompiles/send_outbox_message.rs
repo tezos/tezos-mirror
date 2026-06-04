@@ -17,6 +17,7 @@ use tezos_data_encoding::{
     types::Zarith,
 };
 use tezos_protocol::contract::Contract;
+use tezos_smart_rollup_core::MAX_OUTPUT_SIZE;
 use tezos_smart_rollup_encoding::michelson::{
     ticket::TicketError, MichelsonBytes, MichelsonContract, MichelsonNat,
     MichelsonOption, MichelsonPair, MichelsonTimestamp,
@@ -115,7 +116,7 @@ pub enum Withdrawal {
 }
 
 #[derive(Debug, thiserror::Error)]
-enum SendOutboxRevertReason {
+pub(crate) enum SendOutboxRevertReason {
     #[error("Custom decode error: {0}")]
     CustomDecode(String),
 
@@ -139,6 +140,9 @@ enum SendOutboxRevertReason {
 
     #[error("Database access error")]
     DatabaseAccess(CustomPrecompileError),
+
+    #[error("Outbox message too large: {size} bytes exceeds the {max} bytes limit")]
+    OutboxMessageTooLarge { size: usize, max: usize },
 }
 
 impl From<CustomPrecompileError> for SendOutboxRevertReason {
@@ -247,6 +251,37 @@ fn prepare_message(
     }
 }
 
+/// Ensure a withdrawal message fits in the outbox before it is queued.
+///
+/// The serialized outbox message is bounded by [`MAX_OUTPUT_SIZE`]. A
+/// caller-controlled field (e.g. the fast-withdrawal `payload`, or the FA
+/// `routing_info`/`content`) can push the message past that limit. If we let
+/// such a message reach the outbox queue, serialization fails there with
+/// `InputOutputTooLarge` *after* the EVM transaction has already succeeded --
+/// and for a forced (delayed-inbox) transaction that error aborts block
+/// production and wedges the sequencer.
+///
+/// Instead, replicate the same serialization here (matching `queue_message`)
+/// and reject oversized messages eagerly. The precompile reverts, the
+/// surrounding `require` in the predeployed contract reverts the whole
+/// transaction, and no unserializable message is ever produced.
+pub(crate) fn check_outbox_message_size(
+    withdrawal: &Withdrawal,
+) -> Result<(), SendOutboxRevertReason> {
+    let mut buffer = Vec::with_capacity(MAX_OUTPUT_SIZE);
+    match withdrawal {
+        Withdrawal::Standard(message) => message.bin_write(&mut buffer),
+        Withdrawal::Fast(message) => message.bin_write(&mut buffer),
+    }?;
+    if buffer.len() > MAX_OUTPUT_SIZE {
+        return Err(SendOutboxRevertReason::OutboxMessageTooLarge {
+            size: buffer.len(),
+            max: MAX_OUTPUT_SIZE,
+        });
+    }
+    Ok(())
+}
+
 fn parse_l1_routing_info(
     routing_info: &[u8],
 ) -> Result<(Contract, Contract), SendOutboxRevertReason> {
@@ -303,7 +338,7 @@ where
                 entrypoint,
                 destination,
             );
-            context.journal_mut().push_withdrawal(withdrawal);
+            context.journal_mut().push_withdrawal(withdrawal)?;
             Ok(Bytes::from(fixed_target))
         }
         SendOutboxMessage::SendOutboxMessageCalls::push_fast_withdrawal_to_outbox(
@@ -349,7 +384,7 @@ where
                 entrypoint,
                 fast_withdrawal_contract,
             );
-            context.journal_mut().push_withdrawal(withdrawal);
+            context.journal_mut().push_withdrawal(withdrawal)?;
             Ok(Bytes::from(fixed_target))
         }
         SendOutboxMessage::SendOutboxMessageCalls::push_fa_withdrawal_to_outbox(
@@ -391,7 +426,7 @@ where
                 target: fixed_target,
                 proxy: fixed_proxy,
             };
-            context.journal_mut().push_withdrawal(withdrawal);
+            context.journal_mut().push_withdrawal(withdrawal)?;
             Ok(Bytes::copy_from_slice(&routing_info.abi_encode()))
         }
         SendOutboxMessage::SendOutboxMessageCalls::push_fast_fa_withdrawal_to_outbox(
@@ -448,7 +483,7 @@ where
                 target: fixed_target,
                 proxy: fixed_proxy,
             };
-            context.journal_mut().push_withdrawal(withdrawal);
+            context.journal_mut().push_withdrawal(withdrawal)?;
             Ok(Bytes::copy_from_slice(&routing_info.abi_encode()))
         }
     }
@@ -482,4 +517,49 @@ where
         gas,
         output,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tezos_crypto_rs::hash::ContractKt1Hash;
+
+    fn fast_withdrawal_with_payload(payload_len: usize) -> Withdrawal {
+        let ticketer = Contract::Originated(
+            ContractKt1Hash::from_base58_check("KT1NgXQ6Mwu3XKFDcKdYFS6dkkY3iNKdBKEc")
+                .unwrap(),
+        );
+        let content = MichelsonPair(0.into(), MichelsonOption(None));
+        let ticket = FA2_1Ticket::new(ticketer.clone(), content, 1).unwrap();
+        let withdrawal_id = MichelsonNat::new(Zarith(BigInt::from(0))).unwrap();
+        let entrypoint = Entrypoint::try_from(String::from("default")).unwrap();
+
+        prepare_message(
+            ticket,
+            MessageInput::Fast {
+                target: ticketer.clone(),
+                payload: vec![0u8; payload_len],
+                timestamp: U256::ZERO,
+                withdrawal_id,
+                caller: Address::ZERO,
+            },
+            entrypoint,
+            ticketer,
+        )
+    }
+
+    #[test]
+    fn small_fast_withdrawal_payload_is_accepted() {
+        assert!(check_outbox_message_size(&fast_withdrawal_with_payload(64)).is_ok());
+    }
+
+    #[test]
+    fn oversized_fast_withdrawal_payload_is_rejected() {
+        // 8 KiB payload, as in the reported attack: well above MAX_OUTPUT_SIZE.
+        let result = check_outbox_message_size(&fast_withdrawal_with_payload(8 * 1024));
+        assert!(matches!(
+            result,
+            Err(SendOutboxRevertReason::OutboxMessageTooLarge { .. })
+        ));
+    }
 }

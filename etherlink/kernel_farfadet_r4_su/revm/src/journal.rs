@@ -28,7 +28,10 @@ use crate::{
     database::{DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges},
     helpers::legacy::FaDepositWithProxy,
     layered_state::LayeredState,
-    precompiles::{error::CustomPrecompileError, send_outbox_message::Withdrawal},
+    precompiles::{
+        error::CustomPrecompileError,
+        send_outbox_message::{check_outbox_message_size, Withdrawal},
+    },
     storage::sequencer_key_change::SequencerKeyChange,
 };
 
@@ -435,8 +438,18 @@ impl<DB: DatabasePrecompileStateChanges> Journal<DB> {
         self.layered_state.queue_deposit(deposit, deposit_id)
     }
 
-    pub fn push_withdrawal(&mut self, withdrawal: Withdrawal) {
-        self.layered_state.push_withdrawal(withdrawal)
+    pub fn push_withdrawal(
+        &mut self,
+        withdrawal: Withdrawal,
+    ) -> Result<(), CustomPrecompileError> {
+        // Reject any withdrawal whose serialized outbox message would exceed
+        // the outbox size limit, before it is accepted. Otherwise the failure
+        // surfaces only later, at queueing time, after the EVM transaction has
+        // already succeeded -- which for a forced (delayed-inbox) transaction
+        // aborts block production and wedges the sequencer.
+        check_outbox_message_size(&withdrawal)?;
+        self.layered_state.push_withdrawal(withdrawal);
+        Ok(())
     }
 
     pub fn find_deposit_in_queue(
