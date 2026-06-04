@@ -13,6 +13,7 @@ use runtime_farfadet::internal_runtime::InternalRuntime as FarfadetInternalRunti
 use runtime_farfadet_r1::internal_runtime::InternalRuntime as FarfadetR1InternalRuntime;
 use runtime_farfadet_r2_su::internal_runtime::InternalRuntime as FarfadetR2InternalRuntime;
 use runtime_farfadet_r3_su::internal_runtime::InternalRuntime as FarfadetR3InternalRuntime;
+use runtime_farfadet_r4_su::internal_runtime::InternalRuntime as FarfadetR4InternalRuntime;
 use tezos_smart_rollup_core_v2::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_host_v2::{
     dal_parameters::RollupDalParameters,
@@ -374,6 +375,16 @@ impl FarfadetR2InternalRuntime for Hasher {
 }
 
 impl FarfadetR3InternalRuntime for Hasher {
+    fn __internal_store_get_hash<T: Path>(&mut self, path: &T) -> Result<Vec<u8>, RuntimeError> {
+        trace!("store_get_hash({path})");
+        let hash = bindings::store_get_hash(&self.0.borrow(), path.as_bytes())
+            .map_err(from_binding_error)?;
+
+        Ok(hash.as_bytes().to_vec())
+    }
+}
+
+impl FarfadetR4InternalRuntime for Hasher {
     fn __internal_store_get_hash<T: Path>(&mut self, path: &T) -> Result<Vec<u8>, RuntimeError> {
         trace!("store_get_hash({path})");
         let hash = bindings::store_get_hash(&self.0.borrow(), path.as_bytes())

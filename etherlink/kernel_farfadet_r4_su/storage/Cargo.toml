@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = "tezos-storage-farfadet-r3-su"
+name = "tezos-storage-farfadet-r4-su"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"

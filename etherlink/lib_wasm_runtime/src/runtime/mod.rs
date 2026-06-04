@@ -125,6 +125,7 @@ enum NativeKernel {
     FarfadetR1,
     FarfadetR2,
     FarfadetR3,
+    FarfadetR4,
 }
 
 impl NativeKernel {
@@ -140,6 +141,7 @@ impl NativeKernel {
             Self::FarfadetR1 => RuntimeVersion::V1,
             Self::FarfadetR2 => RuntimeVersion::V1,
             Self::FarfadetR3 => RuntimeVersion::V1,
+            Self::FarfadetR4 => RuntimeVersion::V1,
         }
     }
 }
@@ -164,6 +166,8 @@ const FARFADET_R2_ROOT_HASH_HEX: &'static str =
     "7e06577f7a7c81303636aadf4faf0cc352a74a4cb1dffe8e1a459725cd558ff5";
 const FARFADET_R3_ROOT_HASH_HEX: &'static str =
     "f812a9fd0170678224bb9386862e41d4f9c1f485a6b1d74a8767ec88506347eb";
+const FARFADET_R4_ROOT_HASH_HEX: &'static str =
+    "076353bedb639a3f3a75389180d7b2b0ff891271e5a89be57862f5fc2c63c84e";
 
 impl NativeKernel {
     fn of_root_hash(root_hash: &ContextHash) -> Option<NativeKernel> {
@@ -181,6 +185,7 @@ impl NativeKernel {
             FARFADET_R1_ROOT_HASH_HEX => Some(NativeKernel::FarfadetR1),
             FARFADET_R2_ROOT_HASH_HEX => Some(NativeKernel::FarfadetR2),
             FARFADET_R3_ROOT_HASH_HEX => Some(NativeKernel::FarfadetR3),
+            FARFADET_R4_ROOT_HASH_HEX => Some(NativeKernel::FarfadetR4),
             _ => None,
         }
     }
@@ -389,6 +394,39 @@ impl Runtime for NativeRuntime {
                 trace!("farfadet_r3_su::assemble_block");
                 let hasher = self.host().hasher();
                 kernel_farfadet_r3_su::evm_node_entrypoint::assemble_block_fn(
+                    self.mut_host(),
+                    hasher,
+                );
+                Ok(())
+            }
+            ("kernel_run", NativeKernel::FarfadetR4) => {
+                trace!("farfadet_r4_su::kernel_loop");
+                let hasher = self.host().hasher();
+                kernel_farfadet_r4_su::kernel(self.mut_host(), hasher);
+                Ok(())
+            }
+            ("populate_delayed_inbox", NativeKernel::FarfadetR4) => {
+                trace!("farfadet_r4_su::populate_delayed_inbox");
+                let hasher = self.host().hasher();
+                kernel_farfadet_r4_su::evm_node_entrypoint::populate_delayed_inbox_with_durable_storage(
+                    self.mut_host(),
+                    hasher,
+                );
+                Ok(())
+            }
+            ("single_tx_execution", NativeKernel::FarfadetR4) => {
+                trace!("farfadet_r4_su::single_tx_execution");
+                let hasher = self.host().hasher();
+                kernel_farfadet_r4_su::evm_node_entrypoint::single_tx_execution_fn(
+                    self.mut_host(),
+                    hasher,
+                );
+                Ok(())
+            }
+            ("assemble_block", NativeKernel::FarfadetR4) => {
+                trace!("farfadet_r4_su::assemble_block");
+                let hasher = self.host().hasher();
+                kernel_farfadet_r4_su::evm_node_entrypoint::assemble_block_fn(
                     self.mut_host(),
                     hasher,
                 );
