@@ -67,6 +67,13 @@ let reboot_counter_key =
 
 let version_key = Durable.key_of_string_exn "/readonly/wasm_version"
 
+(* Sentinel written by the kernel under [/kernel/env] to request
+   activation of the NDS (new durable storage) at the next reboot.
+   Read and cleared by the PVM at the [Padding] reboot boundary.
+   [/kernel/env] is the designated namespace for kernel->PVM control
+   flags (alongside [/kernel/env/reboot]). *)
+let activate_nds_flag_key = Durable.key_of_string_exn "/kernel/env/activate_nds"
+
 let stack_size_limit = 300
 
 let nairobi_name = "nairobi_017"
