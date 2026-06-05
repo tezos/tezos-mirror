@@ -1090,17 +1090,19 @@ let test_dal_node_snapshot_version_check ~operators _protocol parameters
 (** Tests that the snapshot --skip-shards CLI flag is honored on both export
     and import, for both the plain-directory and tar-archive formats.
 
-    The test:
-    1. Publishes slots so the source DAL node stores both slot and shard data.
-    2. Exports with --skip-shards to a plain directory and verifies that no
+    After publishing slots so the source DAL node stores both slot and shard
+    data, the test:
+    1. Exports with --skip-shards to a plain directory and verifies that no
        shard file is written under [store/shard_store/], while the slot store
        does contain files.
-    3. Exports with --skip-shards to a tar archive and verifies that no entry
-       under [shard_store/] is present in the archive, while slot and
-       skip-list entries are.
-    4. Exports a complete snapshot (with shards), imports it into a fresh DAL
-       node with --skip-shards, and verifies that the imported store contains
-       no shard files. *)
+    2. Exports with --skip-shards to a tar archive and verifies that no entry
+       under [shard_store/] is present in the archive, while slot entries are.
+    3. Exports a complete (with-shards) snapshot to a plain directory, imports
+       it with --skip-shards into a fresh DAL node, and verifies that the
+       imported store contains no shard files.
+    4. Exports a complete (with-shards) tar archive, imports it with
+       --skip-shards into a fresh DAL node, and verifies that the imported
+       store contains slot files but no shard files. *)
 let test_dal_node_snapshot_skip_shards ~operators _protocol parameters cryptobox
     node client dal_node =
   let store_subdir = "store" in
@@ -1268,6 +1270,78 @@ let test_dal_node_snapshot_skip_shards ~operators _protocol parameters cryptobox
     ~error_msg:
       "Import with --skip-shards still wrote %L shard files into the \
        destination (expected 0)" ;
+  (* Step 4: export a complete (with-shards) tar archive and import it with
+     --skip-shards. Unlike the step-2 archive, this source tar does contain
+     shard entries, so the destination having none genuinely exercises
+     shard-skipping on the tar import path; slot entries (gated by
+     [is_slot_entry]) must still be imported. *)
+  let full_tar_base = Temp.file "dal-snapshot-with-shards-tar" in
+  let* () =
+    Dal_node.snapshot_export
+      ~compress:true
+      ~min_published_level
+      ~max_published_level
+      ~endpoint
+      dal_node
+      full_tar_base
+  in
+  let full_tar_file = full_tar_base ^ ".tar" in
+  let full_tar_listing = Temp.file "dal-snapshot-with-shards-tar.list" in
+  let rc =
+    Sys.command (Printf.sprintf "tar tf %s > %s" full_tar_file full_tar_listing)
+  in
+  if rc <> 0 then Test.fail "tar tf failed (exit code %d)" rc ;
+  let full_tar_shard_entries =
+    let ic = open_in full_tar_listing in
+    let rec loop acc =
+      match input_line ic with
+      | exception End_of_file ->
+          close_in ic ;
+          List.rev acc
+      | line -> loop (line :: acc)
+    in
+    loop []
+    |> List.filter (fun e ->
+           String.length e
+           >= String.length Tezos_dal_node_lib.Store.Stores_dirs.shard
+           && String.equal
+                (String.sub
+                   e
+                   0
+                   (String.length Tezos_dal_node_lib.Store.Stores_dirs.shard))
+                Tezos_dal_node_lib.Store.Stores_dirs.shard)
+  in
+  Check.((List.length full_tar_shard_entries > 0) ~__LOC__ int)
+    ~error_msg:
+      "Source full tar is expected to contain shard entries but contains %L \
+       (test setup error)" ;
+  let tar_dst_dal_node = Dal_node.create ~node () in
+  let* () =
+    Dal_node.init_config ~operator_profiles:operators tar_dst_dal_node
+  in
+  let* () =
+    Dal_node.snapshot_import
+      ~no_check:true
+      ~skip_shards:true
+      ~endpoint
+      tar_dst_dal_node
+      full_tar_file
+  in
+  let tar_imported_data_dir = Dal_node.data_dir tar_dst_dal_node in
+  let tar_imported_shard_count =
+    count_files_recursive (Filename.concat tar_imported_data_dir shard_subdir)
+  in
+  let tar_imported_slot_count =
+    count_files_recursive (Filename.concat tar_imported_data_dir slot_subdir)
+  in
+  Check.((tar_imported_shard_count = 0) ~__LOC__ int)
+    ~error_msg:
+      "Tar import with --skip-shards wrote %L shard files into the destination \
+       (expected 0)" ;
+  Check.((tar_imported_slot_count > 0) ~__LOC__ int)
+    ~error_msg:
+      "Tar import with --skip-shards wrote %L slot files into the destination \
+       (expected > 0)" ;
   unit
 
 let test_dal_node_startup ~__FILE__ =
