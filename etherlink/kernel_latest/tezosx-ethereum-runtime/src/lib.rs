@@ -1956,6 +1956,117 @@ mod tests {
         );
     }
 
+    #[test]
+    fn outgoing_state_mutating_crac_forwards_originator_not_caller() {
+        use alloy_sol_types::SolCall;
+        use revm_etherlink::precompiles::runtime_gateway::RuntimeGateway;
+        use tezosx_interfaces::testing::MockRegistry;
+
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+
+        // A = true originator (X-Tezos-Source), B = immediate caller (X-Tezos-Sender).
+        let originator = Address::from_slice(&[0x11; 20]); // A
+        let sender = Address::from_slice(&[0x22; 20]); // B
+        let contract = Address::from_slice(&[0x33; 20]); // C
+
+        // Contract C: copies all calldata into memory, then forwards it
+        // to the runtime-gateway precompile via CALL.
+        //
+        // CALLDATASIZE PUSH1 0 PUSH1 0 CALLDATACOPY   -- copy calldata → mem
+        // PUSH1 0 PUSH1 0 CALLDATASIZE PUSH1 0         -- retLen retOff argsLen argsOff
+        // PUSH1 0 PUSH20 <gw> GAS CALL POP STOP        -- value to gas call
+        deploy_at(
+            &mut host,
+            &contract,
+            Bytes::from_hex(
+                "36600060003760006000366000600073\
+                 ff000000000000000000000000000000000000075af15000",
+            )
+            .unwrap(),
+        );
+
+        // ABI-encode transfer("tz1target"): the dummy Tezos implicit address
+        // is irrelevant to the assertion; only the state-mutating dispatch
+        // path (which goes through capture_original_source) matters.
+        let calldata = RuntimeGateway::transferCall {
+            implicitAddress: "tz1target".to_string(),
+        }
+        .abi_encode();
+
+        // MockRegistry records every ensure_alias call so we can inspect
+        // which address bytes were forwarded as the source alias.
+        let registry = MockRegistry::new("tz1_mock_alias");
+
+        let mut journal = TezosXJournal::default();
+        // Inbound CRAC: source = A (originator), sender = B (caller).
+        // Use a finite gas limit: gas::convert(Ethereum, Tezos, gas) =
+        // gas * EVM_GAS_TO_MILLIGAS (100), so u64::MAX overflows and the
+        // alias generation returns an error before ensure_alias is called.
+        // 30_000_000 (30 M) is large enough for the bytecode + precompile but
+        // small enough not to overflow the milligas conversion.
+        let gas_limit: u64 = 30_000_000;
+        let request = {
+            let url = format!(
+                "http://ethereum/{}",
+                alloy_primitives::hex::encode(contract.as_slice())
+            );
+            http::Request::builder()
+                .method(http::Method::POST)
+                .uri(&url)
+                .header(
+                    tezosx_interfaces::X_TEZOS_SENDER,
+                    format!("0x{}", alloy_primitives::hex::encode(sender.as_slice())),
+                )
+                .header(
+                    tezosx_interfaces::X_TEZOS_SOURCE,
+                    format!("0x{}", alloy_primitives::hex::encode(originator.as_slice())),
+                )
+                .header(tezosx_interfaces::X_TEZOS_AMOUNT, "0")
+                .header(tezosx_interfaces::X_TEZOS_GAS_LIMIT, gas_limit.to_string())
+                .header(tezosx_interfaces::X_TEZOS_TIMESTAMP, "1")
+                .header(tezosx_interfaces::X_TEZOS_BLOCK_NUMBER, "1")
+                .body(calldata)
+                .unwrap()
+        };
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        assert_eq!(
+            resp.status(),
+            http::StatusCode::OK,
+            "serve must succeed: {}",
+            String::from_utf8_lossy(resp.body())
+        );
+
+        // resolve_aliases is called twice inside the transfer precompile arm:
+        //   [0] sender slot = C (inputs.caller, the contract that called the precompile)
+        //   [1] source slot = should be A (originator); is B (caller) on buggy code
+        let alias_calls = registry.ensure_alias_calls.borrow();
+        assert!(
+            alias_calls.len() >= 2,
+            "expected at least 2 ensure_alias calls (sender + source), got {}",
+            alias_calls.len()
+        );
+
+        // For an EVM address with no /origin record, resolve_routing returns
+        // RoutingDecision::Native → AliasInfo { runtime: Ethereum,
+        // native_address: canonicalize(Ethereum, addr.to_string()) }.
+        // canonicalize lowercases the address, so the bytes are "0x11...11".
+        let source_native_addr =
+            String::from_utf8(alias_calls[1].0.native_address.clone())
+                .expect("native_address must be valid UTF-8");
+        let expected_originator_hex =
+            format!("0x{}", alloy_primitives::hex::encode(originator.as_slice()));
+        assert_eq!(
+            source_native_addr,
+            expected_originator_hex,
+            "outgoing transfer must forward originator A ({expected_originator_hex}) \
+             as X-Tezos-Source, not caller B (0x{}); \
+             bug: capture_original_source uses tx().caller() instead of \
+             cross_runtime_originator()",
+            alloy_primitives::hex::encode(sender.as_slice()),
+        );
+    }
+
     // ── L2-1259: HTTP method dispatch and GET-static path ────────────
 
     /// Build an HTTP request with an explicit method, used by the

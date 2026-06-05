@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Bug fixes
+
+- Cross-runtime calls re-entering from an inbound CRAC now attribute the transitive originator (not the immediate caller) as the call source, fixing the source reported in EVM→Michelson CRAC receipts. (L2-1450)
+- Nested EVM→Michelson CRAC legs are now recorded and folded into the originating Michelson operation's internal operations when the call chain originates in the Michelson runtime — including a top-level manager operation that calls the gateway `%call_evm` directly — instead of being dropped. (L2-1450)
+
 ## Version 6 (Farfadet)
 
 ### 6.2 (4d6762e)

@@ -537,10 +537,18 @@ where
     Ok(OriginalSource::new(runtime, native_address, source_addr))
 }
 
-/// Capture the original source from `tx().caller()` for the
-/// state-mutating gateway entries, which persist the result via
-/// [`resolve_original_source`] and propagate it across re-entrant
-/// frames.
+/// Capture the original source for the state-mutating gateway entries,
+/// which persist the result via [`resolve_original_source`] and propagate
+/// it across re-entrant frames.
+///
+/// Prefers the inbound CRAC's transitive originator
+/// ([`CrossRuntimeCall::cross_runtime_originator`]) when one is present,
+/// falling back to `tx().caller()` for a direct EVM transaction — the
+/// same precedence applied by [`capture_readonly_original_source`] and
+/// the custom `ORIGIN` opcode (`etherlink_origin` in `revm/src/lib.rs`).
+/// This ensures `X-Tezos-Source` always identifies the transitive
+/// originator, not the immediate caller (L2-1450; mirrors the L2-1462
+/// fix on the read-only path).
 fn capture_original_source<'j, CTX, Host, R>(
     context: &CTX,
     remaining_evm_gas: u64,
@@ -550,7 +558,11 @@ where
     R: Registry + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
-    build_original_source(context, context.tx().caller(), remaining_evm_gas)
+    let source_addr = context
+        .journal()
+        .cross_runtime_originator()
+        .unwrap_or_else(|| context.tx().caller());
+    build_original_source(context, source_addr, remaining_evm_gas)
 }
 
 /// Capture the original source for the read-only gateway entries

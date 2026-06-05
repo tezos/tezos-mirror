@@ -728,8 +728,9 @@ where
         crac_chain_depth: hdrs.crac_depth,
         // Retain the inbound CRAC originator so the gateway can forward
         // it (translated) as the outbound source, keeping `tx.origin`
-        // invariant across runtime hops (L2-1363). `None` for a
-        // top-level Michelson tx (non-KT1 `X-Tezos-Source`).
+        // invariant across runtime hops (L2-1363). May be `Originated(KT1)`
+        // (EVM alias) or `Implicit(pkh)` (native Michelson origin). `None`
+        // only for a top-level Michelson tx (absent `X-Tezos-Source`).
         crac_origin: hdrs.crac_origin_contract.clone(),
     };
     let parser = mir::parser::Parser::new();
@@ -870,13 +871,12 @@ where
                 // a gas-tight failed CRAC still records its receipt here
                 // (L2-1464). The `Err` arm below therefore only covers the
                 // (practically unreachable) serialization/signature paths.
-                if let (Some(kt1), CracError::Operation(te)) =
+                if let (Some(source_contract), CracError::Operation(te)) =
                     (hdrs.crac_origin_contract.as_ref(), error)
                 {
-                    let source_contract = Contract::Originated(kt1.clone());
                     match build_failed_crac_receipt(
                         &source_pkh,
-                        &source_contract,
+                        source_contract,
                         &hdrs.sender,
                         &hdrs.amount,
                         &parsed.destination,
@@ -929,23 +929,18 @@ where
     // successful CRAC to an OutOfGas error when the caller's leftover
     // budget is tight (L2-1464).
     let transfer = if is_crac {
-        let source_contract = Contract::Originated(
-            hdrs.crac_origin_contract
-                .as_ref()
-                .ok_or_else(|| {
-                    TezosXRuntimeError::Custom(
-                        "is_crac set but crac_origin_contract is None".into(),
-                    )
-                })?
-                .clone(),
-        );
+        let source_contract = hdrs.crac_origin_contract.as_ref().ok_or_else(|| {
+            TezosXRuntimeError::Custom(
+                "is_crac set but crac_origin_contract is None".into(),
+            )
+        })?;
         // Pass the alias-forwarder origination internals separately so
         // `build_crac_receipt` can insert them BETWEEN the CRAC event
         // and the synthetic transfer — the materializations happen
         // before the cross-runtime transfer they participate in.
         let receipt = build_crac_receipt(
             &source_pkh,
-            &source_contract,
+            source_contract,
             &hdrs.sender,
             &hdrs.amount,
             &parsed.destination,
