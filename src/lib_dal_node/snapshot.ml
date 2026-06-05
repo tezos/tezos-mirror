@@ -789,7 +789,16 @@ module Export_tar = struct
     List.iter_es
       (fun slot_index ->
         let slot_id = Types.Slot_id.{slot_level = level; slot_index} in
-        let filepath = src_slot_dir // slot_id_to_filename slot_id in
+        (* Locate the slot file by its real on-disk KVS path: the slot file
+           name embeds the slot size ([<level>_<index>_<slot_size>]), which
+           [slot_id_to_filename] does not reconstruct. The tar entry reuses
+           that on-disk basename, so on import [is_slot_entry] matches it and
+           the bytes (a verbatim copy of the KVS file) are restored under the
+           same name. *)
+        let* file_layout = Store.Slots.get_file_layout ~slot_id in
+        let filepath =
+          KVS.filepath (file_layout ~root_dir:src_slot_dir slot_id)
+        in
         let*! exists = Lwt_unix.file_exists filepath in
         if not exists then return_unit
         else
@@ -798,7 +807,7 @@ module Export_tar = struct
             gzip_compress_bytes (Bytes.unsafe_of_string content)
           in
           let tar_filename =
-            Store.Stores_dirs.slot // slot_id_to_filename slot_id
+            Store.Stores_dirs.slot // Filename.basename filepath
           in
           let*! () =
             add_bytes_to_tar tar ~bytes:compressed ~filename:tar_filename
