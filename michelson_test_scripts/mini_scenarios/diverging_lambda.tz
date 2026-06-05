@@ -1,0 +1,10 @@
+parameter unit ;
+storage int ;
+code { DROP ;
+       LAMBDA_REC int int { EXEC } ;
+       PUSH int 1 ;
+       EXEC ;
+       DROP ;
+       PUSH int 0 ;
+       NIL operation ;
+       PAIR }

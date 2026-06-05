@@ -4988,6 +4988,220 @@ let test_entrypoints_normalize_types =
       ~error_msg:"Expected %R but got %L") ;
   unit
 
+(* Regression scenarios for the MIR explicit stack conversion. Each
+   scenario shapes a Michelson input that would overflow a recursive
+   walker on master; after the conversion MIR completes or fails on gas. *)
+
+let write_temp_michelson ~name ~contents =
+  let path = Filename.temp_file name ".tz" in
+  let oc = open_out path in
+  output_string oc contents ;
+  close_out oc ;
+  path
+
+let nested_pair_param_script depth =
+  let buf = Buffer.create 4096 in
+  Buffer.add_string buf "parameter " ;
+  for _ = 1 to depth do
+    Buffer.add_string buf "(pair int "
+  done ;
+  Buffer.add_string buf "int" ;
+  for _ = 1 to depth do
+    Buffer.add_string buf ")"
+  done ;
+  Buffer.add_string buf " ; storage int ; code { CDR ; NIL operation ; PAIR }" ;
+  Buffer.contents buf
+
+let nested_if_code_script depth =
+  let buf = Buffer.create 4096 in
+  Buffer.add_string buf "parameter bool ; storage int ; code { CAR ; IF { " ;
+  for _ = 2 to depth do
+    Buffer.add_string buf "PUSH bool True ; IF { "
+  done ;
+  Buffer.add_string buf "PUSH int 0" ;
+  for _ = 1 to depth do
+    Buffer.add_string buf " } { PUSH int 0 }"
+  done ;
+  Buffer.add_string buf " ; NIL operation ; PAIR }" ;
+  Buffer.contents buf
+
+let nested_or_param_script depth =
+  let buf = Buffer.create 4096 in
+  Buffer.add_string buf "parameter " ;
+  for _ = 1 to depth do
+    Buffer.add_string buf "(or int "
+  done ;
+  Buffer.add_string buf "int" ;
+  for _ = 1 to depth do
+    Buffer.add_string buf ")"
+  done ;
+  Buffer.add_string buf " ; storage int ; code { CDR ; NIL operation ; PAIR }" ;
+  Buffer.contents buf
+
+(* Depths sit just below the protocol operation size limit (32 KB) so a
+   regression that grows the encoded operation surfaces in CI rather
+   than silently leaving headroom. Layer cost is about 4 bytes for pair
+   and or, 24 bytes for IF. *)
+let deep_pair_depth = 8100
+
+let deep_if_depth = 1300
+
+let deep_or_depth = 8100
+
+let test_deep_pair_param =
+  register_tezosx_test
+    ~title:"Deep nested pair parameter type is accepted"
+    ~tags:["stack_overflow"; "origination"; "typecheck"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let path =
+    write_temp_michelson
+      ~name:"deep_pair_param"
+      ~contents:(nested_pair_param_script deep_pair_depth)
+  in
+  (* About 32 KB encoded, so the origination burn is around 8 tez. *)
+  let* _alias =
+    Client.originate_contract
+      ~endpoint
+      ~amount:Tez.zero
+      ~alias:"deep_pair_param"
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:"0"
+      ~prg:path
+      ~burn_cap:(Tez.of_int 10)
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  unit
+
+let test_deep_if_code =
+  register_tezosx_test
+    ~title:"Deep nested IF code is accepted"
+    ~tags:["stack_overflow"; "origination"; "typecheck"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let path =
+    write_temp_michelson
+      ~name:"deep_if_code"
+      ~contents:(nested_if_code_script deep_if_depth)
+  in
+  (* About 32 KB encoded, so the origination burn is around 8 tez. *)
+  let* _alias =
+    Client.originate_contract
+      ~endpoint
+      ~amount:Tez.zero
+      ~alias:"deep_if_code"
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:"0"
+      ~prg:path
+      ~burn_cap:(Tez.of_int 10)
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  unit
+
+let test_deep_or_param =
+  register_tezosx_test
+    ~title:"Deep nested or parameter type is accepted"
+    ~tags:["stack_overflow"; "origination"; "typecheck"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let path =
+    write_temp_michelson
+      ~name:"deep_or_param"
+      ~contents:(nested_or_param_script deep_or_depth)
+  in
+  (* About 32 KB encoded, so the origination burn is around 8 tez. *)
+  let* _alias =
+    Client.originate_contract
+      ~endpoint
+      ~amount:Tez.zero
+      ~alias:"deep_or_param"
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:"0"
+      ~prg:path
+      ~burn_cap:(Tez.of_int 10)
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  unit
+
+(* Originates a contract whose recursive lambda loops via self execution.
+   After the conversion the interpreter exhausts gas instead of trapping
+   the WASM stack. Script reused by the cross runtime test. *)
+let test_recursive_lambda_exhausts_gas =
+  register_tezosx_test
+    ~title:"Recursive lambda exhausts gas instead of trapping"
+    ~tags:["stack_overflow"; "execution"; "interpret"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; sc_rollup_node; client; _} protocol ->
+  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let path =
+    Michelson_script.(
+      find ["mini_scenarios"; "diverging_lambda"] protocol |> path)
+  in
+  let* _alias =
+    Client.originate_contract
+      ~endpoint
+      ~amount:Tez.zero
+      ~alias:"diverging_lambda"
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:"0"
+      ~prg:path
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  let call_proc =
+    Client.spawn_transfer
+      ~endpoint
+      ~amount:Tez.zero
+      ~fee:(Tez.of_mutez_int 100_000)
+      ~gas_limit:1_000_000
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:"diverging_lambda"
+      ~arg:"Unit"
+      ~burn_cap:Tez.one
+      client
+  in
+  let* _stderr = Process.check_and_read_stderr ~expect_failure:true call_proc in
+  (* The call must fail, the kernel must not trap. We do not assert on
+     a specific error string because the gas error message can vary
+     across client versions. *)
+  let*@ _ = produce_block sequencer in
+  (* [expect_failure] alone cannot tell a graceful gas exhaustion apart from a
+     kernel trap or reboot (a reboot also makes the call fail). Prove the kernel
+     is still alive by landing a *successful* operation afterwards and reading
+     the resulting balance back from the chain. *)
+  let* receiver = Client.gen_and_show_keys client in
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~amount:(Tez.of_int 5)
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:receiver.alias
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  let* balance =
+    Client.get_balance_for ~endpoint ~account:receiver.public_key_hash client
+  in
+  Tez.(
+    Check.(
+      (balance = of_int 5)
+        typ
+        ~error_msg:"Follow-up transfer did not land: expected %R, got %L")) ;
+  (* Re-execute every blueprint (including the diverging-lambda block) through
+     the rollup-node PVM. The PVM runs the kernel on the small consensus stack,
+     not the large-stack sequencer Wasmer runtime, so a recursive walker that
+     overflowed only on the small stack would stall this sync. *)
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
+  unit
+
 let () =
   test_observer_starts [Alpha] ;
   test_describe_endpoint [Alpha] ;
@@ -5069,4 +5283,8 @@ let () =
   test_big_map_transfer [Alpha] ;
   test_upgrade_kernel_auto_sync [Alpha] ;
   test_entrypoints_originated [Alpha] ;
-  test_entrypoints_normalize_types [Alpha]
+  test_entrypoints_normalize_types [Alpha] ;
+  test_deep_pair_param [Alpha] ;
+  test_deep_if_code [Alpha] ;
+  test_deep_or_param [Alpha] ;
+  test_recursive_lambda_exhausts_gas [Alpha]

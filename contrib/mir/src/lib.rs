@@ -214,7 +214,11 @@ mod tests {
         });
         assert_eq!(
             Gas::default().milligas().unwrap() - ctx.gas.milligas().unwrap(),
-            1287
+            // 14 × `interpret_cost::FRAME_PUSH` (100 milligas) reflects the
+            // worklist-growth pushes the iterative driver does on the
+            // FIBONACCI_SRC run (IF / DIP / EXEC bodies); the remaining
+            // 1287 milligas is L1-coherent.
+            1287 + 14 * crate::gas::interpret_cost::FRAME_PUSH
         );
     }
 
@@ -230,6 +234,53 @@ mod tests {
         ctx.gas = Gas::new(1);
         assert_eq!(
             ast.interpret(ctx, &temp, &mut istack),
+            Err(interpreter::InterpretError::OutOfGas),
+        );
+    }
+
+    /// Regression for the kernel-DoS path surfaced by the CRAC tezt
+    /// `CRAC: deep EVM recursion then Michelson diverging lambda returns
+    /// OOG` (`etherlink/tezt/tests/cross_runtime.ml`). A diverging
+    /// `LAMBDA_REC int int { EXEC }` applied to itself never returns;
+    /// without per-push gas charges the iterative driver pushes an
+    /// `AfterExec` + body `NextInstr` + fresh `IStack` per iteration,
+    /// only EXEC's per-call constant is paid in Michelson gas, and the
+    /// worklist grows linearly with iteration count — under a 30 M-gas
+    /// budget the host kernel allocates gigabytes (~7.4 GB in the
+    /// observed CI failure) and aborts the WASM module with
+    /// `unreachable` before Michelson gas exhausts. With
+    /// `STACK_PUSH` + `FRAME_PUSH` charged in `handle_step`, every
+    /// iteration costs at least `STACK_PUSH + 2 × FRAME_PUSH`
+    /// milligas, so a finite gas budget bounds iteration count
+    /// — and hence worklist memory — independently of the body's
+    /// per-call cost. This test asserts the clean `OutOfGas` outcome
+    /// (no panic, no allocation explosion).
+    #[test]
+    fn diverging_recursive_lambda_oogs_cleanly() {
+        // `LAMBDA_REC int int { EXEC }; PUSH int 1; EXEC` — the body
+        // is exactly the divergent fragment used by the
+        // `diverging_lambda` Michelson contract in the CRAC tezt.
+        let src = "{ LAMBDA_REC int int { EXEC } ; PUSH int 1 ; EXEC }";
+        let ast = parse(src).unwrap();
+        let ast = ast
+            .typecheck_instruction(&mut Gas::default(), None, &[])
+            .unwrap();
+        let temp = Arena::new();
+        let mut istack: IStack<'_> = Stack::new();
+        let mut ctx = Ctx::default();
+        // Cap the budget so the iterative worklist cannot grow beyond a
+        // few thousand frames. At 710 milligas/iter
+        // (`STACK_PUSH + 2 * FRAME_PUSH + EXEC`) this admits ~1.4k
+        // iterations and ≲ 1 MiB of heap, still exercising every code
+        // path the divergent `EXEC` visits while keeping the test
+        // process footprint comparable to the rest of the MIR suite.
+        // The previous `Gas::default()` (~1.04 G milligas) lets the
+        // worklist grow to ~1.46 M frames, peaking ~710 MiB of RSS per
+        // run — outsize for a unit test that runs in parallel with
+        // hundreds of others on memory-tight CI shards.
+        ctx.gas = Gas::new(1_000_000);
+        assert_eq!(
+            ast.interpret(&mut ctx, &temp, &mut istack),
             Err(interpreter::InterpretError::OutOfGas),
         );
     }
