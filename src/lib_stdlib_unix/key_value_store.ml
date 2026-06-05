@@ -991,6 +991,8 @@ let layout ?encoded_value_size ~encoding ~filepath ~eq ~index_of
           invalid_arg
             "Key_value_store.layout: encoding does not have fixed size")
 
+let filepath layout = layout.filepath
+
 type ('file, 'key, 'value) file_layout =
   root_dir:string -> 'file -> ('key, 'value) layout
 
