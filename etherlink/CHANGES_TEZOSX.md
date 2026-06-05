@@ -60,6 +60,9 @@
 
 ### Michelson Runtime
 
+- The `big_maps/index/<id>` raw-info RPC now returns the big-map's actual
+  `total_bytes`, read from the kernel-maintained per-big-map size counter
+  in durable storage, instead of a hardcoded zero. (!22080)
 - A cross-runtime call or `staticcall_evm` view whose EVM target
   exhausts the forwarded gas (HTTP 429) now fails closed with an
   out-of-gas error instead of being collapsed onto a generic 4xx

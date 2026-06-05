@@ -154,6 +154,9 @@ type ('a, 'cap) path =
   | Tezos_big_map_value_type :
       Tezlink_imports.Imported_context.Big_map.Id.t
       -> (Tezlink_imports.Imported_context.Script.expr, ro) path
+  | Tezos_big_map_total_bytes :
+      Tezlink_imports.Imported_context.Big_map.Id.t
+      -> (Z.t, ro) path
   | Tezlink_balance : Tezos_types.Contract.t -> (Tezos_types.Tez.t, ro) path
   | Tezlink_manager :
       Tezos_types.Contract.implicit

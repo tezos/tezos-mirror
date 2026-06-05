@@ -64,6 +64,13 @@ val tezos_big_map_key_type :
 val tezos_big_map_value_type :
   Tezlink_imports.Imported_context.Big_map.Id.t -> path
 
+(** [tezos_big_map_total_bytes id] is the durable storage path of big_map
+    [id]'s aggregate size counter
+    ([/tez/tez_accounts/big_map/<id>/total_bytes]), maintained by the
+    Michelson runtime kernel and encoded as a [Data_encoding.z]. *)
+val tezos_big_map_total_bytes :
+  Tezlink_imports.Imported_context.Big_map.Id.t -> path
+
 (** [/kernel/boot.wasm] — path of the kernel's WASM blob, the entry
     point [Pvm.Kernel] runs. Writable by the EVM node only for
     debugger / replay overrides. *)

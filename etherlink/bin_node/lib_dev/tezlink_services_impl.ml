@@ -183,15 +183,18 @@ let make (ctxt : Evm_ro_context.t) =
       let* value_type =
         Durable_storage.read_opt (Tezos_big_map_value_type id) state
       in
+      let* total_bytes =
+        Durable_storage.read_opt (Tezos_big_map_total_bytes id) state
+      in
       match (key_type, value_type) with
       | Some kt, Some vt ->
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/8229
-             - total_bytes:
-               Not yet implemented, requires kernel-side tracking
-               (L1 stores this at /big_maps/index/<id>/total_bytes)
-             - contents: intentionally empty, consistent with L1 raw context
-               behavior (L1 never returns big_map contents in this RPC) *)
-          return_some (kt, vt, Z.zero, [])
+          (* [total_bytes] defaults to zero when the counter path is absent,
+             which only happens for a big-map predating the kernel-side counter
+             and not written since (the kernel migrates it lazily on write; this
+             read-only RPC cannot trigger that migration).
+             contents: intentionally empty, consistent with L1 raw context
+             behavior (L1 never returns big_map contents in this RPC). *)
+          return_some (kt, vt, Option.value ~default:Z.zero total_bytes, [])
       | _ -> return_none
 
     let block chain block =
