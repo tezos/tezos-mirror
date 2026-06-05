@@ -16,7 +16,14 @@ use crate::{
 /// Representation of a Micheline node. The representation is non-owning by
 /// design, so something has to own the child nodes. Generally used with an
 /// arena allocator, like, e.g. [typed_arena].
-#[derive(Debug, Clone, Eq, PartialEq)]
+///
+/// `Debug` is implemented manually as an iterative tree walk (see below) so a
+/// deeply nested Micheline does not blow the WASM call stack when formatted in
+/// an error message: `TcError::UnexpectedMicheline` is built with
+/// `format!("{x:?}")`, and the kernel turns errors into strings via
+/// `err.to_string()` outside MIR's gas accounting. The output is byte-identical
+/// to the derived `Debug`.
+#[derive(Clone, Eq, PartialEq)]
 pub enum Micheline<'a> {
     /// Micheline integer literal.
     Int(BigInt),
@@ -30,6 +37,60 @@ pub enum Micheline<'a> {
     App(Prim, &'a [Micheline<'a>], Annotations<'a>),
     /// Micheline braced sequence.
     Seq(&'a [Micheline<'a>]),
+}
+
+/// Frame for the iterative `Debug for Micheline` driver. Recursion in the
+/// derived `Debug` happens only through the `App` argument slice and the `Seq`
+/// element slice; `Prim` and `Annotations` are shallow and formatted inline.
+enum MichelineDebugFrame<'a, 'b> {
+    Visit(&'b Micheline<'a>),
+    Lit(&'static str),
+    /// Writes `], <annots>)` — the tail of an `App(...)` after its arguments.
+    AppSuffix(&'b Annotations<'a>),
+}
+
+impl<'a> std::fmt::Debug for Micheline<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use Micheline::*;
+        use MichelineDebugFrame::*;
+        let mut stack: Vec<MichelineDebugFrame<'a, '_>> = vec![Visit(self)];
+        while let Some(frame) = stack.pop() {
+            match frame {
+                Lit(s) => f.write_str(s)?,
+                AppSuffix(annots) => write!(f, "], {annots:?})")?,
+                Visit(m) => match m {
+                    Int(i) => write!(f, "Int({i:?})")?,
+                    String(s) => write!(f, "String({s:?})")?,
+                    Bytes(b) => write!(f, "Bytes({b:?})")?,
+                    App(prim, args, annots) => {
+                        write!(f, "App({prim:?}, [")?;
+                        // Push closer + args (reversed, separated by ", " with
+                        // no trailing comma) so LIFO popping yields
+                        // `App(prim, [a0, a1, ...], annots)`, byte-identical to
+                        // the derived output.
+                        stack.push(AppSuffix(annots));
+                        for (i, arg) in args.iter().enumerate().rev() {
+                            stack.push(Visit(arg));
+                            if i > 0 {
+                                stack.push(Lit(", "));
+                            }
+                        }
+                    }
+                    Seq(elems) => {
+                        f.write_str("Seq([")?;
+                        stack.push(Lit("])"));
+                        for (i, e) in elems.iter().enumerate().rev() {
+                            stack.push(Visit(e));
+                            if i > 0 {
+                                stack.push(Lit(", "));
+                            }
+                        }
+                    }
+                },
+            }
+        }
+        Ok(())
+    }
 }
 
 /* *** Note: Carbonation of allocations ***
@@ -647,6 +708,53 @@ pub mod test_helpers {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The manual iterative `Debug` must match the derived layout exactly
+    /// (variant names, brackets, `, ` separators with no trailing comma,
+    /// nesting). The `Seq` slice formatting shares its code path with `App`'s
+    /// argument slice.
+    #[test]
+    fn micheline_debug_format() {
+        assert_eq!(format!("{:?}", Micheline::Int(5.into())), "Int(5)");
+        assert_eq!(format!("{:?}", Micheline::Seq(&[])), "Seq([])");
+        assert_eq!(
+            format!(
+                "{:?}",
+                Micheline::Seq(&[Micheline::Int(1.into()), Micheline::Int(2.into())])
+            ),
+            "Seq([Int(1), Int(2)])"
+        );
+        assert_eq!(
+            format!(
+                "{:?}",
+                Micheline::Seq(&[Micheline::Seq(&[Micheline::Int(1.into())])])
+            ),
+            "Seq([Seq([Int(1)])])"
+        );
+    }
+
+    /// L2-1436: formatting a deeply nested Micheline (reachable via
+    /// `TcError::UnexpectedMicheline = format!("{x:?}")`, formatted by the
+    /// kernel outside gas) must not overflow the ~1 MiB Rust stack. The old
+    /// derived `Debug` recursed and aborted here.
+    #[test]
+    fn deep_micheline_debug_does_not_overflow() {
+        const DEPTH: usize = 100_000;
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let arena: Arena<Micheline<'_>> = Arena::new();
+                let mut m = Micheline::Seq(&[]);
+                for _ in 0..DEPTH {
+                    m = Micheline::Seq(std::slice::from_ref(arena.alloc(m)));
+                }
+                let s = format!("{m:?}");
+                assert!(s.len() > DEPTH);
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
+    }
 
     #[allow(dead_code)]
     /// Static test to check that `micheline_*` pattern synonyms cover all

@@ -210,10 +210,12 @@ impl<T> From<T> for SingleBox<T> {
 /// The names of the variants correspond to the names of Michelson types, but
 /// snake_case is converted to PascalCase.
 ///
-/// `PartialEq` is implemented manually as an iterative tree walk so equality
-/// of deeply nested types does not blow the WASM call stack. `Eq` is a
-/// marker and stays derived.
-#[derive(Debug, Clone, Eq)]
+/// `PartialEq` and `Debug` are implemented manually as iterative tree walks so
+/// deeply nested types do not blow the WASM call stack on equality checks or
+/// on error message formatting (TcError variants embed `Type` via `{0:?}`,
+/// and the kernel formats those errors via `err.to_string()` outside MIR's
+/// gas accounting). `Eq` is a marker and stays derived.
+#[derive(Clone, Eq)]
 #[allow(missing_docs)]
 pub enum Type {
     Nat,
@@ -403,6 +405,101 @@ fn drain_iteratively<T>(root: &mut T, mut extract: impl FnMut(&mut T, &mut Vec<T
 impl Drop for Type {
     fn drop(&mut self) {
         drain_iteratively(self, extract_type_children);
+    }
+}
+
+/// Frame for the iterative `Debug for Type` driver.
+enum TypeDebugFrame<'a> {
+    Visit(&'a Type),
+    Str(&'static str),
+}
+
+/// Emits `Name(<left>, <right>)`. Pushes closer, right, separator, left
+/// in reverse so LIFO popping yields the lexical order.
+fn push_pair_debug<'a>(
+    f: &mut std::fmt::Formatter<'_>,
+    stack: &mut Vec<TypeDebugFrame<'a>>,
+    open: &'static str,
+    p: &'a PairBox<Type>,
+) -> std::fmt::Result {
+    f.write_str(open)?;
+    stack.push(TypeDebugFrame::Str(")"));
+    stack.push(TypeDebugFrame::Visit(&p.1));
+    stack.push(TypeDebugFrame::Str(", "));
+    stack.push(TypeDebugFrame::Visit(&p.0));
+    Ok(())
+}
+
+/// Emits `Name(<child>)`.
+fn push_single_debug<'a>(
+    f: &mut std::fmt::Formatter<'_>,
+    stack: &mut Vec<TypeDebugFrame<'a>>,
+    open: &'static str,
+    s: &'a SingleBox<Type>,
+) -> std::fmt::Result {
+    f.write_str(open)?;
+    stack.push(TypeDebugFrame::Str(")"));
+    stack.push(TypeDebugFrame::Visit(s));
+    Ok(())
+}
+
+/// Iterative `Debug` so deeply nested types do not blow the WASM call
+/// stack when formatted for error output. `TcError` variants embed
+/// `Type` via `{0:?}` and the kernel formats those errors with
+/// `err.to_string()` (see
+/// `etherlink/kernel_latest/tezos/src/operation_result.rs:218`) outside
+/// MIR's gas accounting, so a deep parameter type carried by a clean
+/// rejection (wrong argument type, etc.) would otherwise trap the PVM.
+///
+/// Output format is the simplified shape that would result if `PairBox`
+/// and `SingleBox` were transparent wrappers, e.g. `Pair(Int, Int)`
+/// rather than the auto derived `Pair(PairBox { inner: Some((Int, Int)) })`.
+impl std::fmt::Debug for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut stack: Vec<TypeDebugFrame> = vec![TypeDebugFrame::Visit(self)];
+        while let Some(frame) = stack.pop() {
+            let t = match frame {
+                TypeDebugFrame::Str(s) => {
+                    f.write_str(s)?;
+                    continue;
+                }
+                TypeDebugFrame::Visit(t) => t,
+            };
+            match t {
+                Type::Nat => f.write_str("Nat")?,
+                Type::Int => f.write_str("Int")?,
+                Type::Bool => f.write_str("Bool")?,
+                Type::Mutez => f.write_str("Mutez")?,
+                Type::String => f.write_str("String")?,
+                Type::Unit => f.write_str("Unit")?,
+                Type::Never => f.write_str("Never")?,
+                Type::Operation => f.write_str("Operation")?,
+                Type::Address => f.write_str("Address")?,
+                Type::ChainId => f.write_str("ChainId")?,
+                Type::Bytes => f.write_str("Bytes")?,
+                Type::Key => f.write_str("Key")?,
+                Type::Signature => f.write_str("Signature")?,
+                Type::KeyHash => f.write_str("KeyHash")?,
+                Type::Timestamp => f.write_str("Timestamp")?,
+                #[cfg(feature = "bls")]
+                Type::Bls12381Fr => f.write_str("Bls12381Fr")?,
+                #[cfg(feature = "bls")]
+                Type::Bls12381G1 => f.write_str("Bls12381G1")?,
+                #[cfg(feature = "bls")]
+                Type::Bls12381G2 => f.write_str("Bls12381G2")?,
+                Type::Pair(p) => push_pair_debug(f, &mut stack, "Pair(", p)?,
+                Type::Or(p) => push_pair_debug(f, &mut stack, "Or(", p)?,
+                Type::Map(p) => push_pair_debug(f, &mut stack, "Map(", p)?,
+                Type::BigMap(p) => push_pair_debug(f, &mut stack, "BigMap(", p)?,
+                Type::Lambda(p) => push_pair_debug(f, &mut stack, "Lambda(", p)?,
+                Type::Option(s) => push_single_debug(f, &mut stack, "Option(", s)?,
+                Type::List(s) => push_single_debug(f, &mut stack, "List(", s)?,
+                Type::Set(s) => push_single_debug(f, &mut stack, "Set(", s)?,
+                Type::Contract(s) => push_single_debug(f, &mut stack, "Contract(", s)?,
+                Type::Ticket(s) => push_single_debug(f, &mut stack, "Ticket(", s)?,
+            }
+        }
+        Ok(())
     }
 }
 
@@ -618,7 +715,12 @@ impl<'a> IntoMicheline<'a> for &'_ Type {
 ///    typechecker has verified this invariant holds. However, be mindful of
 ///    this when comparing `TypedValue` in client code. [PartialOrd] is safe to
 ///    use, it'll just return [None] for incomparable values.
-#[derive(Debug, Clone, Eq, PartialEq)]
+/// 3. `Debug` is implemented manually as an iterative tree walk so deeply
+///    nested values do not blow the WASM call stack when they appear in an
+///    error message. `InterpretError::FailedWith` carries a `TypedValue`
+///    via `{1:?}`, and the kernel formats those errors via
+///    `err.to_string()` outside MIR's gas accounting.
+#[derive(Clone, Eq, PartialEq)]
 #[allow(missing_docs)]
 pub enum TypedValue<'a> {
     Int(BigInt),
@@ -652,6 +754,245 @@ pub enum TypedValue<'a> {
     Bls12381G1(Box<bls::G1>),
     #[cfg(feature = "bls")]
     Bls12381G2(Box<bls::G2>),
+}
+
+/// Iterative `Debug` so deeply nested values do not blow the WASM call
+/// stack when formatted for error output. `InterpretError::FailedWith`
+/// embeds a `TypedValue` via `{1:?}` and the kernel formats those errors
+/// with `err.to_string()` outside MIR's gas accounting.
+///
+/// Leaf variants delegate to the underlying type's `Debug` (`BigInt`,
+/// `BigUint`, `bool`, `String`, etc., none of which are recursive in the
+/// MIR type graph). Recursive variants (`Pair`, `Or`, `Option`, `List`,
+/// `Set`, `Map`, `Lambda`, `Ticket`) emit a clean form like
+/// `Pair(<l>, <r>)` driven by a `Vec<Frame>` worklist.
+///
+/// The output intentionally diverges from the derived `Debug`: the
+/// `PairBox` / `SingleBox` / `MichelsonList` indirection wrappers are
+/// elided (they are implementation detail), and `Map` prints `k -> v`
+/// rather than the `BTreeMap`-derived `k: v`. This Debug appears only in
+/// error messages; no consumer parses it.
+impl<'a> std::fmt::Debug for TypedValue<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        debug_fmt_walk(DebugFrame::VisitTv(self), f)
+    }
+}
+
+/// Frames shared between [`TypedValue::fmt`] and [`Closure::fmt`].
+///
+/// `VisitTv` and `VisitCl` are pushed onto the same worklist so that the
+/// alternating `TypedValue::Lambda(Closure)` /
+/// `Closure::Apply { arg_val: TypedValue, .. }` cycle is unwound on the
+/// heap instead of the call stack. An attacker can chain
+/// `Lambda(Apply { arg_val: Lambda(Apply { arg_val: … }), .. })` to any
+/// depth (via repeated `APPLY` of lambda values), and a recursive Debug
+/// would burn two real frames per nesting level. Routing both sides
+/// through a single loop bounds the real stack to a constant.
+pub(crate) enum DebugFrame<'b, 'a: 'b> {
+    VisitTv(&'b TypedValue<'a>),
+    VisitCl(&'b Closure<'a>),
+    Str(&'static str),
+    // Iterate over a Map's (key, value) pairs without recursing
+    // into the BTreeMap's auto Debug (which would walk values
+    // recursively).
+    // The `bool` is `first`: whether the next entry is the first in
+    // the container, so the ", " separator is emitted *before* every
+    // non-first entry (no trailing comma).
+    MapEntries(
+        std::collections::btree_map::Iter<'b, Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+        bool,
+    ),
+    SetEntries(std::collections::btree_set::Iter<'b, Rc<TypedValue<'a>>>, bool),
+    ListEntries(crate::ast::michelson_list::Iter<'b, Rc<TypedValue<'a>>>, bool),
+}
+
+pub(crate) fn debug_fmt_walk<'a, 'b>(
+    seed: DebugFrame<'b, 'a>,
+    f: &mut std::fmt::Formatter<'_>,
+) -> std::fmt::Result {
+    use TypedValue as TV;
+    let mut stack: Vec<DebugFrame<'b, 'a>> = vec![seed];
+    while let Some(frame) = stack.pop() {
+        match frame {
+            DebugFrame::Str(s) => f.write_str(s)?,
+            DebugFrame::MapEntries(mut it, first) => {
+                if let Some((k, v)) = it.next() {
+                    // Re-push the iterator so further entries follow this
+                    // key/value pair; emit ", " before this pair unless it
+                    // is the first (so there is no trailing comma).
+                    stack.push(DebugFrame::MapEntries(it, false));
+                    stack.push(DebugFrame::VisitTv(v.as_ref()));
+                    stack.push(DebugFrame::Str(" -> "));
+                    stack.push(DebugFrame::VisitTv(k.as_ref()));
+                    if !first {
+                        stack.push(DebugFrame::Str(", "));
+                    }
+                }
+            }
+            DebugFrame::SetEntries(mut it, first) => {
+                if let Some(e) = it.next() {
+                    stack.push(DebugFrame::SetEntries(it, false));
+                    stack.push(DebugFrame::VisitTv(e.as_ref()));
+                    if !first {
+                        stack.push(DebugFrame::Str(", "));
+                    }
+                }
+            }
+            DebugFrame::ListEntries(mut it, first) => {
+                if let Some(e) = it.next() {
+                    stack.push(DebugFrame::ListEntries(it, false));
+                    stack.push(DebugFrame::VisitTv(e.as_ref()));
+                    if !first {
+                        stack.push(DebugFrame::Str(", "));
+                    }
+                }
+            }
+            DebugFrame::VisitCl(c) => match c {
+                Closure::Lambda(lam) => {
+                    // Terminal Lambda: emit inline. `micheline_code` goes
+                    // through the iterative `Micheline` Debug; the
+                    // typechecked `code` is elided as `code: ..` (its
+                    // `Instruction` Debug is still recursive). `in_ty` /
+                    // `out_ty` use `Type`'s iterative Debug. None of these
+                    // walks any further `TypedValue`/`Closure`.
+                    f.write_str("Lambda(")?;
+                    match lam {
+                        Lambda::Lambda { micheline_code, .. } => {
+                            write!(
+                                f,
+                                "Lambda {{ micheline_code: {micheline_code:?}, code: .. }}"
+                            )?;
+                        }
+                        Lambda::LambdaRec {
+                            in_ty,
+                            out_ty,
+                            micheline_code,
+                            ..
+                        } => {
+                            write!(
+                                f,
+                                "LambdaRec {{ in_ty: {in_ty:?}, out_ty: {out_ty:?}, \
+                                 micheline_code: {micheline_code:?}, code: .. }}"
+                            )?;
+                        }
+                    }
+                    f.write_str(")")?;
+                }
+                Closure::Apply {
+                    arg_ty,
+                    arg_val,
+                    closure,
+                } => {
+                    // `arg_ty` is rendered inline (iterative `Type` Debug).
+                    // `arg_val` may itself be `Lambda(Apply { … })`, and
+                    // `closure` may chain further `Apply` spines — both go
+                    // back through the worklist so neither path burns a
+                    // real stack frame.
+                    write!(f, "Apply {{ arg_ty: {arg_ty:?}, arg_val: ")?;
+                    stack.push(DebugFrame::Str(" }"));
+                    stack.push(DebugFrame::VisitCl(closure.as_ref()));
+                    stack.push(DebugFrame::Str(", closure: "));
+                    stack.push(DebugFrame::VisitTv(arg_val.as_ref()));
+                }
+            },
+            DebugFrame::VisitTv(v) => match v {
+                // Leaves: format directly. None of these inner Debug
+                // impls walk a `TypedValue` themselves, so they are
+                // iteratively safe.
+                TV::Int(n) => write!(f, "Int({:?})", n)?,
+                TV::Nat(n) => write!(f, "Nat({:?})", n)?,
+                TV::Mutez(m) => write!(f, "Mutez({:?})", m)?,
+                TV::Bool(b) => write!(f, "Bool({:?})", b)?,
+                TV::String(s) => write!(f, "String({:?})", s)?,
+                TV::Unit => f.write_str("Unit")?,
+                TV::Bytes(b) => write!(f, "Bytes({:?})", b)?,
+                TV::Address(a) => write!(f, "Address({:?})", a)?,
+                TV::ChainId(c) => write!(f, "ChainId({:?})", c)?,
+                TV::Contract(a) => write!(f, "Contract({:?})", a)?,
+                TV::Key(k) => write!(f, "Key({:?})", k)?,
+                TV::Signature(s) => write!(f, "Signature({:?})", s)?,
+                TV::KeyHash(h) => write!(f, "KeyHash({:?})", h)?,
+                TV::Timestamp(t) => write!(f, "Timestamp({:?})", t)?,
+                TV::Operation(op) => write!(f, "Operation({:?})", op)?,
+                TV::BigMap(bm) => write!(f, "BigMap({:?})", bm)?,
+                #[cfg(feature = "bls")]
+                TV::Bls12381Fr(x) => write!(f, "Bls12381Fr({:?})", x)?,
+                #[cfg(feature = "bls")]
+                TV::Bls12381G1(x) => write!(f, "Bls12381G1({:?})", x)?,
+                #[cfg(feature = "bls")]
+                TV::Bls12381G2(x) => write!(f, "Bls12381G2({:?})", x)?,
+                // Lambda: enqueue the closure on the shared worklist so the
+                // alternating `arg_val: TypedValue` / `closure: Closure`
+                // chain (reachable via `APPLY` of lambda values) never
+                // burns a real stack frame.
+                TV::Lambda(c) => {
+                    f.write_str("Lambda(")?;
+                    stack.push(DebugFrame::Str(")"));
+                    stack.push(DebugFrame::VisitCl(c));
+                }
+                // Ticket: payload's type and content can be deep.
+                // Format manually so the inner TypedValue goes through
+                // this iterative walker.
+                TV::Ticket(t) => {
+                    // Re-push the closer and an enumerated visit for
+                    // the ticket content. Ticketer/amount/content_type
+                    // are leaves and can be formatted inline up front.
+                    f.write_str("Ticket(")?;
+                    write!(
+                        f,
+                        "ticketer: {:?}, content_type: {:?}, amount: {:?}, content: ",
+                        t.ticketer, t.content_type, t.amount
+                    )?;
+                    stack.push(DebugFrame::Str(")"));
+                    stack.push(DebugFrame::VisitTv(&t.content));
+                }
+                // Recursive variants.
+                TV::Pair(l, r) => {
+                    f.write_str("Pair(")?;
+                    stack.push(DebugFrame::Str(")"));
+                    stack.push(DebugFrame::VisitTv(r.as_ref()));
+                    stack.push(DebugFrame::Str(", "));
+                    stack.push(DebugFrame::VisitTv(l.as_ref()));
+                }
+                TV::Option(opt) => match opt {
+                    None => f.write_str("Option(None)")?,
+                    Some(inner) => {
+                        f.write_str("Option(Some(")?;
+                        stack.push(DebugFrame::Str("))"));
+                        stack.push(DebugFrame::VisitTv(inner.as_ref()));
+                    }
+                },
+                TV::Or(or) => match or {
+                    Or::Left(x) => {
+                        f.write_str("Or(Left(")?;
+                        stack.push(DebugFrame::Str("))"));
+                        stack.push(DebugFrame::VisitTv(x.as_ref()));
+                    }
+                    Or::Right(x) => {
+                        f.write_str("Or(Right(")?;
+                        stack.push(DebugFrame::Str("))"));
+                        stack.push(DebugFrame::VisitTv(x.as_ref()));
+                    }
+                },
+                TV::List(lst) => {
+                    f.write_str("List([")?;
+                    stack.push(DebugFrame::Str("])"));
+                    stack.push(DebugFrame::ListEntries(lst.iter(), true));
+                }
+                TV::Set(set) => {
+                    f.write_str("Set({")?;
+                    stack.push(DebugFrame::Str("})"));
+                    stack.push(DebugFrame::SetEntries(set.iter(), true));
+                }
+                TV::Map(map) => {
+                    f.write_str("Map({")?;
+                    stack.push(DebugFrame::Str("})"));
+                    stack.push(DebugFrame::MapEntries(map.iter(), true));
+                }
+            },
+        }
+    }
+    Ok(())
 }
 
 impl<'a> IntoMicheline<'a> for TypedValue<'a> {
@@ -2083,5 +2424,61 @@ mod drop_safety {
             let mut gas = Gas::unmetered();
             tv.into_micheline_optimized_legacy(&arena, &mut gas).unwrap();
         });
+    }
+}
+
+#[cfg(test)]
+mod debug_tests {
+    use super::*;
+
+    /// `Debug` on a deeply nested `Type` must not overflow the WASM kernel's
+    /// 1 MiB call stack, because `TcError` variants embed `Type` via `{0:?}`
+    /// and the kernel formats errors via `err.to_string()` outside MIR's
+    /// gas accounting (see `etherlink/kernel_latest/tezos/src/operation_result.rs:218`).
+    /// We pin a representative depth on an explicit 1 MiB worker thread so
+    /// the test exercises the same budget as the kernel.
+    #[test]
+    fn deeply_nested_type_debug_format() {
+        use std::thread;
+        const DEPTH: usize = 100_000;
+        let join = thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let mut deep = Type::Int;
+                for _ in 0..DEPTH {
+                    deep = Type::new_pair(Type::Int, deep);
+                }
+                let formatted = format!("{:?}", deep);
+                assert!(formatted.starts_with("Pair("));
+                assert!(formatted.ends_with(')'));
+            })
+            .unwrap();
+        join.join().expect("worker thread completes");
+    }
+
+    /// Same for `TypedValue`: `InterpretError::FailedWith` embeds a value via
+    /// `{1:?}` and a contract emitting `FAILWITH` with a runtime built deep
+    /// pair would otherwise trap the kernel during error formatting.
+    #[test]
+    fn deeply_nested_typed_value_debug_format() {
+        use std::thread;
+        const DEPTH: usize = 100_000;
+        let join = thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let mut deep: TypedValue<'_> = TypedValue::Unit;
+                for _ in 0..DEPTH {
+                    deep = TypedValue::Pair(Rc::new(TypedValue::Unit), Rc::new(deep));
+                }
+                let formatted = format!("{:?}", deep);
+                assert!(formatted.starts_with("Pair("));
+                assert!(formatted.ends_with(')'));
+                // Drain so the iterative auto Drop on TypedValue (still a
+                // separately tracked follow up) does not overflow the
+                // worker thread.
+                drain_deep_typed_value(&mut deep);
+            })
+            .unwrap();
+        join.join().expect("worker thread completes");
     }
 }

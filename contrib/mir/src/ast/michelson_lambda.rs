@@ -48,7 +48,15 @@ implementation)
 
 /// Either a simple [Lambda], or a partially-applied one, the result of the
 /// `APPLY` instruction.
-#[derive(Debug, Clone, Eq, PartialEq)]
+///
+/// `Debug` is implemented manually as an iterative walk over the
+/// `Apply` chain so a closure built by many nested `APPLY`s does not
+/// blow the WASM call stack when formatted into an error message
+/// (`InterpretError::FailedWith` embeds a `TypedValue` via `{1:?}`,
+/// which in turn formats `TypedValue::Lambda(Closure)` via `Closure`'s
+/// `Debug`; the kernel runs `err.to_string()` outside MIR's gas
+/// accounting).
+#[derive(Clone, Eq, PartialEq)]
 pub enum Closure<'a> {
     /// Simple [Lambda].
     Lambda(Lambda<'a>),
@@ -61,6 +69,16 @@ pub enum Closure<'a> {
         /// Inner closure
         closure: Box<Closure<'a>>,
     },
+}
+
+/// Debug seeds the shared `TypedValue`/`Closure` walker so the alternating
+/// `Closure::Apply { arg_val: TypedValue, .. }` /
+/// `TypedValue::Lambda(Closure)` cycle (reachable via repeated `APPLY` of
+/// lambda values) is unwound on the heap, not the call stack.
+impl<'a> std::fmt::Debug for Closure<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        crate::ast::debug_fmt_walk(crate::ast::DebugFrame::VisitCl(self), f)
+    }
 }
 
 impl<'a> IntoMicheline<'a> for Closure<'a> {
@@ -95,6 +113,116 @@ mod tests {
         parser::Parser,
         stack::Stack,
     };
+
+    /// L2-1436: a lambda value with a deeply nested body must not overflow when
+    /// formatted (reachable via `FAILWITH` -> `InterpretError::FailedWith`,
+    /// which the kernel turns into a string outside gas). `micheline_code` goes
+    /// through the iterative `Micheline` Debug; the typechecked `code` (whose
+    /// derived `Instruction` Debug is still recursive) is elided as `code: ..`.
+    #[test]
+    fn deep_lambda_debug_does_not_overflow() {
+        use crate::ast::Micheline;
+        const DEPTH: usize = 100_000;
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let arena: Arena<Micheline<'_>> = Arena::new();
+                let mut m = Micheline::Seq(&[]);
+                for _ in 0..DEPTH {
+                    m = Micheline::Seq(std::slice::from_ref(arena.alloc(m)));
+                }
+                let lam = super::Lambda::Lambda {
+                    micheline_code: m,
+                    code: Vec::new().into(),
+                };
+                let tv = TypedValue::Lambda(super::Closure::Lambda(lam));
+                let s = format!("{tv:?}");
+                assert!(s.contains("code: .."));
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
+    }
+
+    /// L2-1436: the iterative `Closure::Debug` must not overflow on a deep
+    /// `Closure::Apply` spine (an APPLY chain is ~7400-deep reachable within
+    /// one operation's gas budget). Builds N nested `Apply` and formats on a
+    /// 1 MiB worker thread; a regression to recursive walking would overflow.
+    /// `Closure` has no iterative `Drop` yet (its `Box<Closure>` spine recurses
+    /// on drop — tracked in L2-1446), so the deep value is `mem::forget`-ed to
+    /// avoid the recursive destructor.
+    #[test]
+    fn deeply_nested_closure_apply_debug_format() {
+        use crate::ast::{Micheline, Type};
+        const DEPTH: usize = 100_000;
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let mut c = super::Closure::Lambda(super::Lambda::Lambda {
+                    micheline_code: Micheline::Seq(&[]),
+                    code: Vec::new().into(),
+                });
+                for _ in 0..DEPTH {
+                    c = super::Closure::Apply {
+                        arg_ty: Type::Unit,
+                        arg_val: Box::new(TypedValue::Unit),
+                        closure: Box::new(c),
+                    };
+                }
+                let tv = TypedValue::Lambda(c);
+                let s = format!("{tv:?}");
+                assert!(s.contains("Apply {") && s.len() > DEPTH);
+                std::mem::forget(tv);
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
+    }
+
+    /// L2-1436 follow-up (review on !21988): when an `APPLY` captures a
+    /// lambda value as `arg_val`, `Closure::Debug` recurses into
+    /// `TypedValue::Debug`, which then recurses back into `Closure::Debug`
+    /// for the inner `Lambda(...)` — N alternations burn ~2N real frames
+    /// and overflow the 1 MiB stack independently of the `Apply` spine
+    /// length. The pre-fix sibling test only exercised `arg_val: Unit`, so
+    /// it missed the alternating path. Here every level nests another
+    /// lambda inside the captured `arg_val`; a regression to per-impl
+    /// recursion would overflow even at small DEPTH.
+    #[test]
+    fn deep_apply_arg_lambda_debug_does_not_overflow() {
+        use crate::ast::{Micheline, Type};
+        const DEPTH: usize = 100_000;
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let leaf = || {
+                    super::Closure::Lambda(super::Lambda::Lambda {
+                        micheline_code: Micheline::Seq(&[]),
+                        code: Vec::new().into(),
+                    })
+                };
+                let mut c = leaf();
+                for _ in 0..DEPTH {
+                    c = super::Closure::Apply {
+                        arg_ty: Type::new_lambda(Type::Unit, Type::Unit),
+                        arg_val: Box::new(TypedValue::Lambda(leaf())),
+                        closure: Box::new(c),
+                    };
+                }
+                // Wrap the whole chain inside one final outer Lambda so the
+                // formatting starts on the `TypedValue` side.
+                let tv = TypedValue::Lambda(c);
+                let s = format!("{tv:?}");
+                // Every captured `arg_val` is itself rendered as `Lambda(...)`
+                // — count occurrences must exceed DEPTH (one per Apply +
+                // the outer / leaf wrappers).
+                assert!(s.matches("Lambda(").count() > DEPTH);
+                std::mem::forget(tv);
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
+    }
 
     #[test]
     fn apply_micheline() {
