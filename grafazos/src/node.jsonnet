@@ -72,18 +72,23 @@ local table = base.table;
     + info.withMapping([['0', 'Unsync', 'red'], ['1', 'Sync', 'green'], ['2', 'Stuck', 'red']]),
 
   uptime(h, w, x, y):
-    // Pin grafazos_app to the octez-node scrape job. A host can run multiple
-    // scrapers (node-exporter, process-exporter, octez-node) that each emit
-    // process_start_time_seconds tagged with the same grafazos_instance, so
-    // without this filter the panel shows one value per scrape job (3+ on a
-    // typical Tezos host) instead of just the octez-node process uptime.
-    local selector = '{' + base.node_instance + '="$node_instance", grafazos_app="octez-node"}';
+    // process_start_time_seconds is emitted by every Prometheus scrape job
+    // on the host (node-exporter, process-exporter, octez-node, sometimes
+    // a per-pod process-exporter sidecar), all tagged with the same
+    // grafazos_instance. Pin grafazos_app="octez-node" AND
+    // container!="process-exporter" so we report only the octez-node
+    // process's own /metrics scrape, not a sidecar that targets it.
+    //
+    // The container!= filter is k8s-specific: PromQL treats a missing
+    // label as the empty string, so the != matcher passes through
+    // gcp-sentinel1 metrics that have no `container` label at all.
+    local selector = '{' + base.node_instance + '="$node_instance", grafazos_app="octez-node", container!="process-exporter"}';
     local q = query.prometheus.new(base.datasource, 'time()-(process_start_time_seconds' + selector + ')')
-              + query.prometheus.withLegendFormat('octez-node uptime');
+              + query.prometheus.withLegendFormat('');
     info.new('Node uptime', q, h, w, x, y)
     + stat.panelOptions.withDescription('Time since the octez-node process last restarted on the selected instance (process uptime, not host uptime).')
     + stat.standardOptions.withUnit('dtdhms')
-    + stat.options.withTextMode('max'),
+    + stat.options.withTextMode('value'),
 
   headLevel(h, w, x, y):
     local q = prometheus('validator_chain_head_level', legendFormat='currrent head level');
