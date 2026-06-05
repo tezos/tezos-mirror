@@ -781,6 +781,13 @@ impl BlockInProgress {
             );
         }
 
+        // Account for the CRAC's gas *before* building the receipt so that
+        // `cumulative_gas_used` reflects the post-transaction block total, as
+        // required by EIP-658 / the Yellow Paper. This matches the ordering in
+        // `register_valid_transaction`.
+        self.add_gas(gas_used)?;
+        self.cumulative_execution_gas += gas_used;
+
         let receipt = TransactionReceipt {
             hash: hash_bytes,
             index,
@@ -811,8 +818,6 @@ impl BlockInProgress {
             signature: None,
         };
 
-        self.add_gas(gas_used)?;
-        self.cumulative_execution_gas += gas_used;
         self.valid_txs.push(hash_bytes);
         self.index += 1;
         self.cumulative_receipts.push(receipt);
@@ -993,5 +998,55 @@ mod tests {
         let decoded =
             BlockInProgress::decode(&decoder).expect("Should have decoded data");
         assert_eq!(decoded, bip);
+    }
+
+    fn dummy_crac_effect(gas_used: u64) -> crate::apply::EvmCracEffect {
+        crate::apply::EvmCracEffect {
+            crac_id: "0".to_string(),
+            logs: Vec::new(),
+            source: H160::zero(),
+            sender: H160::zero(),
+            gas_limit: U256::from(gas_used),
+            amount: U256::zero(),
+            gas_used: U256::from(gas_used),
+        }
+    }
+
+    /// A CRAC synthetic receipt must report the *post-transaction* block gas
+    /// accumulator in `cumulative_gas_used`, as required by EIP-658 / the
+    /// Yellow Paper. This is a regression test for the bug where the
+    /// accumulator was stamped into the receipt *before* the CRAC's own gas
+    /// was added (L2-1478).
+    #[test]
+    fn test_crac_fake_receipt_cumulative_gas_includes_own_gas() {
+        use tezos_evm_runtime::runtime::MockKernelHost;
+
+        let mut host = MockKernelHost::default();
+        let mut bip =
+            BlockInProgress::new(U256::from(1), Default::default(), U256::one());
+
+        // Pre-existing block gas (as if a prior transaction had run).
+        bip.cumulative_gas = U256::from(100u64);
+
+        bip.register_crac_evm_transaction(&mut host, dummy_crac_effect(7), None)
+            .expect("CRAC registration should succeed");
+
+        assert_eq!(
+            bip.cumulative_receipts[0].cumulative_gas_used,
+            U256::from(107u64),
+            "CRAC receipt must include its own gas in cumulative_gas_used"
+        );
+
+        // A second CRAC must keep the staircase monotonic.
+        bip.register_crac_evm_transaction(&mut host, dummy_crac_effect(13), None)
+            .expect("CRAC registration should succeed");
+
+        assert_eq!(
+            bip.cumulative_receipts[1].cumulative_gas_used,
+            U256::from(120u64),
+            "consecutive CRAC receipts must accumulate gas monotonically"
+        );
+
+        assert_eq!(bip.cumulative_gas, U256::from(120u64));
     }
 }
