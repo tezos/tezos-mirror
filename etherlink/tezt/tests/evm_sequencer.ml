@@ -3703,7 +3703,9 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
 
   (* Produce a block where the upgrade would happen *)
   let*@ _ = produce_block ~timestamp:"2020-01-01T00:00:10Z" sequencer in
-  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
+  let* () =
+    bake_until_sync ~timeout:120. ~sc_rollup_node ~sequencer ~client ()
+  in
 
   (* Ensure the kernel is upgraded *)
   let* () =
