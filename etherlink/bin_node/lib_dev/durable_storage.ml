@@ -207,6 +207,9 @@ type ('a, 'cap) path =
   | Tezos_big_map_value_type :
       Tezlink_imports.Imported_context.Big_map.Id.t
       -> (Tezlink_imports.Imported_context.Script.expr, ro) path
+  | Tezos_big_map_total_bytes :
+      Tezlink_imports.Imported_context.Big_map.Id.t
+      -> (Z.t, ro) path
   | Tezlink_balance : Tezos_types.Contract.t -> (Tezos_types.Tez.t, ro) path
   | Tezlink_manager :
       Tezos_types.Contract.implicit
@@ -708,6 +711,15 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
           decode =
             safe_binary_decode
               Tezlink_imports.Imported_context.Script.expr_encoding;
+        }
+  | Tezos_big_map_total_bytes id ->
+      (* The Michelson runtime kernel persists this counter as a [Zarith]
+         ([Encoding::Z]), the binary counterpart of [Data_encoding.z] — not a
+         little-endian scalar, so [qty_le_ro_codec] would mis-decode it. *)
+      static_ro
+        {
+          path = Durable_storage_path.tezos_big_map_total_bytes id;
+          decode = safe_binary_decode Data_encoding.z;
         }
   | Tezlink_balance (Originated _ as c) ->
       static_ro

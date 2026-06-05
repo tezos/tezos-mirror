@@ -153,6 +153,8 @@ let tezos_big_map_key_type id = tezos_big_map_dir id ^ "/key_type"
 
 let tezos_big_map_value_type id = tezos_big_map_dir id ^ "/value_type"
 
+let tezos_big_map_total_bytes id = tezos_big_map_dir id ^ "/total_bytes"
+
 let michelson_ledger_root = TEZ.Tez_accounts.make "/tezosx"
 
 (** TezosX: Tezos blocks live in the Michelson world-state keyspace. *)

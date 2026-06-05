@@ -1766,17 +1766,33 @@ let test_bigmap_rpcs =
   register_tezosx_test
     ~title:"Test of the big_map RPCs"
     ~tags:["rpc"; "big_map"]
-    ~bootstrap_contracts:[counter_contract]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
   let endpoint = tezlink_endpoint_from_evm_node sequencer in
-  (* Call the contract to populate the big_map with key 1 *)
+  (* Originate the contract at runtime (rather than as a bootstrap contract)
+     so the big-map is allocated and populated through the kernel's lazy
+     storage path, which is what maintains the [total_bytes] counter. A
+     bootstrap-injected big-map bypasses that path, leaving the counter
+     unset. *)
+  let* contract =
+    Client.originate_contract
+      ~endpoint
+      ~amount:Tez.zero
+      ~alias:"big_map_counter"
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:counter_contract.initial_storage
+      ~prg:counter_contract.path
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  (* Call the contract to rotate the big_map key from 0 to 1. *)
   let* () =
     Client.transfer
       ~endpoint
       ~amount:(Tez.of_int 10)
       ~giver:Constant.bootstrap1.public_key_hash
-      ~receiver:counter_contract.address
+      ~receiver:contract
       ~burn_cap:Tez.one
       client
   in
@@ -1804,6 +1820,15 @@ let test_bigmap_rpcs =
     (value_type_prim = "unit")
       string
       ~error_msg:"Expected value_type %R but got %L") ;
+  (* [total_bytes] is the kernel-maintained aggregate size of the big-map,
+     encoded as a [Data_encoding.z] (hence a JSON string). The big-map holds a
+     single [nat -> unit] entry, giving a deterministic non-zero size; asserting
+     the exact value makes the test fail were the RPC to regress to a hardcoded
+     zero. *)
+  let total_bytes =
+    JSON.(json |-> "total_bytes" |> as_string |> int_of_string)
+  in
+  Check.((total_bytes = 67) int ~error_msg:"Expected total_bytes %R but got %L") ;
   unit
 
 let test_pack_data =
