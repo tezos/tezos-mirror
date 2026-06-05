@@ -215,9 +215,6 @@ module Make (T : Tezos_tree_encoding.TREE) :
 
     let decode state = Tree_encoding_runner.decode pvm_state_encoding state
 
-    let encode_durable_storage durable state =
-      Tree_encoding_runner.encode durable_storage_encoding durable state
-
     let decode_durable_storage state =
       Tree_encoding_runner.decode durable_storage_encoding state
 
