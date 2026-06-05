@@ -461,8 +461,13 @@ where
         address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
         data: CracReceived {
             cracId: journal.crac_id().to_string(),
-            // TODO: Pass it in headers when more than 2 runtimes are supported.
-            sourceRuntime: "tezos".to_string(),
+            // The native runtime of `sourceAddress` (forwarded as
+            // `X-Tezos-Source-Runtime`), not the immediate sender's. On a
+            // nested `EVM -> Michelson -> EVM` CRAC the source is the
+            // transitive EVM origin, so this is `ethereum`; pairing it with
+            // a hardcoded `tezos` produced an incoherent identity tuple for
+            // event consumers.
+            sourceRuntime: hdrs.source_runtime.as_host().to_string(),
             senderAddress: hdrs.sender.to_string(),
             sourceAddress: hdrs.source.unwrap_or_default().to_string(),
             targetAddress: parsed.destination.to_string(),
@@ -1821,6 +1826,109 @@ mod tests {
             revm::primitives::U256::from_be_slice(sender.as_slice()),
             "msg.sender must stay the immediate caller (X-Tezos-Sender)"
         );
+    }
+
+    /// `CracReceived.sourceRuntime` reflects the native runtime of
+    /// `X-Tezos-Source` (forwarded as `X-Tezos-Source-Runtime`), not a
+    /// hardcoded `"tezos"`. On a nested `EVM -> Michelson -> EVM` CRAC the
+    /// forwarded source is the transitive EVM origin, so the pair
+    /// `(sourceRuntime, sourceAddress)` must be self-consistent — Ethereum
+    /// here. Reverting the fix re-hardcodes `"tezos"` and fails the
+    /// assertion.
+    #[test]
+    fn cracreceived_source_runtime_follows_header() {
+        use alloy_sol_types::SolEvent;
+
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let registry = UnimplementedRegistry;
+
+        let sender = Address::from_slice(&[0x11; 20]); // immediate Tezos sender alias
+        let source = Address::from_slice(&[0x22; 20]); // transitive EVM origin
+        let destination = Address::from_slice(&[0x33; 20]);
+
+        let url = format!(
+            "http://ethereum/{}",
+            alloy_primitives::hex::encode(destination.0 .0)
+        );
+        let request = http::Request::builder()
+            .method(http::Method::POST)
+            .uri(&url)
+            .header(
+                tezosx_interfaces::X_TEZOS_SENDER,
+                format!("0x{}", alloy_primitives::hex::encode(sender.0 .0)),
+            )
+            .header(
+                tezosx_interfaces::X_TEZOS_SOURCE,
+                format!("0x{}", alloy_primitives::hex::encode(source.0 .0)),
+            )
+            // The originator is EVM-native (round-trip alias resolved back
+            // to the real EVM address on the Michelson side). The header
+            // carries the numeric RuntimeId tag.
+            .header(
+                tezosx_interfaces::X_TEZOS_SOURCE_RUNTIME,
+                u8::from(tezosx_interfaces::RuntimeId::Ethereum).to_string(),
+            )
+            .header(tezosx_interfaces::X_TEZOS_AMOUNT, "0")
+            .header(tezosx_interfaces::X_TEZOS_GAS_LIMIT, u64::MAX.to_string())
+            .header(tezosx_interfaces::X_TEZOS_TIMESTAMP, "1")
+            .header(tezosx_interfaces::X_TEZOS_BLOCK_NUMBER, "1")
+            .body(vec![])
+            .unwrap();
+
+        let mut journal = TezosXJournal::default();
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        assert_eq!(resp.status(), http::StatusCode::OK);
+
+        // A plain transfer to a code-less account emits no contract logs,
+        // so the only log is the kernel's `CracReceived`.
+        let crac_log = journal
+            .evm
+            .inner
+            .logs
+            .first()
+            .expect("CracReceived log emitted");
+        let decoded = crate::CracReceived::decode_log_data(&crac_log.data)
+            .expect("log decodes as CracReceived");
+        assert_eq!(
+            decoded.sourceRuntime, "ethereum",
+            "sourceRuntime must follow X-Tezos-Source-Runtime, not be hardcoded tezos"
+        );
+        assert_eq!(decoded.sourceAddress, source.to_string());
+        assert_eq!(decoded.senderAddress, sender.to_string());
+    }
+
+    /// Backwards compatibility: a CRAC with no `X-Tezos-Source-Runtime`
+    /// header (the historical Tezos-originated shape) still reports
+    /// `sourceRuntime = "tezos"`.
+    #[test]
+    fn cracreceived_source_runtime_defaults_to_tezos_when_absent() {
+        use alloy_sol_types::SolEvent;
+
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let registry = UnimplementedRegistry;
+
+        let sender = Address::from_slice(&[0x11; 20]);
+        let source = Address::from_slice(&[0x22; 20]);
+        let destination = Address::from_slice(&[0x33; 20]);
+
+        // `build_serve_request_with_source` omits X-Tezos-Source-Runtime.
+        let request =
+            build_serve_request_with_source(&sender, &source, &destination, "0", vec![]);
+        let mut journal = TezosXJournal::default();
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        assert_eq!(resp.status(), http::StatusCode::OK);
+
+        let crac_log = journal
+            .evm
+            .inner
+            .logs
+            .first()
+            .expect("CracReceived log emitted");
+        let decoded = crate::CracReceived::decode_log_data(&crac_log.data)
+            .expect("log decodes as CracReceived");
+        assert_eq!(decoded.sourceRuntime, "tezos");
     }
 
     /// When the originator *is* the immediate caller (the common

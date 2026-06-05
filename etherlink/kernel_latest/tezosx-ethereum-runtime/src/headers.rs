@@ -12,7 +12,8 @@
 
 pub use tezosx_interfaces::{
     X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_DEPTH, X_TEZOS_CRAC_ID,
-    X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
+    X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME,
+    X_TEZOS_TIMESTAMP,
 };
 
 use alloy_primitives::{hex::FromHex, Address, U256 as AlloyU256};
@@ -21,7 +22,7 @@ use tezosx_interfaces::headers::{
     check_crac_depth, parse_str, parse_tez_to_wei, parse_u32_default, require_str,
     require_u32, require_u64,
 };
-use tezosx_interfaces::TezosXRuntimeError;
+use tezosx_interfaces::{RuntimeId, TezosXRuntimeError};
 
 /// Values contained in the `X-Tezos-*` request headers, in their Ethereum
 /// runtime types.
@@ -41,6 +42,12 @@ pub struct EthereumHeaders {
     pub crac_id: Option<String>,
     /// Source address from `X-Tezos-Source` (present for incoming CRACs).
     pub source: Option<Address>,
+    /// Native runtime of [`source`] from `X-Tezos-Source-Runtime`. On a
+    /// nested `EVM -> Michelson -> EVM` CRAC the forwarded source is the
+    /// transitive EVM origin, so this is `Ethereum`, not the immediate
+    /// Tezos sender's runtime. Absent header → `Tezos` (the historical
+    /// default, when the only inbound CRACs were Tezos-originated).
+    pub source_runtime: RuntimeId,
     /// Cross-runtime chain depth from `X-Tezos-CRAC-Depth`. Counts
     /// CRAC hops (not REVM CALL frames); absent header → `0`.
     pub crac_depth: u32,
@@ -68,6 +75,25 @@ pub fn parse_request_headers(
     };
     let crac_depth = parse_u32_default(headers, X_TEZOS_CRAC_DEPTH, 0)?;
     check_crac_depth(crac_depth)?;
+    let source_runtime = match parse_str(headers, X_TEZOS_SOURCE_RUNTIME)? {
+        // Decimal `RuntimeId` tag, matching the `originOf` /
+        // `resolveAddress` ABI encoding.
+        Some(s) => {
+            let tag = s.parse::<u8>().map_err(|e| {
+                TezosXRuntimeError::HeaderError(format!(
+                    "Invalid {X_TEZOS_SOURCE_RUNTIME}: expected a RuntimeId tag: {e}"
+                ))
+            })?;
+            RuntimeId::try_from(tag).map_err(|e| {
+                TezosXRuntimeError::HeaderError(format!(
+                    "Invalid {X_TEZOS_SOURCE_RUNTIME}: {e}"
+                ))
+            })?
+        }
+        // Absent header → Tezos: preserves the previous behavior where
+        // the receiving EVM frame unconditionally reported a Tezos source.
+        None => RuntimeId::Tezos,
+    };
     Ok(EthereumHeaders {
         sender: require_address(headers, X_TEZOS_SENDER)?,
         amount: amount_wei,
@@ -76,6 +102,7 @@ pub fn parse_request_headers(
         block_number: U256::from(require_u32(headers, X_TEZOS_BLOCK_NUMBER)?),
         crac_id,
         source,
+        source_runtime,
         crac_depth,
     })
 }
@@ -132,6 +159,36 @@ mod tests {
         assert_eq!(parsed.gas_limit, 1_000_000);
         assert_eq!(parsed.timestamp, U256::from(1_000_000));
         assert_eq!(parsed.block_number, U256::from(1));
+        // Absent X-Tezos-Source-Runtime defaults to Tezos.
+        assert_eq!(parsed.source_runtime, RuntimeId::Tezos);
+    }
+
+    #[test]
+    fn source_runtime_parsed_from_numeric_tag() {
+        // The numeric `RuntimeId` tag round-trips through the header back
+        // to the same `RuntimeId` — the transitive-EVM-origin case relies
+        // on this for the Ethereum variant.
+        for runtime in [RuntimeId::Tezos, RuntimeId::Ethereum] {
+            let tag = u8::from(runtime).to_string();
+            let mut hdrs: Vec<(&str, &str)> =
+                required_headers().iter().map(|&(k, v)| (k, v)).collect();
+            hdrs.push((X_TEZOS_SOURCE_RUNTIME, tag.as_str()));
+            let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
+            assert_eq!(parsed.source_runtime, runtime);
+        }
+    }
+
+    #[test]
+    fn invalid_source_runtime_returns_header_error() {
+        for bad in ["2", "tezos", "-1", ""] {
+            let mut hdrs = required_headers();
+            hdrs.push((X_TEZOS_SOURCE_RUNTIME, bad));
+            let err = parse_request_headers(&headers_from(&hdrs)).unwrap_err();
+            assert!(
+                matches!(err, TezosXRuntimeError::HeaderError(_)),
+                "expected HeaderError for X-Tezos-Source-Runtime={bad:?}"
+            );
+        }
     }
 
     #[test]

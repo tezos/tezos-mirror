@@ -12,7 +12,7 @@ use tezosx_interfaces::{
     canonicalize_native_address, gas, AliasInfo, Classification, Registry, RuntimeId,
     ALIAS_LOOKUP_COST, ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER,
     X_TEZOS_CRAC_DEPTH, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT,
-    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
+    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME, X_TEZOS_TIMESTAMP,
 };
 
 use crate::{
@@ -674,6 +674,11 @@ where
 ///
 /// - `X-Tezos-Sender`: The resolved alias of the immediate caller (UTF-8 string).
 /// - `X-Tezos-Source`: The resolved alias of the transaction originator (UTF-8 string).
+/// - `X-Tezos-Source-Runtime`: The native runtime of `X-Tezos-Source`,
+///   as the decimal `RuntimeId` tag. On a same-runtime `EVM -> EVM`
+///   round-trip the source is an EVM origin, so the receiving frame
+///   reports `sourceRuntime = ethereum` rather than a
+///   hardcoded `tezos`.
 /// - `X-Tezos-Amount`: The value attached to the call, as a TEZ decimal string.
 /// - `X-Tezos-Gas-Limit`: The gas limit forwarded to the call (decimal string).
 /// - `X-Tezos-Timestamp`: The current block timestamp in seconds (decimal string).
@@ -683,6 +688,7 @@ fn inject_tezos_headers(
     headers: &mut HeaderMap,
     sender_alias: &str,
     source_alias: &str,
+    source_runtime: RuntimeId,
     amount: U256,
     gas_limit: u64,
     timestamp: U256,
@@ -698,6 +704,12 @@ fn inject_tezos_headers(
     };
     headers.insert(X_TEZOS_SENDER, parse_value(sender_alias)?);
     headers.insert(X_TEZOS_SOURCE, parse_value(source_alias)?);
+    // Numeric `RuntimeId` tag, same encoding as the `originOf` /
+    // `resolveAddress` ABI.
+    headers.insert(
+        X_TEZOS_SOURCE_RUNTIME,
+        parse_value(&u8::from(source_runtime).to_string())?,
+    );
     // Format the amount (in wei) as a TEZ decimal string.
     // The receiving runtime truncates to its own precision (ADR L2-1004).
     headers.insert(
@@ -726,6 +738,7 @@ fn inject_tezos_headers_from_context<'j, CTX, Host, R>(
     headers: &mut HeaderMap,
     sender_alias: &str,
     source_alias: &str,
+    source_runtime: RuntimeId,
     amount: U256,
     gas_limit: u64,
     gas: Gas,
@@ -743,6 +756,7 @@ where
         headers,
         sender_alias,
         source_alias,
+        source_runtime,
         amount,
         gas_limit,
         timestamp,
@@ -859,6 +873,7 @@ where
                 request.headers_mut(),
                 &sender_alias,
                 &source_alias,
+                source.runtime(),
                 amount,
                 gas_limit,
                 gas,
@@ -925,6 +940,7 @@ where
                 request.headers_mut(),
                 &sender_alias,
                 &source_alias,
+                source.runtime(),
                 amount,
                 gas_limit,
                 gas,
@@ -1006,6 +1022,7 @@ where
                 request.headers_mut(),
                 &sender_alias,
                 &source_alias,
+                source.runtime(),
                 U256::ZERO,
                 gas_limit,
                 gas,
@@ -1062,7 +1079,7 @@ where
             let is_get = request.method() == http::Method::GET;
             let amount = inputs.value.get();
 
-            let (sender_alias, source_alias) = if is_get {
+            let (sender_alias, source_alias, source_runtime) = if is_get {
                 if !amount.is_zero() {
                     return Err(CustomPrecompileError::Revert(
                         "call: GET requests cannot carry value".into(),
@@ -1085,6 +1102,7 @@ where
                         target_runtime,
                         gas.remaining(),
                     )?,
+                    source.runtime(),
                 )
             } else {
                 if inputs.is_static {
@@ -1094,13 +1112,14 @@ where
                     ));
                 }
                 let source = resolve_original_source(context, gas.remaining())?;
-                resolve_aliases(
+                let (sender_alias, source_alias) = resolve_aliases(
                     context,
                     &mut gas,
                     target_runtime,
                     inputs.caller,
                     source.evm_alias(),
-                )?
+                )?;
+                (sender_alias, source_alias, source.runtime())
             };
 
             let gas_limit =
@@ -1121,6 +1140,7 @@ where
                 request.headers_mut(),
                 &sender_alias,
                 &source_alias,
+                source_runtime,
                 amount,
                 gas_limit,
                 gas,
@@ -1786,6 +1806,7 @@ mod tests {
             request.headers_mut(),
             &sender_alias.to_b58check(),
             &source_alias.to_b58check(),
+            RuntimeId::Tezos,
             amount,
             gas_limit,
             timestamp,
@@ -1868,6 +1889,15 @@ mod tests {
                 .unwrap(),
             "test-crac-id"
         );
+        assert_eq!(
+            request
+                .headers()
+                .get(X_TEZOS_SOURCE_RUNTIME)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            u8::from(RuntimeId::Tezos).to_string()
+        );
     }
 
     /// Non-zero `crac_depth` materialises on the outgoing header.
@@ -1890,6 +1920,7 @@ mod tests {
             request.headers_mut(),
             alias,
             alias,
+            RuntimeId::Tezos,
             U256::ZERO,
             0,
             U256::ZERO,
@@ -1964,6 +1995,7 @@ mod tests {
             request.headers_mut(),
             &sender_alias.to_b58check(),
             &source_alias.to_b58check(),
+            RuntimeId::Tezos,
             U256::ZERO,
             100_000,
             U256::from(1_700_000_000u64),
@@ -2007,6 +2039,7 @@ mod tests {
             request.headers_mut(),
             &sender_alias.to_b58check(),
             &source_alias.to_b58check(),
+            RuntimeId::Tezos,
             amount,
             100_000,
             U256::from(1_700_000_000u64),
@@ -2048,6 +2081,7 @@ mod tests {
             request.headers_mut(),
             &sender_alias.to_b58check(),
             &source_alias.to_b58check(),
+            RuntimeId::Tezos,
             U256::ZERO,
             0,
             U256::ZERO,
@@ -2244,6 +2278,7 @@ mod tests {
             request.headers_mut(),
             &sender_alias.to_b58check(),
             &sender_alias.to_b58check(),
+            RuntimeId::Tezos,
             // 1 TEZ in wei
             U256::from(10u64).pow(U256::from(18u64)),
             50_000,
