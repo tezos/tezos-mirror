@@ -33,8 +33,6 @@ module type STATE = sig
 
     val decode : state -> Wasm_pvm_state.Internal_state.pvm_state Lwt.t
 
-    val encode_durable_storage : Durable.t -> state -> state Lwt.t
-
     val decode_durable_storage : state -> Durable.t Lwt.t
 
     val encode_storage :
