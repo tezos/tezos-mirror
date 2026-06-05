@@ -343,7 +343,17 @@ let bake_until ?__LOC__ ?(timeout_in_blocks = 20) ?(timeout = 30.) ~bake
 let bake_until_sync ?__LOC__ ?timeout_in_blocks ?timeout ~sc_rollup_node
     ~sequencer ~client () =
   let bake () =
-    let* _l1_lvl = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+    (* Open-coded [Rollup.next_rollup_node_level], which hardcodes a 30s
+       wait on the rollup node processing the baked level. Processing a
+       single level can legitimately exceed 30s (e.g. the level activating
+       a kernel upgrade pays an inline kernel compilation plus storage
+       migrations), so the per-level wait must share the caller-provided
+       [timeout] budget instead; the [Lwt.pick] in {!bake_until} still
+       bounds the overall wall-clock time. *)
+    let* l1_level = Client.bake_for_and_wait_level ~keys:[] client in
+    let* _l1_lvl =
+      Sc_rollup_node.wait_for_level ?timeout sc_rollup_node l1_level
+    in
     unit
   in
   let result_f () =

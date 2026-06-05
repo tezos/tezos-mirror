@@ -191,7 +191,10 @@ val bake_until :
 
 (** [bake_until_sync ?timeout_in_blocks ?timeout ~sc_rollup_node ~sequencer
     ~client] bakes blocks until the rollup node is synced with
-    evm_node. Uses {!bake_until} *)
+    evm_node. Uses {!bake_until}. [timeout] also bounds the wait for the
+    rollup node to process each baked level (instead of the 30s of
+    {!Rollup.next_rollup_node_level}), so that a single expensive level —
+    e.g. one activating a kernel upgrade — does not fail the test early. *)
 val bake_until_sync :
   ?__LOC__:string ->
   ?timeout_in_blocks:int ->

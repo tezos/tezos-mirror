@@ -3648,6 +3648,13 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
       chain_id = None;
     }
   in
+  (* The deposit reaches the sequencer asynchronously: it is read from
+     *finalized* L1 levels through the rollup node and applied to the
+     sequencer's local state by a background worker. Set up the watcher
+     before sending the deposit. *)
+  let delayed_transaction_seen =
+    Evm_node.wait_for_evm_event New_delayed_transaction sequencer
+  in
   let* () =
     send_deposit_to_delayed_inbox
       ~amount:Tez.(of_int 16)
@@ -3658,6 +3665,19 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
       ~sc_rollup_address
       client
   in
+  (* Bake the 2 extra L1 levels that make the deposit's level final, then
+     wait for the sequencer to have seen the deposit, so that it is
+     guaranteed to be part of its local delayed inbox before the
+     post-upgrade block is produced below. Only L1 levels are baked (no
+     sequencer block production): the deposit must not be consumed by the
+     pre-upgrade kernel, since the very point of the test is to decode it
+     with the post-upgrade kernel. *)
+  let* _ =
+    repeat 2 (fun () ->
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  let* _ = delayed_transaction_seen in
 
   let _, to_use = Kernel.to_uses_and_tags to_ in
   let pending_upgrade = Evm_node.wait_for_pending_upgrade sequencer in
@@ -3683,7 +3703,9 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
 
   (* Produce a block where the upgrade would happen *)
   let*@ _ = produce_block ~timestamp:"2020-01-01T00:00:10Z" sequencer in
-  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
+  let* () =
+    bake_until_sync ~timeout:120. ~sc_rollup_node ~sequencer ~client ()
+  in
 
   (* Ensure the kernel is upgraded *)
   let* () =
