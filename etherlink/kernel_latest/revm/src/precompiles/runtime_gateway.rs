@@ -5,15 +5,18 @@ use revm::{
     context::{Block, ContextTr, JournalTr, Transaction},
     context_interface::journaled_state::account::JournaledAccountTr,
     interpreter::{CallInputs, Gas, InstructionResult, InterpreterResult},
-    primitives::{alloy_primitives::IntoLogData, Address, Bytes, Log, U256},
+    primitives::{
+        alloy_primitives::{hex::FromHex, IntoLogData},
+        Address, Bytes, Log, U256,
+    },
 };
-use tezosx_interfaces::headers::format_tez_from_wei;
 use tezosx_interfaces::{
-    canonicalize_native_address, gas, AliasInfo, Classification, Registry, RuntimeId,
-    ALIAS_LOOKUP_COST, ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER,
-    X_TEZOS_CRAC_DEPTH, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT,
-    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME, X_TEZOS_TIMESTAMP,
+    canonicalize_native_address, gas, AliasInfo, Classification, Origin, Registry,
+    RuntimeId, ALIAS_LOOKUP_COST, ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT,
+    X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_DEPTH, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED,
+    X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
 };
+use tezosx_interfaces::{headers::format_tez_from_wei, X_TEZOS_SOURCE_RUNTIME};
 
 use crate::{
     database::EtherlinkVMDB,
@@ -270,16 +273,30 @@ fn dispatch_origin_of<Host: StorageV1, R: Registry>(
     registry: &R,
     addr_str: String,
     source_runtime: RuntimeId,
+    staged_source: Option<Origin>,
     gas: &mut Gas,
 ) -> Result<Vec<u8>, CustomPrecompileError> {
-    // Convert outer EVM gas to source_runtime's native unit.
-    let budget = gas::convert(RuntimeId::Ethereum, source_runtime, gas.remaining())
-        .ok_or_else(|| {
-            CustomPrecompileError::Revert("originOf: gas budget overflow".into(), *gas)
-        })?;
-    let (classification, consumed_source) = registry
-        .read_origin(host, source_runtime, &addr_str, budget)
-        .map_err(|e| CustomPrecompileError::Revert(format!("originOf: {e}"), *gas))?;
+    // An alias staged earlier in this operation is not yet durable.
+    // Consult the overlay first and skip the durable read on a hit,
+    // charging the lookup cost the recorded path would charge anyway.
+    let (classification, consumed_source) = match staged_source {
+        Some(origin) => (Classification::from(origin), ALIAS_LOOKUP_COST),
+        None => {
+            let budget =
+                gas::convert(RuntimeId::Ethereum, source_runtime, gas.remaining())
+                    .ok_or_else(|| {
+                        CustomPrecompileError::Revert(
+                            "originOf: gas budget overflow".into(),
+                            *gas,
+                        )
+                    })?;
+            registry
+                .read_origin(host, source_runtime, &addr_str, budget)
+                .map_err(|e| {
+                    CustomPrecompileError::Revert(format!("originOf: {e}"), *gas)
+                })?
+        }
+    };
     // Convert consumed back to EVM gas and charge.
     let consumed_evm = gas::convert(source_runtime, RuntimeId::Ethereum, consumed_source)
         .unwrap_or(u64::MAX);
@@ -323,6 +340,7 @@ fn dispatch_resolve_address<Host: StorageV1, R: Registry>(
     addr_str: String,
     source_runtime: RuntimeId,
     target_runtime: RuntimeId,
+    staged_source: Option<Origin>,
     gas: &mut Gas,
 ) -> Result<Vec<u8>, CustomPrecompileError> {
     // Same-runtime short-circuit: no storage reads needed.
@@ -338,20 +356,27 @@ fn dispatch_resolve_address<Host: StorageV1, R: Registry>(
         return Ok((true, RESOLUTION_RECORDED, addr_str).abi_encode_params());
     }
 
-    // Read the source /origin classification record.
-    // Convert outer EVM gas to source_runtime's native unit.
-    let budget = gas::convert(RuntimeId::Ethereum, source_runtime, gas.remaining())
-        .ok_or_else(|| {
-            CustomPrecompileError::Revert(
-                "resolveAddress: gas budget overflow".into(),
-                *gas,
-            )
-        })?;
-    let (source_classification, consumed_source) = registry
-        .read_origin(host, source_runtime, &addr_str, budget)
-        .map_err(|e| {
-            CustomPrecompileError::Revert(format!("resolveAddress: {e}"), *gas)
-        })?;
+    // An alias staged earlier in this operation is not yet durable.
+    // Consult the overlay first and skip the durable read on a hit,
+    // charging the lookup cost the recorded path would charge anyway.
+    let (source_classification, consumed_source) = match staged_source {
+        Some(origin) => (Classification::from(origin), ALIAS_LOOKUP_COST),
+        None => {
+            let budget =
+                gas::convert(RuntimeId::Ethereum, source_runtime, gas.remaining())
+                    .ok_or_else(|| {
+                        CustomPrecompileError::Revert(
+                            "resolveAddress: gas budget overflow".into(),
+                            *gas,
+                        )
+                    })?;
+            registry
+                .read_origin(host, source_runtime, &addr_str, budget)
+                .map_err(|e| {
+                    CustomPrecompileError::Revert(format!("resolveAddress: {e}"), *gas)
+                })?
+        }
+    };
     let consumed_evm = gas::convert(source_runtime, RuntimeId::Ethereum, consumed_source)
         .unwrap_or(u64::MAX);
     charge(gas, consumed_evm)?;
@@ -1206,11 +1231,26 @@ where
                     CustomPrecompileError::RevertWithData(payload, gas)
                 })?;
 
+            // The staged overlay only holds EVM aliases, so it is
+            // consulted only when the source runtime is Ethereum.
+            let staged_source = if source_runtime == RuntimeId::Ethereum {
+                Address::from_hex(&call.addr).ok().and_then(|addr| {
+                    context
+                        .journal()
+                        .journal
+                        .evm
+                        .layered_state
+                        .pending_alias_origin(&addr)
+                })
+            } else {
+                None
+            };
             let output = dispatch_origin_of(
                 context.db().host,
                 context.db().registry,
                 call.addr,
                 source_runtime,
+                staged_source,
                 &mut gas,
             )?;
 
@@ -1249,12 +1289,27 @@ where
                     CustomPrecompileError::RevertWithData(payload, gas)
                 })?;
 
+            // The staged overlay only holds EVM aliases, so it is
+            // consulted only when the source runtime is Ethereum.
+            let staged_source = if source_runtime == RuntimeId::Ethereum {
+                Address::from_hex(&call.addr).ok().and_then(|addr| {
+                    context
+                        .journal()
+                        .journal
+                        .evm
+                        .layered_state
+                        .pending_alias_origin(&addr)
+                })
+            } else {
+                None
+            };
             let output = dispatch_resolve_address(
                 context.db().host,
                 context.db().registry,
                 call.addr,
                 source_runtime,
                 target_runtime,
+                staged_source,
                 &mut gas,
             )?;
 
@@ -1388,6 +1443,7 @@ mod tests {
             addr.clone(),
             RuntimeId::Ethereum,
             RuntimeId::Ethereum,
+            None,
             &mut Gas::new(GAS_LIMIT),
         )
         .unwrap();
@@ -1407,6 +1463,7 @@ mod tests {
             "not-a-tz1".to_string(),
             RuntimeId::Tezos,
             RuntimeId::Tezos,
+            None,
             &mut Gas::new(GAS_LIMIT),
         )
         .unwrap();
@@ -1432,6 +1489,7 @@ mod tests {
             "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
             RuntimeId::Ethereum,
             RuntimeId::Tezos,
+            None,
             &mut Gas::new(GAS_LIMIT),
         )
         .unwrap();
@@ -1472,6 +1530,7 @@ mod tests {
             source_addr.to_string(),
             RuntimeId::Ethereum,
             RuntimeId::Tezos,
+            None,
             &mut Gas::new(GAS_LIMIT),
         )
         .unwrap();
@@ -1499,6 +1558,7 @@ mod tests {
             source_addr.to_string(),
             RuntimeId::Ethereum,
             RuntimeId::Tezos,
+            None,
             &mut Gas::new(GAS_LIMIT),
         )
         .unwrap();
@@ -1527,6 +1587,7 @@ mod tests {
             addr_str.to_string(),
             RuntimeId::Ethereum,
             RuntimeId::Tezos,
+            None,
             &mut Gas::new(GAS_LIMIT),
         )
         .unwrap();
@@ -1544,6 +1605,7 @@ mod tests {
             "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
             RuntimeId::Ethereum,
             RuntimeId::Tezos,
+            None,
             &mut Gas::new(GAS_LIMIT),
         )
         .unwrap();
@@ -1562,6 +1624,7 @@ mod tests {
             &registry,
             "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx".to_string(),
             RuntimeId::Tezos,
+            None,
             &mut Gas::new(GAS_LIMIT),
         )
         .unwrap();
@@ -1579,6 +1642,7 @@ mod tests {
             &registry,
             addr,
             RuntimeId::Tezos,
+            None,
             &mut Gas::new(GAS_LIMIT),
         )
         .unwrap();
@@ -1601,11 +1665,38 @@ mod tests {
             &registry,
             "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
             RuntimeId::Ethereum,
+            None,
             &mut Gas::new(GAS_LIMIT),
         )
         .unwrap();
         assert_eq!(output[31], ORIGIN_KIND_ALIAS as u8);
         assert_eq!(output[63], RuntimeId::Tezos as u8);
+    }
+
+    #[test]
+    fn dispatch_origin_of_prefers_staged_overlay() {
+        // Durable storage would classify this address as Unknown; a
+        // staged overlay entry must take precedence, skip the durable
+        // read, and charge the lookup cost.
+        let host = MockKernelHost::default();
+        let registry = StubRegistry::with_classification(Classification::Unknown);
+        let staged = Origin::Alias(AliasInfo {
+            runtime: RuntimeId::Tezos,
+            native_address: b"KT1_STAGED".to_vec(),
+        });
+        let mut gas = Gas::new(GAS_LIMIT);
+        let output = dispatch_origin_of(
+            &host,
+            &registry,
+            "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
+            RuntimeId::Ethereum,
+            Some(staged),
+            &mut gas,
+        )
+        .unwrap();
+        assert_eq!(output[31], ORIGIN_KIND_ALIAS as u8);
+        assert_eq!(output[63], RuntimeId::Tezos as u8);
+        assert_eq!(gas.spent(), ALIAS_LOOKUP_COST);
     }
 
     // ── ABI selector decode/encode round-trips ───────────────────────────────
