@@ -3366,6 +3366,7 @@ name = "tezos-smart-rollup-keyspace"
 version = "0.0.0"
 dependencies = [
  "tezos-smart-rollup-host",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

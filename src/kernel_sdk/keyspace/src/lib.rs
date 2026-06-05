@@ -20,13 +20,15 @@ mod irmin_path_validator;
 pub const MAX_STORE_V2_KEY_SIZE: usize = 256;
 
 /// Key creation error
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum KeyError {
     /// Attempted to create a key that exceeds the maximum allowed size.
+    #[error("key exceeds the maximum allowed size")]
     KeyTooLarge,
     /// Path validation error (e.g. missing leading `/`, invalid bytes, empty step,
     /// or reserved `/readonly` prefix).
     #[cfg(feature = "irmin-compat")]
+    #[error("invalid irmin-durable path: {0}")]
     PathError(tezos_smart_rollup_host::path::PathError),
 }
 
@@ -104,14 +106,16 @@ impl core::fmt::Display for Key {
 }
 
 /// Name creation error
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum NameError {
     /// Attempted to create a name that exceeds the maximum allowed size.
     #[cfg(feature = "irmin-compat")]
+    #[error("name exceeds the maximum allowed size")]
     NameTooLong,
     /// Path validation error (e.g. missing leading `/`, trailing `/`, invalid bytes,
     /// or reserved `/readonly` prefix).
     #[cfg(feature = "irmin-compat")]
+    #[error("invalid irmin-durable storage path: {0}")]
     PathError(tezos_smart_rollup_host::path::PathError),
 }
 
@@ -172,11 +176,14 @@ impl TryFrom<String> for Name {
     }
 }
 
-#[derive(Debug)]
+/// Errors that can occur when writing to a [`KeySpace`].
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum KeySpaceWriteError {
     /// Attempted to write more than the maximum allowed bytes at a given key.
+    #[error("value size exceeded the maximum allowed")]
     ValueSizeExceeded,
     /// The write offset exceeds the current length of the stored value.
+    #[error("write offset exceeds the current length of the stored value")]
     InvalidOffset,
 }
 
@@ -236,15 +243,17 @@ pub trait KeySpace {
 }
 
 /// Error returned by [`KeySpaceLoader::load_or_create`].
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum KeySpaceLoaderError {
     /// A key space whose name overlaps (is a prefix of, or has as prefix) the
     /// requested name is already loaded. Only meaningful when names form a
     /// hierarchical path, which is why this variant is gated on `irmin-compat`.
     #[cfg(feature = "irmin-compat")]
+    #[error("key space name overlaps an already-loaded key space")]
     Overlapping,
     /// A key space with this exact name is already loaded and has not been
     /// dropped yet.
+    #[error("a key space with this name is already loaded")]
     AlreadyLoaded,
 }
 
