@@ -31,7 +31,7 @@ features = ["derive"]
 version = "0.4"
 
 [dependencies.thiserror]
-version = "1.0"
+workspace = true
 
 [dependencies.wasm-gen]
 version = "0.1.4"
