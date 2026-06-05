@@ -72,10 +72,16 @@ local table = base.table;
     + info.withMapping([['0', 'Unsync', 'red'], ['1', 'Sync', 'green'], ['2', 'Stuck', 'red']]),
 
   uptime(h, w, x, y):
-    local q = query.prometheus.new(base.datasource, 'time()-(process_start_time_seconds' + base.node_instance_query + ')')
-              + query.prometheus.withLegendFormat('node uptime');
+    // Pin grafazos_app to the octez-node scrape job. A host can run multiple
+    // scrapers (node-exporter, process-exporter, octez-node) that each emit
+    // process_start_time_seconds tagged with the same grafazos_instance, so
+    // without this filter the panel shows one value per scrape job (3+ on a
+    // typical Tezos host) instead of just the octez-node process uptime.
+    local selector = '{' + base.node_instance + '="$node_instance", grafazos_app="octez-node"}';
+    local q = query.prometheus.new(base.datasource, 'time()-(process_start_time_seconds' + selector + ')')
+              + query.prometheus.withLegendFormat('octez-node uptime');
     info.new('Node uptime', q, h, w, x, y)
-    + stat.panelOptions.withDescription('Reflects the uptime of the monitoring of the job, not the uptime of the process.')
+    + stat.panelOptions.withDescription('Time since the octez-node process last restarted on the selected instance (process uptime, not host uptime).')
     + stat.standardOptions.withUnit('dtdhms')
     + stat.options.withTextMode('max'),
 
