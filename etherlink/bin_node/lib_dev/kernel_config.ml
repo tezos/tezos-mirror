@@ -320,6 +320,14 @@ let make_tezos_bootstrap_contracts_instr tez_bootstrap_balance contracts =
            encode_hexa_with_len storage
          in
 
+         (* Initialise the storage space to the bytes the contract occupies
+            (code + storage), instead of zero. *)
+         let initial_used_bytes =
+           String.length encoded_script + String.length encoded_storage
+           |> Z.of_int
+           |> Data_encoding.Binary.to_string_exn Data_encoding.z
+         in
+
          let instr key value = make_instr ~path_prefix (Some (key, value)) in
 
          [
@@ -328,6 +336,8 @@ let make_tezos_bootstrap_contracts_instr tez_bootstrap_balance contracts =
            ("len/code", encoded_script_len);
            ("data/storage", encoded_storage);
            ("len/storage", encoded_storage_len);
+           ("used_bytes", initial_used_bytes);
+           ("paid_bytes", initial_used_bytes);
          ]
          |> List.concat_map (fun (k, v) -> instr k v))
   |> List.flatten
