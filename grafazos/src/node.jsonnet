@@ -61,13 +61,23 @@ local table = base.table;
     local q = prometheus('version', legendFormat='{{ distributed_db_version }}');
     info.new('Distributed db version', q, h, w, x, y),
 
+  // Both stat panels below smooth the underlying boolean/ternary metric
+  // with `max_over_time(...[2m])`. The metrics tend to dip briefly (one
+  // scrape, ~60s) during normal block-validator transitions; without the
+  // smoothing the stat panel renders red even on healthy nodes. The 2m
+  // window covers ~2 scrape intervals on the slowest configurations and
+  // is short enough that a genuine outage still surfaces within minutes.
+  // For sync_status, value 2 ("Stuck") is rare enough across the fleet
+  // (<1 transition per day per instance observed) that the max-over-time
+  // semantic is acceptable: a stuck node would stay at 2 for the full
+  // window and correctly render red.
   bootstrapStatus(h, w, x, y):
-    local q = prometheus('validator_chain_is_bootstrapped');
+    local q = query.prometheus.new(base.datasource, 'max_over_time(' + namespace + '_validator_chain_is_bootstrapped' + base.node_instance_query + '[2m])');
     info.new('Bootstrap status', q, h, w, x, y)
     + info.withMapping([['0', 'Bootstrapping', 'red'], ['1', 'Bootstrapped', 'green']]),
 
   syncStatus(h, w, x, y):
-    local q = prometheus('validator_chain_synchronisation_status');
+    local q = query.prometheus.new(base.datasource, 'max_over_time(' + namespace + '_validator_chain_synchronisation_status' + base.node_instance_query + '[2m])');
     info.new('Sync status', q, h, w, x, y)
     + info.withMapping([['0', 'Unsync', 'red'], ['1', 'Sync', 'green'], ['2', 'Stuck', 'red']]),
 
