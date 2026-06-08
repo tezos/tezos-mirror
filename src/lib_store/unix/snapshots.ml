@@ -96,6 +96,7 @@ type error +=
       hash : Block_hash.t;
       error : Data_encoding.Binary.write_error;
     }
+  | Invalid_snapshot_member of string
 
 let () =
   let open Data_encoding in
@@ -297,6 +298,22 @@ let () =
        (req "path" string))
     (function Cannot_read {kind; path} -> Some (kind, path) | _ -> None)
     (fun (kind, path) -> Cannot_read {kind; path}) ;
+  register_error_kind
+    `Permanent
+    ~id:"snapshots.invalid_snapshot_member"
+    ~title:"Invalid snapshot archive member"
+    ~description:
+      "A snapshot archive member has a path that resolves outside the \
+       destination directory."
+    ~pp:(fun ppf path ->
+      Format.fprintf
+        ppf
+        "Snapshot archive contains a member with path %S that resolves outside \
+         the destination directory."
+        path)
+    Data_encoding.(obj1 (req "path" string))
+    (function Invalid_snapshot_member path -> Some path | _ -> None)
+    (fun path -> Invalid_snapshot_member path) ;
   register_error_kind
     `Permanent
     ~id:"snapshot.inconsistent_floating_store"
@@ -2643,7 +2660,7 @@ module type IMPORTER = sig
   val copy_and_validate_protocol :
     t -> protocol_hash:Protocol_hash.t -> (unit, error trace) result Lwt.t
 
-  val restore_cemented_indexes : t -> unit Lwt.t
+  val restore_cemented_indexes : t -> unit tzresult Lwt.t
 
   val load_cemented_files : t -> string list tzresult Lwt.t
 
@@ -2802,7 +2819,7 @@ module Raw_importer : IMPORTER = struct
           (Inconsistent_protocol_hash {expected = protocol_hash; got = hash})
 
   let restore_cemented_indexes t =
-    let open Lwt_syntax in
+    let open Lwt_result_syntax in
     let src_level_dir =
       Naming.(
         cemented_blocks_level_index_dir t.snapshot_cemented_dir |> dir_path)
@@ -2811,7 +2828,7 @@ module Raw_importer : IMPORTER = struct
       Naming.(
         cemented_blocks_hash_index_dir t.snapshot_cemented_dir |> dir_path)
     in
-    let* () =
+    let*! () =
       if Sys.file_exists src_level_dir then
         Lwt_utils_unix.copy_dir
           src_level_dir
@@ -2819,11 +2836,14 @@ module Raw_importer : IMPORTER = struct
             cemented_blocks_level_index_dir t.dst_cemented_dir |> dir_path)
       else Lwt.return_unit
     in
-    if Sys.file_exists src_hash_dir then
-      Lwt_utils_unix.copy_dir
-        src_hash_dir
-        Naming.(cemented_blocks_hash_index_dir t.dst_cemented_dir |> dir_path)
-    else Lwt.return_unit
+    let*! () =
+      if Sys.file_exists src_hash_dir then
+        Lwt_utils_unix.copy_dir
+          src_hash_dir
+          Naming.(cemented_blocks_hash_index_dir t.dst_cemented_dir |> dir_path)
+      else Lwt.return_unit
+    in
+    return_unit
 
   let load_cemented_files t =
     let open Lwt_result_syntax in
@@ -3012,23 +3032,32 @@ module Tar_importer : IMPORTER = struct
       Octez_tar_helpers.find_files_with_common_path t.tar ~pattern:"context"
     in
     let dst_dir = Tezos_context_ops.Context_ops.context_dir dst_data_dir in
-    let*! () =
-      List.iter_s
+    let* () =
+      List.iter_es
         (fun file ->
           let filename = Octez_tar_helpers.get_filename file in
-          (* Remove context from the filename since we can
-             restore a brassaia context and would want to
-             store it in brassaia_context *)
-          let dst =
-            dst_dir
-            ^ (String.remove_prefix ~prefix:"context" filename
-              |> Option.value ~default:"")
-          in
-          Octez_tar_helpers.copy_to_file
-            t.tar
-            file
-            ~dst
-            ~buffer_size:cemented_buffer_size)
+          (* The member name comes from the snapshot archive. Reject any name
+             that could resolve outside [dst_dir] before building the
+             destination. *)
+          if not (Octez_tar_helpers.member_name_is_safe filename) then
+            tzfail (Invalid_snapshot_member filename)
+          else
+            (* Remove context from the filename since we can
+               restore a brassaia context and would want to
+               store it in brassaia_context *)
+            let dst =
+              dst_dir
+              ^ (String.remove_prefix ~prefix:"context" filename
+                |> Option.value ~default:"")
+            in
+            let*! () =
+              Octez_tar_helpers.copy_to_file
+                t.tar
+                file
+                ~dst
+                ~buffer_size:cemented_buffer_size
+            in
+            return_unit)
         context_files
     in
     return_unit
@@ -3121,8 +3150,8 @@ module Tar_importer : IMPORTER = struct
           (Inconsistent_protocol_hash {expected = protocol_hash; got = hash})
 
   let restore_cemented_indexes t =
-    let open Lwt_syntax in
-    let* cbl =
+    let open Lwt_result_syntax in
+    let*! cbl =
       Octez_tar_helpers.find_files_with_common_path
         t.tar
         ~pattern:
@@ -3130,7 +3159,7 @@ module Tar_importer : IMPORTER = struct
             cemented_blocks_level_index_dir t.snapshot_cemented_blocks_dir
             |> dir_path)
     in
-    let* cbh =
+    let*! cbh =
       Octez_tar_helpers.find_files_with_common_path
         t.tar
         ~pattern:
@@ -3139,37 +3168,47 @@ module Tar_importer : IMPORTER = struct
             |> dir_path)
     in
     let cemented_indexes_paths = cbl @ cbh in
-    if cemented_indexes_paths <> [] then
-      let level_index_dir =
-        Naming.(cemented_blocks_level_index_dir t.dst_cemented_dir |> dir_path)
-      in
-      let hash_index_dir =
-        Naming.(cemented_blocks_hash_index_dir t.dst_cemented_dir |> dir_path)
-      in
-      let* () = Lwt_unix.mkdir level_index_dir snapshot_dir_perm in
-      let* () = Lwt_unix.mkdir hash_index_dir snapshot_dir_perm in
-      let* () =
-        Lwt_unix.mkdir
-          Filename.(concat level_index_dir "index")
-          snapshot_dir_perm
-      in
-      let* () =
-        Lwt_unix.mkdir
-          Filename.(concat hash_index_dir "index")
-          snapshot_dir_perm
-      in
-      List.iter_s
-        (fun file ->
-          Octez_tar_helpers.copy_to_file
-            t.tar
-            file
-            ~dst:
-              (Filename.concat
-                 (Naming.dir_path t.dst_chain_dir)
-                 (Octez_tar_helpers.get_filename file))
-            ~buffer_size:cemented_buffer_size)
-        cemented_indexes_paths
-    else Lwt.return_unit
+    match cemented_indexes_paths with
+    | [] -> return_unit
+    | _ ->
+        let level_index_dir =
+          Naming.(
+            cemented_blocks_level_index_dir t.dst_cemented_dir |> dir_path)
+        in
+        let hash_index_dir =
+          Naming.(cemented_blocks_hash_index_dir t.dst_cemented_dir |> dir_path)
+        in
+        let*! () = Lwt_unix.mkdir level_index_dir snapshot_dir_perm in
+        let*! () = Lwt_unix.mkdir hash_index_dir snapshot_dir_perm in
+        let*! () =
+          Lwt_unix.mkdir
+            Filename.(concat level_index_dir "index")
+            snapshot_dir_perm
+        in
+        let*! () =
+          Lwt_unix.mkdir
+            Filename.(concat hash_index_dir "index")
+            snapshot_dir_perm
+        in
+        List.iter_es
+          (fun file ->
+            let filename = Octez_tar_helpers.get_filename file in
+            (* The member name comes from the snapshot archive. Reject any name
+               that could resolve outside [dst_chain_dir] before building the
+               destination. *)
+            if not (Octez_tar_helpers.member_name_is_safe filename) then
+              tzfail (Invalid_snapshot_member filename)
+            else
+              let*! () =
+                Octez_tar_helpers.copy_to_file
+                  t.tar
+                  file
+                  ~dst:
+                    (Filename.concat (Naming.dir_path t.dst_chain_dir) filename)
+                  ~buffer_size:cemented_buffer_size
+              in
+              return_unit)
+          cemented_indexes_paths
 
   let load_cemented_files t =
     let open Lwt_syntax in
@@ -3289,7 +3328,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       ~genesis_hash ~progress_display_mode snapshot_importer =
     let open Lwt_result_syntax in
     let*! () = Event.(emit restoring_cemented_indexes) () in
-    let*! () = Importer.restore_cemented_indexes snapshot_importer in
+    let* () = Importer.restore_cemented_indexes snapshot_importer in
     let* cemented_files = Importer.load_cemented_files snapshot_importer in
     let*! () = Event.(emit restoring_cemented_cycles) () in
     let nb_cemented_files = List.length cemented_files in
