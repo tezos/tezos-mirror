@@ -507,6 +507,86 @@ let make_tests_export_import speed genesis_parameters =
                          store ))))
     permutations
 
+(* Regression test for archive member name validation: a context member whose
+   name contains ".." components ("context/../../snapshot_escape_marker") must
+   be rejected during import and must not write any file outside the destination
+   context directory. *)
+let test_tar_import_rejects_non_canonical_member_names speed =
+  let test (store_dir, data_dir) store =
+    let open Lwt_result_syntax in
+    let open Filename.Infix in
+    let chain_store = Store.main_chain_store store in
+    let*! genesis_block = Store.Chain.genesis_block chain_store in
+    let* _blocks, _head = Alpha_utils.bake_n chain_store 2 genesis_block in
+    let snapshot_path = store_dir // "snapshot.member-validation.full" in
+    let chain_name = Distributed_db_version.Name.of_string "test" in
+    let* () =
+      Snapshots.export
+        ~snapshot_path
+        Snapshots.Tar
+        ~rolling:false
+        ~block:(`Head 0)
+        ~store_dir
+        ~data_dir
+        ~chain_name
+        ~progress_display_mode:Animation.Auto
+        genesis
+    in
+    let marker_path = store_dir // "snapshot_escape_marker" in
+    (* Append a member whose name contains ".." components and resolves outside
+       the context directory, using the OCaml helper so the test has no
+       dependency on GNU tar. *)
+    let raw_member = "context/../../snapshot_escape_marker" in
+    let*! () =
+      Octez_tar_helpers.Internal_for_test.append_raw_member
+        ~file:snapshot_path
+        ~member_name:raw_member
+        ~data:"test payload\n"
+    in
+    let*! marker_exists = Lwt_unix.file_exists marker_path in
+    Assert.assert_true
+      "marker file unexpectedly exists before import"
+      (not marker_exists) ;
+    let import_dir = store_dir // "imported_member_validation" in
+    let dst_store_dir = import_dir // "store" in
+    let dst_data_dir = import_dir in
+    let*! import_result =
+      Snapshots.import
+        ~snapshot_path
+        ~dst_store_dir
+        ~dst_data_dir
+        ~chain_name
+        ~configured_history_mode:None
+        ~user_activated_upgrades:[]
+        ~user_activated_protocol_overrides:[]
+        ~operation_metadata_size_limit:Unlimited
+        ~progress_display_mode:Animation.Auto
+        genesis
+    in
+    (match import_result with
+    | Ok () ->
+        Assert.fail_msg
+          "snapshot import unexpectedly succeeded on a snapshot containing \
+           member with non-canonical name %S"
+          raw_member
+    | Error _ -> ()) ;
+    let*! marker_exists = Lwt_unix.file_exists marker_path in
+    if marker_exists then
+      Assert.fail_msg
+        "snapshot import wrote context member %S outside destination context \
+         directory at %S"
+        raw_member
+        marker_path ;
+    return_unit
+  in
+  wrap_test
+    ~speed
+    ~with_gc:true
+    ~keep_dir:false
+    ~history_mode:(Full (Some History_mode.default_additional_cycles))
+    ~patch_context:(fun ctxt -> Alpha_utils.default_patch_context ctxt)
+    ("tar snapshot import rejects members with non-canonical paths", test)
+
 let test_rolling speed export_mode =
   let patch_context ctxt = Alpha_utils.default_patch_context ctxt in
   let test (store_dir, data_dir) store =
@@ -774,6 +854,7 @@ let tests speed =
     in
     let tests_rolling = make_tests_rolling speed in
     let tests_drag_after_import = make_tests_drag_after_import speed in
-    tests_rolling @ tests_drag_after_import @ export_import_tests
+    test_tar_import_rejects_non_canonical_member_names speed
+    :: (tests_rolling @ tests_drag_after_import @ export_import_tests)
   in
   ("snapshots", test_cases)
