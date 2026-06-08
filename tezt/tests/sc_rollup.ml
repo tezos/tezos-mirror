@@ -9100,6 +9100,117 @@ let test_refute_apply_assertion_failure =
     level_after ;
   unit
 
+(* Regression test for the frozen-protocol (T/U) mempool mitigation, in the
+   realistic gossip threat model.
+
+   [Mempool.pre_filter] runs only on operations received from PEERS, not on
+   locally-injected ones (injection is fast-pathed, see
+   [prevalidator.ml:on_inject]). So the attack and its mitigation are inter-node:
+
+   - An attacker injects the un-appliable refute operation on its own node, where
+     it is [validated] (bypassing that node's filter) and gossiped.
+   - An honest node receives it and, thanks to the plugin's [pre_filter]
+     (proto_*/lib_plugin/mempool.ml), classifies it [branch_delayed] instead of
+     [validated]; it is then neither re-gossiped nor offered to a baker.
+
+   We use two nodes: [attacker] injects the operation and we check that on the
+   honest node it is [branch_delayed] (not [validated]). That an honest baker
+   then keeps producing blocks follows generically -- a baker never selects
+   [branch_delayed] operations -- and is covered by the forging and consensus
+   tests. *)
+let test_refute_apply_assertion_gossiped_op_refused =
+  let commitment_period = 5 in
+  register_test
+    ~__FILE__
+    ~kind:"arith"
+    ~tags:["refutation"; "game"; "dal"; "assertion"; "apply"; "plugin"]
+    ~title:
+      "Sc_rollup, dal_page_level_overflow: gossiped op refused by plugin \
+       pre_filter"
+  @@ fun protocol ->
+  (* Honest node configured with the smart-rollup parameters. *)
+  let* honest_node, honest_client =
+    setup_l1 ~commitment_period ~challenge_window:100 protocol
+  in
+  (* Attacker node, which will inject the malicious operation. *)
+  let* attacker_node =
+    Node.init [Synchronisation_threshold 0; Private_mode; No_bootstrap_peers]
+  in
+  let* attacker_client = Client.init ~endpoint:(Node attacker_node) () in
+  let* () = Client.Admin.trust_address honest_client ~peer:attacker_node
+  and* () = Client.Admin.trust_address attacker_client ~peer:honest_node in
+  let* () = Client.Admin.connect_address honest_client ~peer:attacker_node in
+  let keys =
+    Account.Bootstrap.keys
+    |> Array.map (fun k -> k.Account.alias)
+    |> Array.to_list
+  in
+  let* sc_rollup =
+    originate_sc_rollup
+      ~keys
+      ~kind:"arith"
+      ~src:Constant.bootstrap1.alias
+      honest_client
+  in
+  (* Set up the single-tick refutation game and build the malicious move on the
+     honest node (its operations propagate to the attacker node). We build the
+     operation here but inject it on the attacker node below. *)
+  let* () =
+    setup_dal_overflow_game ~keys ~commitment_period ~sc_rollup honest_client
+  in
+  let* op = build_dal_overflow_refute ~sc_rollup honest_client in
+  (* Make sure the attacker node is synchronised before injecting (so the
+     operation's branch is known there). *)
+  let* head_level = Node.get_level honest_node in
+  let* (_ : int) = Node.wait_for_level attacker_node head_level in
+  (* Inject on the attacker node: it bypasses that node's [pre_filter] and is
+     classified [validated] there. *)
+  let* (`OpHash oph) = Operation.inject op attacker_client in
+  let* attacker_mempool = Mempool.get_mempool attacker_client in
+  if not (List.mem oph attacker_mempool.validated) then
+    Test.fail
+      "Expected the operation %s to be 'validated' on the attacker node (local \
+       injection bypasses the filter), but it was not."
+      oph ;
+  Log.info "Operation %s is 'validated' on the attacker node." oph ;
+  (* Wait for the honest node to receive the gossiped operation, then check its
+     plugin filter [refused] it (rather than 'validated'). *)
+  let is_classified mempool =
+    List.mem oph mempool.Mempool.refused
+    || List.mem oph mempool.validated
+    || List.mem oph mempool.branch_delayed
+    || List.mem oph mempool.branch_delayed
+  in
+  let rec wait_for_honest_classification n =
+    let* mempool = Mempool.get_mempool honest_client in
+    if is_classified mempool then return mempool
+    else if n <= 0 then
+      Test.fail
+        "The honest node never received the gossiped operation %s after \
+         waiting."
+        oph
+    else
+      let* () = Lwt_unix.sleep 1. in
+      wait_for_honest_classification (n - 1)
+  in
+  let* honest_mempool = wait_for_honest_classification 30 in
+  if List.mem oph honest_mempool.validated then
+    Test.fail
+      "The honest node classified the gossiped operation %s as 'validated'; \
+       the plugin filter should have refused it."
+      oph ;
+  if not (List.mem oph honest_mempool.branch_delayed) then
+    Test.fail
+      "Expected the honest node to classify the operation %s as \
+       'branch_delayed' (branch_delayed=[%s] refused=[%s])."
+      oph
+      (String.concat "," honest_mempool.branch_delayed)
+      (String.concat "," honest_mempool.refused) ;
+  Log.info
+    "OK: the honest node 'branch_delayed' the gossiped operation (plugin \
+     pre_filter)." ;
+  unit
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_get_genesis_info ~kind protocols ;
@@ -9219,6 +9330,8 @@ let register ~protocols =
   test_refutation protocols ~kind:"wasm_2_0_0" ;
   let from_proto_v = List.filter (fun p -> Protocol.number p > 025) protocols in
   test_refute_apply_assertion_failure from_proto_v ;
+  let before_v = List.filter (fun p -> Protocol.number p <= 025) protocols in
+  test_refute_apply_assertion_gossiped_op_refused before_v ;
   test_recover_bond_of_stakers protocols ;
   test_patch_durable_storage_on_commitment protocols ;
   (* Specific Arith PVM tezts *)
