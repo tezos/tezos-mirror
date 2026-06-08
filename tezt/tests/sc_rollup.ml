@@ -9332,6 +9332,140 @@ let test_refute_apply_assertion_baker_excludes_op =
     level_after ;
   unit
 
+(* Two honest bakers (one per node) with the bootstrap delegates split across the
+   two nodes, so reaching a (pre)quorum is a genuine multi-party process. The
+   malicious refute op is injected while the bakers run; the test asserts the
+   chain keeps ADVANCING.
+
+   This guards against a consensus halt: a proposal that includes an un-appliable
+   op can reach a prequorum and the bakers lock on its payload, which can then be
+   neither applied nor abandoned (they are locked) -- a network-wide halt with no
+   malicious baker.
+
+   The head is brought close to wall-clock before the bakers start (a short
+   negative activation delay plus the catch-up below), so they run at small,
+   second-scale rounds; with the default far-past genesis they would sit at
+   hours-per-round and the chain would stall for unrelated reasons. *)
+let test_refute_apply_assertion_halts_baking_2nodes =
+  let commitment_period = 5 in
+  Protocol.register_test
+    ~__FILE__
+    ~title:"refute DAL-overflow op does not halt two honest bakers"
+    ~tags:["refutation"; "game"; "dal"; "assertion"; "apply"; "baker"; "lock"]
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  (* Activate ~25s in the past (not the default ~1 year) so the bakers run at
+     small rounds; the catch-up below brings the head to ~now. *)
+  let* node1, client1 =
+    setup_l1
+      ~timestamp:(Client.Ago (Client.Time.Span.of_seconds_exn 25.))
+      ~commitment_period
+      ~challenge_window:100
+      protocol
+  in
+  (* A second, independent node. *)
+  let* node2 = Node.init [Synchronisation_threshold 0; History_mode Archive] in
+  let* client2 = Client.init ~endpoint:(Node node2) () in
+  let* () = Client.Admin.trust_address client1 ~peer:node2
+  and* () = Client.Admin.trust_address client2 ~peer:node1 in
+  let* () = Client.Admin.connect_address client1 ~peer:node2 in
+  let* level1 = Node.get_level node1 in
+  let* _ = Node.wait_for_level node2 level1 in
+  Log.info "Two nodes connected and synced at level %d." level1 ;
+  let all_keys =
+    Account.Bootstrap.keys
+    |> Array.map (fun k -> k.Account.alias)
+    |> Array.to_list
+  in
+  let* sc_rollup = originate_sc_rollup ~keys:all_keys ~kind:"arith" client1 in
+  Log.info
+    "Originated rollup %s; setting up the single-tick refutation game."
+    sc_rollup ;
+  let* () =
+    setup_dal_overflow_game ~keys:all_keys ~commitment_period ~sc_rollup client1
+  in
+  (* Bring the head up to ~wall-clock so the bakers start at small rounds.
+     [~minimal_timestamp:false] forges each block at the current time, jumping the
+     head to ~now in one block. Done before injecting so the op's branch is fresh
+     when the bakers start. *)
+  let head_lag_s () =
+    let* header = Client.RPC.call client1 @@ RPC.get_chain_block_header () in
+    let ts_notation = JSON.(header |-> "timestamp" |> as_string) in
+    match Client.Time.of_notation_opt ts_notation with
+    | None -> Test.fail "Could not parse head timestamp %s" ts_notation
+    | Some ts ->
+        return (Ptime.diff (Client.Time.now ()) ts |> Ptime.Span.to_float_s)
+  in
+  let rec catch_up n =
+    let* lag = head_lag_s () in
+    if lag > 2. && n < 20 then
+      let* () =
+        Client.bake_for_and_wait ~minimal_timestamp:false ~keys:all_keys client1
+      in
+      catch_up (n + 1)
+    else (
+      Log.info "Head caught up to wall-clock (lag %.1fs) after %d blocks." lag n ;
+      unit)
+  in
+  let* () = catch_up 0 in
+  (* Split the bootstrap delegates across the two nodes so locking is a genuine
+     multi-party commitment (neither baker alone proposes and self-confirms).
+     Bakers run with DEFAULT configuration. *)
+  let delegates1 =
+    [
+      Constant.bootstrap1.public_key_hash;
+      Constant.bootstrap2.public_key_hash;
+      Constant.bootstrap3.public_key_hash;
+    ]
+  in
+  let delegates2 =
+    [Constant.bootstrap4.public_key_hash; Constant.bootstrap5.public_key_hash]
+  in
+  let* _baker1 =
+    Agnostic_baker.init ~event_level:`Info ~delegates:delegates1 node1 client1
+  in
+  let* _baker2 =
+    Agnostic_baker.init ~event_level:`Info ~delegates:delegates2 node2 client1
+  in
+  (* Let the bakers run first so they are actively monitoring the mempool; the op
+     we inject next is then reliably picked up in the next proposal (injecting
+     before they start raced with their initial mempool fetch). *)
+  let* start_level = Node.get_level node1 in
+  let* _ = Node.wait_for_level node1 (start_level + 2) in
+  Log.info
+    "Bakers are advancing the chain (level %d); now injecting the malicious op."
+    (start_level + 2) ;
+  let* _op, oph = inject_dal_overflow_refute ~protocol ~sc_rollup client1 in
+  let* level_before = Node.get_level node1 in
+  Log.info
+    "Malicious op %s injected at level %d; checking the chain keeps advancing."
+    oph
+    level_before ;
+  (* The op applies (does not abort), so baking proceeds; we require the chain to
+     advance by two more levels. A timeout means the bakers locked on a proposal
+     carrying the un-appliable op (a consensus halt). *)
+  let advanced =
+    let* l = Node.wait_for_level node1 (level_before + 2) in
+    return (`Advanced l)
+  in
+  let timeout =
+    let* () = Lwt_unix.sleep 90. in
+    return `Stuck
+  in
+  let* result = Lwt.pick [advanced; timeout] in
+  match result with
+  | `Advanced l ->
+      Log.info
+        "OK: the chain advanced to level %d -- the op applies and baking is \
+         not halted."
+        l ;
+      unit
+  | `Stuck ->
+      Test.fail
+        "The chain did not advance past level %d within 90s; the bakers locked \
+         on a proposal carrying the un-appliable op (a consensus halt)."
+        level_before
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_get_genesis_info ~kind protocols ;
@@ -9454,6 +9588,7 @@ let register ~protocols =
   let before_v = List.filter (fun p -> Protocol.number p <= 025) protocols in
   test_refute_apply_assertion_gossiped_op_refused before_v ;
   test_refute_apply_assertion_baker_excludes_op before_v ;
+  test_refute_apply_assertion_halts_baking_2nodes protocols ;
   test_recover_bond_of_stakers protocols ;
   test_patch_durable_storage_on_commitment protocols ;
   (* Specific Arith PVM tezts *)
