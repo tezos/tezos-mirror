@@ -13,6 +13,9 @@ publish = false
 default = ["irmin-compat"]
 irmin-compat = ["dep:tezos-smart-rollup-host"]
 
+[dependencies]
+thiserror.workspace = true
+
 [dependencies.tezos-smart-rollup-host]
 path = "../host"
 default-features = false

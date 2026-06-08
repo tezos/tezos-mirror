@@ -1148,7 +1148,7 @@ checksum = "bd283d9651eeda4b2a83a43c1c91b266c40fd76ecd39a50a8c630ae69dc72891"
 dependencies = [
  "getrandom",
  "libredox",
- "thiserror",
+ "thiserror 1.0.50",
 ]
 
 [[package]]
@@ -1427,7 +1427,7 @@ dependencies = [
  "proptest",
  "tezos_crypto_rs",
  "tezos_data_encoding",
- "thiserror",
+ "thiserror 1.0.50",
 ]
 
 [[package]]
@@ -1496,7 +1496,7 @@ dependencies = [
  "tezos-smart-rollup-host",
  "tezos_crypto_rs",
  "tezos_data_encoding",
- "thiserror",
+ "thiserror 2.0.18",
  "time",
 ]
 
@@ -1539,7 +1539,7 @@ dependencies = [
  "tezos-smart-rollup-installer-config",
  "tezos-smart-rollup-mock",
  "tezos_data_encoding",
- "thiserror",
+ "thiserror 2.0.18",
  "wasm-gen",
 ]
 
@@ -1556,7 +1556,7 @@ dependencies = [
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-mock",
  "tezos_data_encoding",
- "thiserror",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -1564,6 +1564,7 @@ name = "tezos-smart-rollup-keyspace"
 version = "0.0.0"
 dependencies = [
  "tezos-smart-rollup-host",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -1606,7 +1607,7 @@ dependencies = [
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-mock",
- "thiserror",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -1645,7 +1646,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "tezos_data_encoding",
- "thiserror",
+ "thiserror 1.0.50",
  "zeroize",
 ]
 
@@ -1662,7 +1663,7 @@ dependencies = [
  "num-traits",
  "serde",
  "tezos_data_encoding_derive",
- "thiserror",
+ "thiserror 1.0.50",
 ]
 
 [[package]]
@@ -1683,7 +1684,16 @@ version = "1.0.50"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9a7210f5c9a7156bb50aa36aed4c95afb51df0df00713949448cf9e97d382d2"
 dependencies = [
- "thiserror-impl",
+ "thiserror-impl 1.0.50",
+]
+
+[[package]]
+name = "thiserror"
+version = "2.0.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4"
+dependencies = [
+ "thiserror-impl 2.0.18",
 ]
 
 [[package]]
@@ -1691,6 +1701,17 @@ name = "thiserror-impl"
 version = "1.0.50"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "266b2e40bc00e5a6c09c3584011e08b06f123c00362c92b975ba9843aaaa14b8"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "2.0.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ebc4ee7f67670e9b64d05fa4253e753e016c6c95ff35b89b7941d6b856dec1d5"
 dependencies = [
  "proc-macro2",
  "quote",

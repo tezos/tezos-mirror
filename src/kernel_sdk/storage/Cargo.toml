@@ -15,7 +15,7 @@ keywords = ["tezos", "smart", "rollup"]
 categories = ["database", "wasm"]
 
 [dependencies]
-thiserror = "1.0"
+thiserror.workspace = true
 
 [dependencies.tezos-smart-rollup-host]
 path = "../host"

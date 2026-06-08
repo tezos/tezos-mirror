@@ -167,10 +167,10 @@ impl<Host> StorageV1KeySpaceCompat<Host> {
     }
 
     fn full_path(&self, key: &Key) -> OwnedPath {
-        // &key is &&Key which is Sized, and &Key: Path (irmin-compat).
+        // `Key: Path` (irmin-compat), so `key: &Key` is `&impl Path`.
         // Safety: concat only fails if the resulting path is invalid, but since [Name] and [Key]
         // have restricted sizes and contents, the resulting path is guaranteed to be valid.
-        concat(&self.prefix, &key).expect("Valid irmin-durable path")
+        concat(&self.prefix, key).expect("Valid irmin-durable path")
     }
 }
 
@@ -324,57 +324,57 @@ mod tests {
         )
     }
 
-    fn key(s: &[u8]) -> &Key {
+    fn key(s: &[u8]) -> Key {
         Key::from_bytes(s).unwrap()
     }
 
     #[test]
     fn get_returns_none_for_missing_key() {
         let ks = make_ks(MockHost::default(), "/test");
-        assert_eq!(ks.get(key(b"/a")), None);
+        assert_eq!(ks.get(&key(b"/a")), None);
     }
 
     #[test]
     fn set_then_get() {
         let mut ks = make_ks(MockHost::default(), "/test");
-        ks.set(key(b"/a"), b"hello").unwrap();
-        assert_eq!(ks.get(key(b"/a")), Some(b"hello".to_vec()));
+        ks.set(&key(b"/a"), b"hello").unwrap();
+        assert_eq!(ks.get(&key(b"/a")), Some(b"hello".to_vec()));
     }
 
     #[test]
     fn contains_and_delete() {
         let mut ks = make_ks(MockHost::default(), "/test");
-        assert!(!ks.contains(key(b"/a")));
+        assert!(!ks.contains(&key(b"/a")));
 
-        ks.set(key(b"/a"), b"val").unwrap();
-        assert!(ks.contains(key(b"/a")));
+        ks.set(&key(b"/a"), b"val").unwrap();
+        assert!(ks.contains(&key(b"/a")));
 
-        assert!(ks.delete(key(b"/a")));
-        assert!(!ks.contains(key(b"/a")));
+        assert!(ks.delete(&key(b"/a")));
+        assert!(!ks.contains(&key(b"/a")));
     }
 
     #[test]
     fn delete_missing_returns_false() {
         let mut ks = make_ks(MockHost::default(), "/test");
-        assert!(!ks.delete(key(b"/nope")));
+        assert!(!ks.delete(&key(b"/nope")));
     }
 
     #[test]
     fn value_length() {
         let mut ks = make_ks(MockHost::default(), "/test");
-        assert_eq!(ks.value_length(key(b"/a")), None);
+        assert_eq!(ks.value_length(&key(b"/a")), None);
 
-        ks.set(key(b"/a"), b"12345").unwrap();
-        assert_eq!(ks.value_length(key(b"/a")), Some(5));
+        ks.set(&key(b"/a"), b"12345").unwrap();
+        assert_eq!(ks.value_length(&key(b"/a")), Some(5));
     }
 
     #[test]
     fn partial_read() {
         let mut ks = make_ks(MockHost::default(), "/test");
-        ks.set(key(b"/a"), b"hello world").unwrap();
+        ks.set(&key(b"/a"), b"hello world").unwrap();
 
         let mut buf = [0u8; 5];
-        let n = ks.read(key(b"/a"), 6, &mut buf).unwrap();
+        let n = ks.read(&key(b"/a"), 6, &mut buf).unwrap();
         assert_eq!(n, 5);
         assert_eq!(&buf[..n], b"world");
     }
@@ -383,27 +383,27 @@ mod tests {
     fn read_missing_returns_none() {
         let ks = make_ks(MockHost::default(), "/test");
         let mut buf = [0u8; 10];
-        assert_eq!(ks.read(key(b"/a"), 0, &mut buf), None);
+        assert_eq!(ks.read(&key(b"/a"), 0, &mut buf), None);
     }
 
     #[test]
     fn clear_removes_all() {
         let mut ks = make_ks(MockHost::default(), "/test");
-        ks.set(key(b"/a"), b"1").unwrap();
-        ks.set(key(b"/b"), b"2").unwrap();
+        ks.set(&key(b"/a"), b"1").unwrap();
+        ks.set(&key(b"/b"), b"2").unwrap();
 
         ks.clear();
-        assert!(!ks.contains(key(b"/a")));
-        assert!(!ks.contains(key(b"/b")));
+        assert!(!ks.contains(&key(b"/a")));
+        assert!(!ks.contains(&key(b"/b")));
     }
 
     #[test]
     fn write_at_offset() {
         let mut ks = make_ks(MockHost::default(), "/test");
-        ks.set(key(b"/a"), b"hello world").unwrap();
-        let n = ks.write(key(b"/a"), 6, b"rust!").unwrap();
+        ks.set(&key(b"/a"), b"hello world").unwrap();
+        let n = ks.write(&key(b"/a"), 6, b"rust!").unwrap();
         assert_eq!(n, 5);
-        assert_eq!(ks.get(key(b"/a")), Some(b"hello rust!".to_vec()));
+        assert_eq!(ks.get(&key(b"/a")), Some(b"hello rust!".to_vec()));
     }
 
     #[test]
@@ -415,17 +415,17 @@ mod tests {
     #[test]
     fn delete_after_clear_returns_false() {
         let mut ks = make_ks(MockHost::default(), "/test");
-        ks.set(key(b"/a"), b"val").unwrap();
+        ks.set(&key(b"/a"), b"val").unwrap();
         ks.clear();
-        assert!(!ks.delete(key(b"/a")));
+        assert!(!ks.delete(&key(b"/a")));
     }
 
     #[test]
     fn get_after_clear_returns_none() {
         let mut ks = make_ks(MockHost::default(), "/test");
-        ks.set(key(b"/a"), b"val").unwrap();
+        ks.set(&key(b"/a"), b"val").unwrap();
         ks.clear();
-        assert_eq!(ks.get(key(b"/a")), None);
+        assert_eq!(ks.get(&key(b"/a")), None);
     }
 
     #[test]
@@ -435,7 +435,7 @@ mod tests {
         // Even an empty keyspace has a hash (empty tree hash).
         assert!(!empty_hash.is_empty());
 
-        ks.set(key(b"/a"), b"val").unwrap();
+        ks.set(&key(b"/a"), b"val").unwrap();
         let populated_hash = ks.hash();
         assert!(!populated_hash.is_empty());
         assert_ne!(empty_hash, populated_hash);
@@ -444,10 +444,10 @@ mod tests {
     #[test]
     fn hash_changes_after_mutation() {
         let mut ks = make_ks(MockHost::default(), "/test");
-        ks.set(key(b"/a"), b"val").unwrap();
+        ks.set(&key(b"/a"), b"val").unwrap();
         let h1 = ks.hash();
 
-        ks.set(key(b"/a"), b"other").unwrap();
+        ks.set(&key(b"/a"), b"other").unwrap();
         let h2 = ks.hash();
 
         assert_ne!(h1, h2);
@@ -461,9 +461,9 @@ mod tests {
     fn set_then_get_large_value() {
         let mut ks = make_ks(MockHost::default(), "/test");
         let data: Vec<u8> = (0..5000).map(|i| (i % 256) as u8).collect();
-        ks.set(key(b"/big"), &data).unwrap();
+        ks.set(&key(b"/big"), &data).unwrap();
 
-        let got = ks.get(key(b"/big")).unwrap();
+        let got = ks.get(&key(b"/big")).unwrap();
         assert_eq!(got, data);
     }
 
@@ -471,10 +471,10 @@ mod tests {
     fn read_large_value_returns_all_bytes() {
         let mut ks = make_ks(MockHost::default(), "/test");
         let data: Vec<u8> = (0..5000).map(|i| (i % 256) as u8).collect();
-        ks.set(key(b"/big"), &data).unwrap();
+        ks.set(&key(b"/big"), &data).unwrap();
 
         let mut buf = vec![0u8; 5000];
-        let n = ks.read(key(b"/big"), 0, &mut buf).unwrap();
+        let n = ks.read(&key(b"/big"), 0, &mut buf).unwrap();
         assert_eq!(n, 5000);
         assert_eq!(&buf[..n], &data[..]);
     }
@@ -482,17 +482,17 @@ mod tests {
     #[test]
     fn read_at_offset_past_end_returns_none() {
         let mut ks = make_ks(MockHost::default(), "/test");
-        ks.set(key(b"/a"), b"hello").unwrap();
+        ks.set(&key(b"/a"), b"hello").unwrap();
 
         let mut buf = [0u8; 10];
-        assert_eq!(ks.read(key(b"/a"), 10, &mut buf), None);
+        assert_eq!(ks.read(&key(b"/a"), 10, &mut buf), None);
     }
 
     #[test]
     fn write_at_offset_past_end_returns_error() {
         let mut ks = make_ks(MockHost::default(), "/test");
-        ks.set(key(b"/a"), b"hello").unwrap();
+        ks.set(&key(b"/a"), b"hello").unwrap();
 
-        assert!(ks.write(key(b"/a"), 100, b"data").is_err());
+        assert!(ks.write(&key(b"/a"), 100, b"data").is_err());
     }
 }

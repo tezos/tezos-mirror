@@ -78,18 +78,10 @@ unsafe impl Path for Name {
     }
 }
 
-// SAFETY: delegates to the `Path` impl on `Name`.
-unsafe impl Path for &Name {
+// SAFETY: Key contents are validated irmin path bytes at construction time.
+unsafe impl Path for Key {
     fn as_bytes(&self) -> &[u8] {
-        self.0.as_bytes()
-    }
-}
-
-// Also implement for references, so `&Key` can be used directly with `concat`.
-// SAFETY: delegates to the `Path` impl on `Key`.
-unsafe impl Path for &Key {
-    fn as_bytes(&self) -> &[u8] {
-        &self.0
+        self.0.as_ref()
     }
 }
 
