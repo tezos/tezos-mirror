@@ -192,6 +192,16 @@
   `X-Tezos-*` namespace. The header lets a callee convey, in mutez,
   the storage cost it asks the caller to bill back for bytes
   allocated during a CRAC sub-execution. (!22093)
+- The sequencer block producer now budgets transactions against the
+  *serialized* blueprint size (the per-transaction runtime tag and RLP
+  framing of the V1 format), instead of the raw transaction size, and
+  reserves the fixed blueprint framing from the chunk budget. Previously a
+  batch could satisfy the raw-size budget yet serialize to more than the
+  maximum number of chunks the kernel accepts, causing block production to
+  fail. (!22092)
+- The sequencer block producer now clears the optimistically-popped pending
+  transactions when block production fails, so a rejected blueprint can no
+  longer permanently stall the sequencer. (!22092)
 
 ## Version 0.6 (ae3d731879b9443f52dc14de64e3208ab256d7a0)
 

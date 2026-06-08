@@ -88,6 +88,14 @@ val michelson_runtime_id : string
 (** Prepend to a raw transaction the id of its runtime. *)
 val tag_transaction : Broadcast.common_transaction -> string
 
+(** [encoded_transaction_size ~version tx] is the number of bytes [tx]
+    contributes to the RLP-encoded blueprint of the given [version], i.e. the
+    raw transaction plus, for [V1], its 1-byte runtime tag, plus the RLP
+    value-length prefix. Used by the block producer to budget against the
+    serialized blueprint size rather than the raw transaction size. *)
+val encoded_transaction_size :
+  version:blueprint_version -> Broadcast.common_transaction -> int
+
 type kernel_blueprint = {
   version : blueprint_version;
   parent_hash : Ethereum_types.block_hash;

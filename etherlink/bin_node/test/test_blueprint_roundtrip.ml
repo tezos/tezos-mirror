@@ -333,6 +333,59 @@ end
 let test_tez_legacy_block_roundtrip =
   test_tez_block_roundtrip (module Tezos_block_legacy_tool)
 
+(* Regression for L2-1509: the block producer budgets transactions against the
+   *serialized* blueprint size (via [encoded_transaction_size]), not the raw
+   transaction size. Any batch whose cumulative [encoded_transaction_size] fits
+   in [maximum_usable_space_in_blueprint n] must serialize to at most [n]
+   chunks, so the kernel never rejects it for exceeding the maximum number of
+   chunks. The pre-fix accounting summed [String.length raw_tx], which (in V1,
+   because of the per-tx runtime tag and RLP framing) over-admits and produces
+   [n + 1] chunks. *)
+let test_budget_respects_chunk_limit ~version () =
+  register
+    ~title:
+      (sf
+         "Budget respects chunk limit (%s)"
+         (match version with
+         | Sequencer_blueprint.Legacy -> "Legacy"
+         | V1 -> "V1"))
+  @@ fun () ->
+  let max_number_of_chunks = 128 in
+  let budget =
+    Sequencer_blueprint.maximum_usable_space_in_blueprint max_number_of_chunks
+  in
+  (* Emulate the block producer's greedy admission: add fixed-size EVM
+     transactions while the cumulative serialized size stays within budget.
+     The size is chosen so that the pre-fix accounting (summing the raw
+     transaction length instead of [encoded_transaction_size]) over-admits and
+     overflows into a 129th chunk. *)
+  let tx : Broadcast.common_transaction = Evm (String.make 500 'a') in
+  let tx_size = Sequencer_blueprint.encoded_transaction_size ~version tx in
+  let rec fill acc current_size =
+    if current_size + tx_size > budget then List.rev acc
+    else fill (tx :: acc) (current_size + tx_size)
+  in
+  let transactions = fill [] 0 in
+  let chunks =
+    Sequencer_blueprint.make_blueprint_chunks
+      ~number:(Qty Z.zero)
+      {
+        version;
+        parent_hash = zero_hash;
+        delayed_transactions = [];
+        transactions;
+        timestamp = Time.Protocol.epoch;
+      }
+  in
+  let nb_chunks =
+    List.length (chunks :> Sequencer_blueprint.unsigned_chunk list)
+  in
+  Check.(
+    (nb_chunks <= max_number_of_chunks)
+      int
+      ~error_msg:"Blueprint produced %L chunks, exceeding the maximum of %R") ;
+  unit
+
 let () =
   test_blueprint_roundtrip
     ~title:"empty legacy blueprint"
@@ -501,5 +554,9 @@ let () =
        ~parent_hash:L2_types.Tezos_block.genesis_parent_hash
        ~operations:(Bytes.of_string "txntxntxn")
        ()
+
+let () =
+  test_budget_respects_chunk_limit ~version:Legacy () ;
+  test_budget_respects_chunk_limit ~version:V1 ()
 
 let () = Test.run ()
