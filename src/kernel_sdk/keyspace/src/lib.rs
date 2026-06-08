@@ -196,9 +196,33 @@ pub trait KeySpace {
     /// Returns `None` if the key does not exist.
     fn get(&self, key: &Key) -> Option<Vec<u8>>;
 
+    /// Read the first `N` bytes of the value associated with the key and return them in a fixed-size array.
+    /// Returns `None` if the key does not exist or if the value is shorter than `N` bytes.
+    ///
+    /// *NB* care should be taken that `N` is small - certainly smaller than a page on the current
+    /// architecture. Otherwise, it may be possible to trigger a stack overflow, by allocating too
+    /// much on the stack in one go - and bypassing rust's [guard page](https://doc.rust-lang.org/rustc/exploit-mitigations.html#stack-clashing-protection).
+    fn get_prefix_exact<const N: usize>(&self, key: &Key) -> Option<[u8; N]> {
+        self.read_exact_in(key, 0)
+    }
+
     /// Read a portion of the value associated with the key and return the number of bytes written.
     /// Returns `None` if the key does not exist.
     fn read(&self, key: &Key, offset: usize, buffer: &mut [u8]) -> Option<usize>;
+
+    /// Read the exact number of bytes from a portion of the value associated with the key and return them in a fixed-size array.
+    /// Returns `None` if the key does not exist or if the value is not long enough to read N bytes from the given offset.
+    ///
+    /// *NB* care should be taken that `N` is small - certainly smaller than a page on the current
+    /// architecture. Otherwise, it may be possible to trigger a stack overflow, by allocating too
+    /// much on the stack in one go - and bypassing rust's [guard page](https://doc.rust-lang.org/rustc/exploit-mitigations.html#stack-clashing-protection).
+    fn read_exact_in<const N: usize>(&self, key: &Key, offset: usize) -> Option<[u8; N]> {
+        let mut buffer = [0u8; N];
+        match self.read(key, offset, &mut buffer) {
+            Some(bytes_read) if bytes_read == N => Some(buffer),
+            _ => None,
+        }
+    }
 
     /// Write the given value to the key.
     fn set(
