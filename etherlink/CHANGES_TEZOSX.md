@@ -76,6 +76,11 @@
 - Bootstrap contracts injected at genesis now have their `used_bytes`
   / `paid_bytes` storage space initialised to the size they
   occupy. (!22089)
+- Introduce a single shared, kernel-owned Michelson alias implementation at
+  `/tez/tez_accounts/tezosx/__system__/alias_implementation`, seeded with the
+  current forwarder code at Michelson runtime activation and via storage
+  migration. Foundation for upgrading every alias atomically; no behaviour
+  change yet, as nothing resolves the slot. (!22099)
 - Expose a contract's storage-space watermarks through two read-only
   RPCs, `GET .../contracts/<id>/storage/used_space` and `.../paid_space`,
   mirroring L1's `get_used_storage_space` / `get_paid_storage_space`
@@ -191,6 +196,8 @@
   dropped. (!22065)
 
 ### Storage versions
+
+- The storage version is now 61. (!22099)
 
 ### Internals
 

@@ -552,6 +552,18 @@ where
                     safe_host.host,
                     processed_blueprint,
                 )?;
+                // L2-1526: seed the shared Michelson alias implementation
+                // when the runtime activates on a fresh network. Migrations
+                // only run on upgrades, so this is the genesis seeding point.
+                // Like the sunrise_level write above, this runs after the
+                // block has been promoted, so the slot is first reflected in
+                // the *next* block's Michelson state_root (its content is
+                // rooted under /tez/tez_accounts). It is identical across all
+                // replicas and idempotent.
+                tezosx_tezos_runtime::account::init_alias_implementation(safe_host.host)
+                    .map_err(|e| {
+                        anyhow::anyhow!("seeding alias implementation failed: {e}")
+                    })?;
             }
             upgrade::possible_sequencer_key_change(safe_host.host, timestamp)?;
 
