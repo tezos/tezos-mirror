@@ -495,4 +495,41 @@ mod tests {
 
         assert!(ks.write(&key(b"/a"), 100, b"data").is_err());
     }
+
+    #[test]
+    fn get_prefix_exact_returns_first_n_bytes_when_value_has_at_least_n() {
+        let mut ks = make_ks(MockHost::default(), "/test");
+        ks.set(&key(b"/exact"), b"hello").unwrap();
+        assert_eq!(ks.get_prefix_exact::<5>(&key(b"/exact")), Some(*b"hello"));
+
+        ks.set(&key(b"/long"), b"hello world").unwrap();
+        assert_eq!(ks.get_prefix_exact::<5>(&key(b"/long")), Some(*b"hello"));
+    }
+
+    #[test]
+    fn get_prefix_exact_returns_none_when_value_too_short_or_key_missing() {
+        let mut ks = make_ks(MockHost::default(), "/test");
+        ks.set(&key(b"/a"), b"hi").unwrap();
+
+        assert_eq!(ks.get_prefix_exact::<5>(&key(b"/a")), None);
+        assert_eq!(ks.get_prefix_exact::<5>(&key(b"/missing")), None);
+    }
+
+    #[test]
+    fn read_exact_in_returns_n_bytes_from_offset() {
+        let mut ks = make_ks(MockHost::default(), "/test");
+        ks.set(&key(b"/a"), b"hello world").unwrap();
+
+        assert_eq!(ks.read_exact_in::<5>(&key(b"/a"), 0), Some(*b"hello"));
+        assert_eq!(ks.read_exact_in::<5>(&key(b"/a"), 6), Some(*b"world"));
+    }
+
+    #[test]
+    fn read_exact_in_returns_none_when_not_enough_bytes_or_key_missing() {
+        let mut ks = make_ks(MockHost::default(), "/test");
+        ks.set(&key(b"/a"), b"hello").unwrap();
+
+        assert_eq!(ks.read_exact_in::<5>(&key(b"/a"), 2), None);
+        assert_eq!(ks.read_exact_in::<5>(&key(b"/missing"), 0), None);
+    }
 }
