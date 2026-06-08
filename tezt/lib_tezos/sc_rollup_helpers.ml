@@ -711,8 +711,8 @@ let get_staked_on_commitment ~sc_rollup ~staker client =
   | Some hash -> return hash
   | None -> failwith (Format.sprintf "hash is missing %s" __LOC__)
 
-let forge_and_publish_commitment ?compressed_state ?number_of_ticks ~inbox_level
-    ~predecessor ~sc_rollup ~src client =
+let forge_and_publish_commitment ?keys ?compressed_state ?number_of_ticks
+    ~inbox_level ~predecessor ~sc_rollup ~src client =
   let open Runnable in
   let open Syntax in
   let commitment, runnable =
@@ -726,11 +726,11 @@ let forge_and_publish_commitment ?compressed_state ?number_of_ticks ~inbox_level
       client
   in
   let*! () = runnable in
-  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait ?keys client in
   let* hash = get_staked_on_commitment ~sc_rollup ~staker:src client in
   return (commitment, hash)
 
-let bake_period_then_publish_commitment ?compressed_state ?number_of_ticks
+let bake_period_then_publish_commitment ?keys ?compressed_state ?number_of_ticks
     ~sc_rollup ~src client =
   let* {commitment_period_in_blocks = commitment_period; _} =
     get_sc_rollup_constants client
@@ -744,9 +744,11 @@ let bake_period_then_publish_commitment ?compressed_state ?number_of_ticks
     last_inbox_level + commitment_period - current_level + 1
   in
   let* () =
-    repeat missing_blocks_to_commit (fun () -> Client.bake_for_and_wait client)
+    repeat missing_blocks_to_commit (fun () ->
+        Client.bake_for_and_wait ?keys client)
   in
   forge_and_publish_commitment
+    ?keys
     ?compressed_state
     ?number_of_ticks
     ~inbox_level
@@ -814,16 +816,16 @@ let check_op_included ~__LOC__ =
 (** Helper function that allows to inject the given operation in a node, bake a
     block, and check that the operation is successfully applied in the baked
     block. *)
-let bake_operation_via_rpc ~__LOC__ client op =
+let bake_operation_via_rpc ~__LOC__ ?keys client op =
   let* (`OpHash oph) = Operation.Manager.inject [op] client in
-  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait ?keys client in
   check_op_included ~__LOC__ ~oph client
 
-let start_refute client ~source ~opponent ~sc_rollup ~player_commitment_hash
-    ~opponent_commitment_hash =
+let start_refute ?keys client ~source ~opponent ~sc_rollup
+    ~player_commitment_hash ~opponent_commitment_hash =
   let module M = Operation.Manager in
   let refutation = M.Start {player_commitment_hash; opponent_commitment_hash} in
-  bake_operation_via_rpc ~__LOC__ client
+  bake_operation_via_rpc ~__LOC__ ?keys client
   @@ M.make ~source
   @@ M.sc_rollup_refute ~sc_rollup ~opponent ~refutation ()
 
