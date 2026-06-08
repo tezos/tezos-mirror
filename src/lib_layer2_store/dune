@@ -19,7 +19,8 @@
   cohttp-lwt-unix
   camlzip
   tar
-  tar-unix)
+  tar-unix
+  octez-tar-helpers)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
