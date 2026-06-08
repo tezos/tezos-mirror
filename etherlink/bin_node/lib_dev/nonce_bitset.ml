@@ -12,6 +12,13 @@ type t = {next_nonce : Z.t; bitset : Bitset.t}
 
 let create ~next_nonce = {next_nonce; bitset = Bitset.empty}
 
+(* A nonce [n] is stored as a set bit at position [n - next_nonce], so the
+   offset directly sizes the underlying bignum ([Bitset.add] allocates a
+   [pos]-bit integer, i.e. [~offset/8] bytes). Bounding the offset to a small
+   constant keeps that allocation small ([~ 125 B] here) while staying far
+   above any legitimate pending-nonce depth *)
+let max_offset = 1024
+
 let offset ~nonce1 ~nonce2 =
   let open Result_syntax in
   if Z.gt nonce2 nonce1 then
@@ -24,10 +31,14 @@ let offset ~nonce1 ~nonce2 =
       nonce1
   else
     let offset = Z.(nonce1 - nonce2) in
-    if Z.fits_int offset then return (Z.to_int offset)
+    if Z.leq offset (Z.of_int max_offset) then return (Z.to_int offset)
     else
       error_with
-        "Internal: invalid nonce offset, it's too large to fit in an integer."
+        "Internal: invalid nonce offset, the gap between the nonce and the \
+         expected next nonce (%a) exceeds the maximum allowed offset (%d)."
+        Z.pp_print
+        offset
+        max_offset
 
 let add {next_nonce; bitset} ~nonce =
   let open Result_syntax in

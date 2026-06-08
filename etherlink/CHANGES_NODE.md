@@ -315,6 +315,9 @@ meaning it is not possible downgrade to a previous version.
 
 - Fix `shell` (and children subcommands) failing with "No store found"
   when the EVM node is running on the same data directory. (!21067)
+- Bound the accepted future-nonce gap when admitting transactions to the
+  `tx_queue`, preventing a single valid transaction with a far-future nonce
+  from forcing a multi-gigabyte allocation in the tx_queue worker (node DoS).
 
 ### Execution changes
 

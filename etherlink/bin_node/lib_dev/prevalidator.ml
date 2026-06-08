@@ -299,7 +299,12 @@ let validate_nonce ~next_nonce:(Qty next_nonce)
     (transaction : Transaction_object.t) =
   let open Lwt_result_syntax in
   let (Qty nonce) = Transaction_object.nonce transaction in
-  if nonce >= next_nonce then return (Ok ()) else return (Error "Nonce too low")
+  if Z.lt nonce next_nonce then return (Error "Nonce too low")
+  else if Z.gt Z.(nonce - next_nonce) (Z.of_int Nonce_bitset.max_offset) then
+    (* fail early when the nonce is too far in the future to be stored
+       in the tx_queue Nonce_bitset *)
+    return (Error "Nonce too high")
+  else return (Ok ())
 
 let validate_gas_limit session (transaction : Transaction_object.t) :
     (unit, string) result tzresult Lwt.t =

@@ -38,11 +38,17 @@ type t = {
 (** [create ~next_nonce] creates a {!t} struct with empty [bitset]. *)
 val create : next_nonce:Z.t -> t
 
+(** [max_offset] is the maximum accepted distance between a nonce and the
+    bitset's [next_nonce]. Since a nonce is stored as a set bit at position
+    [nonce - next_nonce], this constant bounds the size of the bignum backing
+    the bitset and thus the memory a single transaction can require. *)
+val max_offset : int
+
 (** [offset ~nonce1 ~nonce2] computes the difference between
       [nonce1] and [nonce2].
 
       Fails if [nonce2 > nonce1] or if the difference between the two is
-      more than [Int.max_int]. *)
+      strictly more than [max_offset]. *)
 val offset : nonce1:Z.t -> nonce2:Z.t -> int tzresult
 
 (** [add bitset_nonce ~nonce] adds the nonce [nonce] to

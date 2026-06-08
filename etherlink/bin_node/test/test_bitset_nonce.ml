@@ -231,6 +231,37 @@ let test_next_gap_nonce =
   shift_then_next_gap_nonce ~__LOC__ bitset ~shift_nonce:(nonce + 2) ~expected:4 ;
   unit
 
+(* A far-future nonce must be rejected by [Nonce_bitset.add]. *)
+let test_offset_bound =
+  test_register
+    ~title:"future-nonce offset is bounded"
+    ~tags:["bitset_nonce"; "offset_bound"]
+  @@ fun () ->
+  let bitset = Nonce_bitset.create ~next_nonce:Z.zero in
+  let add_z nonce = Nonce_bitset.add bitset ~nonce in
+  (* At the boundary the nonce is accepted. *)
+  (match add_z (Z.of_int Nonce_bitset.max_offset) with
+  | Ok _ -> ()
+  | Error _ ->
+      Test.fail
+        ~__LOC__
+        "nonce at offset max_offset (%d) should be accepted"
+        Nonce_bitset.max_offset) ;
+  (* One past the boundary is rejected. *)
+  (match add_z (Z.of_int (Nonce_bitset.max_offset + 1)) with
+  | Ok _ ->
+      Test.fail
+        ~__LOC__
+        "nonce at offset max_offset + 1 (%d) should be rejected"
+        (Nonce_bitset.max_offset + 1)
+  | Error _ -> ()) ;
+  (* A far-future nonce ([2^33], i.e. a [~1 GiB] allocation) is rejected
+     without ever reaching [Bitset.add]. *)
+  (match add_z Z.(shift_left one 33) with
+  | Ok _ -> Test.fail ~__LOC__ "far-future nonce (2^33) should be rejected"
+  | Error _ -> ()) ;
+  unit
+
 module Address_nonce_helpers = struct
   let find_bitset_nonce nonces ~addr = Address_nonce.find nonces ~addr
 
@@ -331,6 +362,7 @@ let () =
   add_shift_then_remove ;
   add_shift_then_remove_many ;
   test_next_gap_nonce ;
+  test_offset_bound ;
   test_address_nonces
 
 let () = Test.run ()
