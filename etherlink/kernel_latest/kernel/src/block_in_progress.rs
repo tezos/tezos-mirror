@@ -32,7 +32,6 @@ use revm_etherlink::inspectors::storage::{
     flush_call_traces, store_return_value, store_trace_failed, store_trace_gas,
 };
 use revm_etherlink::inspectors::TracerInput;
-use revm_etherlink::precompiles::constants::TEZOSX_CALLER_H160;
 use rlp::{Decodable, DecoderError, Encodable};
 use std::collections::VecDeque;
 use tezos_ethereum::block::{BlockConstants, BlockFees, EthBlock};
@@ -676,9 +675,14 @@ impl BlockInProgress {
         hasher.update(effect.crac_id.as_bytes());
         let hash_bytes: [u8; 32] = hasher.finalize().into();
 
-        // The handler address is the constant TezosX caller, not the
-        // originator. `to` is the alias of the top-level originator.
-        let from = TEZOSX_CALLER_H160;
+        // Neutral envelope: `from == to == originator alias`, carrying no
+        // value. The originator (`X-Tezos-Source`) is the only invariant,
+        // top-level-meaningful identity across the op's crossings. The
+        // per-crossing sender/target/amount — which vary and are held by
+        // the senders, not the originator — are NOT collapsed into these
+        // fields; they live in the `CracReceived` logs. A self-addressed,
+        // zero-value tx asserts no spurious transfer edge (L2-1408).
+        let from = effect.source;
         let to = Some(effect.source);
         let index = self.index;
         let block_number = self.number;
@@ -726,7 +730,8 @@ impl BlockInProgress {
                     let alloy_to = to.map(|addr| {
                         revm::primitives::Address::from_slice(addr.as_bytes())
                     });
-                    let alloy_value = revm::primitives::U256::from_limbs(effect.amount.0);
+                    // Envelope carries no value (see `from`/`to` above).
+                    let alloy_value = revm::primitives::U256::ZERO;
                     let mut trace = CallTrace::new_minimal_trace(
                         b"CALL".to_vec(),
                         alloy_from,
@@ -814,7 +819,9 @@ impl BlockInProgress {
             nonce: 0,
             to,
             index,
-            value: effect.amount,
+            // Neutral envelope: see `from`/`to` above. Per-crossing
+            // values are in the `CracReceived` logs, not here (L2-1408).
+            value: U256::zero(),
             signature: None,
         };
 
@@ -1005,9 +1012,6 @@ mod tests {
             crac_id: "0".to_string(),
             logs: Vec::new(),
             source: H160::zero(),
-            sender: H160::zero(),
-            gas_limit: U256::from(gas_used),
-            amount: U256::zero(),
             gas_used: U256::from(gas_used),
         }
     }
