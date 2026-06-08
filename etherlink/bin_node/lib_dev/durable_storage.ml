@@ -197,6 +197,8 @@ type ('a, 'cap) path =
   | Tezos_contract_code :
       Tezos_types.Contract.t
       -> (Tezlink_imports.Imported_context.Script.expr, ro) path
+  | Tezos_contract_used_bytes : Tezos_types.Contract.t -> (Z.t, ro) path
+  | Tezos_contract_paid_bytes : Tezos_types.Contract.t -> (Z.t, ro) path
   | Tezos_big_map_value :
       Tezlink_imports.Imported_context.Big_map.Id.t
       * Tezlink_imports.Imported_protocol.Script_expr_hash.t
@@ -687,6 +689,20 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
           decode =
             safe_binary_decode
               Tezlink_imports.Imported_context.Script.expr_encoding;
+        }
+  | Tezos_contract_used_bytes contract ->
+      static_ro
+        {
+          path = Durable_storage_path.michelson_contract_used_bytes contract;
+          (* The kernel stores the watermark as a signed Zarith
+             ([Data_encoding.z]); it may be negative. *)
+          decode = safe_binary_decode Data_encoding.z;
+        }
+  | Tezos_contract_paid_bytes contract ->
+      static_ro
+        {
+          path = Durable_storage_path.michelson_contract_paid_bytes contract;
+          decode = safe_binary_decode Data_encoding.z;
         }
   | Tezos_big_map_value (id, key_hash) ->
       static_ro

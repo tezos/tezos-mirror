@@ -208,11 +208,14 @@ Available services:
             Access the manager of an implicit contract. 
         - GET /chains/main/blocks/head/context/contracts/<contract_id>/script
             Access the code and data of the contract. 
-        - GET /chains/main/blocks/head/context/contracts/<contract_id>/storage
-            Access the data of the contract. 
-        - POST /chains/main/blocks/head/context/contracts/<contract_id>/storage/normalized
-            Access the data of the contract and normalize it using the
-            requested unparsing mode. 
+        + storage/
+          - POST /chains/main/blocks/head/context/contracts/<contract_id>/storage/normalized
+              Access the data of the contract and normalize it using the
+              requested unparsing mode. 
+          - GET /chains/main/blocks/head/context/contracts/<contract_id>/storage/paid_space
+              Access the paid storage space of the contract. 
+          - GET /chains/main/blocks/head/context/contracts/<contract_id>/storage/used_space
+              Access the used storage space of the contract. 
       - GET /chains/main/blocks/head/context/issuance/expected_issuance
           Returns the expected issued tez for the provided block and the next
           'consensus_rights_delay' cycles (in mutez) 

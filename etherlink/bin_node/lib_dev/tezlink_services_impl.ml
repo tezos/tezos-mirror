@@ -167,6 +167,36 @@ let make (ctxt : Evm_ro_context.t) =
           Tezlink_durable_storage.counter state source
       | Originated _ -> return_none
 
+    let used_storage_space chain block (c : Tezos_types.Contract.t) =
+      let open Lwt_result_syntax in
+      let `Main = chain in
+      match c with
+      | Implicit _ -> return_none
+      | Originated _ ->
+          let* state = get_state ~block in
+          let* used =
+            Durable_storage.read_or_default
+              ~default:Z.zero
+              (Tezos_contract_used_bytes c)
+              state
+          in
+          return_some used
+
+    let paid_storage_space chain block (c : Tezos_types.Contract.t) =
+      let open Lwt_result_syntax in
+      let `Main = chain in
+      match c with
+      | Implicit _ -> return_none
+      | Originated _ ->
+          let* state = get_state ~block in
+          let* paid =
+            Durable_storage.read_or_default
+              ~default:Z.zero
+              (Tezos_contract_paid_bytes c)
+              state
+          in
+          return_some paid
+
     let big_map_get chain block id key_hash =
       let open Lwt_result_syntax in
       let `Main = chain in

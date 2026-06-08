@@ -618,6 +618,138 @@ let test_storage_rpc =
 
   unit
 
+let test_used_space_rpc =
+  register_tezosx_test
+    ~title:"Test of the used_space rpc"
+    ~tags:["rpc"; "storage"; "used_space"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let foreign_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let endpoint = Client.(Foreign_endpoint foreign_endpoint) in
+  (* 1. An originated contract reports its used space. *)
+  (* The binary Micheline of the code of concat_hello is 66 bytes. *)
+  let code_size = 66 in
+  let initial_storage = {|{ "initial" }|} in
+  let initial_storage_size = 17 in
+  let expected_used_space = code_size + initial_storage_size in
+  let concat_hello = Tezt_etherlink.Michelson_contracts.concat_hello () in
+  let* kt1 =
+    Client.originate_contract
+      ~endpoint
+      ~amount:Tez.zero
+      ~alias:"concat_hello"
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:initial_storage
+      ~prg:concat_hello.path
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  let* used_space =
+    RPC_core.call foreign_endpoint
+    @@ RPC.get_chain_block_context_contract_storage_used_space kt1
+  in
+  Check.(
+    (used_space = expected_used_space)
+      int
+      ~error_msg:"Expected used_space %R, got %L") ;
+
+  (* 2. A non-existent KT1 defaults to 0. *)
+  let fake_kt1 = "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5" in
+  let* used_space =
+    RPC_core.call foreign_endpoint
+    @@ RPC.get_chain_block_context_contract_storage_used_space fake_kt1
+  in
+  Check.(
+    (used_space = 0) int ~error_msg:"Expected 0 for a non-existent KT1, got %L") ;
+
+  (* 3. An implicit account (tz1) has no storage watermark: null. *)
+  let* implicit_used_space =
+    Client.RPC.call_json ~endpoint client
+    @@ RPC.get_chain_block_context_contract_storage_used_space
+         Constant.bootstrap1.public_key_hash
+  in
+  Check.is_true
+    (JSON.is_null implicit_used_space)
+    ~error_msg:"Expected null for an implicit account" ;
+
+  (* 4. A non-existent tz1 is implicit too: null. *)
+  let fake_tz1 = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU" in
+  let* implicit_used_space =
+    Client.RPC.call_json ~endpoint client
+    @@ RPC.get_chain_block_context_contract_storage_used_space fake_tz1
+  in
+  Check.is_true
+    (JSON.is_null implicit_used_space)
+    ~error_msg:"Expected null for a non-existent tz1" ;
+  unit
+
+let test_paid_space_rpc =
+  register_tezosx_test
+    ~title:"Test of the paid_space rpc"
+    ~tags:["rpc"; "storage"; "paid_space"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let foreign_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let endpoint = Client.(Foreign_endpoint foreign_endpoint) in
+  (* 1. An originated contract reports code_size + storage_size. *)
+  (* The binary Micheline of the code of concat_hello is 66 bytes. *)
+  let code_size = 66 in
+  let initial_storage = {|{ "initial" }|} in
+  let initial_storage_size = 17 in
+  let expected_paid_space = code_size + initial_storage_size in
+  let concat_hello = Tezt_etherlink.Michelson_contracts.concat_hello () in
+  let* kt1 =
+    Client.originate_contract
+      ~endpoint
+      ~amount:Tez.zero
+      ~alias:"concat_hello"
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:initial_storage
+      ~prg:concat_hello.path
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  let* paid_space =
+    RPC_core.call foreign_endpoint
+    @@ RPC.get_chain_block_context_contract_storage_paid_space kt1
+  in
+  Check.(
+    (paid_space = expected_paid_space)
+      int
+      ~error_msg:"Expected paid_space %R, got %L") ;
+
+  (* 2. A non-existent KT1 defaults to 0. *)
+  let fake_kt1 = "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5" in
+  let* paid_space =
+    RPC_core.call foreign_endpoint
+    @@ RPC.get_chain_block_context_contract_storage_paid_space fake_kt1
+  in
+  Check.(
+    (paid_space = 0) int ~error_msg:"Expected 0 for a non-existent KT1, got %L") ;
+
+  (* 3. An implicit account (tz1) has no storage watermark: null. *)
+  let* implicit_paid_space =
+    Client.RPC.call_json ~endpoint client
+    @@ RPC.get_chain_block_context_contract_storage_paid_space
+         Constant.bootstrap1.public_key_hash
+  in
+  Check.is_true
+    (JSON.is_null implicit_paid_space)
+    ~error_msg:"Expected null for an implicit account" ;
+
+  (* 4. A non-existent tz1 is implicit too: null. *)
+  let fake_tz1 = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU" in
+  let* implicit_paid_space =
+    Client.RPC.call_json ~endpoint client
+    @@ RPC.get_chain_block_context_contract_storage_paid_space fake_tz1
+  in
+  Check.is_true
+    (JSON.is_null implicit_paid_space)
+    ~error_msg:"Expected null for a non-existent tz1" ;
+  unit
+
 let test_chain_id =
   register_tezosx_test
     ~title:"Test of the chain_id rpc"
@@ -5339,6 +5471,8 @@ let () =
   test_block_metadata [Alpha] ;
   test_constants [Alpha] ;
   test_storage_rpc [Alpha] ;
+  test_used_space_rpc [Alpha] ;
+  test_paid_space_rpc [Alpha] ;
   test_produceBlock [Alpha] ;
   test_hash_rpc [Alpha] ;
   test_script_rpc [Alpha] ;

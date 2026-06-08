@@ -144,6 +144,8 @@ type ('a, 'cap) path =
   | Tezos_contract_code :
       Tezos_types.Contract.t
       -> (Tezlink_imports.Imported_context.Script.expr, ro) path
+  | Tezos_contract_used_bytes : Tezos_types.Contract.t -> (Z.t, ro) path
+  | Tezos_contract_paid_bytes : Tezos_types.Contract.t -> (Z.t, ro) path
   | Tezos_big_map_value :
       Tezlink_imports.Imported_context.Big_map.Id.t
       * Tezlink_imports.Imported_protocol.Script_expr_hash.t
