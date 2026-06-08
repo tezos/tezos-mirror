@@ -28,4 +28,7 @@ pub enum EtherlinkEntry {
     StoreSequencerKeyChange {
         old_sequencer_key_change: Option<SequencerKeyChange>,
     },
+    CreateAlias {
+        address: Address,
+    },
 }

@@ -11,6 +11,7 @@ use evm_types::{
 };
 use michelson_types::Withdrawal;
 use revm::primitives::{Address, U256};
+use tezosx_types::Origin;
 
 use crate::LayeredStateError;
 
@@ -155,6 +156,15 @@ impl LayeredState {
         self.etherlink_data.removed_deposits.contains(deposit_id)
     }
 
+    pub fn create_alias(&mut self, address: Address, origin: Origin) {
+        self.etherlink_data.created_aliases.insert(address, origin);
+        self.entries.push(EtherlinkEntry::CreateAlias { address });
+    }
+
+    pub fn pending_alias_origin(&self, address: &Address) -> Option<Origin> {
+        self.etherlink_data.created_aliases.get(address).cloned()
+    }
+
     pub fn checkpoint(&mut self) {
         self.depths.push(self.entries.len());
     }
@@ -217,6 +227,9 @@ impl LayeredState {
                     old_sequencer_key_change,
                 } => {
                     self.etherlink_data.sequencer_key_change = old_sequencer_key_change;
+                }
+                EtherlinkEntry::CreateAlias { address } => {
+                    self.etherlink_data.created_aliases.remove(&address);
                 }
             }
         }

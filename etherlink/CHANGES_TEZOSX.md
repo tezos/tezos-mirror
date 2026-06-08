@@ -150,6 +150,10 @@
 
 ### Native Atomic Composability
 
+- EVM alias creation is now tied to the transaction outcome: the forwarder
+  code and classification are staged in the journal and flushed only when
+  the enclosing operation commits, so a revert leaves no durable alias. (!22046)
+
 ### Storage versions
 
 ### Internals

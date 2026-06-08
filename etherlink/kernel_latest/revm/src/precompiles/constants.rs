@@ -3,7 +3,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use revm::primitives::{Address, FixedBytes};
+use revm::primitives::{Address, FixedBytes, B256};
+use revm::state::Bytecode;
+
+use crate::helpers::storage::bytes_hash;
 
 pub struct PredeployedContract {
     pub code: &'static [u8],
@@ -120,6 +123,14 @@ pub const ALIAS_FORWARDER_PRECOMPILE_ADDRESS: Address = Address(FixedBytes::new(
     0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0xff, 0xff, 0x08,
 ]));
+
+pub fn alias_forwarder_delegation() -> Bytecode {
+    Bytecode::new_eip7702(ALIAS_FORWARDER_PRECOMPILE_ADDRESS)
+}
+
+pub fn alias_forwarder_delegation_code_hash() -> B256 {
+    bytes_hash(alias_forwarder_delegation().original_byte_slice())
+}
 
 pub const FA12_WRAPPER_SOL_ADDR: Address = Address(FixedBytes::new([
     0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

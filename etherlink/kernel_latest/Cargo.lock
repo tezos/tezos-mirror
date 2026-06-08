@@ -1190,6 +1190,7 @@ dependencies = [
  "tezos-smart-rollup-host",
  "tezos_crypto_rs",
  "tezos_ethereum_latest",
+ "tezosx-types",
  "thiserror 1.0.69",
 ]
 

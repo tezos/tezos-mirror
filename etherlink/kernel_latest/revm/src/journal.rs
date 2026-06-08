@@ -688,10 +688,16 @@ where
             block_number: self.database.block.number,
         };
         let remaining = Gas::new(remaining_evm_gas);
-        let origin = StorageAccount::from_address(&source)
-            .map_err(OriginStorageError::from)
-            .and_then(|a| a.get_origin(self.database.host))
-            .map_err(|e| e.into_with_remainder(remaining))?;
+        // An alias staged earlier in this transaction is not yet durable;
+        // consult the overlay so round-trip routing resolves within the
+        // same transaction.
+        let origin = match self.journal.evm.layered_state.pending_alias_origin(&source) {
+            Some(origin) => Some(origin),
+            None => StorageAccount::from_address(&source)
+                .map_err(OriginStorageError::from)
+                .and_then(|a| a.get_origin(self.database.host))
+                .map_err(|e| e.into_with_remainder(remaining))?,
+        };
         let alias_info = match resolve_routing(origin, target_runtime)
             .map_err(|e| CustomPrecompileError::Revert(e.to_string(), remaining))?
         {
@@ -753,10 +759,16 @@ where
             return Ok(source.to_string());
         }
         let remaining = Gas::new(remaining_evm_gas);
-        let origin = StorageAccount::from_address(&source)
-            .map_err(OriginStorageError::from)
-            .and_then(|a| a.get_origin(self.database.host))
-            .map_err(|e| e.into_with_remainder(remaining))?;
+        // An alias staged earlier in this transaction is not yet durable;
+        // consult the overlay so round-trip routing resolves within the
+        // same transaction.
+        let origin = match self.journal.evm.layered_state.pending_alias_origin(&source) {
+            Some(origin) => Some(origin),
+            None => StorageAccount::from_address(&source)
+                .map_err(OriginStorageError::from)
+                .and_then(|a| a.get_origin(self.database.host))
+                .map_err(|e| e.into_with_remainder(remaining))?,
+        };
         let native_bytes = match resolve_routing(origin, target_runtime)
             .map_err(|e| CustomPrecompileError::Revert(e.to_string(), remaining))?
         {

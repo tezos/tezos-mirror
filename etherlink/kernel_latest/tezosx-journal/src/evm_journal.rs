@@ -81,6 +81,10 @@ pub struct EvmJournal {
     original_source: Option<OriginalSource>,
     crac_chain_depth: u32,
     revm_call_depth: Option<u32>,
+    /// Alias whose delegation the next run_transaction installs in the
+    /// journaled state. Set by alias materialization, consumed once; None
+    /// for ordinary transactions.
+    pending_alias_delegation: Option<Address>,
     /// Originator of the inbound CRAC being serviced — the
     /// `X-Tezos-Source` alias parsed into an EVM `Address`. When `Some`,
     /// the kernel's custom `ORIGIN` opcode pushes this address instead
@@ -120,6 +124,7 @@ impl EvmJournal {
             revm_call_depth: None,
             cross_runtime_originator: None,
             outer_block,
+            pending_alias_delegation: None,
         }
     }
 }
@@ -135,12 +140,23 @@ impl EvmJournal {
         self.crac_chain_depth = 0;
         self.revm_call_depth = None;
         self.cross_runtime_originator = None;
+        self.pending_alias_delegation = None;
         // `outer_block` is intentionally NOT reset: it is
         // top-level-transaction context, set once at creation and
         // invariant for the whole operation. `clear()` runs on a
         // backtracked Michelson operation to drop accumulated EVM state,
         // but a later CRAC in the same operation must still observe the
         // same block — wiping it here would re-zero those observables.
+    }
+
+    /// Stage the alias whose delegation the next run_transaction installs.
+    pub fn set_pending_alias_delegation(&mut self, alias: Address) {
+        self.pending_alias_delegation = Some(alias);
+    }
+
+    /// Consume the staged alias delegation, if any.
+    pub fn take_pending_alias_delegation(&mut self) -> Option<Address> {
+        self.pending_alias_delegation.take()
     }
 
     /// See the field doc on [`Self::cross_runtime_originator`].

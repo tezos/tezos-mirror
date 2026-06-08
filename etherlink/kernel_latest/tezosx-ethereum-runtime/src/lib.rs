@@ -12,14 +12,13 @@ use http::StatusCode;
 use primitive_types::U256;
 use revm::context::result::{EVMError, ExecutionResult, HaltReason, Output};
 use revm::primitives::KECCAK_EMPTY;
-use revm::state::Bytecode;
 use revm_etherlink::precompiles::constants::{
     CODE_BACKSTOP_COST, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
 };
 use revm_etherlink::{
     precompiles::constants::{
-        ALIAS_FORWARDER_PRECOMPILE_ADDRESS, ALIAS_FORWARDER_SOL_CONTRACT,
-        TEZOSX_CALLER_ADDRESS,
+        alias_forwarder_delegation_code_hash, ALIAS_FORWARDER_PRECOMPILE_ADDRESS,
+        ALIAS_FORWARDER_SOL_CONTRACT, TEZOSX_CALLER_ADDRESS,
     },
     run_transaction,
     storage::{
@@ -75,18 +74,9 @@ impl EthereumRuntime {
         }
     }
 
-    /// Branch 3 of [`RuntimeInterface::ensure_alias`]: store the
-    /// forwarder code, run `init_tezosx_alias`, and record the
-    /// `Origin::Alias` classification.
-    ///
-    /// The caller writes the delegation `code_hash` *before* invoking
-    /// this — the EVM call to the alias resolves the EIP-7702
-    /// delegation, so the code must already be present — and rolls that
-    /// write back if this returns `Err`. Keeping every fallible step of
-    /// the materialization inside one `Result` means a single rollback
-    /// at the call site covers all failure paths (store failure, init
-    /// revert, halt, or run error); there is no per-arm rollback to
-    /// forget when a new failure path is added.
+    /// Branch 3 of ensure_alias: ensure the forwarder precompile code and
+    /// run init to set forwarder storage and forward any prior balance.
+    /// The delegation and classification are staged by the caller.
     #[allow(clippy::too_many_arguments)]
     fn materialize_alias<Host>(
         &self,
@@ -94,21 +84,14 @@ impl EthereumRuntime {
         host: &mut Host,
         journal: &mut TezosXJournal,
         alias: Address,
-        alias_info: &AliasInfo,
         native_address: &str,
         native_public_key: Option<&[u8]>,
         context: &CrossRuntimeContext,
         gas_remaining: u64,
-        code_bytes: &[u8],
-        delegation_code_hash: revm::primitives::B256,
     ) -> Result<(String, u64), TezosXRuntimeError>
     where
         Host: StorageV1,
     {
-        CodeStorage::add(host, code_bytes, Some(delegation_code_hash)).map_err(|e| {
-            TezosXRuntimeError::Custom(format!("Failed to store delegation code: {e}"))
-        })?;
-
         // Ensure the AliasForwarder precompile code is available
         // (it should be initialized at kernel startup, but verify it exists)
         let precompile_account =
@@ -150,6 +133,10 @@ impl EthereumRuntime {
         // future credit, but here we don't credit anything.
         let gas_data = GasData::new(gas_remaining, 0, gas_remaining);
 
+        // Stage the alias delegation for this init transaction so the call
+        // below resolves it and the write commits or reverts with the tx.
+        journal.evm.set_pending_alias_delegation(alias);
+
         // Run the EVM transaction to call init_tezosx_alias
         let outcome = run_transaction(
             host,
@@ -174,22 +161,10 @@ impl EthereumRuntime {
         let gas_used = outcome.result.gas_used();
         let remaining_after = gas_remaining.saturating_sub(gas_used);
         match outcome.result {
-            ExecutionResult::Success { .. } => {
-                // Record the classification only after init succeeded.
-                // The forwarder bytecode and the classification record
-                // share the same persistence model: both go to durable
-                // storage, both survive a revert in the surrounding
-                // frame, and the next call to ensure_alias finds the
-                // no-op branch.
-                let mut alias_account = StorageAccount::from_address(&alias)?;
-                let new_origin = Origin::Alias(alias_info.clone());
-                alias_account.set_origin(host, &new_origin).map_err(|e| {
-                    TezosXRuntimeError::Custom(format!(
-                        "Failed to write alias origin: {e}"
-                    ))
-                })?;
-                Ok((alias.to_string(), remaining_after))
-            }
+            // The classification was staged by the caller; the forwarder
+            // storage lives in the EVM journal. Both flush at commit and
+            // drop together on revert.
+            ExecutionResult::Success { .. } => Ok((alias.to_string(), remaining_after)),
             ExecutionResult::Revert { output, .. } => Err(TezosXRuntimeError::Custom(
                 format!("init_tezosx_alias reverted: {output:?}"),
             )),
@@ -677,21 +652,24 @@ impl RuntimeInterface for EthereumRuntime {
         let hash = hasher.finalize();
         let alias = Address::from_slice(&hash[0..20]);
 
-        // Set up the EIP-7702 delegation bytecode and its hash so we
-        // can both detect whether a forwarder is already deployed and
-        // deploy one if needed.
-        let delegation_bytecode =
-            Bytecode::new_eip7702(ALIAS_FORWARDER_PRECOMPILE_ADDRESS);
-        let code_bytes = delegation_bytecode.original_byte_slice();
-        let delegation_code_hash =
-            revm_etherlink::helpers::storage::bytes_hash(code_bytes);
+        // The delegation designator is the same constant for every alias;
+        // the shared helper keeps Branch 2 detection and the installed
+        // delegation in agreement.
+        let delegation_code_hash = alias_forwarder_delegation_code_hash();
 
-        let mut alias_account = StorageAccount::from_address(&alias)?;
+        let alias_account = StorageAccount::from_address(&alias)?;
 
-        // Branch 1: already classified as alias. The kernel reaches
-        // this on the second and later calls to ensure_alias for the
-        // same source. Returning early preserves the gas budget and
-        // performs no durable writes.
+        // Branch 1: already classified as alias, either staged earlier in
+        // this transaction or persisted by a previous one. Returning early
+        // preserves the gas budget and performs no writes.
+        if journal
+            .evm
+            .layered_state
+            .pending_alias_origin(&alias)
+            .is_some()
+        {
+            return Ok((alias.to_string(), gas_remaining));
+        }
         match alias_account.get_origin(host).map_err(|e| {
             TezosXRuntimeError::Custom(format!("Failed to read alias origin: {e}"))
         })? {
@@ -706,66 +684,36 @@ impl RuntimeInterface for EthereumRuntime {
             None => {}
         }
 
-        // Branch 2: a forwarder is already deployed but the
-        // classification path is empty. This is the legacy account
-        // case. Write the classification record only and skip the
-        // redeploy.
-        let mut storage_info = alias_account.info(host)?;
+        // Branch 2: a forwarder is already deployed but the classification
+        // path is empty. Stage the classification only and skip the
+        // redeploy; the durable write is deferred to commit.
+        let storage_info = alias_account.info(host)?;
         if storage_info.code_hash == delegation_code_hash {
-            let new_origin = Origin::Alias(alias_info);
-            alias_account.set_origin(host, &new_origin).map_err(|e| {
-                TezosXRuntimeError::Custom(format!("Failed to write alias origin: {e}"))
-            })?;
+            journal
+                .evm
+                .layered_state
+                .create_alias(alias, Origin::Alias(alias_info));
             return Ok((alias.to_string(), gas_remaining));
         }
 
-        // Branch 3: full materialization. Deploy the forwarder, run the
-        // init transaction, and record the classification.
-        //
-        // Materialization must be atomic. The delegation `code_hash`
-        // written just below is a direct, un-journaled durable write,
-        // while `Origin::Alias` is only recorded once init succeeds. If
-        // init fails in between, a half-materialized account (delegation
-        // `code_hash` set, no `Origin`) would let the next `ensure_alias`
-        // take Branch 2 and bless the alias *without* re-running init —
-        // permanently bricking an uninitialized forwarder. So we snapshot
-        // the pre-init account info, hand the rest of the materialization
-        // to `materialize_alias`, and on *any* failure restore the
-        // snapshot (reverting `code_hash` while preserving any
-        // balance/nonce), leaving no half-state for the next attempt. The
-        // single rollback below covers every failure path inside
-        // `materialize_alias`.
-        let original_info = storage_info.clone();
+        // Branch 3: full materialization. Stage the alias, then run init.
+        // The staged alias reverts with its EVM frame and flushes only at
+        // commit, so a failed parent leaves no durable state.
+        journal
+            .evm
+            .layered_state
+            .create_alias(alias, Origin::Alias(alias_info.clone()));
 
-        // Set up EIP-7702 delegation bytecode at the alias address.
-        storage_info.code_hash = delegation_code_hash;
-        alias_account.set_info(host, storage_info)?;
-
-        match self.materialize_alias(
+        self.materialize_alias(
             registry,
             host,
             journal,
             alias,
-            &alias_info,
             native_address,
             native_public_key,
             &context,
             gas_remaining,
-            code_bytes,
-            delegation_code_hash,
-        ) {
-            Ok(result) => Ok(result),
-            Err(e) => {
-                alias_account
-                    .set_info_without_code(host, original_info)
-                    .map_err(|err| {
-                        TezosXRuntimeError::Custom(format!(
-                            "Failed to roll back alias materialization: {err}"
-                        ))
-                    })?;
-                Err(e)
-            }
-        }
+        )
     }
 
     fn compute_alias(&self, native_address: &[u8]) -> Result<String, TezosXRuntimeError> {
@@ -2706,15 +2654,11 @@ mod tests {
             Address::from_slice(&hasher.finalize()[0..20])
         }
 
-        // A failed init (here a budget below intrinsic gas, so the init
-        // transaction never executes) must leave NO half-materialized
-        // state and must not brick the alias: the next ensure_alias has
-        // to re-run full materialization (Branch 3), not bless an
-        // uninitialized forwarder via Branch 2. Regression test for
-        // L2-1369 — pre-fix the delegation code_hash survived the failed
-        // init, so the second call returned Ok with an empty forwarder.
+        // A failed init must write no durable state and, once the frame
+        // reverts, leave no staged alias, so the retry re-runs full
+        // materialization instead of blessing an uninitialized forwarder.
         #[test]
-        fn failed_init_rolls_back_and_does_not_brick_alias() {
+        fn failed_init_defers_and_does_not_brick_alias() {
             let mut host = MockKernelHost::default();
             let runtime = EthereumRuntime::default();
             let registry = UnimplementedRegistry;
@@ -2724,16 +2668,17 @@ mod tests {
             let alias = alias_address(&info);
             let pubkey = [0xab; 32];
 
-            // The delegation code_hash ensure_alias writes during
-            // materialization — the very write that must be rolled back.
             let delegation_code_hash = bytes_hash(
                 Bytecode::new_eip7702(ALIAS_FORWARDER_PRECOMPILE_ADDRESS)
                     .original_byte_slice(),
             );
 
+            // Mirror the EVM checkpoint taken around the gateway precompile
+            // that drives ensure_alias.
+            journal.evm.layered_state.checkpoint();
+
             // Budget 0 is below the EVM intrinsic gas, so init fails
-            // before it can run, exercising the failure arm that
-            // previously left the delegation code_hash behind.
+            // before it can run.
             let failed = runtime.ensure_alias(
                 &registry,
                 &mut host,
@@ -2744,30 +2689,40 @@ mod tests {
                 0,
             );
             // A budget below intrinsic gas is a pre-execution validation
-            // failure: the user-shaped error must surface as a catchable
-            // `BadRequest` (400), never a block-aborting 500.
+            // failure: it must surface as a catchable BadRequest, never a
+            // block-aborting 500.
             assert!(
                 matches!(failed, Err(TezosXRuntimeError::BadRequest(_))),
                 "init under a zero gas budget must be a catchable BadRequest, got {failed:?}"
             );
 
-            // No half-state: the delegation code_hash was rolled back and
-            // no Origin record was written.
+            // Nothing is written to durable storage: the alias account has
+            // no delegation code_hash and no Origin record.
             let alias_account = StorageAccount::from_address(&alias).unwrap();
             assert_ne!(
                 alias_account.info(&mut host).unwrap().code_hash,
                 delegation_code_hash,
-                "delegation code_hash must be rolled back after a failed init"
+                "no delegation code_hash may be written when init fails"
             );
             assert!(
                 alias_account.get_origin(&host).unwrap().is_none(),
-                "no Origin record must be written when init fails"
+                "no Origin record may be written when init fails"
             );
 
-            // A second attempt must re-run full materialization (Branch
-            // 3) and fail the same way under the same budget — NOT
-            // short-circuit through Branch 2 and bless the still
-            // uninitialized forwarder. Pre-fix this returned Ok.
+            // Frame revert on the propagated error drops the staged alias.
+            journal.evm.layered_state.checkpoint_revert();
+            assert!(
+                journal
+                    .evm
+                    .layered_state
+                    .pending_alias_origin(&alias)
+                    .is_none(),
+                "the staged alias must be dropped when its frame reverts"
+            );
+
+            // A second attempt re-runs full materialization and fails the
+            // same way, rather than short-circuiting through a stale
+            // classification.
             let retried = runtime.ensure_alias(
                 &registry,
                 &mut host,
@@ -2779,7 +2734,7 @@ mod tests {
             );
             assert!(
                 retried.is_err(),
-                "a half-init alias must remain re-materializable, not bricked"
+                "a non-materialized alias must remain re-materializable, not bricked"
             );
         }
     }
