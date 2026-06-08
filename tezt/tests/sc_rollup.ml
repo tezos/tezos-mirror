@@ -9005,12 +9005,100 @@ let inject_dal_overflow_refute ~protocol ~sc_rollup client =
   return (op, oph)
 
 (* Combined setup + inject. *)
-let _setup_and_inject_dal_overflow_refute ?keys ~protocol ~commitment_period
+let setup_and_inject_dal_overflow_refute ?keys ~protocol ~commitment_period
     ~sc_rollup client =
   let* () =
     setup_dal_overflow_game ?keys ~commitment_period ~sc_rollup client
   in
   inject_dal_overflow_refute ~protocol ~sc_rollup client
+
+(* A refute [Move] whose DAL page proof targets [published_level = Int32.max_int]
+   is accepted by the mempool (operation validation does not verify the proof).
+   This test checks that applying such an operation behaves normally: the
+   [preapply/operations] RPC returns it rather than aborting, and an honest baker
+   includes it in a baked block with an "applied" result. *)
+let test_refute_apply_assertion_failure =
+  let commitment_period = 5 in
+  test_l1_scenario
+    ~kind:"arith"
+    ~commitment_period
+      (* Large challenge window so commitments are not cementable during the
+         test (we never cement; this just avoids interference). *)
+    ~challenge_window:100
+    {
+      tags = ["refutation"; "game"; "dal"; "assertion"; "apply"];
+      variant = Some "dal_overflow_applies_cleanly";
+      description = "refute DAL-overflow proof applies cleanly";
+    }
+  @@ fun protocol sc_rollup node client ->
+  let* op, oph =
+    setup_and_inject_dal_overflow_refute
+      ~protocol
+      ~commitment_period
+      ~sc_rollup
+      client
+  in
+  (* Apply the op on top of head with the [preapply/operations] RPC -- the
+     block-construction apply path (it only skips the signature check, which we
+     supply). A clean application returns HTTP 200; an abort surfaces as a 500. *)
+  let* signature = Operation.sign ~protocol op client in
+  let preapply_input =
+    Operation.make_preapply_operation_input ~protocol ~signature op
+  in
+  let* response =
+    Node.RPC.(
+      call_json
+        node
+        (post_chain_block_helpers_preapply_operations
+           ~data:(Data (`A [preapply_input]))
+           ()))
+  in
+  let body = JSON.encode response.body in
+  if not (response.code = 200) then
+    Test.fail
+      "Expected preapply to return HTTP 200 (the operation applies). Got code \
+       %d with body: %s. A 500 'Assertion failed' means applying the op \
+       aborted on an uncaught assertion."
+      response.code
+      body ;
+  Log.info "OK (1): applying the operation does not abort (HTTP 200)" ;
+  (* (2) An honest baker can apply the operation, so it is
+     included in the block with an "applied" status -- not dropped. *)
+  let* level_before = Node.get_level node in
+  let* () = Client.bake_for_and_wait client in
+  let* level_after = Node.get_level node in
+  Check.((level_after = level_before + 1) int)
+    ~error_msg:"Expected a new block at level %R, got %L." ;
+  let* block = Client.RPC.call client @@ RPC.get_chain_block () in
+  let manager_ops = JSON.(block |-> "operations" |=> 3 |> as_list) in
+  let op_json =
+    match
+      List.find_opt
+        (fun o -> JSON.(o |-> "hash" |> as_string) = oph)
+        manager_ops
+    with
+    | Some j -> j
+    | None ->
+        Test.fail
+          "The refute operation %s was NOT included in the baked block."
+          oph
+  in
+  let status =
+    JSON.(
+      op_json |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
+      |-> "status" |> as_string)
+  in
+  if status <> "applied" then
+    Test.fail
+      "The refute operation %s was included but with operation_result status \
+       %S; expected \"applied\"."
+      oph
+      status ;
+  Log.info
+    "OK (2): the baker included the operation %s in a block (level %d)."
+    oph
+    level_after ;
+  unit
 
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
@@ -9129,6 +9217,8 @@ let register ~protocols =
     protocols ;
   test_refutation protocols ~kind:"arith" ;
   test_refutation protocols ~kind:"wasm_2_0_0" ;
+  let from_proto_v = List.filter (fun p -> Protocol.number p > 025) protocols in
+  test_refute_apply_assertion_failure from_proto_v ;
   test_recover_bond_of_stakers protocols ;
   test_patch_durable_storage_on_commitment protocols ;
   (* Specific Arith PVM tezts *)
