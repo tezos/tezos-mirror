@@ -463,6 +463,15 @@ struct
       include Writer
     end) in
     let out_channel_of_header (header : Tar.Header.t) =
+      (* The member name comes from the snapshot archive. Reject any name that
+         could resolve outside [dest] before creating any directory or file:
+         extraction must never write outside the destination directory. *)
+      if not (Octez_tar_helpers.member_name_is_safe header.file_name) then
+        Format.kasprintf
+          Stdlib.failwith
+          "Invalid snapshot archive member %S: path that resolves outside the \
+           destination directory."
+          header.file_name ;
       let path = Filename.concat dest header.file_name in
       Tezos_stdlib_unix.Utils.create_dir (Filename.dirname path) ;
       open_out path
