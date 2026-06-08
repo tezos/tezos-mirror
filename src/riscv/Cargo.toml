@@ -30,17 +30,17 @@ features = ["derive"]
 [workspace.dependencies.octez-riscv]
 # The rev and regression assets can be updated via `make update-riscv-pvm`
 git = "https://github.com/tezos/riscv-pvm.git"
-rev = "6f5bc4b5b191e1de0b67fb0f00c71919cf6a1c70"
+rev = "62e1eb726209a2e2388ceb9d79141af5d1b42c2d"
 
 [workspace.dependencies.octez-riscv-data]
 # The rev and regression assets can be updated via `make update-riscv-pvm`
 git = "https://github.com/tezos/riscv-pvm.git"
-rev = "6f5bc4b5b191e1de0b67fb0f00c71919cf6a1c70"
+rev = "62e1eb726209a2e2388ceb9d79141af5d1b42c2d"
 
 [workspace.dependencies.octez-riscv-durable-storage]
 # The rev and regression assets can be updated via `make update-riscv-pvm`
 git = "https://github.com/tezos/riscv-pvm.git"
-rev = "6f5bc4b5b191e1de0b67fb0f00c71919cf6a1c70"
+rev = "62e1eb726209a2e2388ceb9d79141af5d1b42c2d"
 default-features = false
 
 [workspace.dependencies.octez-riscv-api-common]
