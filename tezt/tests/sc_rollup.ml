@@ -8835,6 +8835,183 @@ let test_nds_host_func_crashes_node ~kind =
   let* () = Client.bake_for_and_wait tezos_client in
   crash
 
+(* ------------------------------------------------------------------------ *)
+(* Manager-operation apply-time assertion failure                            *)
+(* ------------------------------------------------------------------------ *)
+
+(* A well-formed [Smart_rollup_state_hash] distinct from
+   [Constant.sc_rollup_compressed_state]. The exact value is arbitrary -- only
+   being well-formed and distinct from the honest state matters; this one is a
+   base58check [Smart_rollup_state_hash] ([srs1...]) obtained by encoding an
+   arbitrary 32-byte digest. *)
+let sc_rollup_compressed_state_bis =
+  "srs11Zb2dxcFEMWEAqCS6F1BSKkoGqaUyFA2d9s5SrWj9RGzjMn3BL"
+
+(* A serialized Arith-PVM proof step. Its bytes embed the PVM's [boot_sector] and
+   [status] state; the refutation verifier requires a valid [pvm_step] (it checks
+   the proof's state level) before it reaches the DAL page proof.
+
+   It is recorded here as a hex literal because it cannot be produced through the
+   client/RPC: it is the binary [Sc_rollup.Proof] encoding of a proof built with
+   the protocol's [Internal_for_tests] API. To regenerate, construct such a proof
+   in an OCaml protocol test and print its bytes as hex. *)
+let malicious_dal_overflow_pvm_step =
+  "030002db10db4d3b595f59e0b53740f164bf951bcfae9e0873fd23fbce82fac4f404e181f3368597fee1f77358b98fea989fd6a88e8ee63beaaddc09a68e79563dae34820b626f6f745f736563746f72c8baff5f78423676a25d9cd27a412dd932327b9b3e1cc26e754a36410a5efbf7b406737461747573c00100"
+
+(* A refutation [Proof] step combining [malicious_dal_overflow_pvm_step] with a
+   DAL page proof for a page at [published_level = Int32.max_int]. The
+   [dal_proof = "02000000"] is the only shape constructible without an on-chain
+   skip list ([Invalid_page_id], no target cell). The out-of-range
+   [published_level] is the only malicious part: verifying the proof during
+   [apply] computes [Raw_level_repr.add published_level lag], which overflows
+   [int32] and trips an assertion. *)
+let malicious_dal_overflow_step : Ezjsonm.value =
+  `O
+    [
+      ("pvm_step", `String malicious_dal_overflow_pvm_step);
+      ( "input_proof",
+        `O
+          [
+            ("input_proof_kind", `String "reveal_proof");
+            ( "reveal_proof",
+              `O
+                [
+                  ("reveal_proof_kind", `String "dal_page_proof");
+                  ( "dal_page_id",
+                    `O
+                      [
+                        (* Int32.max_int: the value that triggers the overflow *)
+                        ("published_level", `Float 2147483647.);
+                        ("slot_index", `Float 0.);
+                        ("page_index", `Float 0.);
+                      ] );
+                  ("dal_proof", `String "02000000");
+                ] );
+          ] );
+    ]
+
+(* Set up a single-tick refutation game between bootstrap1 (p1) and bootstrap2
+   (p2): publish two conflicting single-tick commitments and have p1 start the
+   dispute, so the next expected move is a {e proof} move. Does NOT inject the
+   malicious move. [?keys] is forwarded to every [bake_for] used to drive the
+   chain: pass all bootstrap delegates to keep round 0 always available, so the
+   setup bakes at round 0 (timestamp +1s/block) instead of bootstrap1's first
+   free -- often high -- round (which jumps the timestamp by the super-linear
+   round duration and, against a near-now genesis, stalls each [bake_for] until
+   wall-clock catches up). *)
+let setup_dal_overflow_game ?keys ~commitment_period ~sc_rollup client =
+  let p1 = Constant.bootstrap1 in
+  let p2 = Constant.bootstrap2 in
+  let* commitment, player_commitment_hash =
+    bake_period_then_publish_commitment
+      ?keys
+      ~number_of_ticks:1
+      ~sc_rollup
+      ~src:p1.public_key_hash
+      client
+  in
+  let* _commitment_bis, opponent_commitment_hash =
+    forge_and_publish_commitment
+      ?keys
+      ~compressed_state:sc_rollup_compressed_state_bis
+      ~number_of_ticks:1
+      ~inbox_level:commitment.inbox_level
+      ~predecessor:commitment.predecessor
+      ~sc_rollup
+      ~src:p2.public_key_hash
+      client
+  in
+  (* A refutation game may not start too early: wait one commitment period. *)
+  let* () =
+    repeat commitment_period (fun () -> Client.bake_for_and_wait ?keys client)
+  in
+  (* [p1] starts the dispute against [p2]. *)
+  start_refute
+    ?keys
+    client
+    ~source:p1
+    ~opponent:p2.public_key_hash
+    ~sc_rollup
+    ~player_commitment_hash
+    ~opponent_commitment_hash
+
+(* Build [p1]'s malicious proof [Move] (DAL page proof with
+   [published_level = Int32.max_int]) WITHOUT injecting. Exposed on its own for
+   the gossip test, which builds the operation on one node and injects it on
+   another. *)
+let build_dal_overflow_refute ~sc_rollup client =
+  let p1 = Constant.bootstrap1 in
+  let p2 = Constant.bootstrap2 in
+  (* A generous gas limit ensures the overflow assertion is reached before any
+     gas exhaustion. *)
+  let malicious_op =
+    Operation.Manager.(
+      make ~source:p1 ~gas_limit:200_000 ~fee:1_000_000
+      @@ sc_rollup_refute
+           ~sc_rollup
+           ~opponent:p2.public_key_hash
+           ~refutation:
+             (Move
+                {
+                  choice_tick = 0;
+                  refutation_step = Proof malicious_dal_overflow_step;
+                })
+           ())
+  in
+  Operation.Manager.operation [malicious_op] client
+
+(* Build and inject the malicious refute [Move] WITHOUT baking, then assert the
+   mempool accepts it: operation validation passes (it does not verify the proof).
+   Returns the forged operation and its hash.
+
+   The exact accepted class depends on the protocol -- they implement different
+   mitigations -- and on whether a baker is producing blocks concurrently:
+   - proto <= 025 (frozen T/U, plugin mitigation): local injection fast-paths
+     around the plugin [pre_filter], so the op is [validated] right after
+     injection. [pre_filter] (which classifies this refute op [branch_delayed])
+     re-runs on every mempool flush, i.e. on every new head, so with a baker
+     running a flush may reclassify it [branch_delayed] before we read. The plugin
+     keeps the op out of blocks, so it never leaves the mempool: we accept
+     [validated] or [branch_delayed].
+   - proto > 025 (Alpha, in-protocol fix): the overflow is a normal [tzresult], so
+     the op applies cleanly and there is no [pre_filter] -- it is [validated], and
+     never [branch_delayed]. With a baker running it may already have been baked
+     into a block by the time we read, after which it has left the mempool
+     entirely: we accept [validated] or absent (but never [branch_delayed]). *)
+let inject_dal_overflow_refute ~protocol ~sc_rollup client =
+  let* op = build_dal_overflow_refute ~sc_rollup client in
+  let* (`OpHash oph) = Operation.inject op client in
+  Log.info "Injected malicious refute operation %s" oph ;
+  let* mempool = Mempool.get_mempool client in
+  let validated = List.mem oph mempool.validated in
+  let branch_delayed = List.mem oph mempool.branch_delayed in
+  let accepted =
+    if Protocol.number protocol <= 025 then validated || branch_delayed
+    else (* Alpha: [validated], or already baked into a block (absent). *)
+      validated || not (List.mem oph mempool.refused || branch_delayed)
+  in
+  if not accepted then
+    Test.fail
+      "The malicious refute operation %s was not accepted by the mempool \
+       (operation validation must pass): expected %s. Mempool: validated=[%s] \
+       branch_delayed=[%s] refused=[%s]"
+      oph
+      (if Protocol.number protocol <= 025 then "'validated' or 'branch_delayed'"
+       else "'validated' (or already included in a block)")
+      (String.concat "," mempool.validated)
+      (String.concat "," mempool.branch_delayed)
+      (String.concat "," mempool.refused) ;
+  Log.info "OK: the operation %s passed mempool validation." oph ;
+  return (op, oph)
+
+(* Combined setup + inject. *)
+let _setup_and_inject_dal_overflow_refute ?keys ~protocol ~commitment_period
+    ~sc_rollup client =
+  let* () =
+    setup_dal_overflow_game ?keys ~commitment_period ~sc_rollup client
+  in
+  inject_dal_overflow_refute ~protocol ~sc_rollup client
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_get_genesis_info ~kind protocols ;
