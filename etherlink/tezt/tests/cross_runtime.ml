@@ -8294,14 +8294,15 @@ let test_crac_receipt_two_failed_independent =
       top
   in
   Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
-  (* 8 internal ops: event + (alias materializations + run failed +
-     _revert failed) for each bridge. CRAC #1 materializes
-     alias(bridge_1) AND alias(EOA = sender); CRAC #2 only
-     materializes alias(bridge_2) (EOA cached after CRAC #1). *)
+  (* 9 internal ops: event + (alias materializations + run failed +
+     _revert failed) for each bridge. Both CRACs fail and revert, so the
+     alias(EOA = sender) materialized inside CRAC #1 is rolled back along
+     with the rest of CRAC #1's world-state changes; CRAC #2 therefore
+     re-materializes alias(bridge_2) AND alias(EOA = sender). *)
   Check.(
-    (List.length internals = 8)
+    (List.length internals = 9)
       int
-      ~error_msg:"Expected 8 internal operations, got %L") ;
+      ~error_msg:"Expected 9 internal operations, got %L") ;
   (* ── Internal #0: CRAC event — single event for the merged top-level. *)
   check_crac_event
     ~prefix
@@ -8347,24 +8348,33 @@ let test_crac_receipt_two_failed_independent =
     ~expected_alias_kt1:bridge_2_alias
     ~expected_status:"applied"
     (List.nth internals 5) ;
-  (* ── Internal #6: alias(bridge_2) → tez_reverter_2 (%run) — failed *)
-  check_crac_internal_transaction
+  (* ── Internal #6: origination alias(EOA = sender), re-materialized ──
+     CRAC #1 reverted, dropping its alias(sender) materialization, so
+     CRAC #2 creates it again. *)
+  check_crac_internal_alias_origination
     ~prefix
     ~expected_nonce:6
+    ~expected_alias_kt1:sender_alias
+    ~expected_status:"applied"
+    (List.nth internals 6) ;
+  (* ── Internal #7: alias(bridge_2) → tez_reverter_2 (%run) — failed *)
+  check_crac_internal_transaction
+    ~prefix
+    ~expected_nonce:7
     ~expected_source:bridge_2_alias
     ~expected_destination:tez_reverter_2_kt1
     ~expected_entrypoint:"run"
     ~expected_status:"failed"
-    (List.nth internals 6) ;
-  (* ── Internal #7: tez_reverter_2 → tez_reverter_2 (%_revert) — failed *)
+    (List.nth internals 7) ;
+  (* ── Internal #8: tez_reverter_2 → tez_reverter_2 (%_revert) — failed *)
   check_crac_internal_transaction
     ~prefix
-    ~expected_nonce:7
+    ~expected_nonce:8
     ~expected_source:tez_reverter_2_kt1
     ~expected_destination:tez_reverter_2_kt1
     ~expected_entrypoint:"_revert"
     ~expected_status:"failed"
-    (List.nth internals 7) ;
+    (List.nth internals 8) ;
   unit
 
 (* Interleaved successful + failed CRACs from the SAME EVM tx, with the
@@ -8465,10 +8475,13 @@ let test_crac_receipt_interleaved_failed_pending =
       top
   in
   Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
-  (* 1 event + 3 alias originations (bridge_ok + sender for the
-     first S, bridge_fail for the first F; subsequent S/F pairs
-     reuse cached aliases) + 4*n_pairs transactional internals. *)
-  let n_alias_internals = 3 in
+  (* 1 event + alias originations + 4*n_pairs transactional internals.
+     Alias originations: bridge_ok + sender are materialized once in the
+     first S and persist (S succeeds). bridge_fail is re-materialized in
+     every F: each failing CRAC reverts its world-state changes, dropping
+     the bridge_fail alias it just created, so the next F creates it
+     again. Hence 2 + n_pairs alias originations. *)
+  let n_alias_internals = 2 + n_pairs in
   let expected_internals = 1 + n_alias_internals + (4 * n_pairs) in
   Check.(
     (List.length internals = expected_internals)
@@ -8535,13 +8548,16 @@ let test_crac_receipt_interleaved_failed_pending =
   in
   (* Execution order: event ; (S₁ → orig bridge_ok, orig sender, run,
      incr) ; (F₁ → orig bridge_fail, run, revert) ; then [n_pairs - 1]
-     more (S, F) pairs whose aliases are cached, contributing only
-     their four transactional internals each. *)
+     more (S, F) pairs. The S aliases stay cached (S₁ committed), but
+     each F reverts and drops its bridge_fail alias, so every subsequent
+     F re-originates bridge_fail before its two transactional internals. *)
   let expected =
     (event_key :: [orig_key bridge_ok_alias; orig_key sender_alias])
     @ s_pair_txs
     @ (orig_key bridge_fail_alias :: f_pair_txs)
-    @ List.concat (List.init (n_pairs - 1) (fun _ -> s_pair_txs @ f_pair_txs))
+    @ List.concat
+        (List.init (n_pairs - 1) (fun _ ->
+             s_pair_txs @ (orig_key bridge_fail_alias :: f_pair_txs)))
   in
   Check.(
     (observed = expected)
