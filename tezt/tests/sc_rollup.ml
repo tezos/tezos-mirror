@@ -8882,6 +8882,127 @@ let test_refute_apply_assertion_gossiped_op_refused =
      pre_filter)." ;
   unit
 
+(* Forging-side counterpart to [test_refute_apply_assertion_gossiped_op_refused].
+
+   On the frozen protocols (T/U) the plugin's [check_block_operation] is wired
+   into operation selection ([lib_delegate/operation_selection.ml]), where it
+   gates each manager op BEFORE the apply simulation. So even when the
+   un-appliable refute operation is [validated] in the mempool -- here by local
+   injection, which bypasses [pre_filter] -- forging DROPS it via the plugin gate
+   instead of feeding it to the apply simulation (which would trip the
+   frozen-protocol overflow assertion).
+
+   We forge with [Client.bake_for] rather than a baker daemon: it runs the very
+   same [operation_selection] path but synchronously, so there is no daemon
+   scheduling and no concurrent mempool flush to race against. (A running daemon
+   could flush on a new head and let [pre_filter] demote the op to
+   [branch_delayed] before forging, making the drop happen mempool-side rather
+   than at forging -- a race that made the daemon version flaky on slow CI.)
+
+   The decisive observation is that the block is forged cleanly while EXCLUDING
+   our [validated] op. That is only reachable via the plugin gate: without the
+   mitigation the op would instead reach the apply simulation and raise the
+   overflow [assert] -- an uncaught exception, not a tzresult error, so it is not
+   caught as a normal operation error -- aborting the forge and failing this
+   [bake_for]. (An apply-time *drop* cannot happen for this op precisely because
+   the failure is an exception, not an [Error].)
+
+   The operation is [validated] right after injection (the fast-path of local
+   injection bypasses [pre_filter]), but once the mempool is flushed on the new
+   head it is re-validated through the full pipeline -- including [pre_filter] --
+   and reclassified [branch_delayed] by the same plugin predicate. So we end the
+   test by checking it is [branch_delayed] (no longer [validated]).
+
+   Registered only up to protocol 25: alpha's plugin [check_block_operation] is a
+   stub, so the op would not be dropped at forging there. *)
+let test_refute_apply_assertion_baker_excludes_op =
+  let commitment_period = 5 in
+  register_test
+    ~__FILE__
+    ~kind:"arith"
+    ~tags:["refutation"; "game"; "dal"; "assertion"; "apply"; "baker"; "plugin"]
+    ~title:
+      "Sc_rollup, dal_page_level_overflow: baker drops un-appliable refute op \
+       at forging (plugin)"
+  @@ fun protocol ->
+  let* node, client =
+    setup_l1 ~commitment_period ~challenge_window:100 protocol
+  in
+  let keys =
+    Account.Bootstrap.keys
+    |> Array.map (fun k -> k.Account.alias)
+    |> Array.to_list
+  in
+  let* sc_rollup =
+    originate_sc_rollup
+      ~keys
+      ~kind:"arith"
+      ~src:Constant.bootstrap1.alias
+      client
+  in
+  (* Local injection bypasses [pre_filter], so the operation is [validated] in
+     the baker's own mempool: the baker WILL consider it at forging. *)
+  let* _op, oph =
+    setup_and_inject_dal_overflow_refute
+      ~protocol
+      ~keys
+      ~commitment_period
+      ~sc_rollup
+      client
+  in
+  let* level_before = Node.get_level node in
+  (* Forge one block synchronously via the client. This runs the same
+     [operation_selection] path as the baker daemon: our [validated] op is a
+     candidate, the plugin's [check_block_operation] rejects it before the apply
+     simulation, and the block is produced without it. A clean bake here that
+     excludes the op is the proof that the plugin gate dropped it -- without the
+     mitigation the op would reach the apply simulation and the overflow [assert]
+     would abort this bake. *)
+  let* () = Client.bake_for_and_wait ~keys client in
+  let* level_after = Node.get_level node in
+  Check.((level_after = level_before + 1) int)
+    ~error_msg:"Expected the baker to forge a block at level %R, got %L." ;
+  (* The un-appliable op is excluded from the freshly forged block. *)
+  let* block = Client.RPC.call client @@ RPC.get_chain_block () in
+  let manager_ops = JSON.(block |-> "operations" |=> 3 |> as_list) in
+  if List.exists (fun o -> JSON.(o |-> "hash" |> as_string) = oph) manager_ops
+  then
+    Test.fail
+      "The un-appliable operation %s was included in the forged block at level \
+       %d; the plugin's [check_block_operation] should have dropped it at \
+       forging."
+      oph
+      level_after ;
+  Log.info
+    "OK: the operation %s was dropped at forging (plugin \
+     [check_block_operation]) and the block was produced cleanly."
+    oph ;
+  (* On the new head the mempool was flushed and our operation re-validated
+     through the full pipeline -- including [pre_filter], bypassed only by the
+     injection fast-path -- so the same plugin predicate now reclassifies it
+     [branch_delayed]. *)
+  let* mempool = Mempool.get_mempool client in
+  if List.mem oph mempool.validated then
+    Test.fail
+      "Operation %s is unexpectedly still 'validated' after baking; expected \
+       it to be reclassified by [pre_filter] on the mempool flush."
+      oph ;
+  if not (List.mem oph mempool.branch_delayed) then
+    Test.fail
+      "Expected the un-appliable operation %s to be 'branch_delayed' after the \
+       mempool flush (re-validated through pre_filter). validated=[%s] \
+       branch_delayed=[%s] refused=[%s]"
+      oph
+      (String.concat "," mempool.validated)
+      (String.concat "," mempool.branch_delayed)
+      (String.concat "," mempool.refused) ;
+  Log.info
+    "OK: the chain advanced to level %d, the un-appliable operation was \
+     dropped at forging via the plugin filter ([check_block_operation]) and is \
+     now 'branch_delayed' in the mempool."
+    level_after ;
+  unit
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_get_genesis_info ~kind protocols ;
@@ -8997,6 +9118,7 @@ let register ~protocols =
   test_refute_apply_assertion_failure from_proto_v ;
   let before_v = List.filter (fun p -> Protocol.number p <= 025) protocols in
   test_refute_apply_assertion_gossiped_op_refused before_v ;
+  test_refute_apply_assertion_baker_excludes_op before_v ;
   test_recover_bond_of_stakers protocols ;
   test_patch_durable_storage_on_commitment protocols ;
   (* Specific Arith PVM tezts *)
