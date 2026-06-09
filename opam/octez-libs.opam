@@ -68,7 +68,7 @@ depends: [
   "lwt_eio"
   "ppxlib" { >= "0.34.0" }
   "opentelemetry" { >= "0.12" }
-  "ambient-context-lwt" { = "0.1.0" }
+  "ambient-context-lwt" { = "0.1.1" }
   "opentelemetry-client-cohttp-lwt"
   "bheap" { >= "2.0.0" }
   "digestif" { >= "0.9.0" }
