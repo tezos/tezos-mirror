@@ -94,5 +94,8 @@ DAL node
   only fires on status transitions). The current L1 crawler status is now
   pushed as the first stream element on subscription. (MR :gl:`!21864`)
 
+- The DAL node now stops if it detects that a registered attester attested a slot
+  containing traps, preventing further reward loss. (MR :gl:`!21544`)
+
 Miscellaneous
 -------------

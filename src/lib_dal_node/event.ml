@@ -1181,6 +1181,20 @@ open struct
       ("slot_index", Data_encoding.int31)
       ("shard_index", Data_encoding.int31)
 
+  let registered_attester_attested_trap =
+    declare_3
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"registered_attester_attested_trap"
+      ~msg:
+        "Registered attester {attester} attested a trap at slot {slot_index}, \
+         attested level {attested_level}. Stopping the DAL node."
+      ~level:Error
+      ("attester", Signature.Public_key_hash.encoding)
+      ("slot_index", Data_encoding.int31)
+      ("attested_level", Data_encoding.int32)
+      ~pp1:Signature.Public_key_hash.pp_short
+
   let register_trap =
     declare_4
       ~section
@@ -1836,6 +1850,10 @@ let emit_cannot_attest_slot_because_of_trap ~pkh ~published_level ~slot_index
 
 let emit_register_trap ~delegate ~published_level ~slot_index ~shard_index =
   emit register_trap (delegate, published_level, slot_index, shard_index)
+
+let emit_registered_attester_attested_trap ~delegate ~slot_index ~attested_level
+    =
+  emit registered_attester_attested_trap (delegate, slot_index, attested_level)
 
 let emit_start_catchup ~start_level ~end_level ~levels_to_clean_up =
   emit start_catchup (start_level, end_level, levels_to_clean_up)

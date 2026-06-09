@@ -54,6 +54,33 @@ let filter_injectable_traps attestations_map traps =
               tb_slot ))
     traps
 
+(* If the accused delegate is one of our registered attesters, either our DAL
+   node surfaced attestable data for a trapped slot, or the baker attested
+   without consulting the DAL node. Stop the node so the operator can
+   investigate. The entrapment evidence is not injected against our own
+   delegate, other nodes' accusers will handle that. *)
+let check_self_accusation node_ctxt ~delegate ~slot_index ~attested_level =
+  let open Lwt_result_syntax in
+  let is_registered =
+    match
+      Profile_manager.get_profiles (Node_context.get_profile_ctxt node_ctxt)
+    with
+    | Bootstrap -> false
+    | Controller c ->
+        Signature.Public_key_hash.Set.mem
+          delegate
+          (Controller_profiles.attesters c)
+  in
+  if is_registered then
+    let*! () =
+      Event.emit_registered_attester_attested_trap
+        ~delegate
+        ~slot_index
+        ~attested_level
+    in
+    Lwt_exit.exit_and_raise Errors.Exit_codes.trapped_attester_code
+  else return_unit
+
 (* [inject_entrapment_evidences] processes and injects trap evidence
    for each lag in attestation_lags. For each lag, it retrieves traps
    from the corresponding published level, filters them to identify
@@ -156,6 +183,13 @@ let inject_entrapment_evidences
                         ~lag_index
                         slot_index
                     then
+                      let* () =
+                        check_self_accusation
+                          node_ctxt
+                          ~delegate
+                          ~slot_index
+                          ~attested_level
+                      in
                       let*! () =
                         Event.emit_trap_injection
                           ~delegate
