@@ -57,8 +57,9 @@ module Prove :
 
 (** Verify mode: registry, database, and verify entry point.
 
-    {b Note}: Currently a stub (TZX-114). All operations will raise a
-    runtime error if called. *)
+    Operations are replayed against a proof. A divergence from the proof
+    (data absent from it) raises {!Nds_errors.Verification_failed}, to be
+    caught at the {!Nds.with_verification} boundary. *)
 module Verify : VERIFY with type proof := Proof.t
 
 (** {2 Typed mode-switching}

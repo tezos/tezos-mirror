@@ -461,6 +461,147 @@ let test_proof_state_hashes (module B : PROOF_LIFECYCLE_BACKEND) () =
     ~error_msg:"proof stop_state %L does not match Prove registry hash %R" ;
   unit
 
+(** {2 Verify properties} *)
+
+(** End-to-end proof verification: record a read/write step in Prove mode,
+    serialise the proof, deserialise it, then replay the step in Verify mode
+    against the proof.  The verify-mode registry must start at the proof's
+    start state, the recorded reads must replay to the same values, and after
+    replaying the write the registry must reach the proof's stop state. *)
+let test_verify_replays_proof (module B : VERIFY_LIFECYCLE_BACKEND) () =
+  let key_a = Bytes.of_string "a" in
+  let key_b = Bytes.of_string "b" in
+  let key_c = Bytes.of_string "c" in
+  (* Normal-mode initial state: db0 = {a -> foo}, db1 = {b -> bar}. *)
+  let normal = B.create_normal_with_dbs 2 in
+  let^? () =
+    B.Normal.Database.set
+      normal
+      ~db_index:0L
+      ~key:key_a
+      ~value:(Bytes.of_string "foo")
+  in
+  let^? () =
+    B.Normal.Database.set
+      normal
+      ~db_index:1L
+      ~key:key_b
+      ~value:(Bytes.of_string "bar")
+  in
+  let start_hash = B.Normal.Registry.hash normal in
+  (* The step: read a from db0, read b from db1, write c to db1. *)
+  let prove = B.Prove.start_proof normal in
+  let^? _ =
+    B.Prove.Database.read prove ~db_index:0L ~key:key_a ~offset:0L ~len:3L
+  in
+  let^? _ =
+    B.Prove.Database.read prove ~db_index:1L ~key:key_b ~offset:0L ~len:3L
+  in
+  let^? () =
+    B.Prove.Database.set
+      prove
+      ~db_index:1L
+      ~key:key_c
+      ~value:(Bytes.of_string "baz")
+  in
+  let stop_hash = B.Prove.Registry.hash prove in
+  let proof = B.Prove.produce_proof prove in
+  (* Round-trip the proof through its byte serialisation. *)
+  let proof_bytes = B.Prove.Proof.serialise proof in
+  let proof =
+    match B.Prove.Proof.deserialise proof_bytes with
+    | Ok proof -> proof
+    | Error err ->
+        Test.fail
+          "proof deserialisation failed: %a"
+          Error_monad.pp_print_trace
+          err
+  in
+  Check.(
+    (Bytes.to_string (B.Prove.Proof.start_state proof)
+    = Bytes.to_string start_hash)
+      string)
+    ~error_msg:"proof start_state %L does not match Normal registry hash %R" ;
+  Check.(
+    (Bytes.to_string (B.Prove.Proof.stop_state proof)
+    = Bytes.to_string stop_hash)
+      string)
+    ~error_msg:"proof stop_state %L does not match Prove registry hash %R" ;
+  (* Replay the step in Verify mode. *)
+  let verify = B.Verify.start_verify proof in
+  Check.(
+    (Bytes.to_string (B.Verify.Registry.hash verify)
+    = Bytes.to_string start_hash)
+      string)
+    ~error_msg:
+      "verify registry start hash %L does not match proof start_state %R" ;
+  let^? read_a =
+    B.Verify.Database.read verify ~db_index:0L ~key:key_a ~offset:0L ~len:3L
+  in
+  Check.((Bytes.to_string read_a = "foo") string)
+    ~error_msg:"verify read of a: expected foo, got %L" ;
+  let^? read_b =
+    B.Verify.Database.read verify ~db_index:1L ~key:key_b ~offset:0L ~len:3L
+  in
+  Check.((Bytes.to_string read_b = "bar") string)
+    ~error_msg:"verify read of b: expected bar, got %L" ;
+  let^? () =
+    B.Verify.Database.set
+      verify
+      ~db_index:1L
+      ~key:key_c
+      ~value:(Bytes.of_string "baz")
+  in
+  Check.(
+    (Bytes.to_string (B.Verify.Registry.hash verify) = Bytes.to_string stop_hash)
+      string)
+    ~error_msg:"verify registry stop hash %L does not match proof stop_state %R" ;
+  unit
+
+(** A proof only attests to the data it recorded.  Replaying an operation
+    that touches data absent from the proof must be rejected with
+    {!Nds_errors.Verification_failed}, rather than silently producing a value
+    or a plain invalid-argument error. *)
+let test_verify_rejects_unproven_read (module B : VERIFY_LIFECYCLE_BACKEND) () =
+  let key_a = Bytes.of_string "a" in
+  let key_d = Bytes.of_string "d" in
+  (* db0 holds two keys; the proof below only records a read of [a], so the
+     subtree covering [d] stays blinded in the proof. *)
+  let normal = B.create_normal_with_dbs 1 in
+  let^? () =
+    B.Normal.Database.set
+      normal
+      ~db_index:0L
+      ~key:key_a
+      ~value:(Bytes.of_string "foo")
+  in
+  let^? () =
+    B.Normal.Database.set
+      normal
+      ~db_index:0L
+      ~key:key_d
+      ~value:(Bytes.of_string "extra")
+  in
+  let prove = B.Prove.start_proof normal in
+  let^? _ =
+    B.Prove.Database.read prove ~db_index:0L ~key:key_a ~offset:0L ~len:3L
+  in
+  let proof = B.Prove.produce_proof prove in
+  let verify = B.Verify.start_verify proof in
+  (* Reading [d], whose value is absent from the proof, must diverge. *)
+  let raised =
+    try
+      let _ =
+        B.Verify.Database.read verify ~db_index:0L ~key:key_d ~offset:0L ~len:5L
+      in
+      false
+    with Nds_errors.Verification_failed _ -> true
+  in
+  Check.((raised = true) bool)
+    ~error_msg:
+      "reading data absent from the proof should raise Verification_failed" ;
+  unit
+
 (** {2 Model-based (stateful) properties} *)
 
 (** Bisimulation: a random sequence of operations on the NDS must produce
@@ -571,6 +712,21 @@ let register_proof_tests (module B : PROOF_LIFECYCLE_BACKEND) =
     ~tags:["unit"; "nds"; "proof"; B.name]
     unit_body
 
+let register_verify_tests (module B : VERIFY_LIFECYCLE_BACKEND) =
+  let is_disk = String.starts_with ~prefix:"disk" B.name in
+  let register title body =
+    let body = if is_disk then with_disk_gc body else body in
+    Test.register
+      ~__FILE__
+      ~title:(B.name ^ ": " ^ title)
+      ~tags:["unit"; "nds"; "verify"; B.name]
+      body
+  in
+  register "verify replays a proof" (fun () ->
+      test_verify_replays_proof (module B) ()) ;
+  register "verify rejects a read absent from the proof" (fun () ->
+      test_verify_rejects_unproven_read (module B) ())
+
 let register_with_backend (backend : (module BACKEND)) =
   (* Unit tests *)
   List.iter
@@ -637,4 +793,7 @@ let () =
   register_pbt_disk ~long:true ~long_factor:5 test_cross_backend_bisimulation ;
   (* Proof API *)
   register_proof_tests (module Memory_proof_lifecycle) ;
-  register_proof_tests (module Disk_proof_lifecycle)
+  register_proof_tests (module Disk_proof_lifecycle) ;
+  (* Verify API *)
+  register_verify_tests (module Memory_verify_lifecycle) ;
+  register_verify_tests (module Disk_verify_lifecycle)

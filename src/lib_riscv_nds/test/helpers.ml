@@ -129,6 +129,52 @@ module Disk_proof_lifecycle : PROOF_LIFECYCLE_BACKEND = struct
     r
 end
 
+(** Backend abstraction for verify-API tests.  Extends
+    {!PROOF_LIFECYCLE_BACKEND} with the {!Intf.VERIFY} mode, so a test can
+    drive the full proof round-trip: set up Normal state, record a step in
+    Prove mode, {!Intf.PROOF.serialise}/{!Intf.PROOF.deserialise} the proof,
+    and replay the step in Verify mode against it.  Lets the verify tests
+    run against both the memory and disk backends. *)
+module type VERIFY_LIFECYCLE_BACKEND = sig
+  val name : string
+
+  module Normal : NORMAL
+
+  module Prove : PROVE with type normal_registry := Normal.Registry.t
+
+  module Verify : VERIFY with type proof := Prove.Proof.t
+
+  (** Create a fresh Normal-mode registry with [n] databases. *)
+  val create_normal_with_dbs : int -> Normal.Registry.t
+end
+
+module Memory_verify_lifecycle : VERIFY_LIFECYCLE_BACKEND = struct
+  let name = "memory"
+
+  module Normal = Octez_riscv_nds_memory.Normal
+  module Prove = Octez_riscv_nds_memory.Prove
+  module Verify = Octez_riscv_nds_memory.Verify
+
+  let create_normal_with_dbs n =
+    let r = Normal.Registry.create () in
+    grow_registry Normal.Registry.resize r n ;
+    r
+end
+
+module Disk_verify_lifecycle : VERIFY_LIFECYCLE_BACKEND = struct
+  let name = "disk"
+
+  module Normal = Octez_riscv_nds_disk.Normal
+  module Prove = Octez_riscv_nds_disk.Prove
+  module Verify = Octez_riscv_nds_disk.Verify
+
+  let create_normal_with_dbs n =
+    let repo = get_disk_repo () in
+    let r = Normal.Registry.create repo in
+    grow_registry Normal.Registry.resize r n ;
+    r
+end
+
 (** Force finalization of Rust-side RocksDB handles at the end of the
     test, before Tezt removes the temporary directory; otherwise the
     cleanup emits "Failed to remove" warnings.  Scoped per-test rather
