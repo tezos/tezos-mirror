@@ -141,8 +141,8 @@ let with_disk_gc body () =
       Lwt.return_unit)
 
 (** Like [Qcheck_tezt.register] but wraps the test body with
-    [with_disk_gc].  The GC runs once at the end of the Tezt test, not
-    after each QCheck iteration. *)
+    [with_disk_gc].  The GC runs once at the end of each QCheck iteration,
+    to avoid excessive file-handle accumulation. *)
 let register_pbt_with_disk_gc ~__FILE__ ?title ~tags ?long ?seed
     (t : QCheck2.Test.t) =
   let (QCheck2.Test.Test cell) = t in
@@ -152,8 +152,9 @@ let register_pbt_with_disk_gc ~__FILE__ ?title ~tags ?long ?seed
   let tags = "qcheck" :: tags in
   Test.register ~__FILE__ ~title ~tags ?seed
   @@ with_disk_gc (fun () ->
+         let disk_gc _name _cell _content _res = Gc.full_major () in
          let rand = Random.get_state () in
-         QCheck2.Test.check_cell_exn ?long ~rand cell ;
+         QCheck2.Test.check_cell_exn ?long ~rand ~step:disk_gc cell ;
          unit)
 
 (** {1 Error matching helpers} *)

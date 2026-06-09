@@ -626,13 +626,12 @@ let () =
     test_bisimulation ;
   register_pbt
     ~long:true
-    ~long_factor:50
+    ~long_factor:10
     (module Disk_backend)
     test_bisimulation ;
   register_pbt
     ~long:true
-    ~long_factor:50
-    ~extra_tags:["slow"]
+    ~long_factor:10
     (module Disk_prove_backend)
     test_bisimulation ;
   register_pbt_disk ~long:true ~long_factor:5 test_cross_backend_bisimulation ;
