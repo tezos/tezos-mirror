@@ -921,7 +921,9 @@ where
                 )
                 .map_err(|e| TransferError::GatewayError(e.to_string()))?
         };
-        // TODO(L2-1519): handle the sender_resolution storage cost delegated by the callee.
+        if let Some(v) = sender_resolution.delegated_storage_cost {
+            ctx.add_delegated_storage_cost(v);
+        }
         let sender_target_consumed = target_budget - sender_resolution.gas_remaining;
         let sender_milligas =
             convert_gas(target_runtime, RuntimeId::Tezos, sender_target_consumed)
@@ -979,7 +981,9 @@ where
                     )
                     .map_err(|e| TransferError::GatewayError(e.to_string()))?
             };
-            // TODO(L2-1519): handle the source_resolution storage cost delegated by the callee.
+            if let Some(v) = source_resolution.delegated_storage_cost {
+                ctx.add_delegated_storage_cost(v);
+            }
             let source_target_consumed = target_budget - source_resolution.gas_remaining;
             let source_milligas =
                 convert_gas(target_runtime, RuntimeId::Tezos, source_target_consumed)
@@ -3049,6 +3053,71 @@ pub(crate) mod tests {
             msg.len() >= decoded_len,
             "decoded body must be present in the error: {msg}"
         );
+    }
+
+    /// `inject_context_headers` reads `delegated_storage_cost` on every
+    /// `ensure_alias` return and accumulates each `Some(v)` into the
+    /// caller frame. With both sender and source resolutions delegating
+    /// the same `V`, the accumulator ends at `2 × V` (sender path is
+    /// distinct from source path here because sender != source).
+    #[test]
+    fn test_dispatch_crac_call_accumulates_delegated_alias_storage_cost() {
+        let mut host = MockKernelHost::default();
+        let registry =
+            MockRegistry::new("KT1_mock_alias").with_alias_delegated_storage_cost(777);
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+        let dest = "0x1234567890123456789012345678901234567890";
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
+        ctx.operation_gas = crate::gas::TezlinkOperationGas::start_milligas(
+            tezosx_constants::MICHELSON_MAX_MILLIGAS_PER_OPERATION,
+        )
+        .unwrap();
+        assert_eq!(ctx.delegated_storage_cost(), 0);
+        dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap())
+            .expect("default MockRegistry serve must succeed");
+        assert_eq!(
+            ctx.delegated_storage_cost(),
+            2 * 777,
+            "both sender and source alias materializations must accumulate"
+        );
+    }
+
+    /// Symmetric guard: when the target runtime does NOT delegate
+    /// (`delegated_storage_cost = None`), the accumulator stays at 0.
+    /// Same fixture as the previous test, MockRegistry without the
+    /// `with_alias_delegated_storage_cost` builder.
+    #[test]
+    fn test_dispatch_crac_call_no_accumulation_when_callee_absorbs() {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias");
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+        let dest = "0x1234567890123456789012345678901234567890";
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
+        ctx.operation_gas = crate::gas::TezlinkOperationGas::start_milligas(
+            tezosx_constants::MICHELSON_MAX_MILLIGAS_PER_OPERATION,
+        )
+        .unwrap();
+        dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap())
+            .expect("default MockRegistry serve must succeed");
+        assert_eq!(ctx.delegated_storage_cost(), 0);
     }
 
     // The body surcharge on the 4xx path can itself exhaust gas; that must
