@@ -144,6 +144,9 @@ type ('a, 'cap) path =
   | Tezos_contract_code :
       Tezos_types.Contract.t
       -> (Tezlink_imports.Imported_context.Script.expr, ro) path
+  | Tezos_contract_origin : Tezos_types.Contract.t -> (bool, ro) path
+  | Tezos_alias_implementation :
+      (Tezlink_imports.Imported_context.Script.expr, ro) path
   | Tezos_contract_used_bytes : Tezos_types.Contract.t -> (Z.t, ro) path
   | Tezos_contract_paid_bytes : Tezos_types.Contract.t -> (Z.t, ro) path
   | Tezos_big_map_value :
@@ -187,6 +190,16 @@ val read_opt : ('a, [> `Read]) path -> Pvm.State.t -> 'a option tzresult Lwt.t
     [read_opt]. *)
 val read_or_default :
   default:'a -> ('a, [> `Read]) path -> Pvm.State.t -> 'a tzresult Lwt.t
+
+(** [read_contract_code contract state] reads an originated contract's
+    Michelson code. A code-less Tezos X alias (no [/data/code]) classified as
+    an alias resolves to the shared implementation, mirroring the kernel; any
+    other code-less account is [None]. Shared by the RPC backends so their
+    alias resolution cannot drift. *)
+val read_contract_code :
+  Tezos_types.Contract.t ->
+  Pvm.State.t ->
+  Tezlink_imports.Imported_context.Script.expr option tzresult Lwt.t
 
 (** [write p value state] encodes [value] and stores it at [p]. *)
 val write : ('a, rw) path -> 'a -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t

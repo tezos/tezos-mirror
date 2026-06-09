@@ -135,6 +135,11 @@ let michelson_contract_storage contract =
 let michelson_contract_code contract =
   michelson_contract_dir contract ^ "/data/code"
 
+(* Classification record of an originated account (Native | Alias). Read to
+   resolve a code-less Tezos X alias to the shared implementation. *)
+let michelson_contract_origin contract =
+  michelson_contract_dir contract ^ "/origin"
+
 let michelson_contract_balance contract =
   michelson_contract_dir contract ^ "/balance"
 
@@ -162,6 +167,11 @@ let tezos_big_map_value_type id = tezos_big_map_dir id ^ "/value_type"
 let tezos_big_map_total_bytes id = tezos_big_map_dir id ^ "/total_bytes"
 
 let michelson_ledger_root = TEZ.Tez_accounts.make "/tezosx"
+
+(* Single shared Michelson implementation backing every Tezos X alias.
+   Mirrors the kernel's [ALIAS_IMPLEMENTATION_PATH]. *)
+let michelson_alias_implementation =
+  TEZ.Tez_accounts.make "/tezosx/__system__/alias_implementation"
 
 (** TezosX: Tezos blocks live in the Michelson world-state keyspace. *)
 let tezosx_tezos_blocks_root = TEZ.World_state.make "/tez_blocks"

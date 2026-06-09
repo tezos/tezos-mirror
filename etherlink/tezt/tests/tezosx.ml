@@ -5041,6 +5041,22 @@ let test_alias_forwarder_created_by_evm_cross_runtime_call =
     (Option.is_some alias_storage = true)
       bool
       ~error_msg:"Expected the alias to keep its own /data/storage (%L)") ;
+  (* The EVM node's `/script` RPC resolves the code-less alias to the shared
+     forwarder (not an enshrined stub): the forwarder declares `storage
+     string`, whereas the stub would be `storage unit`. This exercises the
+     node-side `get_code` alias resolution end-to-end. *)
+  let* alias_script = get_script sequencer alias_kt1 in
+  let storage_prim =
+    JSON.(alias_script |-> "code" |> as_list)
+    |> List.find (fun item -> JSON.(item |-> "prim" |> as_string) = "storage")
+    |> fun item -> JSON.(item |-> "args" |=> 0 |-> "prim" |> as_string)
+  in
+  Check.(
+    (storage_prim = "string")
+      string
+      ~error_msg:
+        "Expected the alias /script to resolve to the forwarder (storage %R), \
+         got %L") ;
   unit
 
 (** Test that when an EVM transaction triggers alias materialization

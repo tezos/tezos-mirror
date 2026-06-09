@@ -243,7 +243,11 @@ let make (ctxt : Evm_ro_context.t) =
       let `Main = chain in
       let* block = shell_block_param_to_eth_block_param block in
       let* state = Evm_ro_context.get_state ctxt ~block () in
-      Durable_storage.read_opt (Tezos_contract_code c) state
+      (* Resolves a code-less alias to the shared implementation, so [/script]
+         and [/entrypoints] match the kernel. A genuinely code-less,
+         non-alias account (e.g. an enshrined contract) stays [None] and is
+         handled by the kernel-entrypoints fall-through in [get_script]. *)
+      Durable_storage.read_contract_code c state
 
     let get_script chain block c =
       let open Lwt_result_syntax in
