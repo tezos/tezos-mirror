@@ -149,19 +149,20 @@ local hasExporter(name) = std.member(hardwareExporters, name);
       // [mapping] is a [value,text,color] list.
       withMapping(mappings):
         local unknown =
-          stat.standardOptions.mapping.SpecialValueMap.options.withMatch('null')
+          stat.standardOptions.mapping.SpecialValueMap.withType()
+          + stat.standardOptions.mapping.SpecialValueMap.options.withMatch('null')
           + stat.standardOptions.mapping.SpecialValueMap.options.result.withText('Unknown')
           + stat.standardOptions.mapping.SpecialValueMap.options.result.withColor('yellow');
-        local f(t) =
-          stat.standardOptions.mapping.RangeMap.withType()
-          + stat.standardOptions.mapping.RangeMap.options.withFrom(t[0])
-          + stat.standardOptions.mapping.RangeMap.options.withTo(t[0])
-          + stat.standardOptions.mapping.RangeMap.options.result.withText(t[1])
-          + stat.standardOptions.mapping.RangeMap.options.result.withColor(t[2]);
-        local mapping =
-          std.map(f, mappings);
+        local valueOptions = std.foldl(
+          function(acc, t) acc { [t[0]]: { text: t[1], color: t[2] } },
+          mappings,
+          {}
+        );
+        local valueMap =
+          stat.standardOptions.mapping.ValueMap.withType()
+          + stat.standardOptions.mapping.ValueMap.withOptions(valueOptions);
         stat.options.withColorMode('value')
-        + stat.standardOptions.withMappings(mapping + [unknown]),
+        + stat.standardOptions.withMappings([valueMap, unknown]),
 
     },
 
