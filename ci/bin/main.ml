@@ -536,7 +536,8 @@ let () =
        Hub.\n\n\
        This pipeline publishes the Octez Docker image tagged as \
        [master-YYYYMMDD] (where the date is computed at build time) to \
-       DockerHub (https://hub.docker.com/r/tezos/tezos)." ;
+       DockerHub (https://hub.docker.com/r/tezos/tezos), then promotes it to \
+       the rolling [weekly] tag." ;
   register
     "schedule_docker_build_pipeline"
     schedule_docker_build
