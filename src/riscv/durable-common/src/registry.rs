@@ -4,6 +4,7 @@
 
 //! Generic registry state wrapper for OCaml GC resource tracking.
 
+use std::convert::Infallible;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::ops::DerefMut;
@@ -105,19 +106,21 @@ where
     KV: BackgroundKeyValueStore,
     KV::Repo: Send + Sync,
 {
-    fn apply<F, R>(&self, fun: F) -> Result<R, OperationalError>
+    type NotFoundError = Infallible;
+
+    fn apply<F, R>(&self, fun: F) -> Result<Result<R, Infallible>, OperationalError>
     where
         F: FnOnce(&mut Registry<KV, Normal>) -> R + Send + 'static,
         KV::Repo: Clone,
     {
-        MutableState::apply(self, fun)
+        Ok(Ok(MutableState::apply(self, fun)?))
     }
 
-    fn apply_ro<F, R>(&self, fun: F) -> Result<R, OperationalError>
+    fn apply_ro<F, R>(&self, fun: F) -> Result<Result<R, Infallible>, OperationalError>
     where
         F: FnOnce(&Registry<KV, Normal>) -> R + Send + 'static,
     {
-        Ok(MutableState::apply_ro(self, fun))
+        Ok(Ok(MutableState::apply_ro(self, fun)))
     }
 }
 
@@ -259,26 +262,27 @@ macro_rules! background_apply {
     }};
 }
 
-impl<KV, G, M> RegistryApply<KV, M> for BackgroundRegistry<KV, G, M>
+impl<KV, G> RegistryApply<KV, Prove<'static>> for BackgroundRegistry<KV, G, Prove<'static>>
 where
     KV: BackgroundKeyValueStore,
     KV::Repo: Send + Sync,
-    M: Mode,
 {
-    fn apply<F, R>(&self, fun: F) -> Result<R, OperationalError>
+    type NotFoundError = Infallible;
+
+    fn apply<F, R>(&self, fun: F) -> Result<Result<R, Infallible>, OperationalError>
     where
-        F: FnOnce(&mut Registry<KV, M>) -> R + Send + 'static,
+        F: FnOnce(&mut Registry<KV, Prove<'static>>) -> R + Send + 'static,
         R: Send + 'static,
         KV::Repo: Clone,
     {
-        background_apply!(self, fun, KV, M)
+        Ok(Ok(background_apply!(self, fun, KV, Prove<'static>)?))
     }
 
-    fn apply_ro<F, R>(&self, fun: F) -> Result<R, OperationalError>
+    fn apply_ro<F, R>(&self, fun: F) -> Result<Result<R, Infallible>, OperationalError>
     where
-        F: FnOnce(&Registry<KV, M>) -> R + Send + 'static,
+        F: FnOnce(&Registry<KV, Prove<'static>>) -> R + Send + 'static,
         R: Send + 'static,
     {
-        background_apply!(self, fun, KV, M)
+        Ok(Ok(background_apply!(self, fun, KV, Prove<'static>)?))
     }
 }

@@ -5,6 +5,8 @@
 //! This module defines common (routing) logic of OCaml API
 //! for the RISC-V durable storage system.
 
+use std::convert::Infallible;
+
 use bytes::Bytes;
 use octez_riscv_api_common::OcamlFallible;
 use octez_riscv_api_common::bytes::BytesWrapper;
@@ -41,18 +43,34 @@ trait_set! {
 /// Trait allowing specialised implementations for the `MutableState<...<Registry>>` pattern by each mode.
 ///
 /// This mirrors directly the API used by normal mode - with application directly within the current thread,
-/// while allowing these functions to be issued to a background thread for Prove and Verify in future.
+/// while issuing the operations to a background thread for Prove and Verify.
+///
+/// # Not-found handling
+///
+/// Verify mode replays operations against a proof. When an operation touches data that is absent
+/// from the proof, the underlying state machine raises a [`NotFound`] panic via
+/// [`not_found`](octez_riscv_data::mode::utils::not_found). The Verify implementation catches this
+/// in its worker thread (see [`catch_not_found`](octez_riscv_data::mode::utils::catch_not_found))
+/// and surfaces it through [`Self::NotFoundError`].
+///
+/// This does not occur for Normal and Prove mode (the full state is always available) so their
+/// [`Self::NotFoundError`] is [`Infallible`].
 pub trait RegistryApply<KV: KeyValueStore, M: Mode> {
+    /// Deterministic divergence error captured while applying an operation.
+    ///
+    /// [`Infallible`] for Normal/Prove; [`NotFound`] for Verify.
+    type NotFoundError;
+
     /// Apply a mutable operation over the contained registry. If the mutable state is 'borrowed', this
     /// will result in the underlying state being cloned, which may fail.
-    fn apply<F, R>(&self, fun: F) -> Result<R, OperationalError>
+    fn apply<F, R>(&self, fun: F) -> Result<Result<R, Self::NotFoundError>, OperationalError>
     where
         F: FnOnce(&mut Registry<KV, M>) -> R + Send + 'static,
         R: Send + 'static,
         KV::Repo: Clone;
 
     /// Apply a readonly operation over the contained registry.
-    fn apply_ro<F, R>(&self, fun: F) -> Result<R, OperationalError>
+    fn apply_ro<F, R>(&self, fun: F) -> Result<Result<R, Self::NotFoundError>, OperationalError>
     where
         F: FnOnce(&Registry<KV, M>) -> R + Send + 'static,
         R: Send + 'static;
@@ -79,43 +97,49 @@ macro_rules! key_from {
 }
 
 /// Compute the hash of the registry state.
+///
+/// Only available for modes that cannot diverge from a proof (Normal/Prove), and for whom
+/// `Registry` implements `Foldable<HashFold>` (which again are Normal/Prove only)
 #[inline(always)]
-pub fn registry_hash<KV, M>(state: &impl RegistryApply<KV, M>) -> OcamlFallible<BytesWrapper<Hash>>
+pub fn registry_hash<KV, M, S>(state: &S) -> OcamlFallible<BytesWrapper<Hash>>
 where
     KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     M: Mode,
+    S: RegistryApply<KV, M, NotFoundError = Infallible>,
     ds_registry::Registry<KV, M>: Foldable<HashFold>,
 {
-    let hash = state.apply_ro(move |registry| registry.fold(HashFold))?;
+    let Ok(hash) = state.apply_ro(move |registry| registry.fold(HashFold))?;
 
     Ok(BytesWrapper::from(hash))
 }
 
 /// Return the number of databases in the registry.
 #[inline(always)]
-pub fn registry_size<KV, M>(state: &impl RegistryApply<KV, M>) -> OcamlFallible<u64>
+pub fn registry_size<KV, M, S>(state: &S) -> OcamlFallible<Result<u64, S::NotFoundError>>
 where
     KV: BackgroundKeyValueStore,
     KV::Repo: Send + Sync,
     M: VectorMode + 'static,
+    S: RegistryApply<KV, M>,
 {
-    let size: usize = state.apply_ro(ds_registry::Registry::len)?;
+    let res = match state.apply_ro(ds_registry::Registry::len)? {
+        Ok(size) => Ok(u64::try_from(size)?),
+        Err(not_found) => Err(not_found),
+    };
 
-    Ok(u64::try_from(size)?)
+    Ok(res)
 }
 
 /// Resize the registry to the given number of databases.
 #[inline(always)]
-pub fn registry_resize<KV, Err, M>(
-    state: &impl RegistryApply<KV, M>,
-    size: u64,
-) -> SplitDsResult<(), Err>
+pub fn registry_resize<KV, Err, M, S>(state: &S, size: u64) -> SplitDsResult<(), Err>
 where
     KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
-    Err: From<ds_errors::InvalidArgumentError>,
+    Err: From<ds_errors::InvalidArgumentError> + From<S::NotFoundError>,
     M: RegistryMode + VectorMode,
+    S: RegistryApply<KV, M>,
 {
     let size = usize::try_from(size)?;
     let res = state.apply(move |registry| registry.resize_tick(size))?;
@@ -125,16 +149,17 @@ where
 
 /// Copy the database at `src_index` to `dst_index`.
 #[inline(always)]
-pub fn registry_copy<KV, Err, M>(
-    state: &impl RegistryApply<KV, M>,
+pub fn registry_copy<KV, Err, M, S>(
+    state: &S,
     src_index: u64,
     dst_index: u64,
 ) -> SplitDsResult<(), Err>
 where
     KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
-    Err: From<ds_errors::InvalidArgumentError>,
+    Err: From<ds_errors::InvalidArgumentError> + From<S::NotFoundError>,
     M: RegistryMode + VectorMode,
+    S: RegistryApply<KV, M>,
 {
     let src_index = usize::try_from(src_index)?;
     let dst_index = usize::try_from(dst_index)?;
@@ -146,16 +171,17 @@ where
 
 /// Move the database at `src_index` to `dst_index`.
 #[inline(always)]
-pub fn registry_move<KV, Err, M>(
-    state: &impl RegistryApply<KV, M>,
+pub fn registry_move<KV, Err, M, S>(
+    state: &S,
     src_index: u64,
     dst_index: u64,
 ) -> SplitDsResult<(), Err>
 where
     KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
-    Err: From<ds_errors::InvalidArgumentError>,
+    Err: From<ds_errors::InvalidArgumentError> + From<S::NotFoundError>,
     M: RegistryMode + VectorMode,
+    S: RegistryApply<KV, M>,
 {
     let src_index = usize::try_from(src_index)?;
     let dst_index = usize::try_from(dst_index)?;
@@ -167,15 +193,13 @@ where
 
 /// Clear all entries from the database at `db_index`.
 #[inline(always)]
-pub fn registry_clear<KV, Err, M>(
-    state: &impl RegistryApply<KV, M>,
-    db_index: u64,
-) -> SplitDsResult<(), Err>
+pub fn registry_clear<KV, Err, M, S>(state: &S, db_index: u64) -> SplitDsResult<(), Err>
 where
     KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
-    Err: From<ds_errors::InvalidArgumentError>,
+    Err: From<ds_errors::InvalidArgumentError> + From<S::NotFoundError>,
     M: RegistryMode + VectorMode,
+    S: RegistryApply<KV, M>,
 {
     let db_index = usize::try_from(db_index)?;
 
@@ -186,16 +210,17 @@ where
 
 /// Check whether `key` exists in the database at `db_index`.
 #[inline(always)]
-pub fn database_exists<KV, Err, M>(
-    state: &impl RegistryApply<KV, M>,
+pub fn database_exists<KV, Err, M, S>(
+    state: &S,
     db_index: u64,
     key: KeyParam,
 ) -> SplitDsResult<bool, Err>
 where
     KV: BackgroundKeyValueStore,
     KV::Repo: Send + Sync,
-    Err: From<ds_errors::InvalidArgumentError>,
+    Err: From<ds_errors::InvalidArgumentError> + From<S::NotFoundError>,
     M: VectorMode + DatabaseMode,
+    S: RegistryApply<KV, M>,
 {
     let db_index = usize::try_from(db_index)?;
     let key = key_from!(key, Err);
@@ -211,8 +236,8 @@ where
 
 /// Set the value for `key` in the database at `db_index`.
 #[inline(always)]
-pub fn database_set<KV, Err, M>(
-    state: &impl RegistryApply<KV, M>,
+pub fn database_set<KV, Err, M, S>(
+    state: &S,
     db_index: u64,
     key: KeyParam,
     value: BytesParam,
@@ -220,8 +245,9 @@ pub fn database_set<KV, Err, M>(
 where
     KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
-    Err: From<ds_errors::InvalidArgumentError>,
+    Err: From<ds_errors::InvalidArgumentError> + From<S::NotFoundError>,
     M: VectorMode + DatabaseMode,
+    S: RegistryApply<KV, M>,
 {
     let db_index = usize::try_from(db_index)?;
     let key = key_from!(key, Err);
@@ -240,8 +266,8 @@ where
 ///
 /// Returns the new total length of the value.
 #[inline(always)]
-pub fn database_write<KV, Err, M>(
-    state: &impl RegistryApply<KV, M>,
+pub fn database_write<KV, Err, M, S>(
+    state: &S,
     db_index: u64,
     key: KeyParam,
     offset: u64,
@@ -250,8 +276,9 @@ pub fn database_write<KV, Err, M>(
 where
     KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
-    Err: From<ds_errors::InvalidArgumentError>,
+    Err: From<ds_errors::InvalidArgumentError> + From<S::NotFoundError>,
     M: VectorMode + DatabaseMode,
+    S: RegistryApply<KV, M>,
 {
     let db_index = usize::try_from(db_index)?;
     let offset = usize::try_from(offset)?;
@@ -270,8 +297,8 @@ where
 
 /// Read `len` bytes starting at `offset` from `key`'s value in the database at `db_index`.
 #[inline(always)]
-pub fn database_read<KV, Err, M>(
-    state: &impl RegistryApply<KV, M>,
+pub fn database_read<KV, Err, M, S>(
+    state: &S,
     db_index: u64,
     key: KeyParam,
     offset: u64,
@@ -280,8 +307,9 @@ pub fn database_read<KV, Err, M>(
 where
     KV: BackgroundKeyValueStore,
     KV::Repo: Send + Sync,
-    Err: From<ds_errors::InvalidArgumentError>,
+    Err: From<ds_errors::InvalidArgumentError> + From<S::NotFoundError>,
     M: VectorMode + DatabaseMode,
+    S: RegistryApply<KV, M>,
 {
     let db_index = usize::try_from(db_index)?;
     let offset = usize::try_from(offset)?;
@@ -310,16 +338,17 @@ where
 
 /// Return the byte length of `key`'s value in the database at `db_index`.
 #[inline(always)]
-pub fn value_length<KV, Err, M>(
-    state: &impl RegistryApply<KV, M>,
+pub fn value_length<KV, Err, M, S>(
+    state: &S,
     db_index: u64,
     key: KeyParam,
 ) -> SplitDsResult<u64, Err>
 where
     KV: BackgroundKeyValueStore,
     KV::Repo: Send + Sync,
-    Err: From<ds_errors::InvalidArgumentError>,
+    Err: From<ds_errors::InvalidArgumentError> + From<S::NotFoundError>,
     M: VectorMode + DatabaseMode,
+    S: RegistryApply<KV, M>,
 {
     let db_index = usize::try_from(db_index)?;
     let key = key_from!(key, Err);
@@ -336,16 +365,17 @@ where
 
 /// Delete `key` from the database at `db_index`.
 #[inline(always)]
-pub fn database_delete<KV, Err, M>(
-    state: &impl RegistryApply<KV, M>,
+pub fn database_delete<KV, Err, M, S>(
+    state: &S,
     db_index: u64,
     key: KeyParam,
 ) -> SplitDsResult<(), Err>
 where
     KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
-    Err: From<ds_errors::InvalidArgumentError>,
+    Err: From<ds_errors::InvalidArgumentError> + From<S::NotFoundError>,
     M: VectorMode + DatabaseMode,
+    S: RegistryApply<KV, M>,
 {
     let db_index = usize::try_from(db_index)?;
     let key = key_from!(key, Err);
@@ -361,15 +391,16 @@ where
 
 /// Compute the Merkle hash of the database at `db_index`.
 #[inline(always)]
-pub fn database_hash<KV, Err, M>(
-    state: &impl RegistryApply<KV, M>,
+pub fn database_hash<KV, Err, M, S>(
+    state: &S,
     db_index: u64,
 ) -> SplitDsResult<BytesWrapper<Hash>, Err>
 where
     KV: BackgroundKeyValueStore,
     KV::Repo: Send + Sync,
-    Err: From<ds_errors::InvalidArgumentError>,
+    Err: From<ds_errors::InvalidArgumentError> + From<S::NotFoundError>,
     M: VectorMode + DatabaseMode,
+    S: RegistryApply<KV, M>,
 {
     let db_index = usize::try_from(db_index)?;
 
@@ -385,24 +416,26 @@ where
 
 /// Convert a normal mode registry into a proof mode one
 pub fn start_proof<KV, GcProve>(
-    state: &impl RegistryApply<KV, Normal>,
+    state: &impl RegistryApply<KV, Normal, NotFoundError = Infallible>,
 ) -> OcamlFallible<DsProveRegistry<KV, GcProve>>
 where
     KV: BackgroundKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     GcProve: GcNames,
 {
-    let prove = state.apply_ro(|registry| DsProveRegistry::try_from(registry))??;
+    let Ok(prove_res) = state.apply_ro(|registry| DsProveRegistry::try_from(registry))?;
 
-    Ok(prove)
+    Ok(prove_res?)
 }
 
 /// Produce a proof from the current state of a prove mode registry
-pub fn produce_proof<KV>(state: &impl RegistryApply<KV, Prove<'static>>) -> OcamlFallible<Proof>
+pub fn produce_proof<KV>(
+    state: &impl RegistryApply<KV, Prove<'static>, NotFoundError = Infallible>,
+) -> OcamlFallible<Proof>
 where
     KV: BackgroundKeyValueStore,
 {
-    let proof = state.apply_ro(|registry| registry.produce_proof())?;
+    let Ok(proof) = state.apply_ro(|registry| registry.produce_proof())?;
 
     Ok(proof)
 }

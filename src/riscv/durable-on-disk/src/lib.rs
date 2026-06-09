@@ -26,6 +26,7 @@
 //! Invalid argument errors more refer to attempting to read/write _beyond the end_ of a value, or
 //! attempting to perform an operation on a database that doesn't exist, and such like.
 
+use std::convert::Infallible;
 use std::path::Path;
 
 use octez_riscv_api_common::OcamlFallible;
@@ -158,6 +159,18 @@ pub enum VerificationArgumentError {
     Verification(VerificationError),
 }
 
+// Normal/Prove modes apply 'infallibly' during operation - the state
+// is always available for operations to take place (modulo
+// any `OperationalError` that may occur).
+//
+// This impl allows all three modes to re-use the same pathway, where
+// verify may indeed touch state not-present in a proof.
+impl From<Infallible> for InvalidArgumentError {
+    fn from(value: Infallible) -> Self {
+        match value {}
+    }
+}
+
 // Normal mode — registry
 
 #[ocaml::func]
@@ -219,7 +232,8 @@ pub fn octez_riscv_durable_on_disk_registry_hash(
 pub fn octez_riscv_durable_on_disk_registry_size(
     state: SafePointer<Registry>,
 ) -> OcamlFallible<u64> {
-    api_common::registry_size(&*state)
+    let Ok(size) = api_common::registry_size(&*state)?;
+    Ok(size)
 }
 
 #[ocaml::func]
@@ -355,7 +369,8 @@ pub fn octez_riscv_durable_on_disk_prove_registry_hash(
 pub fn octez_riscv_durable_on_disk_prove_registry_size(
     state: SafePointer<RegistryProve>,
 ) -> OcamlFallible<u64> {
-    api_common::registry_size(&*state)
+    let Ok(size) = api_common::registry_size(&*state)?;
+    Ok(size)
 }
 
 #[ocaml::func]
