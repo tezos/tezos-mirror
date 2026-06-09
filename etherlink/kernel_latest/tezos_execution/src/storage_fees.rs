@@ -11,10 +11,12 @@ use num_traits::{ops::checked::CheckedSub, Zero};
 use tezos_data_encoding::types::{Narith, Zarith};
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_tezlink::operation::{OriginationContent, RevealContent, TransferContent};
 use tezos_tezlink::operation_result::{
-    ApplyOperationError, Balance, BalanceUpdate, ContentResult, InternalOperationSum,
-    OperationResultSum, OriginationSuccess, TransferError, TransferSuccess,
-    TransferTarget, UpdateOrigin,
+    ApplyOperationError, Balance, BalanceUpdate, ContentResult, EventContent,
+    EventSuccess, InternalContentWithMetadata, InternalOperationSum, OperationKind,
+    OperationResultSum, OriginationSuccess, RevealSuccess, TransferError, TransferTarget,
+    UpdateOrigin,
 };
 
 use crate::account_storage::TezlinkAccount;
@@ -90,6 +92,54 @@ fn compute_storage_balance_updates(
     Ok(vec![source_update, block_fees])
 }
 
+/// Charge the payer for the storage allocated by `content`, when its
+/// status is `Applied`. No-op on every other status: a non-Applied
+/// content result records work that did not allocate anything (Failed,
+/// Skipped) or that has been rolled back (BackTracked).
+pub fn burn_content_storage_fees<Host: StorageV1, M: StorageFeesBurn>(
+    host: &mut Host,
+    payer: &impl TezlinkAccount,
+    storage_limit_remaining: &mut BigUint,
+    content: &mut ContentResult<M>,
+) -> Result<(), ApplyOperationError> {
+    match content {
+        ContentResult::Applied(success) => {
+            M::burn_storage_fees(host, payer, storage_limit_remaining, success)
+        }
+        _ => Ok(()),
+    }
+}
+
+fn burn_internal_meta_storage_fees<Host: StorageV1, M: StorageFeesBurn>(
+    host: &mut Host,
+    payer: &impl TezlinkAccount,
+    storage_limit_remaining: &mut BigUint,
+    meta: &mut InternalContentWithMetadata<M>,
+) -> Result<(), ApplyOperationError> {
+    burn_content_storage_fees(host, payer, storage_limit_remaining, &mut meta.result)
+}
+
+/// Charge the payer for the storage allocated by a single internal
+/// operation, dispatching on its [`InternalOperationSum`] variant.
+pub fn burn_internal_op_storage_fees<Host: StorageV1>(
+    host: &mut Host,
+    payer: &impl TezlinkAccount,
+    storage_limit_remaining: &mut BigUint,
+    op: &mut InternalOperationSum,
+) -> Result<(), ApplyOperationError> {
+    match op {
+        InternalOperationSum::Transfer(meta) => {
+            burn_internal_meta_storage_fees(host, payer, storage_limit_remaining, meta)
+        }
+        InternalOperationSum::Origination(meta) => {
+            burn_internal_meta_storage_fees(host, payer, storage_limit_remaining, meta)
+        }
+        InternalOperationSum::Event(meta) => {
+            burn_internal_meta_storage_fees(host, payer, storage_limit_remaining, meta)
+        }
+    }
+}
+
 /// Charge the source of a manager operation for the storage allocated
 /// by the operation and its successful internal operations. Refuses
 /// to bill more than `storage_limit` bytes across the whole tree.
@@ -102,59 +152,58 @@ pub fn burn_manager_storage_fees<Host: StorageV1>(
     let mut storage_limit_remaining: BigUint = storage_limit.0.clone();
     match receipt {
         OperationResultSum::Reveal(op) => {
-            if matches!(op.result, ContentResult::Applied(_)) {
-                burn_internals(
-                    host,
-                    payer,
-                    &mut storage_limit_remaining,
-                    &mut op.internal_operation_results,
-                )?;
-            }
-            Ok(())
+            burn_content_storage_fees::<_, RevealContent>(
+                host,
+                payer,
+                &mut storage_limit_remaining,
+                &mut op.result,
+            )?;
+            burn_internals(
+                host,
+                payer,
+                &mut storage_limit_remaining,
+                &mut op.internal_operation_results,
+            )
         }
         OperationResultSum::Transfer(op) => {
-            if let ContentResult::Applied(TransferTarget::ToContrat(success)) =
-                &mut op.result
-            {
-                let updates = burn_for_transfer(
-                    host,
-                    payer,
-                    &mut storage_limit_remaining,
-                    success,
-                )?;
-                success.balance_updates = updates;
-                burn_internals(
-                    host,
-                    payer,
-                    &mut storage_limit_remaining,
-                    &mut op.internal_operation_results,
-                )?;
-            }
-            Ok(())
+            burn_content_storage_fees::<_, TransferContent>(
+                host,
+                payer,
+                &mut storage_limit_remaining,
+                &mut op.result,
+            )?;
+            burn_internals(
+                host,
+                payer,
+                &mut storage_limit_remaining,
+                &mut op.internal_operation_results,
+            )
         }
         OperationResultSum::Origination(op) => {
-            if let ContentResult::Applied(success) = &mut op.result {
-                let updates = burn_for_origination(
-                    host,
-                    payer,
-                    &mut storage_limit_remaining,
-                    success,
-                )?;
-                success.balance_updates = updates;
-                burn_internals(
-                    host,
-                    payer,
-                    &mut storage_limit_remaining,
-                    &mut op.internal_operation_results,
-                )?;
-            }
-            Ok(())
+            burn_content_storage_fees::<_, OriginationContent>(
+                host,
+                payer,
+                &mut storage_limit_remaining,
+                &mut op.result,
+            )?;
+            burn_internals(
+                host,
+                payer,
+                &mut storage_limit_remaining,
+                &mut op.internal_operation_results,
+            )
         }
     }
 }
 
 /// Charge the source of a manager operation for the storage that
 /// each of its successful internal operations allocated.
+///
+/// On failure (e.g. quota exceeded mid-loop), the partial mutations on
+/// preceding entries are discarded — `internals` is reassigned only
+/// when every entry burns successfully. This preserves the invariant
+/// that no storage-fees entry survives on an internal that the caller
+/// will subsequently demote to BackTracked.
 fn burn_internals<Host: StorageV1>(
     host: &mut Host,
     payer: &impl TezlinkAccount,
@@ -165,33 +214,12 @@ fn burn_internals<Host: StorageV1>(
         .iter()
         .cloned()
         .map(|mut internal| {
-            match &mut internal {
-                InternalOperationSum::Transfer(inner) => {
-                    if let ContentResult::Applied(TransferTarget::ToContrat(success)) =
-                        &mut inner.result
-                    {
-                        let updates = burn_for_transfer(
-                            host,
-                            payer,
-                            storage_limit_remaining,
-                            success,
-                        )?;
-                        success.balance_updates = updates;
-                    }
-                }
-                InternalOperationSum::Origination(inner) => {
-                    if let ContentResult::Applied(success) = &mut inner.result {
-                        let updates = burn_for_origination(
-                            host,
-                            payer,
-                            storage_limit_remaining,
-                            success,
-                        )?;
-                        success.balance_updates = updates;
-                    }
-                }
-                InternalOperationSum::Event(_) => {}
-            }
+            burn_internal_op_storage_fees(
+                host,
+                payer,
+                storage_limit_remaining,
+                &mut internal,
+            )?;
             Ok(internal)
         })
         .collect();
@@ -199,56 +227,96 @@ fn burn_internals<Host: StorageV1>(
     Ok(())
 }
 
-/// Charge the source for the storage allocated by a successful
-/// transfer to a contract, plus the contract slot when the
-/// transfer freshly allocates the destination.
-fn burn_for_transfer<Host: StorageV1>(
-    host: &mut Host,
-    payer: &impl TezlinkAccount,
-    storage_limit_remaining: &mut BigUint,
-    success: &TransferSuccess,
-) -> Result<Vec<BalanceUpdate>, ApplyOperationError> {
-    let mut updates = burn_storage_fee(
-        host,
-        payer,
-        storage_limit_remaining,
-        &success.paid_storage_size_diff,
-    )?;
-    updates.extend(success.balance_updates.iter().cloned());
-    if success.allocated_destination_contract {
+/// Per-`OperationKind` storage-burn behaviour. Each implementation
+/// describes how the payer is charged for the storage allocated by a
+/// successful operation of that kind, and how the resulting balance
+/// updates are recorded on the operation's success structure.
+///
+/// The receiver (`success`) is reached only when the operation's
+/// [`ContentResult`] is `Applied`; non-Applied content results are
+/// skipped at the dispatch layer, so implementations never see them.
+pub trait StorageFeesBurn: OperationKind {
+    fn burn_storage_fees<Host: StorageV1>(
+        host: &mut Host,
+        payer: &impl TezlinkAccount,
+        storage_limit_remaining: &mut BigUint,
+        success: &mut Self::Success,
+    ) -> Result<(), ApplyOperationError>;
+}
+
+impl StorageFeesBurn for TransferContent {
+    fn burn_storage_fees<Host: StorageV1>(
+        host: &mut Host,
+        payer: &impl TezlinkAccount,
+        storage_limit_remaining: &mut BigUint,
+        success: &mut TransferTarget,
+    ) -> Result<(), ApplyOperationError> {
+        let TransferTarget::ToContrat(success) = success;
+        let mut updates = burn_storage_fee(
+            host,
+            payer,
+            storage_limit_remaining,
+            &success.paid_storage_size_diff,
+        )?;
+        updates.extend(success.balance_updates.iter().cloned());
+        if success.allocated_destination_contract {
+            updates.extend(burn_storage_fee(
+                host,
+                payer,
+                storage_limit_remaining,
+                &ORIGINATION_SIZE.into(),
+            )?);
+        }
+        success.balance_updates = updates;
+        Ok(())
+    }
+}
+
+impl StorageFeesBurn for OriginationContent {
+    fn burn_storage_fees<Host: StorageV1>(
+        host: &mut Host,
+        payer: &impl TezlinkAccount,
+        storage_limit_remaining: &mut BigUint,
+        success: &mut OriginationSuccess,
+    ) -> Result<(), ApplyOperationError> {
+        let mut updates = burn_storage_fee(
+            host,
+            payer,
+            storage_limit_remaining,
+            &success.paid_storage_size_diff,
+        )?;
         updates.extend(burn_storage_fee(
             host,
             payer,
             storage_limit_remaining,
             &ORIGINATION_SIZE.into(),
         )?);
+        updates.extend(success.balance_updates.iter().cloned());
+        success.balance_updates = updates;
+        Ok(())
     }
-    Ok(updates)
 }
 
-/// Charge the source for the storage allocated by a successful
-/// origination: the initial content of the contract and the
-/// contract slot itself.
-fn burn_for_origination<Host: StorageV1>(
-    host: &mut Host,
-    payer: &impl TezlinkAccount,
-    storage_limit_remaining: &mut BigUint,
-    success: &OriginationSuccess,
-) -> Result<Vec<BalanceUpdate>, ApplyOperationError> {
-    let mut updates = burn_storage_fee(
-        host,
-        payer,
-        storage_limit_remaining,
-        &success.paid_storage_size_diff,
-    )?;
-    updates.extend(burn_storage_fee(
-        host,
-        payer,
-        storage_limit_remaining,
-        &ORIGINATION_SIZE.into(),
-    )?);
-    updates.extend(success.balance_updates.iter().cloned());
-    Ok(updates)
+impl StorageFeesBurn for RevealContent {
+    fn burn_storage_fees<Host: StorageV1>(
+        _host: &mut Host,
+        _payer: &impl TezlinkAccount,
+        _storage_limit_remaining: &mut BigUint,
+        _success: &mut RevealSuccess,
+    ) -> Result<(), ApplyOperationError> {
+        Ok(())
+    }
+}
+
+impl StorageFeesBurn for EventContent {
+    fn burn_storage_fees<Host: StorageV1>(
+        _host: &mut Host,
+        _payer: &impl TezlinkAccount,
+        _storage_limit_remaining: &mut BigUint,
+        _success: &mut EventSuccess,
+    ) -> Result<(), ApplyOperationError> {
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -262,8 +330,8 @@ mod tests {
     };
     use tezos_tezlink::operation_result::{
         ApplyOperationErrors, Balance, BalanceTooLow, BalanceUpdate,
-        InternalContentWithMetadata, OperationResult, Originated, RevealSuccess,
-        TransferSuccess, UpdateOrigin,
+        InternalContentWithMetadata, OperationResult, OperationResultSum, Originated,
+        RevealSuccess, TransferSuccess, UpdateOrigin,
     };
 
     use crate::account_storage::{TezlinkImplicitAccount, TezosImplicitAccount};
@@ -286,12 +354,10 @@ mod tests {
         }
     }
 
-    fn applied_origination(success: OriginationSuccess) -> OperationResultSum {
-        OperationResultSum::Origination(OperationResult {
-            balance_updates: vec![],
-            result: ContentResult::Applied(success),
-            internal_operation_results: vec![],
-        })
+    fn applied_origination(
+        success: OriginationSuccess,
+    ) -> ContentResult<OriginationContent> {
+        ContentResult::Applied(success)
     }
 
     fn init_payer(host: &mut MockKernelHost, balance: u64) -> TezlinkImplicitAccount {
@@ -301,6 +367,30 @@ mod tests {
         account.allocate(host).unwrap();
         account.set_balance(host, &balance.into()).unwrap();
         account
+    }
+
+    /// Test wrapper around [`burn_content_storage_fees`] that builds
+    /// the `storage_limit_remaining` accumulator from a `u64`.
+    fn burn_content<M: StorageFeesBurn>(
+        host: &mut MockKernelHost,
+        payer: &impl TezlinkAccount,
+        storage_limit: u64,
+        content: &mut ContentResult<M>,
+    ) -> Result<(), ApplyOperationError> {
+        let mut storage_limit_remaining = BigUint::from(storage_limit);
+        burn_content_storage_fees(host, payer, &mut storage_limit_remaining, content)
+    }
+
+    /// Test wrapper around [`burn_internal_op_storage_fees`] that
+    /// builds the `storage_limit_remaining` accumulator from a `u64`.
+    fn burn_internal_op(
+        host: &mut MockKernelHost,
+        payer: &impl TezlinkAccount,
+        storage_limit: u64,
+        op: &mut InternalOperationSum,
+    ) -> Result<(), ApplyOperationError> {
+        let mut storage_limit_remaining = BigUint::from(storage_limit);
+        burn_internal_op_storage_fees(host, payer, &mut storage_limit_remaining, op)
     }
 
     /// On a zero-byte input, `burn_storage_fee` returns no balance
@@ -383,29 +473,21 @@ mod tests {
         }
     }
 
-    fn applied_transfer(success: TransferSuccess) -> OperationResultSum {
-        OperationResultSum::Transfer(OperationResult {
-            balance_updates: vec![],
-            result: ContentResult::Applied(TransferTarget::ToContrat(success)),
-            internal_operation_results: vec![],
-        })
+    fn applied_transfer(success: TransferSuccess) -> ContentResult<TransferContent> {
+        ContentResult::Applied(TransferTarget::ToContrat(success))
     }
 
-    /// A Reveal receipt with no internals leaves the payer balance
-    /// untouched.
+    /// A successful Reveal allocates no storage and leaves the payer
+    /// balance untouched.
     #[test]
-    fn reveal_with_no_internals_is_a_noop() {
+    fn applied_reveal_is_a_noop() {
         let mut host = MockKernelHost::default();
         let payer = init_payer(&mut host, 1_000);
-        let mut receipt = OperationResultSum::Reveal(OperationResult {
-            balance_updates: vec![],
-            result: ContentResult::Applied(RevealSuccess {
+        let mut content: ContentResult<RevealContent> =
+            ContentResult::Applied(RevealSuccess {
                 consumed_milligas: 0_u64.into(),
-            }),
-            internal_operation_results: vec![],
-        });
-        burn_manager_storage_fees(&mut host, &payer, &u64::MAX.into(), &mut receipt)
-            .unwrap();
+            });
+        burn_content(&mut host, &payer, u64::MAX, &mut content).unwrap();
         assert_eq!(payer.balance(&host).unwrap(), 1_000_u64.into());
     }
 
@@ -417,13 +499,12 @@ mod tests {
     fn transfer_with_storage_growth_fires_variable_burn() {
         let mut host = MockKernelHost::default();
         let payer = init_payer(&mut host, 100_000);
-        let mut receipt = applied_transfer(TransferSuccess {
+        let mut content = applied_transfer(TransferSuccess {
             paid_storage_size_diff: 10_u64.into(),
             ..Default::default()
         });
 
-        burn_manager_storage_fees(&mut host, &payer, &u64::MAX.into(), &mut receipt)
-            .unwrap();
+        burn_content(&mut host, &payer, u64::MAX, &mut content).unwrap();
 
         let burn = 10 * COST_PER_BYTES;
         assert_eq!(
@@ -431,11 +512,7 @@ mod tests {
             (100_000 - burn).into(),
             "payer must drop by the burn amount"
         );
-        let OperationResultSum::Transfer(op) = &receipt else {
-            panic!("expected Transfer receipt");
-        };
-        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &op.result
-        else {
+        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &content else {
             panic!("expected Applied target");
         };
 
@@ -462,15 +539,10 @@ mod tests {
     fn transfer_with_no_storage_growth_is_a_noop() {
         let mut host = MockKernelHost::default();
         let payer = init_payer(&mut host, 1_000);
-        let mut receipt = applied_transfer(TransferSuccess::default());
-        burn_manager_storage_fees(&mut host, &payer, &u64::MAX.into(), &mut receipt)
-            .unwrap();
+        let mut content = applied_transfer(TransferSuccess::default());
+        burn_content(&mut host, &payer, u64::MAX, &mut content).unwrap();
         assert_eq!(payer.balance(&host).unwrap(), 1_000_u64.into());
-        let OperationResultSum::Transfer(op) = &receipt else {
-            panic!("expected Transfer receipt");
-        };
-        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &op.result
-        else {
+        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &content else {
             panic!("expected Applied target");
         };
         assert!(success.balance_updates.is_empty());
@@ -482,13 +554,9 @@ mod tests {
     fn failed_top_level_does_not_burn() {
         let mut host = MockKernelHost::default();
         let payer = init_payer(&mut host, 1_000);
-        let mut receipt = OperationResultSum::Transfer(OperationResult {
-            balance_updates: vec![],
-            result: ContentResult::Failed(ApplyOperationErrors { errors: vec![] }),
-            internal_operation_results: vec![],
-        });
-        burn_manager_storage_fees(&mut host, &payer, &u64::MAX.into(), &mut receipt)
-            .unwrap();
+        let mut content: ContentResult<TransferContent> =
+            ContentResult::Failed(ApplyOperationErrors { errors: vec![] });
+        burn_content(&mut host, &payer, u64::MAX, &mut content).unwrap();
         assert_eq!(payer.balance(&host).unwrap(), 1_000_u64.into());
     }
 
@@ -499,13 +567,12 @@ mod tests {
     fn insolvent_payer_returns_cannot_pay() {
         let mut host = MockKernelHost::default();
         let payer = init_payer(&mut host, 100);
-        let mut receipt = applied_transfer(TransferSuccess {
+        let mut content = applied_transfer(TransferSuccess {
             paid_storage_size_diff: 10_u64.into(),
             ..Default::default()
         });
-        let err =
-            burn_manager_storage_fees(&mut host, &payer, &u64::MAX.into(), &mut receipt)
-                .expect_err("burn must fail when payer is insolvent");
+        let err = burn_content(&mut host, &payer, u64::MAX, &mut content)
+            .expect_err("burn must fail when payer is insolvent");
 
         assert_eq!(
             err,
@@ -524,7 +591,7 @@ mod tests {
     fn applied_internal_transfer_fires_its_own_burn() {
         let mut host = MockKernelHost::default();
         let payer = init_payer(&mut host, 100_000);
-        let internal = InternalOperationSum::Transfer(InternalContentWithMetadata {
+        let mut op = InternalOperationSum::Transfer(InternalContentWithMetadata {
             sender: payer.contract(),
             nonce: 0,
             content: TransferContent {
@@ -537,30 +604,13 @@ mod tests {
                 ..Default::default()
             })),
         });
-        let mut receipt = OperationResultSum::Transfer(OperationResult {
-            balance_updates: vec![],
-            result: ContentResult::Applied(TransferTarget::ToContrat(
-                TransferSuccess::default(),
-            )),
-            internal_operation_results: vec![internal],
-        });
 
-        burn_manager_storage_fees(&mut host, &payer, &u64::MAX.into(), &mut receipt)
-            .unwrap();
+        burn_internal_op(&mut host, &payer, u64::MAX, &mut op).unwrap();
 
         let burn = 4 * COST_PER_BYTES;
         assert_eq!(payer.balance(&host).unwrap(), (100_000 - burn).into());
-        let OperationResultSum::Transfer(op) = &receipt else {
-            panic!("expected Transfer receipt");
-        };
-        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &op.result
-        else {
-            panic!("expected Applied target");
-        };
-        assert!(success.balance_updates.is_empty());
 
-        let InternalOperationSum::Transfer(inner) = &op.internal_operation_results[0]
-        else {
+        let InternalOperationSum::Transfer(inner) = &op else {
             panic!("expected internal Transfer");
         };
         let ContentResult::Applied(TransferTarget::ToContrat(s)) = &inner.result else {
@@ -592,18 +642,14 @@ mod tests {
     fn origination_with_storage_growth_fires_double_burn() {
         let mut host = MockKernelHost::default();
         let payer = init_payer(&mut host, 1_000_000);
-        let mut receipt = applied_origination(origination_success(38));
+        let mut content = applied_origination(origination_success(38));
 
-        burn_manager_storage_fees(&mut host, &payer, &u64::MAX.into(), &mut receipt)
-            .unwrap();
+        burn_content(&mut host, &payer, u64::MAX, &mut content).unwrap();
 
         let variable = 38 * COST_PER_BYTES;
         let total = variable + SLOT_BURN;
         assert_eq!(payer.balance(&host).unwrap(), (1_000_000 - total).into());
-        let OperationResultSum::Origination(op) = &receipt else {
-            panic!("expected Origination receipt");
-        };
-        let ContentResult::Applied(success) = &op.result else {
+        let ContentResult::Applied(success) = &content else {
             panic!("expected Applied origination");
         };
 
@@ -641,19 +687,15 @@ mod tests {
     fn origination_with_no_growth_only_fires_slot_burn() {
         let mut host = MockKernelHost::default();
         let payer = init_payer(&mut host, 1_000_000);
-        let mut receipt = applied_origination(origination_success(0));
+        let mut content = applied_origination(origination_success(0));
 
-        burn_manager_storage_fees(&mut host, &payer, &u64::MAX.into(), &mut receipt)
-            .unwrap();
+        burn_content(&mut host, &payer, u64::MAX, &mut content).unwrap();
 
         assert_eq!(
             payer.balance(&host).unwrap(),
             (1_000_000 - SLOT_BURN).into()
         );
-        let OperationResultSum::Origination(op) = &receipt else {
-            panic!("expected Origination receipt");
-        };
-        let ContentResult::Applied(success) = &op.result else {
+        let ContentResult::Applied(success) = &content else {
             panic!("expected Applied origination");
         };
 
@@ -686,11 +728,10 @@ mod tests {
         // Cover variable burn (38 × COST_PER_BYTES = 9_500) but not the slot burn.
         // 10_000 - 9_500 = 500 remaining
         let payer = init_payer(&mut host, 10_000);
-        let mut receipt = applied_origination(origination_success(38));
+        let mut content = applied_origination(origination_success(38));
 
-        let err =
-            burn_manager_storage_fees(&mut host, &payer, &u64::MAX.into(), &mut receipt)
-                .expect_err("slot burn must fail when payer is insolvent");
+        let err = burn_content(&mut host, &payer, u64::MAX, &mut content)
+            .expect_err("slot burn must fail when payer is insolvent");
 
         assert_eq!(
             err,
@@ -701,10 +742,7 @@ mod tests {
             }),
         );
 
-        let OperationResultSum::Origination(op) = &receipt else {
-            panic!("expected Origination receipt");
-        };
-        let ContentResult::Applied(success) = &op.result else {
+        let ContentResult::Applied(success) = &content else {
             panic!("expected Applied origination");
         };
 
@@ -723,7 +761,7 @@ mod tests {
     fn applied_internal_origination_fires_double_burn() {
         let mut host = MockKernelHost::default();
         let payer = init_payer(&mut host, 1_000_000);
-        let internal = InternalOperationSum::Origination(InternalContentWithMetadata {
+        let mut op = InternalOperationSum::Origination(InternalContentWithMetadata {
             sender: payer.contract(),
             nonce: 0,
             content: OriginationContent {
@@ -736,34 +774,14 @@ mod tests {
             },
             result: ContentResult::Applied(origination_success(10)),
         });
-        let mut receipt = OperationResultSum::Transfer(OperationResult {
-            balance_updates: vec![],
-            result: ContentResult::Applied(TransferTarget::ToContrat(
-                TransferSuccess::default(),
-            )),
-            internal_operation_results: vec![internal],
-        });
 
-        burn_manager_storage_fees(&mut host, &payer, &u64::MAX.into(), &mut receipt)
-            .unwrap();
+        burn_internal_op(&mut host, &payer, u64::MAX, &mut op).unwrap();
 
         let variable = 10 * COST_PER_BYTES;
         let total = variable + SLOT_BURN;
         assert_eq!(payer.balance(&host).unwrap(), (1_000_000 - total).into());
-        let OperationResultSum::Transfer(op) = &receipt else {
-            panic!("expected Transfer receipt");
-        };
-        let ContentResult::Applied(TransferTarget::ToContrat(top_success)) = &op.result
-        else {
-            panic!("expected Applied top");
-        };
-        assert!(
-            top_success.balance_updates.is_empty(),
-            "top has no growth and no allocation, must not burn"
-        );
 
-        let InternalOperationSum::Origination(inner) = &op.internal_operation_results[0]
-        else {
+        let InternalOperationSum::Origination(inner) = &op else {
             panic!("expected internal Origination");
         };
         let ContentResult::Applied(success) = &inner.result else {
@@ -807,23 +825,18 @@ mod tests {
     fn transfer_with_allocation_only_fires_slot_burn() {
         let mut host = MockKernelHost::default();
         let payer = init_payer(&mut host, 1_000_000);
-        let mut receipt = applied_transfer(TransferSuccess {
+        let mut content = applied_transfer(TransferSuccess {
             allocated_destination_contract: true,
             ..Default::default()
         });
 
-        burn_manager_storage_fees(&mut host, &payer, &u64::MAX.into(), &mut receipt)
-            .unwrap();
+        burn_content(&mut host, &payer, u64::MAX, &mut content).unwrap();
 
         assert_eq!(
             payer.balance(&host).unwrap(),
             (1_000_000 - SLOT_BURN).into()
         );
-        let OperationResultSum::Transfer(op) = &receipt else {
-            panic!("expected Transfer receipt");
-        };
-        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &op.result
-        else {
+        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &content else {
             panic!("expected Applied target");
         };
 
@@ -851,23 +864,18 @@ mod tests {
     fn transfer_with_growth_and_allocation_fires_both_burns() {
         let mut host = MockKernelHost::default();
         let payer = init_payer(&mut host, 1_000_000);
-        let mut receipt = applied_transfer(TransferSuccess {
+        let mut content = applied_transfer(TransferSuccess {
             paid_storage_size_diff: 10_u64.into(),
             allocated_destination_contract: true,
             ..Default::default()
         });
 
-        burn_manager_storage_fees(&mut host, &payer, &u64::MAX.into(), &mut receipt)
-            .unwrap();
+        burn_content(&mut host, &payer, u64::MAX, &mut content).unwrap();
 
         let variable = 10 * COST_PER_BYTES;
         let total = variable + SLOT_BURN;
         assert_eq!(payer.balance(&host).unwrap(), (1_000_000 - total).into());
-        let OperationResultSum::Transfer(op) = &receipt else {
-            panic!("expected Transfer receipt");
-        };
-        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &op.result
-        else {
+        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &content else {
             panic!("expected Applied target");
         };
 
@@ -910,15 +918,14 @@ mod tests {
         // Cover variable burn (10 × COST_PER_BYTES = 2_500) but not the slot burn.
         // 3_000 - 2_500 = 500 remaining
         let payer = init_payer(&mut host, 3_000);
-        let mut receipt = applied_transfer(TransferSuccess {
+        let mut content = applied_transfer(TransferSuccess {
             paid_storage_size_diff: 10_u64.into(),
             allocated_destination_contract: true,
             ..Default::default()
         });
 
-        let err =
-            burn_manager_storage_fees(&mut host, &payer, &u64::MAX.into(), &mut receipt)
-                .expect_err("slot burn must fail when payer is insolvent");
+        let err = burn_content(&mut host, &payer, u64::MAX, &mut content)
+            .expect_err("slot burn must fail when payer is insolvent");
 
         assert_eq!(
             err,
@@ -929,11 +936,7 @@ mod tests {
             }),
         );
 
-        let OperationResultSum::Transfer(op) = &receipt else {
-            panic!("expected Transfer receipt");
-        };
-        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &op.result
-        else {
+        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &content else {
             panic!("expected Applied target");
         };
 
@@ -953,7 +956,7 @@ mod tests {
     fn applied_internal_allocation_fires_slot_burn() {
         let mut host = MockKernelHost::default();
         let payer = init_payer(&mut host, 1_000_000);
-        let internal = InternalOperationSum::Transfer(InternalContentWithMetadata {
+        let mut op = InternalOperationSum::Transfer(InternalContentWithMetadata {
             sender: payer.contract(),
             nonce: 0,
             content: TransferContent {
@@ -966,35 +969,14 @@ mod tests {
                 ..Default::default()
             })),
         });
-        let mut receipt = OperationResultSum::Transfer(OperationResult {
-            balance_updates: vec![],
-            result: ContentResult::Applied(TransferTarget::ToContrat(
-                TransferSuccess::default(),
-            )),
-            internal_operation_results: vec![internal],
-        });
 
-        burn_manager_storage_fees(&mut host, &payer, &u64::MAX.into(), &mut receipt)
-            .unwrap();
+        burn_internal_op(&mut host, &payer, u64::MAX, &mut op).unwrap();
 
         assert_eq!(
             payer.balance(&host).unwrap(),
             (1_000_000 - SLOT_BURN).into()
         );
-        let OperationResultSum::Transfer(op) = &receipt else {
-            panic!("expected Transfer receipt");
-        };
-        let ContentResult::Applied(TransferTarget::ToContrat(top_success)) = &op.result
-        else {
-            panic!("expected Applied top");
-        };
-        assert!(
-            top_success.balance_updates.is_empty(),
-            "top has no growth and no allocation, must not burn"
-        );
-
-        let InternalOperationSum::Transfer(inner) = &op.internal_operation_results[0]
-        else {
+        let InternalOperationSum::Transfer(inner) = &op else {
             panic!("expected internal Transfer");
         };
         let ContentResult::Applied(TransferTarget::ToContrat(success)) = &inner.result
@@ -1027,14 +1009,13 @@ mod tests {
     fn transfer_overshoot_returns_quota_exceeded() {
         let mut host = MockKernelHost::default();
         let payer = init_payer(&mut host, 1_000_000);
-        let mut receipt = applied_transfer(TransferSuccess {
+        let mut content = applied_transfer(TransferSuccess {
             paid_storage_size_diff: 10_u64.into(),
             ..Default::default()
         });
 
-        let trace =
-            burn_manager_storage_fees(&mut host, &payer, &9_u64.into(), &mut receipt)
-                .expect_err("burn must fail when consumed exceeds storage_limit");
+        let trace = burn_content(&mut host, &payer, 9, &mut content)
+            .expect_err("burn must fail when consumed exceeds storage_limit");
 
         assert_eq!(trace, ApplyOperationError::OperationQuotaExceeded);
         assert_eq!(
@@ -1053,13 +1034,13 @@ mod tests {
     fn origination_overshoot_on_slot_burn_returns_quota_exceeded() {
         let mut host = MockKernelHost::default();
         let payer = init_payer(&mut host, 10_000_000);
-        let mut receipt = applied_origination(origination_success(38));
+        let mut content = applied_origination(origination_success(38));
 
-        let trace = burn_manager_storage_fees(
+        let trace = burn_content(
             &mut host,
             &payer,
-            &(38_u64 + ORIGINATION_SIZE - 1).into(),
-            &mut receipt,
+            38_u64 + ORIGINATION_SIZE - 1,
+            &mut content,
         )
         .expect_err("slot burn must fail when budget cannot cover both burns");
 
