@@ -173,7 +173,6 @@ enum InternalOpOrigin {
 /// frame's tree.
 struct TaggedInternalOp {
     op: InternalOperationSum,
-    #[allow(dead_code)]
     origin: InternalOpOrigin,
 }
 
@@ -278,12 +277,14 @@ where
             .iter()
             .map(|tagged_op| {
                 let mut op = tagged_op.op.clone();
-                storage_fees::burn_internal_op_storage_fees(
-                    host,
-                    payer,
-                    storage_limit_remaining,
-                    &mut op,
-                )?;
+                if matches!(tagged_op.origin, InternalOpOrigin::Own) {
+                    storage_fees::burn_internal_op_storage_fees(
+                        host,
+                        payer,
+                        storage_limit_remaining,
+                        &mut op,
+                    )?;
+                }
                 Ok(op)
             })
             .collect();
@@ -9024,5 +9025,101 @@ mod tests {
                 "no storage-fees / payer-debit entry must survive on a rolled-back internal",
             );
         }
+    }
+
+    /// [`burn_pass`]: an internal op tagged `Crac` is left untouched —
+    /// no `balance_updates` are appended on it, and its
+    /// `paid_storage_size_diff` does not consume the shared
+    /// `storage_limit`. An `Own` entry sitting next to it is burned
+    /// as usual. The vec order is preserved.
+    #[test]
+    fn burn_pass_skips_crac_tagged_entries() {
+        let mut host = MockKernelHost::default();
+        let pkh = PublicKeyHash::from_b58check(PAYER_PKH).unwrap();
+        let payer = init_account(&mut host, &pkh, 100_000);
+
+        let own_op = InternalOperationSum::Transfer(InternalContentWithMetadata {
+            sender: payer.contract(),
+            nonce: 0,
+            content: TransferContent {
+                amount: 0_u64.into(),
+                destination: payer.contract(),
+                parameters: Parameters::default(),
+            },
+            result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+                paid_storage_size_diff: 4_u64.into(),
+                ..Default::default()
+            })),
+        });
+        let crac_op = InternalOperationSum::Transfer(InternalContentWithMetadata {
+            sender: payer.contract(),
+            nonce: 1,
+            content: TransferContent {
+                amount: 0_u64.into(),
+                destination: payer.contract(),
+                parameters: Parameters::default(),
+            },
+            result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+                // Non-zero diff is the worst case: a buggy burn would
+                // try to charge 7 bytes and consume from the budget.
+                paid_storage_size_diff: 7_u64.into(),
+                ..Default::default()
+            })),
+        });
+        let tagged = vec![
+            TaggedInternalOp::own(own_op),
+            TaggedInternalOp::from_crac(crac_op),
+        ];
+        let mut content: ContentResult<TransferContent> =
+            ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess::default()));
+
+        // Storage limit deliberately tight: 4 bytes is just enough for
+        // the Own internal alone. A buggy burn that also charged the
+        // Crac internal (7 bytes) would overshoot and return an error.
+        let mut storage_limit_remaining = num_bigint::BigUint::from(4_u64);
+        let (internals, outcome) = burn_pass::<_, TransferContent, _>(
+            &mut host,
+            &payer,
+            &mut storage_limit_remaining,
+            &mut content,
+            tagged,
+        );
+        outcome.expect("Own internal must be burned, Crac internal must be skipped");
+
+        // (a) The Own internal got its `Debited / Credited(StorageFees)`
+        // pair, charging 4 × COST_PER_BYTES against the payer's balance.
+        let own_burn = 4 * COST_PER_BYTES;
+        assert_eq!(payer.balance(&host).unwrap(), (100_000 - own_burn).into());
+
+        assert_eq!(internals.len(), 2);
+
+        // (b) The Own internal's body carries the storage-fee pair.
+        let InternalOperationSum::Transfer(own_after) = &internals[0] else {
+            panic!("expected Own internal at index 0");
+        };
+        let ContentResult::Applied(TransferTarget::ToContrat(own_success)) =
+            &own_after.result
+        else {
+            panic!("expected Applied Own");
+        };
+        assert_eq!(own_success.balance_updates.len(), 2);
+
+        // (c) The Crac internal is intact: empty balance_updates.
+        let InternalOperationSum::Transfer(crac_after) = &internals[1] else {
+            panic!("expected Crac internal at index 1");
+        };
+        let ContentResult::Applied(TransferTarget::ToContrat(crac_success)) =
+            &crac_after.result
+        else {
+            panic!("expected Applied Crac");
+        };
+        assert!(
+            crac_success.balance_updates.is_empty(),
+            "Crac internal must not have storage-fee balance_updates"
+        );
+
+        // (d) The vec order is preserved (Own first, Crac second).
+        assert_eq!(own_after.nonce, 0);
+        assert_eq!(crac_after.nonce, 1);
     }
 }
