@@ -273,6 +273,19 @@ let first_automaton_event state =
          level after waiting its date *)
       bake_at_next_level_event state
 
+(* Field-wise comparison on [consensus_content], used to deduplicate
+   attestations before summing their voting power.
+
+   /!\ Never add a [{... ; _}] construct in the record pattern below: binding
+   every field explicitly makes the comparison exhaustive, so adding a field
+   to [consensus_content] forces this function to be updated. *)
+let compare_consensus_content {slot; level; round; block_payload_hash}
+    (b : consensus_content) =
+  Compare.or_else (Slot.compare slot b.slot) @@ fun () ->
+  Compare.or_else (Raw_level.compare level b.level) @@ fun () ->
+  Compare.or_else (Round.compare round b.round) @@ fun () ->
+  Block_payload_hash.compare block_payload_hash b.block_payload_hash
+
 let attestations_attesting_power state attestations =
   let get_attestation_voting_power {slot; _} =
     match
@@ -281,7 +294,7 @@ let attestations_attesting_power state attestations =
     | None -> 0L (* cannot happen *)
     | Some attesting_power -> attesting_power
   in
-  List.sort_uniq compare attestations
+  List.sort_uniq compare_consensus_content attestations
   |> List.fold_left
        (fun power attestation ->
          Int64.add power (get_attestation_voting_power attestation))
