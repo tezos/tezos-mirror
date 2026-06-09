@@ -105,7 +105,7 @@ esac
 cd opam-repository
 OPAMSOLVERTIMEOUT=600 opam admin filter --yes --resolve \
   "octez-deps,release-tools-deps,ocaml,ocaml-base-compiler,odoc,ledgerwallet-tezos,caqti-driver-postgresql,$dummy_pkg" \
-  --environment "os=linux,arch=$arch,os-family=alpine"
+  --environment "os=linux,arch=$arch,os-family=alpine,os-distribution=alpine"
 
 # Clean up: remove packages that we do not actually want to install.
 rm -rf packages/"$dummy_pkg" packages/octez-deps packages/release-tools-deps
