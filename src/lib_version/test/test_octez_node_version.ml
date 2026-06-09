@@ -15,11 +15,11 @@
 let all_products : Tezos_version_parser.product array =
   [|Octez; Octez_evm_node|]
 
-(* Values of Beta x, Beta_dev x, RC x or RC_dev x in additional_info are
-   ignored. *)
+(* Values of Beta x, Beta_dev x, Pre x, Pre_dev x, RC x or RC_dev x in
+   additional_info are ignored. *)
 let version_generator ?(product = all_products) ?major ?minor ?build
     ?(additional_info =
-      ([|Dev; Beta 0; Beta_dev 0; RC 0; RC_dev 0; Release|]
+      ([|Dev; Beta 0; Beta_dev 0; Pre 0; Pre_dev 0; RC 0; RC_dev 0; Release|]
         : Tezos_version_parser.additional_info array)) ?additional_info_value ()
     =
   let product = QCheck2.Gen.oneofa product in
@@ -41,6 +41,8 @@ let version_generator ?(product = all_products) ?major ?minor ?build
         match additional_info with
         | Beta _ -> Beta v
         | Beta_dev _ -> Beta_dev v
+        | Pre _ -> Pre v
+        | Pre_dev _ -> Pre_dev v
         | RC _ -> RC v
         | RC_dev _ -> RC_dev v
         | x -> x)
@@ -148,7 +150,9 @@ let () =
   @@
   let generator =
     QCheck2.Gen.tup3
-      (version_generator ~additional_info:[|Dev; Beta_dev 0; RC_dev 0|] ())
+      (version_generator
+         ~additional_info:[|Dev; Beta_dev 0; Pre_dev 0; RC_dev 0|]
+         ())
       (commit_info_opt_generator ())
       (commit_info_opt_generator ())
   in
@@ -199,7 +203,7 @@ let () =
         QCheck2.Gen.tup4
           (version_generator
              ~product
-             ~additional_info:[|Dev; Beta_dev 0; RC_dev 0|]
+             ~additional_info:[|Dev; Beta_dev 0; Pre_dev 0; RC_dev 0|]
              ())
           (commit_info_opt_generator ())
           (version_generator ~product ())
@@ -457,6 +461,131 @@ let () =
   match Octez_node_version.partially_compare v1 c1 v2 c2 with
   | Some x when x < 0 -> (
       match Octez_node_version.partially_compare v2 c2 v1 c1 with
+      | Some x when x > 0 -> true
+      | _ ->
+          QCheck2.Test.fail_reportf "version2 should be greater than version1")
+  | _ -> QCheck2.Test.fail_reportf "version1 should be less than version2"
+
+(* Test Pre < RC or Release *)
+let () =
+  Qcheck_tezt.register ~__FILE__ ~tags:["version"]
+  @@
+  let generator =
+    let product = QCheck2.Gen.oneofa all_products in
+    QCheck2.Gen.bind
+      (QCheck2.Gen.tup4 product QCheck2.Gen.int QCheck2.Gen.int QCheck2.Gen.int)
+      (fun (p, major, minor, build) ->
+        let product = [|p|] in
+        QCheck2.Gen.tup2
+          (version_generator
+             ~product
+             ~major
+             ~minor
+             ~build
+             ~additional_info:[|Pre 0|]
+             ())
+          (version_generator
+             ~product
+             ~major
+             ~minor
+             ~build
+             ~additional_info:[|RC 0; Release|]
+             ()))
+  in
+  let print (v1, v2) = print_opt ~v1 ~v2 () in
+  QCheck2.Test.make
+    ~name:"partially_compare pre < RC or Release"
+    ~print
+    generator
+  @@ fun (v1, v2) ->
+  match Octez_node_version.partially_compare v1 None v2 None with
+  | Some x when x < 0 -> (
+      match Octez_node_version.partially_compare v2 None v1 None with
+      | Some x when x > 0 -> true
+      | _ ->
+          QCheck2.Test.fail_reportf "version2 should be greater than version1")
+  | _ -> QCheck2.Test.fail_reportf "version1 should be less than version2"
+
+(* Test Pre and Beta are incomparable with each other *)
+let () =
+  Qcheck_tezt.register ~__FILE__ ~tags:["version"]
+  @@
+  let generator =
+    let product = QCheck2.Gen.oneofa all_products in
+    QCheck2.Gen.bind
+      (QCheck2.Gen.tup4 product QCheck2.Gen.int QCheck2.Gen.int QCheck2.Gen.int)
+      (fun (p, major, minor, build) ->
+        let product = [|p|] in
+        QCheck2.Gen.tup2
+          (version_generator
+             ~product
+             ~major
+             ~minor
+             ~build
+             ~additional_info:[|Pre 0|]
+             ())
+          (version_generator
+             ~product
+             ~major
+             ~minor
+             ~build
+             ~additional_info:[|Beta 0|]
+             ()))
+  in
+  let print (v1, v2) = print_opt ~v1 ~v2 () in
+  QCheck2.Test.make
+    ~name:"partially_compare pre incomparable with beta"
+    ~print
+    generator
+  @@ fun (v1, v2) ->
+  match
+    ( Octez_node_version.partially_compare v1 None v2 None,
+      Octez_node_version.partially_compare v2 None v1 None )
+  with
+  | None, None -> true
+  | _ -> QCheck2.Test.fail_reportf "Pre and Beta should be incomparable"
+
+(* Test two Pre versions are ordered by their number *)
+let () =
+  Qcheck_tezt.register ~__FILE__ ~tags:["version"]
+  @@
+  let generator =
+    let product = QCheck2.Gen.oneofa all_products in
+    QCheck2.Gen.bind
+      (QCheck2.Gen.tup5
+         product
+         QCheck2.Gen.int
+         QCheck2.Gen.int
+         QCheck2.Gen.int
+         (QCheck2.Gen.tup2 QCheck2.Gen.int QCheck2.Gen.int))
+      (fun (p, major, minor, build, (x, y)) ->
+        let product = [|p|] in
+        let n1, n2 = if x < y then (x, y) else (y, x) in
+        QCheck2.Gen.tup2
+          (version_generator
+             ~product
+             ~major
+             ~minor
+             ~build
+             ~additional_info:[|Pre 0|]
+             ~additional_info_value:n1
+             ())
+          (version_generator
+             ~product
+             ~major
+             ~minor
+             ~build
+             ~additional_info:[|Pre 0|]
+             ~additional_info_value:n2
+             ()))
+  in
+  let print (v1, v2) = print_opt ~v1 ~v2 () in
+  QCheck2.Test.make ~name:"partially_compare pre < pre" ~print generator
+  @@ fun (v1, v2) ->
+  QCheck2.assume (v1.additional_info <> v2.additional_info) ;
+  match Octez_node_version.partially_compare v1 None v2 None with
+  | Some x when x < 0 -> (
+      match Octez_node_version.partially_compare v2 None v1 None with
       | Some x when x > 0 -> true
       | _ ->
           QCheck2.Test.fail_reportf "version2 should be greater than version1")

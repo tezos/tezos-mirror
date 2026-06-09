@@ -64,6 +64,22 @@ let octez_legal_versions =
         build = 0;
         additional_info = Beta_dev 1;
       } );
+    ( "octez-v10.93-pre1",
+      {
+        product = Octez;
+        Version.major = 10;
+        minor = 93;
+        build = 0;
+        additional_info = Pre 1;
+      } );
+    ( "octez-v10.93-pre1+dev",
+      {
+        product = Octez;
+        Version.major = 10;
+        minor = 93;
+        build = 0;
+        additional_info = Pre_dev 1;
+      } );
     ( "octez-v10.93-4",
       {
         product = Octez;
@@ -132,6 +148,22 @@ let octez_evm_node_legal_versions =
         build = 0;
         additional_info = Beta_dev 1;
       } );
+    ( "octez-evm-node-v10.93-pre1",
+      {
+        product = Octez_evm_node;
+        Version.major = 10;
+        minor = 93;
+        build = 0;
+        additional_info = Pre 1;
+      } );
+    ( "octez-evm-node-v10.93-pre1+dev",
+      {
+        product = Octez_evm_node;
+        Version.major = 10;
+        minor = 93;
+        build = 0;
+        additional_info = Pre_dev 1;
+      } );
   ]
 
 let parse_version s = Tezos_version_parser.version_tag (Lexing.from_string s)
@@ -144,6 +176,8 @@ let eq v1 v2 =
     | Dev, _ -> false
     | Beta n1, Beta n2 | Beta_dev n1, Beta_dev n2 -> n1 = n2
     | Beta _, _ | Beta_dev _, _ -> false
+    | Pre n1, Pre n2 | Pre_dev n1, Pre_dev n2 -> n1 = n2
+    | Pre _, _ | Pre_dev _, _ -> false
     | RC n1, RC n2 | RC_dev n1, RC_dev n2 -> n1 = n2
     | RC _, _ | RC_dev _, _ -> false
     | Release, Release -> true

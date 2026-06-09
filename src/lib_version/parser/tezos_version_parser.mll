@@ -23,6 +23,8 @@
     | Dev
     | Beta of int
     | Beta_dev of int
+    | Pre of int
+    | Pre_dev of int
     | RC of int
     | RC_dev of int
     | Release [@@deriving show]
@@ -74,7 +76,7 @@ rule parse_git_describe_or_node_version_allowed_exn = parse
     (* Version number. *)
     (num as major) ('.' (num as minor))? ".0"?
     (* Additional information for versions that are not actually releases. *)
-    ('-' ("rc" | "beta" as extra_kind) (num as extra_num))?
+    ('-' ("rc" | "beta" | "pre" as extra_kind) (num as extra_num))?
     (* Build number. *)
     ('-' (num as build))?
     (* What follows depends on what we are parsing. *)
@@ -106,8 +108,11 @@ rule parse_git_describe_or_node_version_allowed_exn = parse
               RC (int_of_string num)
           | Some "beta", Some num ->
               Beta (int_of_string num)
+          | Some "pre", Some num ->
+              Pre (int_of_string num)
           | Some _, Some _ ->
-              (* Cannot happen because the regexp only accepts "rc" and "beta". *)
+              (* Cannot happen because the regexp only accepts "rc", "beta"
+                 and "pre". *)
               assert false
       in
       let additional_info =
@@ -119,7 +124,8 @@ rule parse_git_describe_or_node_version_allowed_exn = parse
                 | Release -> Dev
                 | RC n -> RC_dev n
                 | Beta n -> Beta_dev n
-                | Dev | RC_dev _ | Beta_dev _ as x -> x (* not supposed to happen *)
+                | Pre n -> Pre_dev n
+                | Dev | RC_dev _ | Beta_dev _ | Pre_dev _ as x -> x (* not supposed to happen *)
       in
       Some ({ product; major; minor; build; additional_info }, commit_hash)
     }

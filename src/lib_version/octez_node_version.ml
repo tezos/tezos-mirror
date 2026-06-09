@@ -89,6 +89,18 @@ let additional_info_encoding =
         (obj1 (req "beta_dev" int31))
         (function Beta_dev n -> Some n | _ -> None)
         (fun n -> Beta_dev n);
+      case
+        (Tag 6)
+        ~title:"Pre"
+        (obj1 (req "pre" int31))
+        (function Pre n -> Some n | _ -> None)
+        (fun n -> Pre n);
+      case
+        (Tag 7)
+        ~title:"Pre_dev"
+        (obj1 (req "pre_dev" int31))
+        (function Pre_dev n -> Some n | _ -> None)
+        (fun n -> Pre_dev n);
     ]
 
 (* The encoding is defined here to keep [Version] "Data_encoding free"*)
@@ -127,8 +139,8 @@ let partially_compare (v1 : Version.t) (c1 : commit_info option)
   let is_dev (v : Tezos_version_parser.t) =
     let open Tezos_version_parser in
     match v.additional_info with
-    | Dev | Beta_dev _ | RC_dev _ -> true
-    | Beta _ | RC _ | Release -> false
+    | Dev | Beta_dev _ | Pre_dev _ | RC_dev _ -> true
+    | Beta _ | Pre _ | RC _ | Release -> false
   in
   let is_commit_equal =
     match (c1, c2) with
@@ -149,9 +161,14 @@ let partially_compare (v1 : Version.t) (c1 : commit_info option)
           if build_comp <> 0 then Some build_comp
           else
             match (v1.additional_info, v2.additional_info) with
-            | Beta n1, Beta n2 | RC n1, RC n2 -> Some (Int.compare n1 n2)
-            | Beta _, (RC _ | Release) | RC _, Release -> Some (-1)
-            | Release, (RC _ | Beta _) | RC _, Beta _ -> Some 1
+            (* [Beta] and [Pre] are both prereleases older than [RC] and
+               [Release], but are incomparable with each other (handled by
+               the catch-all). *)
+            | Beta n1, Beta n2 | Pre n1, Pre n2 | RC n1, RC n2 ->
+                Some (Int.compare n1 n2)
+            | (Beta _ | Pre _), (RC _ | Release) | RC _, Release -> Some (-1)
+            | Release, (RC _ | Beta _ | Pre _) | RC _, (Beta _ | Pre _) ->
+                Some 1
             | _, _ -> None
   in
   match (is_commit_equal, version_comparison) with

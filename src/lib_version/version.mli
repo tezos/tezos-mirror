@@ -38,6 +38,13 @@
 
     [Beta_dev] refers to a beta version "in development".
 
+    [Pre] refers to a pre-release version, published ahead of an actual
+    release. Like [Beta], it is older than [RC] and [Release], but [Pre]
+    and [Beta] are incomparable with each other.
+    For each release, the first pre-release version has number 1.
+
+    [Pre_dev] refers to a pre-release version "in development".
+
     [RC] means "Release Candidate".
     For each release, the first release candidate has number 1.
 
@@ -55,13 +62,16 @@ type additional_info = Tezos_version_parser.additional_info =
   | Dev
   | Beta of int
   | Beta_dev of int
+  | Pre of int
+  | Pre_dev of int
   | RC of int
   | RC_dev of int
   | Release
 
 (** Convert additional version information to a string.
 
-    The result is a string of the form ["+dev"], ["~rcX"], ["~rcX+dev"] or [""]. *)
+    The result is a string of the form ["+dev"], ["~rcX"], ["~rcX+dev"],
+    ["~betaX"], ["~preX"] or [""]. *)
 val string_of_additional_info : additional_info -> string
 
 (** Product information. *)

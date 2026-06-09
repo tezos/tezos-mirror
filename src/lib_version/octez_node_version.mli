@@ -61,8 +61,9 @@ val encoding : t Data_encoding.t
 
     [v1], [c1] and [v2], [c2] are comparable if:
     - they have the same product and
-      - they are [Beta], [RC] or [Release] or
-      - they are [Dev], [Beta_dev] or [RC_dev] and
+      - they are [Beta], [Pre], [RC] or [Release] — except that [Beta] and
+        [Pre] are incomparable with each other — or
+      - they are [Dev], [Beta_dev], [Pre_dev] or [RC_dev] and
         - have commit info and
         - version and commit info are equal.
     If [v1] and [v2] are equal, but [c1] and [c2] are not then they are not
@@ -74,8 +75,9 @@ val encoding : t Data_encoding.t
     To determine which version is more recent or old:
     - [major] has the priority on [minor]
     - [minor] has priority on [additional_info]
-    - [Beta] is older than [RC]
+    - [Beta] and [Pre] are older than [RC]
     - [RC] is older than [Release]
+    - [Beta] and [Pre] are incomparable with each other
 *)
 val partially_compare :
   Version.t ->
