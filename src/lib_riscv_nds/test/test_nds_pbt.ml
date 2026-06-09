@@ -493,7 +493,8 @@ let register_unit_disk (name, f) =
     ~tags:["unit"; "nds"; "disk"]
     (with_disk_gc f)
 
-let register_pbt ?(long = false) ?long_factor (module B : BACKEND) f =
+let register_pbt ?(long = false) ?long_factor ?(extra_tags = [])
+    (module B : BACKEND) f =
   let register =
     if String.starts_with ~prefix:"disk" B.name then register_pbt_with_disk_gc
     else Qcheck_tezt.register
@@ -502,7 +503,7 @@ let register_pbt ?(long = false) ?long_factor (module B : BACKEND) f =
     ~__FILE__
     ~seed:Random
     ~long
-    ~tags:(["nds"; B.name] @ if long then ["long"] else [])
+    ~tags:(["nds"; B.name] @ (if long then ["long"] else []) @ extra_tags)
     (f ?long_factor (module B : BACKEND))
 
 let register_pbt_disk ?(long = false) ?long_factor f =
@@ -574,6 +575,7 @@ let () =
   register_pbt
     ~long:true
     ~long_factor:50
+    ~extra_tags:["slow"]
     (module Disk_prove_backend)
     test_bisimulation ;
   register_pbt_disk ~long:true ~long_factor:5 test_cross_backend_bisimulation
