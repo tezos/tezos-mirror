@@ -14,9 +14,7 @@
 
 open Intf
 
-(** Proof objects for the in-memory durable storage.
-
-    {b Note}: Currently a stub (TZX-113). *)
+(** Proof objects for the in-memory durable storage. *)
 module Proof : PROOF
 
 (** Normal mode: registry and database operations. *)
@@ -39,10 +37,7 @@ end
     {!Wasm_vm.Make_vm} instantiation. *)
 val make_empty_normal_nds : unit -> Nds.t
 
-(** Prove mode: registry, database, and proof lifecycle.
-
-    {b Note}: Currently a stub (TZX-113). All operations will raise a
-    runtime error if called. *)
+(** Prove mode: registry, database, and proof lifecycle. *)
 module Prove :
   PROVE
     with type normal_registry := Normal.Registry.t

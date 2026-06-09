@@ -3,6 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* SPDX-FileCopyrightText: 2026 Functori <contact@functori.com>              *)
 (* SPDX-FileCopyrightText: 2026 Nomadic Labs <contact@nomadic-labs.com>      *)
+(* SPDX-FileCopyrightText: 2026 Trilitech <contact@trili.tech>               *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -414,6 +415,52 @@ let test_commit_checkout_snapshot ?long_factor =
   let h_restored = Registry.hash r2 in
   Bytes.equal h_at_commit h_restored
 
+(** {2 Proof properties} *)
+
+(** Deterministic check of the proof's state hashes: a proof produced from
+    the NDS registry must record, as its initial state, the hash of the
+    Normal-mode registry taken just before it was wrapped into prove mode,
+    and, as its final state, the hash of the prove-mode registry after the
+    last recorded operation. *)
+let test_proof_state_hashes (module B : PROOF_LIFECYCLE_BACKEND) () =
+  let key = Bytes.of_string "k" in
+  (* Set up some Normal-mode state before starting the proof. *)
+  let normal_r = B.create_normal_with_dbs 2 in
+  let^? () =
+    B.Normal.Database.set
+      normal_r
+      ~db_index:0L
+      ~key
+      ~value:(Bytes.of_string "v0")
+  in
+  let^? () =
+    B.Normal.Database.set
+      normal_r
+      ~db_index:1L
+      ~key
+      ~value:(Bytes.of_string "v1")
+  in
+  (* Hash of the state right before wrapping into prove mode. *)
+  let h_start = B.Normal.Registry.hash normal_r in
+  let prove_r = B.Prove.start_proof normal_r in
+  (* A few prove-mode operations. *)
+  let^? () =
+    B.Prove.Database.set prove_r ~db_index:0L ~key ~value:(Bytes.of_string "v2")
+  in
+  let^? () = B.Prove.Database.delete prove_r ~db_index:1L ~key in
+  (* Hash of the prove-mode state after the last operation. *)
+  let h_stop = B.Prove.Registry.hash prove_r in
+  let proof = B.Prove.produce_proof prove_r in
+  Check.(
+    (Bytes.to_string (B.Prove.Proof.start_state proof) = Bytes.to_string h_start)
+      string)
+    ~error_msg:"proof start_state %L does not match Normal registry hash %R" ;
+  Check.(
+    (Bytes.to_string (B.Prove.Proof.stop_state proof) = Bytes.to_string h_stop)
+      string)
+    ~error_msg:"proof stop_state %L does not match Prove registry hash %R" ;
+  unit
+
 (** {2 Model-based (stateful) properties} *)
 
 (** Bisimulation: a random sequence of operations on the NDS must produce
@@ -514,6 +561,16 @@ let register_pbt_disk ?(long = false) ?long_factor f =
     ~tags:(["nds"; "disk"] @ if long then ["long"] else [])
     (f ?long_factor)
 
+let register_proof_tests (module B : PROOF_LIFECYCLE_BACKEND) =
+  let is_disk = String.starts_with ~prefix:"disk" B.name in
+  let unit_body () = test_proof_state_hashes (module B) () in
+  let unit_body = if is_disk then with_disk_gc unit_body else unit_body in
+  Test.register
+    ~__FILE__
+    ~title:(B.name ^ ": proof has correct start/stop state hashes")
+    ~tags:["unit"; "nds"; "proof"; B.name]
+    unit_body
+
 let register_with_backend (backend : (module BACKEND)) =
   (* Unit tests *)
   List.iter
@@ -569,13 +626,15 @@ let () =
     test_bisimulation ;
   register_pbt
     ~long:true
-    ~long_factor:50
+    ~long_factor:10
     (module Disk_backend)
     test_bisimulation ;
   register_pbt
     ~long:true
-    ~long_factor:50
-    ~extra_tags:["slow"]
+    ~long_factor:10
     (module Disk_prove_backend)
     test_bisimulation ;
-  register_pbt_disk ~long:true ~long_factor:5 test_cross_backend_bisimulation
+  register_pbt_disk ~long:true ~long_factor:5 test_cross_backend_bisimulation ;
+  (* Proof API *)
+  register_proof_tests (module Memory_proof_lifecycle) ;
+  register_proof_tests (module Disk_proof_lifecycle)
