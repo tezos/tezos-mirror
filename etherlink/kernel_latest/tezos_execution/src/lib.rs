@@ -160,6 +160,45 @@ pub mod mir_ctx;
 mod storage_fees;
 mod validate;
 
+/// Where an internal operation entered the current frame's tree.
+enum InternalOpOrigin {
+    /// Operation directly emitted by the current frame.
+    Own,
+    /// Operation surfaced by the CRAC drain mechanism.
+    Crac,
+}
+
+/// An internal operation accumulated during the execution of a manager
+/// operation, paired with the origin that produced it within the current
+/// frame's tree.
+struct TaggedInternalOp {
+    op: InternalOperationSum,
+    #[allow(dead_code)]
+    origin: InternalOpOrigin,
+}
+
+impl TaggedInternalOp {
+    fn own(op: InternalOperationSum) -> Self {
+        Self {
+            op,
+            origin: InternalOpOrigin::Own,
+        }
+    }
+
+    fn from_crac(op: InternalOperationSum) -> Self {
+        Self {
+            op,
+            origin: InternalOpOrigin::Crac,
+        }
+    }
+}
+
+/// Drop the origin tags and return the underlying internal operations
+/// in their original order.
+fn untag_internals(tagged: Vec<TaggedInternalOp>) -> Vec<InternalOperationSum> {
+    tagged.into_iter().map(|t| t.op).collect()
+}
+
 /// Build the final [`ContentResult`] for the parent operation,
 /// cascading any exec failure into the internals (mutated in place).
 ///
@@ -170,7 +209,7 @@ mod validate;
 /// - Otherwise → parent stays `Applied`; internals untouched.
 fn finalize_statuses<M: OperationKind>(
     result: Result<M::Success, ApplyOperationError>,
-    internal_operation_results: &mut [InternalOperationSum],
+    internal_operation_results: &mut [TaggedInternalOp],
 ) -> ContentResult<M> {
     match result {
         Ok(success) => {
@@ -179,13 +218,13 @@ fn finalize_statuses<M: OperationKind>(
             // carries the cascade signal.
             let all_internal_succeeded = internal_operation_results
                 .last()
-                .is_none_or(InternalOperationSum::is_applied);
+                .is_none_or(|t| t.op.is_applied());
             if all_internal_succeeded {
                 ContentResult::Applied(success)
             } else {
                 internal_operation_results
                     .iter_mut()
-                    .for_each(InternalOperationSum::transform_result_backtrack);
+                    .for_each(|t| t.op.transform_result_backtrack());
                 ContentResult::BackTracked(BacktrackedResult {
                     errors: None,
                     result: success,
@@ -195,7 +234,7 @@ fn finalize_statuses<M: OperationKind>(
         Err(operation_error) => {
             internal_operation_results
                 .iter_mut()
-                .for_each(InternalOperationSum::transform_result_backtrack);
+                .for_each(|t| t.op.transform_result_backtrack());
             ContentResult::Failed(vec![operation_error].into())
         }
     }
@@ -217,7 +256,7 @@ fn burn_pass<Host, M, A>(
     payer: &A,
     storage_limit_remaining: &mut BigUint,
     content: &mut ContentResult<M>,
-    internal_operation_results: Vec<InternalOperationSum>,
+    internal_operation_results: Vec<TaggedInternalOp>,
 ) -> (Vec<InternalOperationSum>, Result<(), ApplyOperationError>)
 where
     Host: StorageV1,
@@ -231,14 +270,14 @@ where
         content,
     );
     if parent_outcome.is_err() {
-        return (internal_operation_results, parent_outcome);
+        return (untag_internals(internal_operation_results), parent_outcome);
     }
 
     let burned: Result<Vec<InternalOperationSum>, ApplyOperationError> =
         internal_operation_results
             .iter()
-            .map(|op| {
-                let mut op = op.clone();
+            .map(|tagged_op| {
+                let mut op = tagged_op.op.clone();
                 storage_fees::burn_internal_op_storage_fees(
                     host,
                     payer,
@@ -251,7 +290,7 @@ where
 
     match burned {
         Ok(burned) => (burned, Ok(())),
-        Err(e) => (internal_operation_results, Err(e)),
+        Err(e) => (untag_internals(internal_operation_results), Err(e)),
     }
 }
 
@@ -268,7 +307,7 @@ fn finalize_and_burn<Host, M, A>(
     storage_limit: &Narith,
     balance_updates: Vec<BalanceUpdate>,
     result: Result<M::Success, ApplyOperationError>,
-    mut internal_operation_results: Vec<InternalOperationSum>,
+    mut internal_operation_results: Vec<TaggedInternalOp>,
 ) -> OperationResult<M>
 where
     Host: StorageV1,
@@ -516,7 +555,7 @@ fn execute_internal_operations<'a, Host, C: Context>(
     internal_operations: impl Iterator<Item = OperationInfo<'a>>,
     sender_account: &C::OriginatedAccountType,
     parser: &'a Parser<'a>,
-    all_internal_receipts: &mut Vec<InternalOperationSum>,
+    all_internal_receipts: &mut Vec<TaggedInternalOp>,
     nonce_counter: &mut u16,
 ) -> Result<(), ApplyOperationError>
 where
@@ -606,7 +645,7 @@ where
                                 let sub_ops_succeeded = all_internal_receipts
                                     .get(receipts_before..)
                                     .and_then(|s| s.last())
-                                    .is_none_or(InternalOperationSum::is_applied);
+                                    .is_none_or(|t| t.op.is_applied());
                                 if sub_ops_succeeded {
                                     ContentResult::Applied(success.into())
                                 } else {
@@ -756,7 +795,8 @@ where
         // `receipts_before` was captured before `transfer()` added the
         // child receipts, so inserting at that index puts the parent
         // receipt in the correct position.
-        all_internal_receipts.insert(receipts_before, internal_receipt);
+        all_internal_receipts
+            .insert(receipts_before, TaggedInternalOp::own(internal_receipt));
         // Drain any re-entrant CRAC ops that accumulated during this
         // operation's execution (e.g. a gateway call that re-entered
         // Michelson).  Placing the drain here — right after the gateway
@@ -767,7 +807,8 @@ where
             failed_crac_receipts_before,
             backtracked_crac_receipts_before,
         );
-        all_internal_receipts.extend(reentrant_ops);
+        all_internal_receipts
+            .extend(reentrant_ops.into_iter().map(TaggedInternalOp::from_crac));
     }
     Ok(())
 }
@@ -789,7 +830,7 @@ fn transfer<'a, Host, C: Context>(
     entrypoint: &Entrypoint,
     param: Micheline<'a>,
     parser: &'a Parser<'a>,
-    all_internal_receipts: &mut Vec<InternalOperationSum>,
+    all_internal_receipts: &mut Vec<TaggedInternalOp>,
     skip_sender_debit: bool,
     nonce_counter: &mut u16,
 ) -> Result<TransferSuccess, CracError>
@@ -1080,7 +1121,7 @@ fn transfer_external<'a, Host, C: Context>(
     amount: &Narith,
     dest: &Contract,
     parameters: &Parameters,
-    all_internal_receipts: &mut Vec<InternalOperationSum>,
+    all_internal_receipts: &mut Vec<TaggedInternalOp>,
     parser: &'a Parser<'a>,
     nonce_counter: &mut u16,
 ) -> Result<TransferTarget, CracError>
@@ -1206,9 +1247,8 @@ where
             // receipts. We must inspect the receipts to detect this case,
             // matching the pattern used by [`finalize_statuses`] in the
             // normal Tezos operation path.
-            let all_internal_succeeded = internal_receipts
-                .last()
-                .is_none_or(InternalOperationSum::is_applied);
+            let all_internal_succeeded =
+                internal_receipts.last().is_none_or(|t| t.op.is_applied());
             if all_internal_succeeded {
                 // promote: discard the snapshot, keep changes
                 journal
@@ -1217,7 +1257,7 @@ where
                     .map_err(|e| CracTransferError::from(gw(e)))?;
                 Ok(CrossRuntimeTransferResult {
                     target: success.into(),
-                    internal_receipts,
+                    internal_receipts: untag_internals(internal_receipts),
                 })
             } else {
                 // revert: restore the snapshot
@@ -1227,7 +1267,7 @@ where
                     .map_err(|e| CracTransferError::from(gw(e)))?;
                 internal_receipts
                     .iter_mut()
-                    .for_each(InternalOperationSum::transform_result_backtrack);
+                    .for_each(|t| t.op.transform_result_backtrack());
                 // Return the internal receipts so the failed CRAC
                 // receipt can include backtracked/failed/skipped ops
                 // (RFC Example 4).
@@ -1237,7 +1277,7 @@ where
                             "internal operation failed during cross-runtime call".into(),
                         ),
                     ),
-                    internal_receipts,
+                    internal_receipts: untag_internals(internal_receipts),
                 })
             }
         }
@@ -1248,10 +1288,10 @@ where
                 .map_err(|e| CracTransferError::from(gw(e)))?;
             internal_receipts
                 .iter_mut()
-                .for_each(InternalOperationSum::transform_result_backtrack);
+                .for_each(|t| t.op.transform_result_backtrack());
             Err(CracTransferError {
                 error: e,
-                internal_receipts,
+                internal_receipts: untag_internals(internal_receipts),
             })
         }
     }
@@ -1826,7 +1866,7 @@ fn apply_operation<Host, C: Context>(
 where
     Host: StorageV1,
 {
-    let mut internal_operations_receipts = Vec::new();
+    let mut internal_operations_receipts: Vec<TaggedInternalOp> = Vec::new();
     let mut gas = validated_operation.gas;
     let mut tc_ctx = TcCtx {
         host,
@@ -1904,7 +1944,8 @@ where
                 failed_crac_receipts_before,
                 backtracked_crac_receipts_before,
             );
-            internal_operations_receipts.extend(reentrant_ops);
+            internal_operations_receipts
+                .extend(reentrant_ops.into_iter().map(TaggedInternalOp::from_crac));
             let transfer_result = match transfer_result {
                 Ok(v) => Ok(v),
                 Err(CracError::BlockAbort(msg)) => {
@@ -2038,7 +2079,7 @@ mod tests {
     use crate::{
         account_storage::{Manager, TezlinkAccount},
         burn_pass, context, validate_and_apply_operation, FeeRefundConfig,
-        OperationError, ProcessedOperation,
+        OperationError, ProcessedOperation, TaggedInternalOp,
     };
     use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 
@@ -8899,7 +8940,7 @@ mod tests {
             &payer,
             &mut storage_limit_remaining,
             &mut content,
-            vec![internal],
+            vec![TaggedInternalOp::own(internal)],
         );
         assert_eq!(outcome, Err(ApplyOperationError::OperationQuotaExceeded));
 
@@ -8930,21 +8971,23 @@ mod tests {
         let pkh = PublicKeyHash::from_b58check(PAYER_PKH).unwrap();
         let payer = init_account(&mut host, &pkh, 10_000_000);
         let make_internal = || {
-            InternalOperationSum::Transfer(InternalContentWithMetadata {
-                sender: payer.contract(),
-                nonce: 0,
-                content: TransferContent {
-                    amount: 0_u64.into(),
-                    destination: payer.contract(),
-                    parameters: Parameters::default(),
-                },
-                result: ContentResult::Applied(TransferTarget::ToContrat(
-                    TransferSuccess {
-                        allocated_destination_contract: true,
-                        ..Default::default()
+            TaggedInternalOp::own(InternalOperationSum::Transfer(
+                InternalContentWithMetadata {
+                    sender: payer.contract(),
+                    nonce: 0,
+                    content: TransferContent {
+                        amount: 0_u64.into(),
+                        destination: payer.contract(),
+                        parameters: Parameters::default(),
                     },
-                )),
-            })
+                    result: ContentResult::Applied(TransferTarget::ToContrat(
+                        TransferSuccess {
+                            allocated_destination_contract: true,
+                            ..Default::default()
+                        },
+                    )),
+                },
+            ))
         };
         let mut content: ContentResult<TransferContent> =
             ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess::default()));
