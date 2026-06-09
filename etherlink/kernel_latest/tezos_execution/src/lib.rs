@@ -201,6 +201,103 @@ fn finalize_statuses<M: OperationKind>(
     }
 }
 
+/// Charge the payer for the storage that `content` and each Own
+/// internal allocated.
+///
+/// Entries tagged [`InternalOpOrigin::Crac`] pass through unchanged
+/// — their storage cost belongs to a foreign-runtime caller.
+///
+/// On a per-entry burn failure, the receipt entries
+/// (clone-then-rebuild) carry the pre-burn internals — no stray
+/// balance_updates survive. Host-side debits applied by `burn_tez`
+/// are rolled back out-of-band by the caller's `SafeStorage`
+/// transaction.
+fn burn_pass<Host, M, A>(
+    host: &mut Host,
+    payer: &A,
+    storage_limit_remaining: &mut BigUint,
+    content: &mut ContentResult<M>,
+    internal_operation_results: Vec<InternalOperationSum>,
+) -> (Vec<InternalOperationSum>, Result<(), ApplyOperationError>)
+where
+    Host: StorageV1,
+    M: storage_fees::StorageFeesBurn,
+    A: TezlinkAccount,
+{
+    let parent_outcome = storage_fees::burn_content_storage_fees::<_, M>(
+        host,
+        payer,
+        storage_limit_remaining,
+        content,
+    );
+    if parent_outcome.is_err() {
+        return (internal_operation_results, parent_outcome);
+    }
+
+    let burned: Result<Vec<InternalOperationSum>, ApplyOperationError> =
+        internal_operation_results
+            .iter()
+            .map(|op| {
+                let mut op = op.clone();
+                storage_fees::burn_internal_op_storage_fees(
+                    host,
+                    payer,
+                    storage_limit_remaining,
+                    &mut op,
+                )?;
+                Ok(op)
+            })
+            .collect();
+
+    match burned {
+        Ok(burned) => (burned, Ok(())),
+        Err(e) => (internal_operation_results, Err(e)),
+    }
+}
+
+/// Build the wire [`OperationResult`] for a manager operation:
+/// cascade statuses, burn storage fees, then assemble the receipt
+/// (never mutated afterwards).
+///
+/// A burn-level failure demotes the parent (and every Applied
+/// internal) to `BackTracked`, with the burn errors attached to
+/// the parent.
+fn finalize_and_burn<Host, M, A>(
+    host: &mut Host,
+    payer: &A,
+    storage_limit: &Narith,
+    balance_updates: Vec<BalanceUpdate>,
+    result: Result<M::Success, ApplyOperationError>,
+    mut internal_operation_results: Vec<InternalOperationSum>,
+) -> OperationResult<M>
+where
+    Host: StorageV1,
+    M: storage_fees::StorageFeesBurn,
+    A: TezlinkAccount,
+{
+    let mut content = finalize_statuses::<M>(result, &mut internal_operation_results);
+    let mut storage_limit_remaining: BigUint = storage_limit.0.clone();
+    let (mut internals, burn_outcome) = burn_pass(
+        host,
+        payer,
+        &mut storage_limit_remaining,
+        &mut content,
+        internal_operation_results,
+    );
+    if let Err(errors) = burn_outcome {
+        log!(Debug, "Storage burn failed: {errors:?}");
+        content.backtrack_if_applied_with_errors(errors.into());
+        internals
+            .iter_mut()
+            .for_each(InternalOperationSum::transform_result_backtrack);
+    }
+    OperationResult {
+        balance_updates,
+        result: content,
+        internal_operation_results: internals,
+    }
+}
+
 /// Cost of a single durable-store write of `payload_bytes`, in
 /// milligas. Public counterpart of [`consume_storage_write_milligas`]
 /// for callers outside `tezos_execution` that maintain their own gas
@@ -1741,19 +1838,20 @@ where
     };
     let parser = Parser::new();
     let mut counter = 0u128;
-    let mut receipt = match &validated_operation.content.operation {
+    let storage_limit = &validated_operation.content.storage_limit;
+    let balance_updates = validated_operation.balance_updates;
+    let receipt = match &validated_operation.content.operation {
         OperationContent::Reveal(RevealContent { pk, .. }) => {
             let reveal_result = reveal(&mut tc_ctx, source_account, pk);
             log_on_operation_failure("Reveal", &reveal_result);
-            let result = finalize_statuses::<RevealContent>(
+            OperationResultSum::Reveal(finalize_and_burn::<_, RevealContent, _>(
+                tc_ctx.host,
+                source_account,
+                storage_limit,
+                balance_updates,
                 reveal_result.map_err(Into::into),
-                &mut internal_operations_receipts,
-            );
-            OperationResultSum::Reveal(OperationResult {
-                balance_updates: validated_operation.balance_updates,
-                result,
-                internal_operation_results: internal_operations_receipts,
-            })
+                internal_operations_receipts,
+            ))
         }
         OperationContent::Transfer(TransferContent {
             amount,
@@ -1821,15 +1919,14 @@ where
                     Err(e)
                 }
             };
-            let result = finalize_statuses::<TransferContent>(
+            OperationResultSum::Transfer(finalize_and_burn::<_, TransferContent, _>(
+                tc_ctx.host,
+                source_account,
+                storage_limit,
+                balance_updates,
                 transfer_result.map_err(Into::into),
-                &mut internal_operations_receipts,
-            );
-            OperationResultSum::Transfer(OperationResult {
-                balance_updates: validated_operation.balance_updates,
-                result,
-                internal_operation_results: internal_operations_receipts,
-            })
+                internal_operations_receipts,
+            ))
         }
         OperationContent::Origination(OriginationContent {
             ref balance,
@@ -1852,27 +1949,18 @@ where
                 Err(err) => Err(err),
             };
             log_on_operation_failure("Origination", &origination_result);
-            let result = finalize_statuses::<OriginationContent>(
-                origination_result.map_err(|e| e.into()),
-                &mut internal_operations_receipts,
-            );
-            OperationResultSum::Origination(OperationResult {
-                balance_updates: validated_operation.balance_updates,
-                result,
-                internal_operation_results: internal_operations_receipts,
-            })
+            OperationResultSum::Origination(
+                finalize_and_burn::<_, OriginationContent, _>(
+                    tc_ctx.host,
+                    source_account,
+                    storage_limit,
+                    balance_updates,
+                    origination_result.map_err(|e| e.into()),
+                    internal_operations_receipts,
+                ),
+            )
         }
     };
-
-    if let Err(errors) = storage_fees::burn_manager_storage_fees(
-        tc_ctx.host,
-        source_account,
-        &validated_operation.content.storage_limit,
-        &mut receipt,
-    ) {
-        log!(Debug, "Storage burn failed: {errors:?}");
-        receipt.transform_applied_into_backtracked_with_errors(errors.into());
-    }
 
     // Read the total gas consumed since the start of the operation, immune
     // to baseline resets performed by per-segment measurements (e.g. via
@@ -1949,8 +2037,8 @@ mod tests {
     use crate::storage_fees::{COST_PER_BYTES, ORIGINATION_SIZE};
     use crate::{
         account_storage::{Manager, TezlinkAccount},
-        context, validate_and_apply_operation, FeeRefundConfig, OperationError,
-        ProcessedOperation,
+        burn_pass, context, validate_and_apply_operation, FeeRefundConfig,
+        OperationError, ProcessedOperation,
     };
     use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 
@@ -8774,5 +8862,124 @@ mod tests {
         let size_a = success_a.storage_size.0.clone();
         let size_b = success_b.storage_size.0.clone();
         assert_eq!(size_b - size_a, 1u64.into());
+    }
+
+    const PAYER_PKH: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
+
+    /// [`burn_pass`]: when the parent's storage burn succeeds but the
+    /// internal's burn exhausts the shared budget, the call returns
+    /// `OperationQuotaExceeded` and the *pre-burn* internals are
+    /// surfaced — no half-applied storage-fees entry survives.
+    #[test]
+    fn burn_pass_internal_overshoot_returns_quota_exceeded() {
+        let mut host = MockKernelHost::default();
+        let pkh = PublicKeyHash::from_b58check(PAYER_PKH).unwrap();
+        let payer = init_account(&mut host, &pkh, 10_000_000);
+        let internal = InternalOperationSum::Transfer(InternalContentWithMetadata {
+            sender: payer.contract(),
+            nonce: 0,
+            content: TransferContent {
+                amount: 0_u64.into(),
+                destination: payer.contract(),
+                parameters: Parameters::default(),
+            },
+            result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+                paid_storage_size_diff: 5_u64.into(),
+                ..Default::default()
+            })),
+        });
+        let mut content: ContentResult<TransferContent> =
+            ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+                paid_storage_size_diff: 4_u64.into(),
+                ..Default::default()
+            }));
+        let mut storage_limit_remaining = num_bigint::BigUint::from(8_u64);
+        let (internals, outcome) = burn_pass::<_, TransferContent, _>(
+            &mut host,
+            &payer,
+            &mut storage_limit_remaining,
+            &mut content,
+            vec![internal],
+        );
+        assert_eq!(outcome, Err(ApplyOperationError::OperationQuotaExceeded));
+
+        // The returned internal must be the pre-burn one: no
+        // storage-fee balance_updates survived the clone-then-rebuild
+        // rollback.
+        let InternalOperationSum::Transfer(inner) = &internals[0] else {
+            panic!("expected internal Transfer");
+        };
+        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &inner.result
+        else {
+            panic!("expected Applied internal target");
+        };
+        assert!(
+            success.balance_updates.is_empty(),
+            "internal must carry no storage-fee balance_updates on rollback",
+        );
+    }
+
+    /// [`burn_pass`]: two internals compete for a shared budget that
+    /// fits the first slot burn but not the second. The
+    /// clone-then-rebuild pass discards the first internal's
+    /// half-applied burn so no storage-fees / payer-debit entry
+    /// survives on any internal.
+    #[test]
+    fn burn_pass_two_internals_share_budget_with_rollback() {
+        let mut host = MockKernelHost::default();
+        let pkh = PublicKeyHash::from_b58check(PAYER_PKH).unwrap();
+        let payer = init_account(&mut host, &pkh, 10_000_000);
+        let make_internal = || {
+            InternalOperationSum::Transfer(InternalContentWithMetadata {
+                sender: payer.contract(),
+                nonce: 0,
+                content: TransferContent {
+                    amount: 0_u64.into(),
+                    destination: payer.contract(),
+                    parameters: Parameters::default(),
+                },
+                result: ContentResult::Applied(TransferTarget::ToContrat(
+                    TransferSuccess {
+                        allocated_destination_contract: true,
+                        ..Default::default()
+                    },
+                )),
+            })
+        };
+        let mut content: ContentResult<TransferContent> =
+            ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess::default()));
+        // Budget fits one slot (257) but not two (514): remainder
+        // after internal 0 is `2 * ORIGINATION_SIZE - 1 - 257 == 256`,
+        // and internal 1 needs 257.
+        let mut storage_limit_remaining =
+            num_bigint::BigUint::from(2 * ORIGINATION_SIZE - 1);
+        let (internals, outcome) = burn_pass::<_, TransferContent, _>(
+            &mut host,
+            &payer,
+            &mut storage_limit_remaining,
+            &mut content,
+            vec![make_internal(), make_internal()],
+        );
+        assert_eq!(outcome, Err(ApplyOperationError::OperationQuotaExceeded));
+
+        assert_eq!(internals.len(), 2);
+        let payer_contract = payer.contract();
+        for internal in &internals {
+            let InternalOperationSum::Transfer(inner) = internal else {
+                panic!("expected internal Transfer");
+            };
+            let ContentResult::Applied(TransferTarget::ToContrat(success)) =
+                &inner.result
+            else {
+                panic!("expected Applied internal target");
+            };
+            assert!(
+                success.balance_updates.iter().all(|bu| {
+                    !matches!(bu.balance, Balance::StorageFees)
+                        && !matches!(&bu.balance, Balance::Account(c) if c == &payer_contract)
+                }),
+                "no storage-fees / payer-debit entry must survive on a rolled-back internal",
+            );
+        }
     }
 }

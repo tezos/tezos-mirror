@@ -8,15 +8,14 @@
 
 use num_bigint::{BigInt, BigUint, TryFromBigIntError};
 use num_traits::{ops::checked::CheckedSub, Zero};
-use tezos_data_encoding::types::{Narith, Zarith};
+use tezos_data_encoding::types::Zarith;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::operation::{OriginationContent, RevealContent, TransferContent};
 use tezos_tezlink::operation_result::{
     ApplyOperationError, Balance, BalanceUpdate, ContentResult, EventContent,
     EventSuccess, InternalContentWithMetadata, InternalOperationSum, OperationKind,
-    OperationResultSum, OriginationSuccess, RevealSuccess, TransferError, TransferTarget,
-    UpdateOrigin,
+    OriginationSuccess, RevealSuccess, TransferError, TransferTarget, UpdateOrigin,
 };
 
 use crate::account_storage::TezlinkAccount;
@@ -140,93 +139,6 @@ pub fn burn_internal_op_storage_fees<Host: StorageV1>(
     }
 }
 
-/// Charge the source of a manager operation for the storage allocated
-/// by the operation and its successful internal operations. Refuses
-/// to bill more than `storage_limit` bytes across the whole tree.
-pub fn burn_manager_storage_fees<Host: StorageV1>(
-    host: &mut Host,
-    payer: &impl TezlinkAccount,
-    storage_limit: &Narith,
-    receipt: &mut OperationResultSum,
-) -> Result<(), ApplyOperationError> {
-    let mut storage_limit_remaining: BigUint = storage_limit.0.clone();
-    match receipt {
-        OperationResultSum::Reveal(op) => {
-            burn_content_storage_fees::<_, RevealContent>(
-                host,
-                payer,
-                &mut storage_limit_remaining,
-                &mut op.result,
-            )?;
-            burn_internals(
-                host,
-                payer,
-                &mut storage_limit_remaining,
-                &mut op.internal_operation_results,
-            )
-        }
-        OperationResultSum::Transfer(op) => {
-            burn_content_storage_fees::<_, TransferContent>(
-                host,
-                payer,
-                &mut storage_limit_remaining,
-                &mut op.result,
-            )?;
-            burn_internals(
-                host,
-                payer,
-                &mut storage_limit_remaining,
-                &mut op.internal_operation_results,
-            )
-        }
-        OperationResultSum::Origination(op) => {
-            burn_content_storage_fees::<_, OriginationContent>(
-                host,
-                payer,
-                &mut storage_limit_remaining,
-                &mut op.result,
-            )?;
-            burn_internals(
-                host,
-                payer,
-                &mut storage_limit_remaining,
-                &mut op.internal_operation_results,
-            )
-        }
-    }
-}
-
-/// Charge the source of a manager operation for the storage that
-/// each of its successful internal operations allocated.
-///
-/// On failure (e.g. quota exceeded mid-loop), the partial mutations on
-/// preceding entries are discarded — `internals` is reassigned only
-/// when every entry burns successfully. This preserves the invariant
-/// that no storage-fees entry survives on an internal that the caller
-/// will subsequently demote to BackTracked.
-fn burn_internals<Host: StorageV1>(
-    host: &mut Host,
-    payer: &impl TezlinkAccount,
-    storage_limit_remaining: &mut BigUint,
-    internals: &mut Vec<InternalOperationSum>,
-) -> Result<(), ApplyOperationError> {
-    let burned: Result<Vec<InternalOperationSum>, ApplyOperationError> = internals
-        .iter()
-        .cloned()
-        .map(|mut internal| {
-            burn_internal_op_storage_fees(
-                host,
-                payer,
-                storage_limit_remaining,
-                &mut internal,
-            )?;
-            Ok(internal)
-        })
-        .collect();
-    *internals = burned?;
-    Ok(())
-}
-
 /// Per-`OperationKind` storage-burn behaviour. Each implementation
 /// describes how the payer is charged for the storage allocated by a
 /// successful operation of that kind, and how the resulting balance
@@ -330,8 +242,8 @@ mod tests {
     };
     use tezos_tezlink::operation_result::{
         ApplyOperationErrors, Balance, BalanceTooLow, BalanceUpdate,
-        InternalContentWithMetadata, OperationResult, OperationResultSum, Originated,
-        RevealSuccess, TransferSuccess, UpdateOrigin,
+        InternalContentWithMetadata, Originated, RevealSuccess, TransferSuccess,
+        UpdateOrigin,
     };
 
     use crate::account_storage::{TezlinkImplicitAccount, TezosImplicitAccount};
@@ -1045,113 +957,6 @@ mod tests {
         .expect_err("slot burn must fail when budget cannot cover both burns");
 
         assert_eq!(trace, ApplyOperationError::OperationQuotaExceeded);
-    }
-
-    /// An `Applied` internal Transfer whose burn exhausts the shared
-    /// budget after the top-level burn already consumed it raises
-    /// `OperationQuotaExceeded` from inside `burn_internals`.
-    #[test]
-    fn internal_op_overshoot_returns_quota_exceeded() {
-        let mut host = MockKernelHost::default();
-        let payer = init_payer(&mut host, 10_000_000);
-        let internal = InternalOperationSum::Transfer(InternalContentWithMetadata {
-            sender: payer.contract(),
-            nonce: 0,
-            content: TransferContent {
-                amount: 0_u64.into(),
-                destination: payer.contract(),
-                parameters: Parameters::default(),
-            },
-            result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
-                paid_storage_size_diff: 5_u64.into(),
-                ..Default::default()
-            })),
-        });
-        let mut receipt = OperationResultSum::Transfer(OperationResult {
-            balance_updates: vec![],
-            result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
-                paid_storage_size_diff: 4_u64.into(),
-                ..Default::default()
-            })),
-            internal_operation_results: vec![internal],
-        });
-
-        let trace =
-            burn_manager_storage_fees(&mut host, &payer, &8_u64.into(), &mut receipt)
-                .expect_err("internal burn must overshoot the shared budget");
-
-        assert_eq!(trace, ApplyOperationError::OperationQuotaExceeded);
-    }
-
-    /// Two `Applied` internal Transfers compete for a shared
-    /// `storage_limit` that fits the first slot burn but not the
-    /// second; the cascade leaves both internals' `balance_updates`
-    /// free of any storage-fees entry.
-    #[test]
-    fn internal_op_overshoot_returns_quota_exceeded_on_second() {
-        let mut host = MockKernelHost::default();
-        let payer = init_payer(&mut host, 10_000_000);
-        let make_internal = || {
-            InternalOperationSum::Transfer(InternalContentWithMetadata {
-                sender: payer.contract(),
-                nonce: 0,
-                content: TransferContent {
-                    amount: 0_u64.into(),
-                    destination: payer.contract(),
-                    parameters: Parameters::default(),
-                },
-                result: ContentResult::Applied(TransferTarget::ToContrat(
-                    TransferSuccess {
-                        allocated_destination_contract: true,
-                        ..Default::default()
-                    },
-                )),
-            })
-        };
-        let mut receipt = OperationResultSum::Transfer(OperationResult {
-            balance_updates: vec![],
-            result: ContentResult::Applied(TransferTarget::ToContrat(
-                TransferSuccess::default(),
-            )),
-            internal_operation_results: vec![make_internal(), make_internal()],
-        });
-
-        // Budget fits one slot (257) but not two (514): remainder
-        // after internal 0 is `2 * ORIGINATION_SIZE - 1 - 257 == 256`,
-        // and internal 1 needs 257.
-        let storage_limit = (2 * ORIGINATION_SIZE - 1).into();
-
-        let trace =
-            burn_manager_storage_fees(&mut host, &payer, &storage_limit, &mut receipt)
-                .expect_err("second internal must overshoot the shared budget");
-
-        assert_eq!(trace, ApplyOperationError::OperationQuotaExceeded);
-
-        // Neither internal must retain a storage-fees balance update:
-        // the first one's half-applied slot burn is discarded by the
-        // clone-then-rebuild pass, the second never wrote one.
-        let OperationResultSum::Transfer(op) = &receipt else {
-            panic!("expected Transfer receipt");
-        };
-        assert_eq!(op.internal_operation_results.len(), 2);
-        for internal in &op.internal_operation_results {
-            let InternalOperationSum::Transfer(inner) = internal else {
-                panic!("expected internal Transfer");
-            };
-            let ContentResult::Applied(TransferTarget::ToContrat(success)) =
-                &inner.result
-            else {
-                panic!("expected Applied internal target");
-            };
-            let payer_contract = payer.contract();
-            assert!(
-                success.balance_updates.iter().all(|bu| {
-                    !matches!(bu.balance, Balance::StorageFees)
-                        && !matches!(&bu.balance, Balance::Account(c) if c == &payer_contract)
-                }),
-                "no storage-fees / payer-debit entry must survive on a backtracked internal",
-            );
-        }
     }
 
     /// `consumed_bytes == storage_limit_remaining` succeeds; a
