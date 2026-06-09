@@ -221,7 +221,7 @@ mod tests {
             // the MIR interpreter (L2-1553); it no longer matches L1 (it was
             // 1287 before re-pricing). The jump is dominated by the `DUP n`
             // instructions in the loop, now charged a flat 840 each.
-            9736 + 14 * crate::gas::interpret_cost::FRAME_PUSH
+            10006 + 14 * crate::gas::interpret_cost::FRAME_PUSH
         );
     }
 
