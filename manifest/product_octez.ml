@@ -5583,6 +5583,7 @@ let octez_layer2_store =
         camlzip;
         tar;
         tar_unix;
+        octez_tar;
       ]
     ~linkall:true
     ~conflicts:[Conflicts.checkseum]
