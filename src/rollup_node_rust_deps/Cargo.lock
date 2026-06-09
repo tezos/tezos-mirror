@@ -3390,6 +3390,7 @@ dependencies = [
  "octez-riscv-api-common",
  "octez-riscv-data",
  "octez-riscv-durable-storage",
+ "thiserror 2.0.18",
  "trait-set",
 ]
 
