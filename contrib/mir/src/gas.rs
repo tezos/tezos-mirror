@@ -348,7 +348,8 @@ pub mod interpret_cost {
     pub const DIP: u32 = 10;
     // Re-benchmarked on the MIR interpreter (`cost_N_IDrop`).
     pub const DROP: u32 = 20;
-    pub const DUP: u32 = 10;
+    // Re-benchmarked on the MIR interpreter (`cost_N_IDup`).
+    pub const DUP: u32 = 45;
     pub const GT: u32 = 10;
     pub const GE: u32 = 10;
     pub const EQ: u32 = 10;
@@ -574,10 +575,25 @@ pub mod interpret_cost {
         ((n + 1) * 10).as_gas_cost()
     }
 
-    fn dupn(n: u16) -> Result<u32, CostOverflow> {
-        // Approximates 20 + 1.222263*n, copied from the Tezos protocol
-        let n = Checked::from(n as u32);
-        (20 + n + (n >> 2)).as_gas_cost()
+    fn dupn(_n: u16) -> Result<u32, CostOverflow> {
+        // `cost_N_IDupN`, re-benchmarked on the MIR interpreter: the measured
+        // slope is ~0, so the cost is size-independent and charged as a flat
+        // constant.
+        //
+        // TODO(L2-1553): check the micro-benchmark results for `N_IDupN`.
+        // This 840 looks wrong. The fitted model is a flat constant (~835.8 ns,
+        // slope ~0), which is physically implausible: `DUP n` does the same work
+        // as `DUP` (clone) plus an O(n) stack walk, so it should start close to
+        // `DUP` (= 45) and grow slightly with n, not jump to 840 for every n.
+        // The flat ~840 ns const smells of `Timer_latency` contamination /
+        // scatter in the raw bench (cf. report_mir_interpreter PDF). This creates
+        // a discontinuity: `DUP` = 45 but `DUP 1` = `DUP 2` = ... = 840, even
+        // though `DUP 1` is semantically identical to `DUP` (both duplicate the
+        // top). MIR routes `DUP 1` -> DupN exactly like L1 (script_ir_translator
+        // `I_DUP [n]` -> `IDup_n` even for n = 1), so this is not a MIR bug but a
+        // benchmark/model problem to fix upstream (re-fit `N_IDupN` so it is
+        // continuous with `N_IDup`), then regenerate and re-port here.
+        Ok(840)
     }
 
     pub fn dig(n: u16) -> Result<u32, CostOverflow> {
