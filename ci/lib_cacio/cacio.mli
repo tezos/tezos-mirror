@@ -388,6 +388,40 @@ module type COMPONENT_API = sig
     ?legacy_jobs:Tezos_ci.tezos_job list ->
     (trigger * job) list ->
     unit
+
+  (** Register jobs to be included in the prerelease pipeline of the current component.
+
+      This pipeline is for releasing release candidates of this component separately.
+      It runs in [tezos/tezos].
+
+      This function must be called only once per component.
+
+      [tag_rex] allows to specify a custom tag regular expression.
+      It is registered to be returned by {!get_release_tag_rexes}.
+
+      Not implemented for the [Shared] component. *)
+  val register_dedicated_prerelease_pipeline :
+    ?tag_rex:string ->
+    ?legacy_jobs:Tezos_ci.tezos_job list ->
+    (trigger * job) list ->
+    unit
+
+  (** Register jobs to be included in the test prerelease pipeline of the current component.
+
+      This pipeline is for testing the prerelease of this component separately.
+      It runs in namespaces other than [tezos].
+
+      This function must be called only once per component.
+
+      [tag_rex] allows to specify a custom tag regular expression.
+      It is registered to be returned by {!get_release_tag_rexes}.
+
+      Not implemented for the [Shared] component. *)
+  val register_dedicated_test_prerelease_pipeline :
+    ?tag_rex:string ->
+    ?legacy_jobs:Tezos_ci.tezos_job list ->
+    (trigger * job) list ->
+    unit
 end
 
 (** The main functor of Cacio. *)
