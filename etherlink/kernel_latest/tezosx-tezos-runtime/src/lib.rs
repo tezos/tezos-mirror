@@ -720,6 +720,7 @@ where
         // (EVM alias) or `Implicit(pkh)` (native Michelson origin). `None`
         // only for a top-level Michelson tx (absent `X-Tezos-Source`).
         crac_origin: hdrs.crac_origin_contract.clone(),
+        delegated_storage_cost: 0,
     };
     let parser = mir::parser::Parser::new();
 

@@ -2041,6 +2041,7 @@ where
                 source_public_key,
                 crac_chain_depth: 0,
                 crac_origin: None,
+                delegated_storage_cost: 0,
             };
             // Watermarks for `drain_reentrant_crac_ops`: a top-level
             // manager op whose destination is the gateway enters EVM

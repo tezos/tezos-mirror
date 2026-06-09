@@ -103,6 +103,9 @@ pub struct OperationCtx<'operation, A: TezosImplicitAccount> {
     /// as the outbound `X-Tezos-Source` so `tx.origin` stays invariant
     /// across an `EVM -> Michelson -> EVM` round-trip (L2-1363).
     pub crac_origin: Option<Contract>,
+    /// Accumulator (in mutez) of storage costs delegated to this
+    /// frame by the CRACs it called.
+    pub delegated_storage_cost: u64,
 }
 
 pub struct ExecCtx {
@@ -754,6 +757,16 @@ pub trait HasCracChainDepth {
     fn crac_origin(&self) -> Option<Contract>;
 }
 
+/// Read and mutate the per-frame accumulator of storage costs
+/// delegated *to* this frame by its sub-executions. See
+/// [`OperationCtx::delegated_storage_cost`] for the semantics.
+pub trait HasDelegatedStorageCost {
+    fn delegated_storage_cost(&self) -> u64;
+
+    /// Increment the accumulator by `v` mutez.
+    fn add_delegated_storage_cost(&mut self, v: u64);
+}
+
 /// Read the runtime classification record for an address.
 /// Handles host and context access so callers can resolve
 /// cross-runtime aliases without separate borrows.
@@ -887,6 +900,21 @@ impl<Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> HasCracChainDe
 
     fn crac_origin(&self) -> Option<Contract> {
         self.operation_ctx.crac_origin.clone()
+    }
+}
+
+impl<Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> HasDelegatedStorageCost
+    for Ctx<'_, '_, Host, C, R>
+{
+    fn delegated_storage_cost(&self) -> u64 {
+        self.operation_ctx.delegated_storage_cost
+    }
+
+    fn add_delegated_storage_cost(&mut self, v: u64) {
+        // Saturating is safe: exceeding `HARD_STORAGE_LIMIT_PER_OPERATION`
+        // makes the operation fail with `OperationQuotaExceeded`.
+        self.operation_ctx.delegated_storage_cost =
+            self.operation_ctx.delegated_storage_cost.saturating_add(v);
     }
 }
 
@@ -1828,6 +1856,7 @@ pub mod tests {
             source_public_key: &source_public_key,
             crac_chain_depth: 0,
             crac_origin: None,
+            delegated_storage_cost: 0,
         };
 
         let exec_ctx = ExecCtx {
@@ -2385,6 +2414,7 @@ pub mod tests {
             source_public_key: &source_public_key,
             crac_chain_depth: 0,
             crac_origin: None,
+            delegated_storage_cost: 0,
         };
 
         let exec_ctx = ExecCtx {
@@ -2705,6 +2735,7 @@ pub(crate) mod mock {
         pub context: crate::context::TezlinkContext,
         pub crac_chain_depth: u32,
         pub crac_origin: Option<Contract>,
+        pub delegated_storage_cost: u64,
     }
 
     impl<'h, 'j, 'r, Host: StorageV1, R: tezosx_interfaces::Registry>
@@ -2735,6 +2766,7 @@ pub(crate) mod mock {
                 context: crate::context::TezlinkContext::init_context(),
                 crac_chain_depth: 0,
                 crac_origin: None,
+                delegated_storage_cost: 0,
             }
         }
     }
@@ -2748,6 +2780,18 @@ pub(crate) mod mock {
 
         fn crac_origin(&self) -> Option<Contract> {
             self.crac_origin.clone()
+        }
+    }
+
+    impl<'h, 'j, 'r, Host: StorageV1, R: tezosx_interfaces::Registry>
+        HasDelegatedStorageCost for MockCtx<'h, 'j, 'r, Host, R>
+    {
+        fn delegated_storage_cost(&self) -> u64 {
+            self.delegated_storage_cost
+        }
+
+        fn add_delegated_storage_cost(&mut self, v: u64) {
+            self.delegated_storage_cost = self.delegated_storage_cost.saturating_add(v);
         }
     }
 
