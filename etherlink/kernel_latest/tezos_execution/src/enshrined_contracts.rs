@@ -37,8 +37,8 @@ use tezosx_journal::TezosXJournal;
 
 use crate::account_storage::TezlinkAccount;
 use crate::mir_ctx::{
-    HasContractAccount, HasCracChainDepth, HasCrossRuntime, HasHost, HasOperationGas,
-    HasOriginLookup, HasSourcePublicKey,
+    HasContractAccount, HasCracChainDepth, HasCrossRuntime, HasDelegatedStorageCost,
+    HasHost, HasOperationGas, HasOriginLookup, HasSourcePublicKey,
 };
 
 /// Errors from CRAC-capable operations. The two variants have fundamentally
@@ -207,7 +207,8 @@ pub(crate) fn execute_enshrined_contract<'a, Host>(
               + HasSourcePublicKey
               + HasOriginLookup
               + HasCrossRuntime<Host>
-              + HasCracChainDepth),
+              + HasCracChainDepth
+              + HasDelegatedStorageCost),
 ) -> Result<Vec<OperationInfo<'a>>, CracError>
 where
     Host: StorageV1,
@@ -806,7 +807,8 @@ fn inject_context_headers<'a, Host>(
               + HasSourcePublicKey
               + HasOriginLookup
               + HasCrossRuntime<Host>
-              + HasCracChainDepth),
+              + HasCracChainDepth
+              + HasDelegatedStorageCost),
 ) -> Result<http::Request<Vec<u8>>, TransferError>
 where
     Host: StorageV1,
@@ -1208,7 +1210,8 @@ fn dispatch_crac_call<'a, Host>(
               + HasSourcePublicKey
               + HasOriginLookup
               + HasCrossRuntime<Host>
-              + HasCracChainDepth),
+              + HasCracChainDepth
+              + HasDelegatedStorageCost),
     request: http::Request<Vec<u8>>,
 ) -> Result<Vec<u8>, CracError>
 where
@@ -1225,11 +1228,8 @@ where
         let (host, journal, registry) = ctx.cross_runtime_split();
         registry.serve(host, journal, request)
     };
-    let response_body = classify_and_charge_crac_response(
-        response,
-        target_host.as_deref(),
-        ctx.operation_gas(),
-    )?;
+    let response_body =
+        classify_and_charge_crac_response(response, target_host.as_deref(), ctx)?;
 
     // Debit the gateway: after a successful call, the gateway
     // forwarded the funds to EVM so its balance should be reset to 0.
@@ -1895,12 +1895,12 @@ fn biguint_to_u256(value: num_bigint::BigUint) -> Result<U256, TransferError> {
 fn classify_and_charge_crac_response(
     response: http::Response<Vec<u8>>,
     target_host: Option<&str>,
-    operation_gas: &mut crate::gas::TezlinkOperationGas,
+    ctx: &mut (impl HasOperationGas + HasDelegatedStorageCost),
 ) -> Result<Vec<u8>, CracError> {
     let callee_gas = extract_gas_consumed(&response, target_host).ok();
 
     if let Some(milligas) = callee_gas {
-        operation_gas
+        ctx.operation_gas()
             .cast_and_consume_milligas(milligas)
             .map_err(TransferError::OutOfGas)?;
     }
@@ -1913,15 +1913,12 @@ fn classify_and_charge_crac_response(
             )
             .into());
         }
-        // TODO(L2-1519): handle the storage cost delegated by the callee.
         let storage_cost = parse_u64_opt(response.headers(), X_TEZOS_STORAGE_COST)
             .map_err(|e| {
                 CracError::Operation(TransferError::GatewayError(e.to_string()))
             })?;
         if let Some(v) = storage_cost {
-            return Err(CracError::BlockAbort(format!(
-                "{X_TEZOS_STORAGE_COST} not yet supported on the Michelson caller (got {v})"
-            )));
+            ctx.add_delegated_storage_cost(v);
         }
         Ok(response.into_body())
     } else if is_cross_runtime_oog(response.status()) {
@@ -1934,7 +1931,7 @@ fn classify_and_charge_crac_response(
         // like any FAILWITH payload.
         let status = response.status();
         let body = String::from_utf8_lossy(response.body()).into_owned();
-        charge_gateway_payload_gas(operation_gas, body.len())?;
+        charge_gateway_payload_gas(ctx.operation_gas(), body.len())?;
         Err(CracError::Operation(TransferError::GatewayError(format!(
             "Cross-runtime call failed with status {status}: {body}"
         ))))
@@ -2940,14 +2937,24 @@ pub(crate) mod tests {
             .status(429)
             .body(b"OOG".to_vec())
             .unwrap();
-        let mut operation_gas =
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias");
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        let mut ctx = MockCtx::new(
+            &mut host,
+            &mut journal,
+            &registry,
+            AddressHash::from_bytes(&[0u8; 22]).unwrap(),
+            0,
+        );
+        ctx.operation_gas =
             crate::gas::TezlinkOperationGas::start_milligas(1_000_000).unwrap();
-        let err = classify_and_charge_crac_response(
-            response,
-            Some("ethereum"),
-            &mut operation_gas,
-        )
-        .unwrap_err();
+        let err = classify_and_charge_crac_response(response, Some("ethereum"), &mut ctx)
+            .unwrap_err();
         assert!(
             matches!(err, CracError::Operation(TransferError::OutOfGas(OutOfGas))),
             "429 must map to a typed OutOfGas, got {err:?}"
@@ -2968,16 +2975,26 @@ pub(crate) mod tests {
         // No callee-gas header, so the only charge is the body surcharge:
         // body_len * TEZOSX_GATEWAY_PER_BYTE_MILLIGAS.
         let start = 10_000_000;
-        let mut operation_gas =
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias");
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        let mut ctx = MockCtx::new(
+            &mut host,
+            &mut journal,
+            &registry,
+            AddressHash::from_bytes(&[0u8; 22]).unwrap(),
+            0,
+        );
+        ctx.operation_gas =
             crate::gas::TezlinkOperationGas::start_milligas(start).unwrap();
-        let _ = classify_and_charge_crac_response(
-            response,
-            Some("ethereum"),
-            &mut operation_gas,
-        )
-        .unwrap_err();
+        let _ = classify_and_charge_crac_response(response, Some("ethereum"), &mut ctx)
+            .unwrap_err();
         let expected_charge = (body_len as u64) * TEZOSX_GATEWAY_PER_BYTE_MILLIGAS;
-        let remaining = operation_gas.remaining.milligas().unwrap() as u64;
+        let remaining = ctx.operation_gas.remaining.milligas().unwrap() as u64;
         assert_eq!(
             remaining,
             start - expected_charge,
@@ -2997,21 +3014,31 @@ pub(crate) mod tests {
             .body(body.clone())
             .unwrap();
         let start = 10_000_000;
-        let mut operation_gas =
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias");
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        let mut ctx = MockCtx::new(
+            &mut host,
+            &mut journal,
+            &registry,
+            AddressHash::from_bytes(&[0u8; 22]).unwrap(),
+            0,
+        );
+        ctx.operation_gas =
             crate::gas::TezlinkOperationGas::start_milligas(start).unwrap();
-        let err = classify_and_charge_crac_response(
-            response,
-            Some("ethereum"),
-            &mut operation_gas,
-        )
-        .unwrap_err();
+        let err = classify_and_charge_crac_response(response, Some("ethereum"), &mut ctx)
+            .unwrap_err();
         let CracError::Operation(TransferError::GatewayError(msg)) = err else {
             panic!("4xx must map to a GatewayError, got {err:?}");
         };
         let decoded_len = String::from_utf8_lossy(&body).len();
         assert!(decoded_len > body.len(), "lossy must expand invalid bytes");
         let expected_charge = (decoded_len as u64) * TEZOSX_GATEWAY_PER_BYTE_MILLIGAS;
-        let remaining = operation_gas.remaining.milligas().unwrap() as u64;
+        let remaining = ctx.operation_gas.remaining.milligas().unwrap() as u64;
         assert_eq!(
             remaining,
             start - expected_charge,
@@ -3033,14 +3060,24 @@ pub(crate) mod tests {
             .status(400)
             .body(vec![b'A'; 1_000_000])
             .unwrap();
-        let mut operation_gas =
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias");
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        let mut ctx = MockCtx::new(
+            &mut host,
+            &mut journal,
+            &registry,
+            AddressHash::from_bytes(&[0u8; 22]).unwrap(),
+            0,
+        );
+        ctx.operation_gas =
             crate::gas::TezlinkOperationGas::start_milligas(1_000).unwrap();
-        let err = classify_and_charge_crac_response(
-            response,
-            Some("ethereum"),
-            &mut operation_gas,
-        )
-        .unwrap_err();
+        let err = classify_and_charge_crac_response(response, Some("ethereum"), &mut ctx)
+            .unwrap_err();
         assert!(
             matches!(err, CracError::Operation(TransferError::OutOfGas(OutOfGas))),
             "4xx body charge exhaustion must map to a catchable OutOfGas, got {err:?}"
@@ -5137,25 +5174,120 @@ pub(crate) mod tests {
         }
     }
 
+    /// Build a minimal `MockCtx` with a generously-sized operation-gas
+    /// counter so the focus of the storage-cost tests stays on the
+    /// accumulator, not on gas exhaustion.
+    fn classify_test_ctx<'h, 'j, 'r>(
+        host: &'h mut MockKernelHost,
+        journal: &'j mut TezosXJournal,
+        registry: &'r MockRegistry,
+    ) -> MockCtx<'h, 'j, 'r, MockKernelHost, MockRegistry> {
+        let mut ctx = MockCtx::new(
+            host,
+            journal,
+            registry,
+            AddressHash::from_bytes(&[0u8; 22]).unwrap(),
+            0,
+        );
+        ctx.operation_gas = crate::gas::TezlinkOperationGas::start_milligas(
+            tezosx_constants::MICHELSON_MAX_MILLIGAS_PER_OPERATION,
+        )
+        .unwrap();
+        ctx
+    }
+
+    fn make_journal() -> TezosXJournal {
+        TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        )
+    }
+
+    /// 2xx response carrying `X-Tezos-Storage-Cost: V` accumulates `V`
+    /// into the caller frame's `delegated_storage_cost`.
     #[test]
-    fn test_classify_and_charge_crac_response_rejects_storage_cost_header() {
+    fn test_classify_and_charge_crac_response_accumulates_storage_cost_header() {
         let response = http::Response::builder()
             .status(http::status::StatusCode::OK)
             .header(X_TEZOS_GAS_CONSUMED, "1000")
-            .header(X_TEZOS_STORAGE_COST, "42")
+            .header(X_TEZOS_STORAGE_COST, "12345")
             .body(vec![])
             .unwrap();
-        let mut gas = crate::gas::TezlinkOperationGas::default();
-        let result = classify_and_charge_crac_response(response, Some("tezos"), &mut gas);
-        assert!(
-            matches!(
-                result,
-                Err(CracError::BlockAbort(ref msg))
-                 if msg.contains("X-Tezos-Storage-Cost")
-                    && msg.contains("not yet supported")
-                    && msg.contains("42")
-            ),
-            "expected GatewayError with storage-cost not-yet-supported message, got: {result:?}"
+        let mut host = MockKernelHost::default();
+        let mut journal = make_journal();
+        let registry = MockRegistry::new("KT1_mock_alias");
+        let mut ctx = classify_test_ctx(&mut host, &mut journal, &registry);
+        assert_eq!(ctx.delegated_storage_cost(), 0);
+        classify_and_charge_crac_response(response, Some("tezos"), &mut ctx)
+            .expect("2xx response must not error");
+        assert_eq!(ctx.delegated_storage_cost(), 12345);
+    }
+
+    /// 2xx response with no `X-Tezos-Storage-Cost` header leaves the
+    /// accumulator untouched — the callee chose not to delegate.
+    #[test]
+    fn test_classify_and_charge_crac_response_absent_header_no_accumulation() {
+        let response = http::Response::builder()
+            .status(http::status::StatusCode::OK)
+            .header(X_TEZOS_GAS_CONSUMED, "1000")
+            .body(vec![])
+            .unwrap();
+        let mut host = MockKernelHost::default();
+        let mut journal = make_journal();
+        let registry = MockRegistry::new("KT1_mock_alias");
+        let mut ctx = classify_test_ctx(&mut host, &mut journal, &registry);
+        classify_and_charge_crac_response(response, Some("tezos"), &mut ctx)
+            .expect("2xx response must not error");
+        assert_eq!(ctx.delegated_storage_cost(), 0);
+    }
+
+    /// Two successive 2xx responses on the same ctx sum their delegated
+    /// storage costs into the accumulator.
+    #[test]
+    fn test_classify_and_charge_crac_response_sums_across_returns() {
+        let mut host = MockKernelHost::default();
+        let mut journal = make_journal();
+        let registry = MockRegistry::new("KT1_mock_alias");
+        let mut ctx = classify_test_ctx(&mut host, &mut journal, &registry);
+
+        let first = http::Response::builder()
+            .status(http::status::StatusCode::OK)
+            .header(X_TEZOS_GAS_CONSUMED, "1000")
+            .header(X_TEZOS_STORAGE_COST, "100")
+            .body(vec![])
+            .unwrap();
+        classify_and_charge_crac_response(first, Some("tezos"), &mut ctx).unwrap();
+        let second = http::Response::builder()
+            .status(http::status::StatusCode::OK)
+            .header(X_TEZOS_GAS_CONSUMED, "1000")
+            .header(X_TEZOS_STORAGE_COST, "250")
+            .body(vec![])
+            .unwrap();
+        classify_and_charge_crac_response(second, Some("tezos"), &mut ctx).unwrap();
+        assert_eq!(ctx.delegated_storage_cost(), 350);
+    }
+
+    /// On a non-2xx response the storage-cost header — present or
+    /// not — is ignored.
+    #[test]
+    fn test_classify_and_charge_crac_response_ignores_header_on_non_2xx() {
+        let response = http::Response::builder()
+            .status(http::status::StatusCode::BAD_REQUEST)
+            .header(X_TEZOS_GAS_CONSUMED, "1000")
+            .header(X_TEZOS_STORAGE_COST, "999")
+            .body(b"bad".to_vec())
+            .unwrap();
+        let mut host = MockKernelHost::default();
+        let mut journal = make_journal();
+        let registry = MockRegistry::new("KT1_mock_alias");
+        let mut ctx = classify_test_ctx(&mut host, &mut journal, &registry);
+        let result = classify_and_charge_crac_response(response, Some("tezos"), &mut ctx);
+        assert!(result.is_err(), "4xx must surface an error");
+        assert_eq!(
+            ctx.delegated_storage_cost(),
+            0,
+            "header on non-2xx must not accumulate"
         );
     }
 
