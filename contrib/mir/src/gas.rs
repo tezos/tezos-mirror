@@ -572,8 +572,9 @@ pub mod interpret_cost {
     }
 
     pub fn dug(n: u16) -> Result<u32, CostOverflow> {
+        // `cost_N_IDug`, re-benchmarked on the MIR interpreter: 10 + ~0.207*n.
         let n = Checked::from(n as u32);
-        (35 + 6 * n + (n >> 1) + (n >> 2)).as_gas_cost()
+        ((n >> 3) + (n >> 4) + (n >> 6) + (n >> 8) + 10).as_gas_cost()
     }
 
     pub fn dup(mb_n: Option<u16>) -> Result<u32, CostOverflow> {
