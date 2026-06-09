@@ -710,7 +710,7 @@ where
                         address,
                         sender_account,
                         &amount,
-                        &script.code,
+                        Some(&script.code),
                         storage,
                         &Origin::Native,
                     );
@@ -1360,7 +1360,7 @@ pub fn originate_contract<'a, Host, C: Context>(
     contract: ContractKt1Hash,
     sender_account: &impl TezlinkAccount,
     initial_balance: &Narith,
-    script_code: &[u8],
+    script_code: Option<&[u8]>,
     script_storage: TypedValue<'a>,
     origin: &Origin,
 ) -> Result<OriginationSuccess, OriginationError>
@@ -1393,8 +1393,11 @@ where
     // The code and storage have their own size.
     // And then three small counters: code size and storage size are combined for
     // used bytes, and paid bytes.
-    let init_payload_bytes =
-        (script_code.len() as u64).saturating_add(new_storage.len() as u64);
+    //
+    // A code-less origination (`script_code = None`, Tezos X alias) writes no
+    // `/data/code`, so only the storage payload is charged here.
+    let init_payload_bytes = (script_code.map_or(0, |c| c.len()) as u64)
+        .saturating_add(new_storage.len() as u64);
     consume_storage_write_milligas(ctx.operation_gas, 1, init_payload_bytes)
         .map_err(OriginationError::OutOfGas)?;
     consume_storage_write_milligas(ctx.operation_gas, 2, COUNTER_SIZE)
@@ -1413,10 +1416,18 @@ where
         .map_err(|_| OriginationError::CantInitContract)?;
 
     // There's this line in the origination `assert (Compare.Z.(total_size >= Z.zero)) ;`
-    match BigUint::try_from(total_size.0.clone()) {
-        Ok(b) if !b.is_zero() => b,
-        _ => return Err(OriginationError::CantOriginateEmptyContract),
-    };
+    //
+    // A code-less Tezos X alias (`script_code = None`) resolves to the shared
+    // implementation and carries no own code, so its total size is just its
+    // storage — and re-materializing an already-materialized alias sees a zero
+    // storage delta. Neither is an "empty contract" in the sense this guard
+    // rejects, so it only applies to contracts that ship their own code.
+    if script_code.is_some() {
+        match BigUint::try_from(total_size.0.clone()) {
+            Ok(b) if !b.is_zero() => b,
+            _ => return Err(OriginationError::CantOriginateEmptyContract),
+        };
+    }
 
     // Compute the initial_balance setup of the smart contract as a balance update for the origination.
     let balance_updates =
@@ -1984,7 +1995,7 @@ where
                     address,
                     source_account,
                     balance,
-                    &script.code,
+                    Some(&script.code),
                     storage,
                     &Origin::Native,
                 ),
@@ -2477,10 +2488,12 @@ mod tests {
         account
             .init(
                 host,
-                &script_micheline
-                    .encode(&mut Gas::default())
-                    .unwrap()
-                    .unwrap(),
+                Some(
+                    &script_micheline
+                        .encode(&mut Gas::default())
+                        .unwrap()
+                        .unwrap(),
+                ),
                 &storage_micheline
                     .encode(&mut Gas::default())
                     .unwrap()

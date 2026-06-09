@@ -182,6 +182,21 @@ let read_michelson_contract_storage sc_rollup_node contract_hex =
        ~key:path
        ()
 
+(** [read_michelson_contract_code sc_rollup_node contract_hex] reads the
+    [/data/code] of an originated Michelson contract from durable storage.
+    Returns [None] when no per-contract code is stored — e.g. a code-less
+    Tezos X alias, whose script is the shared implementation. *)
+let read_michelson_contract_code sc_rollup_node contract_hex =
+  let path =
+    sf "%s/%s/data/code" tezosx_michelson_contracts_index contract_hex
+  in
+  Sc_rollup_node.RPC.call sc_rollup_node
+  @@ Sc_rollup_rpc.get_global_block_durable_state_value
+       ~pvm_kind:"wasm_2_0_0"
+       ~operation:Sc_rollup_rpc.Value
+       ~key:path
+       ()
+
 (** [decode_michelson_contract_address hex] decodes a hex-encoded
     [Contract_repr.t] into a b58check KT1 address string. *)
 let decode_michelson_contract_address hex =
@@ -189,6 +204,17 @@ let decode_michelson_contract_address hex =
   Hex.to_bytes (`Hex hex)
   |> Data_encoding.Binary.of_bytes_exn C.encoding
   |> C.to_b58check
+
+(** [michelson_contract_hex_of_kt1 kt1] is the hex-encoded [Contract_repr.t]
+    durable-storage key for [kt1] (inverse of
+    [decode_michelson_contract_address]). *)
+let michelson_contract_hex_of_kt1 kt1 =
+  let module C = Tezos_protocol_alpha.Protocol.Contract_repr in
+  let contract = Result.get_ok (C.of_b58check kt1) in
+  let (`Hex h) =
+    Hex.of_bytes (Data_encoding.Binary.to_bytes_exn C.encoding contract)
+  in
+  h
 
 (** [decode_micheline_storage hex_str] decodes a hex string from the durable
     storage into a Micheline [JSON.u] value. Returns [None] if decoding
@@ -4994,6 +5020,27 @@ let test_alias_forwarder_created_by_evm_cross_runtime_call =
       ~error_msg:
         "Expected EVM balance to increase by forwarded amount: expected %R but \
          got %L") ;
+  (* L2-1529: the alias was materialized *code-less* — it stores no
+     /data/code, so its script is the single shared implementation. The
+     successful forwarding above already proves the kernel resolves a
+     code-less alias to that shared code end-to-end; here we pin the durable
+     shape: no /data/code, but a per-contract /data/storage (the native
+     address) is present. *)
+  let alias_contract_hex = michelson_contract_hex_of_kt1 alias_kt1 in
+  let* alias_code =
+    read_michelson_contract_code sc_rollup_node alias_contract_hex
+  in
+  Check.(
+    (alias_code = None)
+      (option string)
+      ~error_msg:"Expected a code-less alias (no /data/code), got %L") ;
+  let* alias_storage =
+    read_michelson_contract_storage sc_rollup_node alias_contract_hex
+  in
+  Check.(
+    (Option.is_some alias_storage = true)
+      bool
+      ~error_msg:"Expected the alias to keep its own /data/storage (%L)") ;
   unit
 
 (** Test that when an EVM transaction triggers alias materialization
