@@ -21,6 +21,16 @@ end
 
 module Michelson = struct
   let stress_INT_nat = file "michelson/stress_INT_nat.tz"
+
+  let stress_DIPN = file "michelson/stress_DIPN.tz"
+
+  (* Map a contract alias to its bundled Michelson source, for the generic
+     [--contract] benchmark flag. Every contract here has storage [unit] and
+     a default entrypoint taking [unit]. *)
+  let by_alias = function
+    | "stress_INT_nat" -> Some stress_INT_nat
+    | "stress_DIPN" -> Some stress_DIPN
+    | _ -> None
 end
 
 module UniswapV2 = struct
