@@ -66,12 +66,12 @@ workflow:
       PIPELINE_TYPE: etherlink.test_release
     when: always
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
-      =~ /^octez-evm-node-v\d+\.\d+-rc\d+$/
+      =~ /^octez-evm-node-v\d+\.\d+-(rc|pre)\d+$/
     variables:
       PIPELINE_TYPE: etherlink.prerelease
     when: always
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
-      =~ /^octez-evm-node-v\d+\.\d+-rc\d+$/
+      =~ /^octez-evm-node-v\d+\.\d+-(rc|pre)\d+$/
     variables:
       PIPELINE_TYPE: etherlink.test_prerelease
     when: always
@@ -158,7 +158,7 @@ workflow:
       != null && $CI_COMMIT_TAG !~ /^octez-v\d+\.0(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
       !~ /^octez-v\d+\.[1-9][0-9]*$/ && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-beta\d*$/
       && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-\d+$/ && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/
-      && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+-rc\d+$/
+      && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+-(rc|pre)\d+$/
       && $CI_COMMIT_TAG !~ /^octez-smart-rollup-node-v\d+(\.\d+)?(?:\-(rc|beta)\d+)?$/
       && $CI_COMMIT_TAG !~ /^tezos-sdk-v\d+\.\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^teztale-v\d+\.\d+$/
     variables:
@@ -168,7 +168,7 @@ workflow:
       != null && $CI_COMMIT_TAG !~ /^octez-v\d+\.0(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
       !~ /^octez-v\d+\.[1-9][0-9]*$/ && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-beta\d*$/
       && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-\d+$/ && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/
-      && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+-rc\d+$/
+      && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+-(rc|pre)\d+$/
       && $CI_COMMIT_TAG !~ /^octez-smart-rollup-node-v\d+(\.\d+)?(?:\-(rc|beta)\d+)?$/
       && $CI_COMMIT_TAG !~ /^tezos-sdk-v\d+\.\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^teztale-v\d+\.\d+$/
     variables:
@@ -340,12 +340,12 @@ include:
 - local: .gitlab/ci/pipelines/etherlink.prerelease.yml
   rules:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
-      =~ /^octez-evm-node-v\d+\.\d+-rc\d+$/
+      =~ /^octez-evm-node-v\d+\.\d+-(rc|pre)\d+$/
     when: always
 - local: .gitlab/ci/pipelines/etherlink.test_prerelease.yml
   rules:
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
-      =~ /^octez-evm-node-v\d+\.\d+-rc\d+$/
+      =~ /^octez-evm-node-v\d+\.\d+-(rc|pre)\d+$/
     when: always
 - local: .gitlab/ci/pipelines/etherlink.daily.yml
   rules:
@@ -426,7 +426,7 @@ include:
       != null && $CI_COMMIT_TAG !~ /^octez-v\d+\.0(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
       !~ /^octez-v\d+\.[1-9][0-9]*$/ && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-beta\d*$/
       && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-\d+$/ && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/
-      && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+-rc\d+$/
+      && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+-(rc|pre)\d+$/
       && $CI_COMMIT_TAG !~ /^octez-smart-rollup-node-v\d+(\.\d+)?(?:\-(rc|beta)\d+)?$/
       && $CI_COMMIT_TAG !~ /^tezos-sdk-v\d+\.\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^teztale-v\d+\.\d+$/
     when: always
@@ -436,7 +436,7 @@ include:
       != null && $CI_COMMIT_TAG !~ /^octez-v\d+\.0(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
       !~ /^octez-v\d+\.[1-9][0-9]*$/ && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-beta\d*$/
       && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-\d+$/ && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/
-      && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+-rc\d+$/
+      && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+-(rc|pre)\d+$/
       && $CI_COMMIT_TAG !~ /^octez-smart-rollup-node-v\d+(\.\d+)?(?:\-(rc|beta)\d+)?$/
       && $CI_COMMIT_TAG !~ /^tezos-sdk-v\d+\.\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^teztale-v\d+\.\d+$/
     when: always

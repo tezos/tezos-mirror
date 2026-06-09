@@ -461,7 +461,7 @@ let register () =
     ] ;
   let octez_evm_node_release_tag_re = "/^octez-evm-node-v\\d+\\.\\d+$/" in
   let octez_evm_node_prerelease_tag_re =
-    "/^octez-evm-node-v\\d+\\.\\d+-rc\\d+$/"
+    "/^octez-evm-node-v\\d+\\.\\d+-(rc|pre)\\d+$/"
   in
   CI.register_dedicated_release_pipeline
     ~tag_rex:octez_evm_node_release_tag_re
