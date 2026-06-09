@@ -28,11 +28,14 @@ pub(crate) const TEZOS_ACCOUNTS_PATH: RefPath =
 // This path must contains balance, nonce and optionally a revealed public key.
 const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
 
-/// Sibling path that holds the classification record. Used by both
-/// implicit and originated KT1 accounts: the segment is appended to
-/// whichever account prefix the caller already has, and the resulting
-/// path lives next to the rest of the account state.
-pub(crate) const ORIGIN_PATH: RefPath = RefPath::assert_from(b"/origin");
+/// Sibling path that holds the classification record. Used by both implicit and
+/// originated KT1 accounts: the segment is appended to whichever account prefix
+/// the caller already has, and the resulting path lives next to the rest of the
+/// account state.
+///
+/// Re-exported from `tezos_execution` rather than redeclared, so the runtime
+/// (writer) and the execution layer (reader) share a single source of truth.
+pub(crate) use tezos_execution::context::code::ORIGIN_PATH;
 
 pub fn narith_to_u256(
     narith: &Narith,

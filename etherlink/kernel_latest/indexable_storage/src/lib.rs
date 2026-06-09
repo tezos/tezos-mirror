@@ -52,6 +52,8 @@ pub enum IndexableStorageError {
     TcError(String),
     #[error("BigInt conversion error: {0}")]
     TryFromBigIntError(TryFromBigIntError<BigUint>),
+    #[error("Internal invariant violation: {0}")]
+    Internal(String),
 }
 
 impl From<GenStorageError> for IndexableStorageError {
@@ -82,6 +84,7 @@ impl From<GenStorageError> for IndexableStorageError {
             GenStorageError::TryFromBigIntError(msg) => {
                 IndexableStorageError::TryFromBigIntError(msg)
             }
+            GenStorageError::Internal(msg) => IndexableStorageError::Internal(msg),
         }
     }
 }

@@ -246,6 +246,13 @@ pub mod code {
 
     const STORAGE_PATH: RefPath = RefPath::assert_from(b"/data/storage");
 
+    /// Classification record (`Origin`) of an originated account, read here to
+    /// resolve a code-less alias to the shared implementation. This is the
+    /// canonical copy of the `/origin` segment: the Michelson runtime imports it
+    /// (`tezosx-tezos-runtime/src/account.rs`) instead of redeclaring it, so the
+    /// reader and the writer of the record can never drift apart.
+    pub const ORIGIN_PATH: RefPath = RefPath::assert_from(b"/origin");
+
     const CODE_SIZE_PATH: RefPath = RefPath::assert_from(b"/len/code");
 
     const STORAGE_SIZE_PATH: RefPath = RefPath::assert_from(b"/len/storage");
@@ -264,6 +271,12 @@ pub mod code {
         account: &A,
     ) -> Result<OwnedPath, PathError> {
         concat(account.path(), &STORAGE_PATH)
+    }
+
+    pub fn origin_path<A: TezosOriginatedAccount>(
+        account: &A,
+    ) -> Result<OwnedPath, PathError> {
+        concat(account.path(), &ORIGIN_PATH)
     }
 
     pub fn code_size_path<A: TezosOriginatedAccount>(
