@@ -364,10 +364,25 @@ impl<'a, Host: StorageV1, R: Registry> JournalTr for Journal<'a, Host, R> {
         balance: U256,
         spec_id: SpecId,
     ) -> Result<JournalCheckpoint, TransferError> {
-        self.journal
+        let checkpoint = self
+            .journal
             .evm
             .inner
-            .create_account_checkpoint(caller, address, balance, spec_id)
+            .create_account_checkpoint(caller, address, balance, spec_id)?;
+        // A CREATE frame is closed by revm's `return_create` through
+        // `checkpoint_commit` / `checkpoint_revert`, both of which pop the
+        // Michelson external checkpoint and the layered-state checkpoint.
+        // The plain `checkpoint` path (CALL frames) pushes them on open; this
+        // path must do the same so the frame stack stays balanced. Otherwise a
+        // committed CRAC's world-state snapshot is dropped at the sub-call
+        // commit and the enclosing CREATE revert cannot restore it — e.g. an
+        // alias forwarder materialized by a CRAC inside a constructor survives
+        // the constructor's revert. Pushed only after the inner checkpoint
+        // succeeds, so a failed account creation (which does not enter the
+        // frame) leaves the stack untouched.
+        self.journal.michelson.push_external_checkpoint();
+        self.journal.evm.layered_state.checkpoint();
+        Ok(checkpoint)
     }
 
     #[inline]
