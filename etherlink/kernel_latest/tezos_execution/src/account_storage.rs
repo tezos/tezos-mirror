@@ -22,7 +22,7 @@ use tezos_smart_rollup::{
     host::{RuntimeError, ValueType},
     types::{PublicKey, PublicKeyHash},
 };
-use tezos_smart_rollup_host::path::OwnedPath;
+use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_storage::{read_nom_value, read_optional_nom_value, store_bin};
 
@@ -251,6 +251,43 @@ impl TezlinkAccount for TezlinkOriginatedAccount {
 pub enum Code {
     Code(Vec<u8>),
     Enshrined(EnshrinedContracts),
+}
+
+/// Durable-storage path of the single shared Michelson implementation that
+/// backs every Tezos X alias. An alias `KT1` carries no script of its own;
+/// when its `/data/code` is absent and it is classified [`Origin::Alias`], its
+/// code resolves to the bytes stored here (see [`TezosOriginatedAccount::code`]).
+///
+/// The slot lives in a `__system__` subtree of the `tezosx/` account namespace
+/// (`__system__` is not a valid base58 account address, so it cannot collide
+/// with a per-account directory) and, being rooted under `/tez/tez_accounts`,
+/// is covered by the Michelson state-hash commitment `h(/tez/tez_accounts)`:
+/// replicas that disagree on the implementation diverge on the Michelson block
+/// `state_root`.
+pub(crate) const ALIAS_IMPLEMENTATION_PATH: RefPath =
+    RefPath::assert_from(b"/tez/tez_accounts/tezosx/__system__/alias_implementation");
+
+/// Read the shared alias implementation. Returns `None` when the slot has not
+/// been seeded yet.
+pub fn read_alias_implementation(
+    host: &impl StorageV1,
+) -> Result<Option<Vec<u8>>, tezos_storage::error::Error> {
+    match host.store_read_all(&ALIAS_IMPLEMENTATION_PATH) {
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(RuntimeError::PathNotFound) => Ok(None),
+        Err(err) => Err(err.into()),
+    }
+}
+
+/// Overwrite the shared alias implementation with `code`. A single write here
+/// changes the behaviour of every existing and future alias at once — the O(1)
+/// upgrade primitive.
+pub fn write_alias_implementation(
+    host: &mut impl StorageV1,
+    code: &[u8],
+) -> Result<(), tezos_storage::error::Error> {
+    host.store_write_all(&ALIAS_IMPLEMENTATION_PATH, code)?;
+    Ok(())
 }
 
 /// Snapshot of a contract's storage-space.
@@ -1202,5 +1239,16 @@ mod test {
 
         assert_eq!(used_bytes, Zarith::from(0u64));
         assert_eq!(allocated_bytes, Zarith::from(0u64));
+    }
+
+    /// The shared alias-implementation slot must stay under `/tez/tez_accounts`
+    /// so it remains covered by the `h(/tez/tez_accounts)` state-hash
+    /// commitment. Nothing enforces this at compile time, so guard it here.
+    #[test]
+    fn alias_implementation_path_is_under_the_accounts_root() {
+        use tezos_smart_rollup_host::path::Path;
+        assert!(ALIAS_IMPLEMENTATION_PATH
+            .as_bytes()
+            .starts_with(b"/tez/tez_accounts"));
     }
 }
