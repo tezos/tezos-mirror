@@ -19,6 +19,10 @@ module Snailtracer = struct
   let bin = file "snailtracer/snailtracer.bin"
 end
 
+module Michelson = struct
+  let stress_INT_nat = file "michelson/stress_INT_nat.tz"
+end
+
 module UniswapV2 = struct
   module Factory = struct
     let json = json_file "UniSwapV2/compiled/UniswapV2Factory.json"

@@ -584,7 +584,7 @@ let tezt_benchmark_lib =
           [
             S "rule";
             [S "target"; S "static_contracts.ml"];
-            [S "deps"; [S "glob_files_rec"; S "contracts/**.{abi,bin,json}"]];
+            [S "deps"; [S "glob_files_rec"; S "contracts/**.{abi,bin,json,tz}"]];
             [
               S "action";
               [
@@ -596,6 +596,8 @@ let tezt_benchmark_lib =
                 S "abi";
                 S "-e";
                 S "json";
+                S "-e";
+                S "tz";
                 S "-m";
                 S "plain";
                 S "-o";
