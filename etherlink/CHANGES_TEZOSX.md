@@ -69,6 +69,14 @@
 - The `big_maps/index/<id>` raw-info RPC now returns the big-map's actual
   `total_bytes`, read from the kernel-maintained per-big-map size counter
   in durable storage, instead of a hardcoded zero. (!22080)
+- A failed cross-runtime call (4xx) now charges the gateway per-byte
+  payload surcharge on the response body before folding it into the
+  persisted `GatewayError`. Previously the attacker-controlled EVM revert
+  body was copied unmetered into the failed CRAC receipt — twice, in both
+  the top-level failed result and the failed internal transfer — letting
+  an EVM callee bloat Michelson operation/block metadata. The charge
+  tracks the decoded length actually stored, so the body is now gas-
+  bounded like any `FAILWITH` payload. (!22068)
 - A cross-runtime call or `staticcall_evm` view whose EVM target
   exhausts the forwarded gas (HTTP 429) now fails closed with an
   out-of-gas error instead of being collapsed onto a generic 4xx

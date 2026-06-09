@@ -416,11 +416,21 @@ pub(crate) fn charge_gateway_payload(
     ctx: &mut impl HasOperationGas,
     bytes: usize,
 ) -> Result<(), TransferError> {
+    charge_gateway_payload_gas(ctx.operation_gas(), bytes)
+}
+
+/// [`charge_gateway_payload`] against a raw [`TezlinkOperationGas`], for
+/// call sites that hold the gas accumulator directly rather than through a
+/// [`HasOperationGas`] context (e.g. [`classify_and_charge_crac_response`]).
+fn charge_gateway_payload_gas(
+    operation_gas: &mut crate::gas::TezlinkOperationGas,
+    bytes: usize,
+) -> Result<(), TransferError> {
     let cost = TEZOSX_GATEWAY_PER_BYTE_MILLIGAS.saturating_mul(bytes as u64);
     if cost == 0 {
         return Ok(());
     }
-    ctx.operation_gas()
+    operation_gas
         .cast_and_consume_milligas(cost)
         .map_err(TransferError::OutOfGas)
 }
@@ -1822,10 +1832,16 @@ fn classify_and_charge_crac_response(
     } else if is_cross_runtime_oog(response.status()) {
         Err(CracError::Operation(TransferError::OutOfGas(OutOfGas)))
     } else if response.status().is_client_error() {
+        // Charge for the attacker-controlled 4xx body the way it is
+        // persisted in the failed CRAC receipt: `from_utf8_lossy` can
+        // expand invalid bytes, so charge for the decoded length, not the
+        // raw body length. Gas then bounds the persisted metadata just
+        // like any FAILWITH payload.
+        let status = response.status();
+        let body = String::from_utf8_lossy(response.body()).into_owned();
+        charge_gateway_payload_gas(operation_gas, body.len())?;
         Err(CracError::Operation(TransferError::GatewayError(format!(
-            "Cross-runtime call failed with status {}: {}",
-            response.status(),
-            String::from_utf8_lossy(response.body())
+            "Cross-runtime call failed with status {status}: {body}"
         ))))
     } else {
         Err(CracError::BlockAbort(format!(
@@ -2795,6 +2811,99 @@ mod tests {
         assert!(
             matches!(err, CracError::Operation(TransferError::OutOfGas(OutOfGas))),
             "429 must map to a typed OutOfGas, got {err:?}"
+        );
+    }
+
+    // The 4xx path charges the per-byte payload surcharge for the
+    // response body, symmetrically with the success path, so the
+    // attacker-controlled body that lands in the failed CRAC receipt is
+    // metered (and thus gas-bounded) rather than copied in for free.
+    #[test]
+    fn test_cross_runtime_4xx_body_is_charged() {
+        let body_len = 1_000;
+        let response = http::Response::builder()
+            .status(400)
+            .body(vec![b'A'; body_len])
+            .unwrap();
+        // No callee-gas header, so the only charge is the body surcharge:
+        // body_len * TEZOSX_GATEWAY_PER_BYTE_MILLIGAS.
+        let start = 10_000_000;
+        let mut operation_gas =
+            crate::gas::TezlinkOperationGas::start_milligas(start).unwrap();
+        let _ = classify_and_charge_crac_response(
+            response,
+            Some("ethereum"),
+            &mut operation_gas,
+        )
+        .unwrap_err();
+        let expected_charge = (body_len as u64) * TEZOSX_GATEWAY_PER_BYTE_MILLIGAS;
+        let remaining = operation_gas.remaining.milligas().unwrap() as u64;
+        assert_eq!(
+            remaining,
+            start - expected_charge,
+            "4xx body must be charged at the gateway per-byte rate"
+        );
+    }
+
+    // `from_utf8_lossy` expands each invalid byte to U+FFFD (3 bytes), and
+    // it is the decoded string — not the raw body — that is persisted in
+    // the receipt. The charge must therefore track the decoded length so
+    // an all-invalid-bytes body cannot be persisted under-metered.
+    #[test]
+    fn test_cross_runtime_4xx_charges_decoded_length() {
+        let body = vec![0xFF_u8; 100]; // every byte is invalid UTF-8
+        let response = http::Response::builder()
+            .status(400)
+            .body(body.clone())
+            .unwrap();
+        let start = 10_000_000;
+        let mut operation_gas =
+            crate::gas::TezlinkOperationGas::start_milligas(start).unwrap();
+        let err = classify_and_charge_crac_response(
+            response,
+            Some("ethereum"),
+            &mut operation_gas,
+        )
+        .unwrap_err();
+        let CracError::Operation(TransferError::GatewayError(msg)) = err else {
+            panic!("4xx must map to a GatewayError, got {err:?}");
+        };
+        let decoded_len = String::from_utf8_lossy(&body).len();
+        assert!(decoded_len > body.len(), "lossy must expand invalid bytes");
+        let expected_charge = (decoded_len as u64) * TEZOSX_GATEWAY_PER_BYTE_MILLIGAS;
+        let remaining = operation_gas.remaining.milligas().unwrap() as u64;
+        assert_eq!(
+            remaining,
+            start - expected_charge,
+            "charge must track the decoded (persisted) length, not the raw body"
+        );
+        // The decoded body is what lands in the persisted error string.
+        assert!(
+            msg.len() >= decoded_len,
+            "decoded body must be present in the error: {msg}"
+        );
+    }
+
+    // The body surcharge on the 4xx path can itself exhaust gas; that must
+    // surface as a catchable operation-level out-of-gas, never abort the
+    // block, and never persist the oversized body.
+    #[test]
+    fn test_cross_runtime_4xx_body_charge_can_oog() {
+        let response = http::Response::builder()
+            .status(400)
+            .body(vec![b'A'; 1_000_000])
+            .unwrap();
+        let mut operation_gas =
+            crate::gas::TezlinkOperationGas::start_milligas(1_000).unwrap();
+        let err = classify_and_charge_crac_response(
+            response,
+            Some("ethereum"),
+            &mut operation_gas,
+        )
+        .unwrap_err();
+        assert!(
+            matches!(err, CracError::Operation(TransferError::OutOfGas(OutOfGas))),
+            "4xx body charge exhaustion must map to a catchable OutOfGas, got {err:?}"
         );
     }
 
