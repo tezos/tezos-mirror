@@ -876,6 +876,8 @@ type global_pipeline =
   (* Debian packaging pipelines *)
   | Debian_partial
   | Debian_daily
+  (* Security scan pipelines *)
+  | Schedule_security_scans
 
 let global_jobs : (global_pipeline, trigger * job) Hashtbl.t =
   Hashtbl.create 128
