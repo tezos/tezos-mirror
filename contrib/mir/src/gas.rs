@@ -541,9 +541,10 @@ pub mod interpret_cost {
     }
 
     fn dipn(n: u16) -> Result<u32, CostOverflow> {
-        // Approximates 15 + 4.05787663635*n, copied from the Tezos protocol
+        // `cost_N_IDipN`, re-benchmarked on the MIR interpreter: max(10, ~0.305*n).
         let n = Checked::from(n as u32);
-        (15 + n * 4).as_gas_cost()
+        let cost = ((n >> 2) + (n >> 5) + (n >> 6) + (n >> 7)).as_gas_cost()?;
+        Ok(cost.max(10))
     }
 
     pub fn dip(mb_n: Option<u16>) -> Result<u32, CostOverflow> {
