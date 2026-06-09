@@ -1281,8 +1281,8 @@ let test_denunciation_next_cycle protocol dal_parameters cryptobox node client
 (**  [test_e2e_trap_faulty_dal_node] verifies a scenario where a
      [faulty_delegate] misbehaves. Specifically, it:
 
-     - Creates a DAL node [proxy] whose role is to mimick the honest
-       [dal_node] by forwarding to the honest DAL node each RPC call,
+     - Creates a DAL node [proxy] whose role is to mimick the baker-facing
+       [baker_dal_node] by forwarding to the honest DAL node each RPC call,
        except for the attestable-slots endpoints for the [faulty_delegate]:
          - the streamed RPC [/profiles/<tz>/monitor/attestable_slots], where
            the proxy rewrites the JSON stream so that, at
