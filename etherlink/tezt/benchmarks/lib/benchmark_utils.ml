@@ -22,6 +22,10 @@ type parameters = {
   mutable accounts : int option;
   mutable contracts : int option;
   mutable timeout : float;
+  mutable lanes : int;
+  mutable batch : bool;
+  mutable contract : string option;
+  mutable check_success : bool;
   mutable spp : int;
   mutable width : int;
   mutable height : int;
@@ -37,6 +41,10 @@ let parameters =
     accounts = None;
     contracts = None;
     timeout = 2.0;
+    lanes = 5;
+    batch = false;
+    contract = None;
+    check_success = false;
     spp = 2;
     width = 64;
     height = 48;
@@ -55,6 +63,14 @@ module type PARAMETERS = sig
   val contracts : int option
 
   val timeout : float
+
+  val lanes : int
+
+  val batch : bool
+
+  val contract : string option
+
+  val check_success : bool
 
   val spp : int
 
@@ -144,6 +160,50 @@ module Parameters () : PARAMETERS = struct
          dropped"
       parameters.timeout
 
+  let lanes =
+    Clap.default_int
+      ~section
+      ~long:"lanes"
+      ~placeholder:"nb"
+      ~description:
+        "Number of operations each signer submits per block in the Michelson \
+         benchmarks. With --batch they are packed into one signed batch; \
+         otherwise each is injected as its own signed manager operation."
+      parameters.lanes
+
+  let batch =
+    Clap.flag
+      ~section
+      ~set_long:"batch"
+      false
+      ~description:
+        "Pack each signer's [lanes] operations into a single signed batch (one \
+         signature, one signature check) instead of injecting them as [lanes] \
+         separately-signed single-content manager operations (same source, \
+         consecutive counters). Off by default, so each operation is signed \
+         and its signature checked individually."
+
+  let contract =
+    Clap.optional_string
+      ~section
+      ~long:"contract"
+      ~placeholder:"alias|path.tz"
+      ~description:
+        "Contract to benchmark with the generic michelson_call scenario: \
+         either a bundled alias (stress_INT_nat, stress_DIPN) or a path to a \
+         .tz file. The contract must have storage `unit` and a default \
+         entrypoint taking `unit`."
+      ()
+
+  let check_success =
+    Clap.flag
+      ~section
+      ~set_long:"check-success"
+      false
+      ~description:
+        "Verify that every applied operation has status `applied` (Michelson \
+         benchmarks). Adds one RPC per visited block."
+
   let spp =
     Clap.default_int
       ~section
@@ -187,6 +247,10 @@ module Parameters () : PARAMETERS = struct
     parameters.accounts <- accounts ;
     parameters.contracts <- contracts ;
     parameters.timeout <- timeout ;
+    parameters.lanes <- lanes ;
+    parameters.batch <- batch ;
+    parameters.contract <- contract ;
+    parameters.check_success <- check_success ;
     parameters.spp <- spp ;
     parameters.width <- width ;
     parameters.height <- height ;
