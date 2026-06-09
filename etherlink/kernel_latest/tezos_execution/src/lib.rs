@@ -36,16 +36,15 @@ use tezos_tezlink::operation::{
 };
 use tezos_tezlink::operation_result::{
     produce_skipped_receipt, BacktrackedResult, ContentResult,
-    InternalContentWithMetadata, InternalOperationSum, OperationWithMetadata, Originated,
-    OriginationSuccess, TransferTarget,
+    InternalContentWithMetadata, InternalOperationSum, OperationKind, OperationResult,
+    OperationWithMetadata, Originated, OriginationSuccess, TransferTarget,
 };
 use tezos_tezlink::{
     operation::{OperationContent, Parameters, RevealContent, TransferContent},
     operation_result::{
-        produce_operation_result, ApplyOperationError, Balance, BalanceTooLow,
-        BalanceUpdate, EventContent, EventSuccess, OperationError, OperationResultSum,
-        OriginationError, RevealError, RevealSuccess, TransferError, TransferSuccess,
-        UpdateOrigin,
+        ApplyOperationError, Balance, BalanceTooLow, BalanceUpdate, EventContent,
+        EventSuccess, OperationError, OperationResultSum, OriginationError, RevealError,
+        RevealSuccess, TransferError, TransferSuccess, UpdateOrigin,
     },
 };
 use tezosx_interfaces::{Origin, Registry};
@@ -160,6 +159,47 @@ mod gas;
 pub mod mir_ctx;
 mod storage_fees;
 mod validate;
+
+/// Build the final [`ContentResult`] for the parent operation,
+/// cascading any exec failure into the internals (mutated in place).
+///
+/// - Parent `Err` → parent becomes `Failed`; every Applied
+///   internal is demoted to `BackTracked`.
+/// - Parent `Ok` but an internal failed → parent demoted to
+///   `BackTracked`; every Applied internal demoted to `BackTracked`.
+/// - Otherwise → parent stays `Applied`; internals untouched.
+fn finalize_statuses<M: OperationKind>(
+    result: Result<M::Success, ApplyOperationError>,
+    internal_operation_results: &mut [InternalOperationSum],
+) -> ContentResult<M> {
+    match result {
+        Ok(success) => {
+            // A top-level Applied stays Applied iff the last internal
+            // op is Applied — internals fail linearly, so the last one
+            // carries the cascade signal.
+            let all_internal_succeeded = internal_operation_results
+                .last()
+                .is_none_or(InternalOperationSum::is_applied);
+            if all_internal_succeeded {
+                ContentResult::Applied(success)
+            } else {
+                internal_operation_results
+                    .iter_mut()
+                    .for_each(InternalOperationSum::transform_result_backtrack);
+                ContentResult::BackTracked(BacktrackedResult {
+                    errors: None,
+                    result: success,
+                })
+            }
+        }
+        Err(operation_error) => {
+            internal_operation_results
+                .iter_mut()
+                .for_each(InternalOperationSum::transform_result_backtrack);
+            ContentResult::Failed(vec![operation_error].into())
+        }
+    }
+}
 
 /// Cost of a single durable-store write of `payload_bytes`, in
 /// milligas. Public counterpart of [`consume_storage_write_milligas`]
@@ -1067,7 +1107,7 @@ where
             // transfer() returns Ok even when internal operations FAILWITH,
             // because execute_internal_operations records failures only in
             // receipts. We must inspect the receipts to detect this case,
-            // matching the pattern used by produce_operation_result in the
+            // matching the pattern used by [`finalize_statuses`] in the
             // normal Tezos operation path.
             let all_internal_succeeded = internal_receipts
                 .last()
@@ -1705,11 +1745,15 @@ where
         OperationContent::Reveal(RevealContent { pk, .. }) => {
             let reveal_result = reveal(&mut tc_ctx, source_account, pk);
             log_on_operation_failure("Reveal", &reveal_result);
-            OperationResultSum::Reveal(produce_operation_result(
-                validated_operation.balance_updates,
+            let result = finalize_statuses::<RevealContent>(
                 reveal_result.map_err(Into::into),
-                internal_operations_receipts,
-            ))
+                &mut internal_operations_receipts,
+            );
+            OperationResultSum::Reveal(OperationResult {
+                balance_updates: validated_operation.balance_updates,
+                result,
+                internal_operation_results: internal_operations_receipts,
+            })
         }
         OperationContent::Transfer(TransferContent {
             amount,
@@ -1777,11 +1821,15 @@ where
                     Err(e)
                 }
             };
-            OperationResultSum::Transfer(produce_operation_result(
-                validated_operation.balance_updates,
+            let result = finalize_statuses::<TransferContent>(
                 transfer_result.map_err(Into::into),
-                internal_operations_receipts,
-            ))
+                &mut internal_operations_receipts,
+            );
+            OperationResultSum::Transfer(OperationResult {
+                balance_updates: validated_operation.balance_updates,
+                result,
+                internal_operation_results: internal_operations_receipts,
+            })
         }
         OperationContent::Origination(OriginationContent {
             ref balance,
@@ -1804,11 +1852,15 @@ where
                 Err(err) => Err(err),
             };
             log_on_operation_failure("Origination", &origination_result);
-            OperationResultSum::Origination(produce_operation_result(
-                validated_operation.balance_updates,
+            let result = finalize_statuses::<OriginationContent>(
                 origination_result.map_err(|e| e.into()),
-                internal_operations_receipts,
-            ))
+                &mut internal_operations_receipts,
+            );
+            OperationResultSum::Origination(OperationResult {
+                balance_updates: validated_operation.balance_updates,
+                result,
+                internal_operation_results: internal_operations_receipts,
+            })
         }
     };
 
