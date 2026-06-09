@@ -388,7 +388,8 @@ pub mod interpret_cost {
     pub const NEG_G1: u32 = 50;
     pub const NEG_G2: u32 = 70;
     pub const SUB_MUTEZ: u32 = 15;
-    pub const UNIT: u32 = 10;
+    // Re-benchmarked on the MIR interpreter (`cost_N_IUnit`).
+    pub const UNIT: u32 = 55;
     pub const AND_BOOL: u32 = 10;
     pub const OR_BOOL: u32 = 10;
     pub const XOR_BOOL: u32 = 15;
