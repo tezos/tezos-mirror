@@ -95,6 +95,23 @@ pub fn parse_u32_default(
     }
 }
 
+/// Extract an optional `u64` header. Returns `None` when the header
+/// is absent, `Some(value)` when it is present and well-formed. Parse
+/// failure (header present but malformed) surfaces as `HeaderError`.
+pub fn parse_u64_opt(
+    headers: &http::HeaderMap,
+    name: &str,
+) -> Result<Option<u64>, TezosXRuntimeError> {
+    match parse_str(headers, name)? {
+        Some(s) => s.parse::<u64>().map(Some).map_err(|_| {
+            TezosXRuntimeError::HeaderError(format!(
+                "Invalid {name} header value: expected u64, got {s:?}"
+            ))
+        }),
+        None => Ok(None),
+    }
+}
+
 /// Reject an inbound cross-runtime call whose CRAC chain depth exceeds
 /// [`MAX_CRAC_DEPTH`].
 ///

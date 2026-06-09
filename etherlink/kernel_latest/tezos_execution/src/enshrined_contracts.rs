@@ -25,11 +25,13 @@ use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::block::AppliedOperation;
 use tezos_tezlink::operation_result::{InternalOperationSum, TransferError};
 use tezosx_interfaces::{
-    gas::convert as convert_gas, headers::format_tez_from_mutez, resolve_routing,
-    AliasInfo, Classification, CrossRuntimeContext, Registry, RoutingDecision, RuntimeId,
-    ALIAS_LOOKUP_MILLIGAS, ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT,
-    X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT,
-    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME, X_TEZOS_TIMESTAMP,
+    gas::convert as convert_gas,
+    headers::{format_tez_from_mutez, parse_u64_opt},
+    resolve_routing, AliasInfo, Classification, CrossRuntimeContext, Registry,
+    RoutingDecision, RuntimeId, ALIAS_LOOKUP_MILLIGAS, ERR_FORBIDDEN_TEZOS_HEADER,
+    X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED,
+    X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME,
+    X_TEZOS_STORAGE_COST, X_TEZOS_TIMESTAMP,
 };
 use tezosx_journal::TezosXJournal;
 
@@ -1805,6 +1807,16 @@ fn classify_and_charge_crac_response(
                     .into(),
             )
             .into());
+        }
+        // TODO(L2-1519): handle the storage cost delegated by the callee.
+        let storage_cost = parse_u64_opt(response.headers(), X_TEZOS_STORAGE_COST)
+            .map_err(|e| {
+                CracError::Operation(TransferError::GatewayError(e.to_string()))
+            })?;
+        if let Some(v) = storage_cost {
+            return Err(CracError::BlockAbort(format!(
+                "{X_TEZOS_STORAGE_COST} not yet supported on the Michelson caller (got {v})"
+            )));
         }
         Ok(response.into_body())
     } else if is_cross_runtime_oog(response.status()) {
@@ -4643,5 +4655,27 @@ mod tests {
             }
             other => panic!("expected FailedWith INVALID_RUNTIME_ID, got: {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_classify_and_charge_crac_response_rejects_storage_cost_header() {
+        let response = http::Response::builder()
+            .status(http::status::StatusCode::OK)
+            .header(X_TEZOS_GAS_CONSUMED, "1000")
+            .header(X_TEZOS_STORAGE_COST, "42")
+            .body(vec![])
+            .unwrap();
+        let mut gas = crate::gas::TezlinkOperationGas::default();
+        let result = classify_and_charge_crac_response(response, Some("tezos"), &mut gas);
+        assert!(
+            matches!(
+                result,
+                Err(CracError::BlockAbort(ref msg))
+                 if msg.contains("X-Tezos-Storage-Cost")
+                    && msg.contains("not yet supported")
+                    && msg.contains("42")
+            ),
+            "expected GatewayError with storage-cost not-yet-supported message, got: {result:?}"
+        );
     }
 }

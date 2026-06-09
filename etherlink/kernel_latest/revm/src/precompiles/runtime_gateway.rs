@@ -11,12 +11,13 @@ use revm::{
     },
 };
 use tezosx_interfaces::{
-    canonicalize_native_address, gas, AliasInfo, Classification, Origin, Registry,
-    RuntimeId, ALIAS_LOOKUP_COST, ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT,
-    X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_DEPTH, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED,
-    X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
+    canonicalize_native_address, gas,
+    headers::{format_tez_from_wei, parse_u64_opt},
+    AliasInfo, Classification, Origin, Registry, RuntimeId, ALIAS_LOOKUP_COST,
+    ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_DEPTH,
+    X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER,
+    X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME, X_TEZOS_STORAGE_COST, X_TEZOS_TIMESTAMP,
 };
-use tezosx_interfaces::{headers::format_tez_from_wei, X_TEZOS_SOURCE_RUNTIME};
 
 use crate::{
     database::EtherlinkVMDB,
@@ -239,6 +240,14 @@ fn classify_and_charge_crac_response(
                 "X-Tezos-Gas-Consumed header missing or invalid in CRAC response".into(),
                 *gas,
             ));
+        }
+        // TODO(L2-1340): handle the storage cost delegated by the callee.
+        let storage_cost = parse_u64_opt(response.headers(), X_TEZOS_STORAGE_COST)
+            .map_err(|e| CustomPrecompileError::Revert(e.to_string(), *gas))?;
+        if let Some(v) = storage_cost {
+            return Err(CustomPrecompileError::Abort(CustomPrecompileAbort::Crac(
+                format!("{X_TEZOS_STORAGE_COST} not yet supported on the EVM caller (got {v})")
+            )));
         }
         Ok(response.into_body())
     } else if response.status().is_client_error() {
@@ -2435,6 +2444,32 @@ mod tests {
                 .to_str()
                 .unwrap(),
             "42"
+        );
+    }
+
+    #[test]
+    fn test_classify_and_charge_crac_response_rejects_storage_cost_header() {
+        let response = http::Response::builder()
+            .status(http::status::StatusCode::OK)
+            .header(X_TEZOS_GAS_CONSUMED, "1000")
+            .header(X_TEZOS_STORAGE_COST, "42")
+            .body(vec![])
+            .unwrap();
+        let mut gas = Gas::new(u64::MAX);
+        let result = super::classify_and_charge_crac_response(
+            response,
+            RuntimeId::Tezos,
+            &mut gas,
+        );
+        assert!(
+            matches!(
+                result,
+                Err(CustomPrecompileError::Abort(CustomPrecompileAbort::Crac(ref msg)))
+                if msg.contains("X-Tezos-Storage-Cost")
+                    && msg.contains("not yet supported")
+                    && msg.contains("42")
+            ),
+            "expected Revert with storage-cost not-yet-supported message, got: {result:?}"
         );
     }
 }
