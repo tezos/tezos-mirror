@@ -157,6 +157,14 @@
   call is now reverted with the parent operation. Previously it was
   written to durable storage during gateway resolution and survived a
   failed parent unburned, allowing storage growth at no cost. (!22056)
+- Cross-runtime calls re-entering from an inbound CRAC now attribute the
+  transitive originator (not the immediate caller) as the call source,
+  fixing the source reported in EVM→Michelson CRAC receipts. (!22065)
+- Nested EVM→Michelson CRAC legs are now recorded and folded into the
+  originating Michelson operation's internal operations when the call chain
+  originates in the Michelson runtime — including a top-level manager
+  operation that calls the gateway `%call_evm` directly — instead of being
+  dropped. (!22065)
 
 ### Storage versions
 
