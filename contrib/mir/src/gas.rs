@@ -367,13 +367,12 @@ pub mod interpret_cost {
     // the entries directly (no such setup), so a flat cost matches MIR's work.
     pub const ITER: u32 = 20;
     pub const SWAP: u32 = 10;
-    pub const ABS: u32 = 10;
     pub const INT_NAT: u32 = 10;
     pub const ISNAT: u32 = 10;
     pub const INT_BLS_FR: u32 = 115;
     // Re-benchmarked on the MIR interpreter (`cost_N_IPush`).
     pub const PUSH: u32 = 60;
-    pub const ADD_TEZ: u32 = 20;
+    pub const ADD_TEZ: u32 = 45;
     pub const ADD_BLS_FR: u32 = 30;
     pub const ADD_BLS_G1: u32 = 900;
     pub const ADD_BLS_G2: u32 = 2470;
@@ -387,7 +386,7 @@ pub mod interpret_cost {
     pub const NEG_FR: u32 = 30;
     pub const NEG_G1: u32 = 50;
     pub const NEG_G2: u32 = 70;
-    pub const SUB_MUTEZ: u32 = 15;
+    pub const SUB_MUTEZ: u32 = 55;
     // Re-benchmarked on the MIR interpreter (`cost_N_IUnit`).
     pub const UNIT: u32 = 55;
     pub const AND_BOOL: u32 = 10;
@@ -621,7 +620,7 @@ pub mod interpret_cost {
         // max is copied from the Tezos protocol, ostensibly adding two big ints depends on
         // the larger of the two due to result allocation
         let sz = Checked::from(std::cmp::max(i1.byte_size(), i2.byte_size()));
-        (35 + (sz >> 1)).as_gas_cost()
+        (65 + (sz >> 3) + (sz >> 7)).as_gas_cost()
     }
 
     pub fn sub_num(
@@ -629,7 +628,7 @@ pub mod interpret_cost {
         i2: &impl BigIntByteSize,
     ) -> Result<u32, CostOverflow> {
         let sz = Checked::from(std::cmp::max(i1.byte_size(), i2.byte_size()));
-        (35 + (sz >> 1)).as_gas_cost()
+        (65 + (sz >> 3) + (sz >> 7)).as_gas_cost()
     }
 
     /// Cost for `AND` on numbers and bytearrays
@@ -1118,11 +1117,8 @@ pub mod interpret_cost {
     }
 
     pub fn abs(int: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
-        // NB: MIR implementation is constant-time and alloc free so could have
-        // a constant gas cost but for consistency with the protocol we use the
-        // same linear model.
         let size = Checked::from(int.byte_size());
-        (20 + (size >> 1)).as_gas_cost()
+        (50 + (size >> 4) + (size >> 6) + (size >> 8) + (size >> 9)).as_gas_cost()
     }
 
     pub fn int_bytes(size: usize) -> Result<u32, CostOverflow> {
