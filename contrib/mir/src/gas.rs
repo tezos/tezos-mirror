@@ -371,7 +371,8 @@ pub mod interpret_cost {
     pub const INT_NAT: u32 = 10;
     pub const ISNAT: u32 = 10;
     pub const INT_BLS_FR: u32 = 115;
-    pub const PUSH: u32 = 10;
+    // Re-benchmarked on the MIR interpreter (`cost_N_IPush`).
+    pub const PUSH: u32 = 60;
     pub const ADD_TEZ: u32 = 20;
     pub const ADD_BLS_FR: u32 = 30;
     pub const ADD_BLS_G1: u32 = 900;
