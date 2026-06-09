@@ -346,7 +346,8 @@ pub mod interpret_cost {
     use crate::ast::{Micheline, Or, Ticket, TypedValue};
 
     pub const DIP: u32 = 10;
-    pub const DROP: u32 = 10;
+    // Re-benchmarked on the MIR interpreter (`cost_N_IDrop`).
+    pub const DROP: u32 = 20;
     pub const DUP: u32 = 10;
     pub const GT: u32 = 10;
     pub const GE: u32 = 10;
@@ -531,9 +532,22 @@ pub mod interpret_cost {
     }
 
     fn dropn(n: u16) -> Result<u32, CostOverflow> {
-        // Approximates 30 + 2.713108*n, copied from the Tezos protocol
-        let n = Checked::from(n as u32);
-        (30 + n * 2 + (n >> 1) + (n >> 3)).as_gas_cost()
+        // `cost_N_IDropN`, re-benchmarked on the MIR interpreter. Piecewise
+        // model with segments split at depths 300 and 400. The model's `S.sub`
+        // is saturating, hence `saturating_sub` (a plain `Checked` subtraction
+        // would underflow to an error below the segment thresholds).
+        let n = n as u32;
+        let w3 = std::cmp::min(300, n);
+        let w1 = std::cmp::min(400, n).saturating_sub(300);
+        let w2 = n.saturating_sub(400);
+        let w1 = Checked::from(w1);
+        let w2 = Checked::from(w2);
+        let w3 = Checked::from(w3);
+        ((w1 >> 1) + (w1 >> 2) + (w1 >> 4) + (w1 >> 5)
+            + (w2 >> 1) + (w2 >> 2) + (w2 >> 3) + (w2 >> 6)
+            + (w3 >> 1) + (w3 >> 2) + (w3 >> 4) + (w3 >> 6)
+            + 10)
+        .as_gas_cost()
     }
 
     pub fn drop(mb_n: Option<u16>) -> Result<u32, CostOverflow> {
