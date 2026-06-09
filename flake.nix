@@ -18,7 +18,7 @@
     # ci-check-version-sh-lock app enforces this.
     opam-repository = {
       flake = false;
-      url = "github:ocaml/opam-repository/8a528d6bb48e4be260fb670a1754df39a1192147";
+      url = "github:ocaml/opam-repository/9d61e8a449aa2436cbd9b390c4afa6b47e8ed0ba";
     };
 
     # This library helps us build OCaml packages and dependencies.

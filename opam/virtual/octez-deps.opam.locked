@@ -16,8 +16,8 @@ depends: [
   "afl-persistent" {= "1.4"}
   "alcotest" {= "1.9.1"}
   "alcotest-lwt" {= "1.9.1"}
-  "ambient-context" {= "0.1.0"}
-  "ambient-context-lwt" {= "0.1.0"}
+  "ambient-context" {= "0.1.1"}
+  "ambient-context-lwt" {= "0.1.1"}
   "angstrom" {= "0.16.1"}
   "asetmap" {= "0.8.1"}
   "asn1-combinators" {= "0.3.2"}

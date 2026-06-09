@@ -36,7 +36,7 @@ let alcotest = external_lib "alcotest" V.(at_least "1.5.0")
 
 let alcotest_lwt = external_lib "alcotest-lwt" V.(at_least "1.5.0")
 
-let ambient_context_lwt = external_lib "ambient-context-lwt" V.(exactly "0.1.0")
+let ambient_context_lwt = external_lib "ambient-context-lwt" V.(exactly "0.1.1")
 
 let asetmap = external_lib "asetmap" V.(at_least "0.8.1")
 
