@@ -393,10 +393,10 @@ pub mod interpret_cost {
     pub const OR_BOOL: u32 = 10;
     pub const XOR_BOOL: u32 = 15;
     pub const NOT_BOOL: u32 = 10;
-    pub const CAR: u32 = 10;
-    pub const CDR: u32 = 10;
+    pub const CAR: u32 = 15;
+    pub const CDR: u32 = 20;
     pub const PAIR: u32 = 10;
-    pub const UNPAIR: u32 = 10;
+    pub const UNPAIR: u32 = 60;
     pub const SOME: u32 = 10;
     pub const NONE: u32 = 10;
     pub const AMOUNT: u32 = 10;
@@ -414,8 +414,8 @@ pub mod interpret_cost {
     pub const PACK: u32 = 0;
     pub const SELF: u32 = 10;
     pub const ADDRESS: u32 = 10;
-    pub const LEFT: u32 = 10;
-    pub const RIGHT: u32 = 10;
+    pub const LEFT: u32 = 20;
+    pub const RIGHT: u32 = 20;
 
     // See `cost_N_IOpt_map` in the Tezos protocol
     pub const MAP_OPTION: u32 = 10;
@@ -1147,25 +1147,29 @@ pub mod interpret_cost {
     }
 
     pub fn pair_n(size: usize) -> Result<u32, CostOverflow> {
+        // corresponds to cost_N_IComb in the Tezos protocol
         let size = Checked::from(size);
         let v0 = size - 2;
-        (40 + ((v0 >> 2) + (v0 * 3))).as_gas_cost()
+        (50 + (v0 * 15)).as_gas_cost()
     }
 
     pub fn unpair_n(size: usize) -> Result<u32, CostOverflow> {
+        // corresponds to cost_N_IUncomb in the Tezos protocol
         let size = Checked::from(size);
         let v0 = size - 2;
-        (30 + (v0 * 4)).as_gas_cost()
+        (50 + ((v0 * 7) + (v0 >> 2))).as_gas_cost()
     }
 
     pub fn get_n(size: usize) -> Result<u32, CostOverflow> {
+        // corresponds to cost_N_IComb_get in the Tezos protocol
         let size = Checked::from(size);
-        (20 + ((size >> 1) + (size >> 4))).as_gas_cost()
+        (60 + ((size >> 1) + (size * 18))).as_gas_cost()
     }
 
     pub fn update_n(size: usize) -> Result<u32, CostOverflow> {
+        // corresponds to cost_N_IComb_set in the Tezos protocol
         let size = Checked::from(size);
-        (30 + ((size >> 5) + ((size >> 2) + size))).as_gas_cost()
+        (50 + ((size >> 2) + (size * 13))).as_gas_cost()
     }
 }
 
