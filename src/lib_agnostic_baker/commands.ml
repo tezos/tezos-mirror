@@ -151,6 +151,12 @@ module Dal = struct
       ~long:"compress"
       ()
 
+  let skip_shards =
+    Tezos_clic.switch
+      ~doc:"Do not export or import shards."
+      ~long:"skip-shards"
+      ()
+
   let commands =
     let open Tezos_clic in
     let group = {name = "dal"; title = "Commands related to the DAL daemon."} in
@@ -180,7 +186,7 @@ module Dal = struct
     let snapshot_export =
       let open Tezos_clic in
       let args =
-        args7
+        args8
           data_dir
           config_file
           endpoint
@@ -188,6 +194,7 @@ module Dal = struct
           max_published_level
           slots
           compress
+          skip_shards
       in
       command
         ~group
@@ -206,7 +213,8 @@ module Dal = struct
                min_published_level,
                max_published_level,
                slots,
-               compress )
+               compress,
+               skip_shards )
              path_list
              _cctxt
            ->
@@ -224,6 +232,7 @@ module Dal = struct
           let max_level = Option.map Int32.of_int max_published_level in
           Snapshot.export
             ~compress
+            ~skip_shards
             ~data_dir
             ~config_file
             ~endpoint
@@ -235,7 +244,7 @@ module Dal = struct
     let snapshot_import =
       let open Tezos_clic in
       let args =
-        args7
+        args8
           data_dir
           config_file
           endpoint
@@ -243,6 +252,7 @@ module Dal = struct
           max_published_level
           slots
           no_check
+          skip_shards
       in
       command
         ~group
@@ -261,7 +271,8 @@ module Dal = struct
                min_published_level,
                max_published_level,
                slots,
-               no_check )
+               no_check,
+               skip_shards )
              path_list
              _cctxt
            ->
@@ -279,6 +290,7 @@ module Dal = struct
           let max_level = Option.map Int32.of_int max_published_level in
           Snapshot.import
             ~check:(not no_check)
+            ~skip_shards
             ~data_dir
             ~config_file
             ~endpoint

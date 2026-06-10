@@ -108,6 +108,10 @@ val layout :
   unit ->
   ('key, 'value) layout
 
+(** [filepath layout] returns the path of the physical file described by
+    [layout]. *)
+val filepath : ('key, 'value) layout -> string
+
 module Read : sig
   (** An abstract representation of a file-based key-value store. *)
   type ('file, 'key, 'value) t
