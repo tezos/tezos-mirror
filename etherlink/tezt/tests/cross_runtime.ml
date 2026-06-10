@@ -16,10 +16,28 @@
 
 open Rpc.Syntax
 
+(** Base-fee floor for the CRAC test setups.  The delayed-inbox transport
+    bypassed the fee market entirely; direct tezlink injection enforces
+    minimal fees (base_fee_per_gas * michelson_to_evm_gas_multiplier *
+    gas_limit), which the historical [~fee:1000] of the forged
+    operations does not cover beyond 100k gas.  The operations must
+    stay byte-for-byte identical, so instead lower the base-fee floor
+    to 1 wei — non-zero so BASEFEE-observable assertions stay
+    meaningful. *)
+let crac_minimum_base_fee_per_gas = Wei.of_string "1"
+
 (** Foreign endpoint of the tezlink RPC served by [evm_node]. *)
 let tezlink_foreign_endpoint_from_evm_node evm_node =
   let evm_node_endpoint = Evm_node.rpc_endpoint_record evm_node in
   {evm_node_endpoint with Endpoint.path = "/tezlink"}
+
+(** Client whose endpoint is the tezlink RPC served by [evm_node], for
+    direct injection of Michelson operations. *)
+let tezlink_client_from_evm_node evm_node =
+  let endpoint =
+    Client.Foreign_endpoint (tezlink_foreign_endpoint_from_evm_node evm_node)
+  in
+  Client.init ~endpoint ()
 
 module EvmContract = struct
   let tezosx_evm_chain_id = 1337
@@ -99,52 +117,48 @@ module TezContract = struct
    *  Michelson contract. *)
   let tezosx_michelson_contracts_index = "/tez/tez_accounts/contracts/index"
 
-  (** [decode_contract_address hex] decodes a hex-encoded
-   *  [Contract_repr.t] into a b58check KT1 address string. *)
-  let decode_contract_address hex =
+  (** [encode_contract_address kt1] encodes a b58check KT1 address string
+   *  into the hex-encoded [Contract_repr.t] under which the contract is
+   *  indexed in the durable storage. *)
+  let encode_contract_address kt1 =
     let module C = Tezos_protocol_alpha.Protocol.Contract_repr in
-    Hex.to_bytes (`Hex hex)
-    |> Data_encoding.Binary.of_bytes_exn C.encoding
-    |> C.to_b58check
+    match C.of_b58check kt1 with
+    | Error _ -> Test.fail "encode_contract_address: invalid address %s" kt1
+    | Ok contract ->
+        Data_encoding.Binary.to_bytes_exn C.encoding contract
+        |> Hex.of_bytes |> Hex.show
 
-  (** [send_op_to_delayed_inbox_and_wait] sends a Tezos operation via the
-   *  delayed inbox and waits until it is included and the delayed inbox is
-   *  empty. *)
-  let send_op_to_delayed_inbox_and_wait ~sc_rollup_address ~sc_rollup_node
-      ~client ~l1_contracts ~sequencer operation =
-    let* _hash =
-      Delayed_inbox.send_tezos_operation_to_delayed_inbox
-        ~sc_rollup_address
-        ~sc_rollup_node
-        ~client
-        ~l1_contracts
-        ~tezosx_format:true
-        operation
+  (** [inject_op_and_produce_block ~client_tezlink ~sequencer op] injects a
+   *  pre-signed operation as-is via the tezlink RPC, seals it with
+   *  [produce_block], and returns the operation (with receipt metadata) as
+   *  found in the produced block.  Fails if the operation was not
+   *  included. *)
+  let inject_op_and_produce_block ~client_tezlink ~sequencer operation =
+    let* (`OpHash op_hash) =
+      Operation.inject ~dont_wait:true operation client_tezlink
     in
-    let* () =
-      Delayed_inbox.wait_for_delayed_inbox_add_tx_and_injected
-        ~sequencer
-        ~sc_rollup_node
-        ~client
+    let*@ _count = Rpc.produce_block sequencer in
+    let* all_passes =
+      RPC_core.call
+        (tezlink_foreign_endpoint_from_evm_node sequencer)
+        (RPC.get_chain_block_operations ())
     in
-    let* () =
-      Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-    in
-    Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node)
+    match
+      List.find_opt
+        (fun op -> JSON.(op |-> "hash" |> as_string) = op_hash)
+        JSON.(all_passes |=> 3 |> as_list)
+    with
+    | None ->
+        Test.fail "Operation %s was not included in the produced block" op_hash
+    | Some op -> return op
 
-  (** [originate_contract_via_delayed_inbox] originates a Michelson
-   *  contract via the delayed inbox. Loads the script from
+  (** [originate_contract_via_tezlink] originates a Michelson contract by
+   *  direct tezlink injection. Loads the script from
    *  [michelson_test_scripts], converts code and initial storage to JSON,
-   *  forges and sends the origination operation, then returns the hex key and
-   *  KT1 address of the new contract. *)
-  let originate_contract_via_delayed_inbox ~sc_rollup_address ~sc_rollup_node
-      ~client ~l1_contracts ~sequencer ~source ~counter ~script_name
-      ~init_storage_data ?(init_balance = 0) protocol =
-    let* contracts_before =
-      Delayed_inbox.subkeys
-        tezosx_michelson_contracts_index
-        (Sc_rollup_node sc_rollup_node)
-    in
+   *  forges, injects and seals the origination operation, then returns the
+   *  hex key and KT1 address of the new contract. *)
+  let originate_contract_via_tezlink ~client ~client_tezlink ~sequencer ~source
+      ~counter ~script_name ~init_storage_data ?(init_balance = 0) protocol =
     let script_path = Michelson_script.(find script_name protocol |> path) in
     let* code = Client.convert_script_to_json ~script:script_path client in
     let* init_storage =
@@ -164,38 +178,31 @@ module TezContract = struct
           ])
         client
     in
-    let* () =
-      send_op_to_delayed_inbox_and_wait
-        ~sc_rollup_address
-        ~sc_rollup_node
-        ~client
-        ~l1_contracts
-        ~sequencer
-        origination_op
-    in
-    let* contracts_after =
-      Delayed_inbox.subkeys
-        tezosx_michelson_contracts_index
-        (Sc_rollup_node sc_rollup_node)
+    let* op_json =
+      inject_op_and_produce_block ~client_tezlink ~sequencer origination_op
     in
     let new_contracts =
-      List.filter (fun c -> not (List.mem c contracts_before)) contracts_after
+      JSON.(
+        op_json |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
+        |-> "originated_contracts" |> as_list |> List.map as_string)
     in
     Check.(
       (List.length new_contracts = 1)
         int
         ~error_msg:"Expected %R new contract but got %L") ;
-    let contract_hex = List.hd new_contracts in
-    let kt1_address = decode_contract_address contract_hex in
-    Log.info "Originated contract: %s" kt1_address ;
-    return (contract_hex, kt1_address)
+    match new_contracts with
+    | [kt1_address] ->
+        let contract_hex = encode_contract_address kt1_address in
+        Log.info "Originated contract: %s" kt1_address ;
+        return (contract_hex, kt1_address)
+    | _ -> assert false
 
-  (** [call_contract_via_delayed_inbox] calls a Michelson contract
-   *  via the delayed inbox. Converts the argument from Michelson notation to
-   *  JSON, forges and sends the call operation. *)
-  let call_contract_via_delayed_inbox ~sc_rollup_address ~sc_rollup_node ~client
-      ~l1_contracts ~sequencer ~source ~counter ~dest ~arg_data
-      ?(entrypoint = "default") ?(amount = 0) ?(gas_limit = 100_000) () =
+  (** [call_contract_via_tezlink] calls a Michelson contract by direct
+   *  tezlink injection. Converts the argument from Michelson notation to
+   *  JSON, forges, injects and seals the call operation. *)
+  let call_contract_via_tezlink ~client ~client_tezlink ~sequencer ~source
+      ~counter ~dest ~arg_data ?(entrypoint = "default") ?(amount = 0)
+      ?(gas_limit = 100_000) () =
     let* arg = Client.convert_data_to_json ~data:arg_data client in
     let* call_op =
       Operation.Manager.(
@@ -211,13 +218,10 @@ module TezContract = struct
           ])
         client
     in
-    send_op_to_delayed_inbox_and_wait
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~sequencer
-      call_op
+    let* (_ : JSON.t) =
+      inject_op_and_produce_block ~client_tezlink ~sequencer call_op
+    in
+    unit
 
   (** [get_consumed_milligas ~block sequencer] queries the tezlink RPC
    *  for [block]'s first manager operation and returns the top-level
@@ -728,14 +732,12 @@ end
 module TezRunner = struct
   open TezContract
 
-  (** Calls [%run] with [Unit] via the delayed inbox. *)
-  let call_run ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ?amount ?gas_limit runner =
-    call_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+  (** Calls [%run] with [Unit] by direct tezlink injection. *)
+  let call_run ~client ~client_tezlink ~sequencer ~source ~counter ?amount
+      ?gas_limit runner =
+    call_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -756,16 +758,13 @@ module TezCrossRuntimeRunnerEvm = struct
 
   (** Originates the contract.  [evm_contract_target_address] is the
    *  EVM address that will be called on [%run]. *)
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance
-      ~evm_contract_target_address () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~evm_contract_target_address () =
     let script_name = ["mini_scenarios"; "cross_runtime_run_evm"] in
     let init_storage_data = sf {|Pair 0 "%s"|} evm_contract_target_address in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -809,16 +808,13 @@ module TezCrossRuntimeHttpCallEvm = struct
   open TezContract
   include TezRunner
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance
-      ~evm_contract_target_address () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~evm_contract_target_address () =
     let script_name = ["mini_scenarios"; "cross_runtime_http_call_evm"] in
     let init_storage_data = sf {|Pair 0 "%s"|} evm_contract_target_address in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -848,20 +844,17 @@ module TezCrossRuntimeHttpCallTezCallback = struct
   open TezContract
   include TezRunner
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance
-      ~tez_contract_target_address () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~tez_contract_target_address () =
     let script_name =
       ["mini_scenarios"; "cross_runtime_http_call_tez_callback"]
     in
     let init_storage_data =
       sf {|Pair 0 (Pair "%s" None)|} tez_contract_target_address
     in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -882,8 +875,8 @@ module TezCrossRuntimeHttpCallTezCallback = struct
           "Expected TezCrossRuntimeHttpCallTezCallback `count` %R but got %L") ;
     unit
 
-  let check_result ~sequencer ~expected_bytes
-      (_contract_hex, contract_address) =
+  let check_result ~sequencer ~expected_bytes (_contract_hex, contract_address)
+      =
     let* storage = get_storage ~sequencer contract_address in
     (* Storage: Pair(count, Pair(destination, option bytes)) *)
     let result_node = JSON.(storage |-> "args" |=> 1 |-> "args" |=> 1) in
@@ -917,16 +910,13 @@ module TezCrossRuntimeHttpCallTez = struct
   open TezContract
   include TezRunner
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance
-      ~tez_contract_target_address () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~tez_contract_target_address () =
     let script_name = ["mini_scenarios"; "cross_runtime_http_call_tez"] in
     let init_storage_data = sf {|Pair 0 "%s"|} tez_contract_target_address in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -957,15 +947,13 @@ module TezMultiRunCaller = struct
   (** Originates the contract.  [callees] is the list of contracts
    *  that will be called on [%run].  [revert] controls whether the
    *  contract reverts after all calls. *)
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance ~revert ~callees () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~revert ~callees () =
     let script_name = ["mini_scenarios"; "multi_run_caller"] in
     let init_storage_data = multi_run_caller_init_storage ~revert ~callees in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -992,15 +980,13 @@ end
 module TezGasBurner = struct
   open TezContract
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance () =
     let script_name = ["mini_scenarios"; "gas_burner"] in
     let init_storage_data = "Unit" in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1148,9 +1134,9 @@ module TezCallbackRunnerEvm = struct
 
   (** Originates the contract.  [evm_contract_target_address] is the
    *  EVM address that will be called on [%run]. *)
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance ~failing
-      ~evm_contract_target_address ~method_sig ~abi_params () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~failing ~evm_contract_target_address ~method_sig
+      ~abi_params () =
     let script_name =
       if failing then ["mini_scenarios"; "failing_callback_run_evm"]
       else ["mini_scenarios"; "callback_run_evm"]
@@ -1162,11 +1148,9 @@ module TezCallbackRunnerEvm = struct
         method_sig
         abi_params
     in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1229,15 +1213,13 @@ end
 module TezMichelsonGasBurner = struct
   open TezContract
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance () =
     let script_name = ["mini_scenarios"; "gas_burner_with_internal_op"] in
     let init_storage_data = "Unit" in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1256,9 +1238,8 @@ module Gateway = struct
   open TezContract
 
   (** Calls the gateway's [%call_evm] with [None] callback. *)
-  let call_evm ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~evm_target ~method_sig ~abi_params
-      ?(amount = 0) () =
+  let call_evm ~client ~client_tezlink ~sequencer ~source ~counter ~evm_target
+      ~method_sig ~abi_params ?(amount = 0) () =
     let arg_data =
       sf
         {|Pair "%s" (Pair "%s" (Pair 0x%s None))|}
@@ -1266,11 +1247,9 @@ module Gateway = struct
         method_sig
         abi_params
     in
-    call_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    call_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1292,15 +1271,13 @@ module TezCollectResult = struct
   (** Originates [gateway_collect_result.tz] with storage
    *  [Pair gateway_address 0x<payload_hex>].  [payload_hex] is the
    *  bytes payload deposited via [%collect_result] (no [0x] prefix). *)
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance ~payload_hex () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~payload_hex () =
     let script_name = ["mini_scenarios"; "gateway_collect_result"] in
     let init_storage_data = sf {|Pair "%s" 0x%s|} gateway_address payload_hex in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1324,17 +1301,15 @@ module TezCollectResultWithAmount = struct
    *  otherwise the TRANSFER_TOKENS would fail with [BalanceTooLow] before
    *  the kernel's amount check has a chance to fire, masking the
    *  rejection we are testing. *)
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance ~payload_hex () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~payload_hex () =
     let script_name =
       ["mini_scenarios"; "gateway_collect_result_with_amount"]
     in
     let init_storage_data = sf {|Pair "%s" 0x%s|} gateway_address payload_hex in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1348,13 +1323,11 @@ end
 module TezAlwaysFailsUnit = struct
   open TezContract
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance () =
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance () =
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1377,13 +1350,11 @@ end
 module TezEmitFailer = struct
   open TezContract
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance () =
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance () =
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1401,18 +1372,15 @@ end
 module TezCollectResultThenFail = struct
   open TezContract
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance ~failing_kt1
-      ~payload_hex () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~failing_kt1 ~payload_hex () =
     let script_name = ["mini_scenarios"; "gateway_collect_result_then_fail"] in
     let init_storage_data =
       sf {|Pair "%s" (Pair "%s" 0x%s)|} gateway_address failing_kt1 payload_hex
     in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1429,13 +1397,11 @@ end
 module TezAlwaysSucceedsUnit = struct
   open TezContract
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance () =
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance () =
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1454,13 +1420,11 @@ end
 module TezEmitter = struct
   open TezContract
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance () =
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance () =
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1477,15 +1441,13 @@ end
 module TezCollectResultTwice = struct
   open TezContract
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance ~payload_hex () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~payload_hex () =
     let script_name = ["mini_scenarios"; "gateway_collect_result_twice"] in
     let init_storage_data = sf {|Pair "%s" 0x%s|} gateway_address payload_hex in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1504,9 +1466,8 @@ end
 module TezCollectResultThenCallEvm = struct
   open TezContract
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance ~evm_target_address
-      ~payload_hex () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~evm_target_address ~payload_hex () =
     let script_name =
       ["mini_scenarios"; "gateway_collect_result_then_call_evm"]
     in
@@ -1517,11 +1478,9 @@ module TezCollectResultThenCallEvm = struct
         evm_target_address
         payload_hex
     in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1538,13 +1497,11 @@ end
 module TezGenerate4MibResult = struct
   open TezContract
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance () =
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance () =
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1844,17 +1801,9 @@ module CracRunnerWrapper = struct
    *  both are auto-incremented on each use. *)
   let build ?(nonce = 0) ?(counter = 0)
       ~sequencer_setup:
-        ({
-           sc_rollup_address;
-           sc_rollup_node;
-           client;
-           l1_contracts;
-           sequencer;
-           evm_version;
-           _;
-         } :
-          Tezt_etherlink.Setup.sequencer_setup) ~sender ~source protocol :
-      (module S) =
+        ({sc_rollup_node; client; sequencer; evm_version; _} :
+          Tezt_etherlink.Setup.sequencer_setup) ~client_tezlink ~sender ~source
+      protocol : (module S) =
     let ref_nonce = ref nonce in
     let ref_counter = ref counter in
 
@@ -1878,10 +1827,6 @@ module CracRunnerWrapper = struct
       let sender = sender
 
       let source = source
-
-      let sc_rollup_address = sc_rollup_address
-
-      let l1_contracts = l1_contracts
 
       let evm_nonce = evm_nonce
 
@@ -2199,10 +2144,8 @@ module CracRunnerWrapper = struct
       module TezRunner = struct
         let call_run ?amount ?gas_limit (`Tez_runner (_, runner)) =
           TezRunner.call_run
-            ~sc_rollup_address
-            ~sc_rollup_node
             ~client
-            ~l1_contracts
+            ~client_tezlink
             ~sequencer
             ~source
             ~counter:(tez_counter ())
@@ -2221,10 +2164,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance (`Evm_runner address) =
           let* contract_hex, address =
             TezCrossRuntimeRunnerEvm.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2247,10 +2188,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance (`Evm_runner address) =
           let* contract_hex, address =
             TezCrossRuntimeHttpCallEvm.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2273,10 +2212,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance (`Tez_runner (_, address)) =
           let* contract_hex, address =
             TezCrossRuntimeHttpCallTez.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2299,10 +2236,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance (`Tez_runner (_, address)) =
           let* contract_hex, address =
             TezCrossRuntimeHttpCallTezCallback.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2335,10 +2270,8 @@ module CracRunnerWrapper = struct
           in
           let* runner_hex, runner =
             TezMultiRunCaller.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2362,10 +2295,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance ~payload_hex () =
           let* runner_hex, runner =
             TezCollectResult.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2381,10 +2312,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance ~payload_hex () =
           let* runner_hex, runner =
             TezCollectResultWithAmount.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2400,10 +2329,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance () =
           let* runner_hex, runner =
             TezAlwaysFailsUnit.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2419,10 +2346,8 @@ module CracRunnerWrapper = struct
             ~payload_hex () =
           let* runner_hex, runner =
             TezCollectResultThenFail.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2439,10 +2364,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance () =
           let* runner_hex, runner =
             TezAlwaysSucceedsUnit.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2457,10 +2380,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance () =
           let* runner_hex, runner =
             TezEmitter.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2475,10 +2396,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance () =
           let* runner_hex, runner =
             TezEmitFailer.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2493,10 +2412,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance ~payload_hex () =
           let* runner_hex, runner =
             TezCollectResultTwice.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2513,10 +2430,8 @@ module CracRunnerWrapper = struct
             ~payload_hex () =
           let* runner_hex, runner =
             TezCollectResultThenCallEvm.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2533,10 +2448,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance () =
           let* runner_hex, runner =
             TezGenerate4MibResult.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2551,10 +2464,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance () =
           let* runner_hex, runner =
             TezGasBurner.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2574,16 +2485,6 @@ module CracRunnerWrapper = struct
         return (evm_runner, tez_runner)
 
       let inject_crac_no_block (`Tez_runner (_, dest)) =
-        let tezlink_endpoint =
-          Client.(
-            Foreign_endpoint
-              Endpoint.
-                {
-                  (Evm_node.rpc_endpoint_record sequencer) with
-                  path = "/tezlink";
-                })
-        in
-        let* client_tezlink = Client.init ~endpoint:tezlink_endpoint () in
         let* arg = Client.convert_data_to_json ~data:"Unit" client in
         let* crac_op =
           Operation.Manager.(
@@ -2672,10 +2573,8 @@ module CracRunnerWrapper = struct
             (`Evm_runner address) =
           let* contract_hex, address =
             TezCallbackRunnerEvm.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2707,10 +2606,8 @@ module CracRunnerWrapper = struct
         let call_evm ~evm_target:(`Evm_runner address) ~method_sig ~abi_params
             ?amount () =
           Gateway.call_evm
-            ~sc_rollup_address
-            ~sc_rollup_node
             ~client
-            ~l1_contracts
+            ~client_tezlink
             ~sequencer
             ~source
             ~counter:(tez_counter ())
@@ -2725,10 +2622,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance () =
           let* runner_hex, runner =
             TezMichelsonGasBurner.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2760,12 +2655,22 @@ let register_crac_runner_test ~title ?(tags = []) body =
     ~kernel:Latest
     ~with_runtimes
     ~enable_dal:false
+    ~minimum_base_fee_per_gas:crac_minimum_base_fee_per_gas
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
   @@ fun sequencer_setup protocol ->
   let sender = Eth_account.bootstrap_accounts.(0) in
   let source = Constant.bootstrap5 in
+  let* client_tezlink =
+    tezlink_client_from_evm_node sequencer_setup.Setup.sequencer
+  in
   let (module Wrapper) =
-    CracRunnerWrapper.build ~counter:1 ~sequencer_setup ~sender ~source protocol
+    CracRunnerWrapper.build
+      ~counter:1
+      ~sequencer_setup
+      ~client_tezlink
+      ~sender
+      ~source
+      protocol
   in
   body (module Wrapper : CracRunnerWrapper.S)
 
@@ -9937,9 +9842,8 @@ let test_l1_vs_tezosx_nested_failwith_receipt =
   let client = sequencer_setup.client in
   let node = sequencer_setup.node in
   let source = Constant.bootstrap5 in
-  let {Setup.sc_rollup_address; sc_rollup_node; l1_contracts; sequencer; _} =
-    sequencer_setup
-  in
+  let {Setup.sequencer; _} = sequencer_setup in
+  let* client_tezlink = tezlink_client_from_evm_node sequencer in
   let tez_counter = ref 1 in
   let next_tez_counter () =
     let c = !tez_counter in
@@ -9965,10 +9869,8 @@ let test_l1_vs_tezosx_nested_failwith_receipt =
       ~originate:(fun ~revert ~callees () ->
         let* _hex, kt1 =
           TezMultiRunCaller.originate
-            ~sc_rollup_address
-            ~sc_rollup_node
             ~client
-            ~l1_contracts
+            ~client_tezlink
             ~sequencer
             ~source
             ~counter:(next_tez_counter ())
@@ -9980,10 +9882,8 @@ let test_l1_vs_tezosx_nested_failwith_receipt =
         return kt1)
       ~call_run:(fun addr ->
         TezRunner.call_run
-          ~sc_rollup_address
-          ~sc_rollup_node
           ~client
-          ~l1_contracts
+          ~client_tezlink
           ~sequencer
           ~source
           ~counter:(next_tez_counter ())
@@ -11637,10 +11537,10 @@ let crac_orig_child_kt1s_for_callees ~prefix ~op_list ~callee_kt1s =
     (String.concat "; " children) ;
   children
 
-(* Register a test exposing the raw [sequencer_setup] (we need direct
-   access to [sc_rollup_address] / [sc_rollup_node] / [client] /
-   [l1_contracts] to originate Michelson contracts via the delayed
-   inbox, which the CRAC runner wrapper hides).
+(* Register a test exposing the raw setup components (we need direct
+   access to [client] / [client_tezlink] to originate Michelson
+   contracts via direct tezlink injection, which the CRAC runner
+   wrapper hides).
 
    Tag-neutral base. The [tags] argument is appended verbatim to the
    default [tezosx; <runtime>; crac] tags so callers control the
@@ -11663,17 +11563,10 @@ let crac_register ~title ~tags body =
     ~enable_dal:false
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
   @@ fun sequencer_setup protocol ->
-  let {
-    Setup.sc_rollup_address;
-    sc_rollup_node;
-    l1_contracts;
-    sequencer;
-    client;
-    evm_version;
-    _;
-  } =
+  let {Setup.sc_rollup_node; sequencer; client; evm_version; _} =
     sequencer_setup
   in
+  let* client_tezlink = tezlink_client_from_evm_node sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let source = Constant.bootstrap5 in
   let ref_nonce = ref 0 in
@@ -11689,11 +11582,10 @@ let crac_register ~title ~tags body =
     c
   in
   body
-    ~sc_rollup_address
     ~sc_rollup_node
-    ~l1_contracts
     ~sequencer
     ~client
+    ~client_tezlink
     ~evm_version
     ~sender
     ~source
@@ -11708,13 +11600,11 @@ let crac_orig_register ~title ~tags body =
 
 (* Originate the Michelson callee fixture: a parameterless %run that
    performs exactly one CREATE_CONTRACT. *)
-let crac_orig_originate_create_on_run ~sc_rollup_address ~sc_rollup_node ~client
-    ~l1_contracts ~sequencer ~source ~counter protocol =
-  TezContract.originate_contract_via_delayed_inbox
-    ~sc_rollup_address
-    ~sc_rollup_node
+let crac_orig_originate_create_on_run ~client ~client_tezlink ~sequencer ~source
+    ~counter protocol =
+  TezContract.originate_contract_via_tezlink
     ~client
-    ~l1_contracts
+    ~client_tezlink
     ~sequencer
     ~source
     ~counter
@@ -11767,11 +11657,10 @@ let test_crac_orig_two_txs_one_block =
        distinct KT1s"
     ~tags:["collision"]
   @@
-  fun ~sc_rollup_address
-      ~sc_rollup_node
-      ~l1_contracts
+  fun ~sc_rollup_node
       ~sequencer
       ~client
+      ~client_tezlink
       ~evm_version
       ~sender
       ~source
@@ -11783,10 +11672,8 @@ let test_crac_orig_two_txs_one_block =
   Log.debug ~prefix "Originate Michelson CREATE_CONTRACT callee #1" ;
   let* _, kt1_callee_1 =
     crac_orig_originate_create_on_run
-      ~sc_rollup_address
-      ~sc_rollup_node
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter:(tez_counter ())
@@ -11795,10 +11682,8 @@ let test_crac_orig_two_txs_one_block =
   Log.debug ~prefix "Originate Michelson CREATE_CONTRACT callee #2" ;
   let* _, kt1_callee_2 =
     crac_orig_originate_create_on_run
-      ~sc_rollup_address
-      ~sc_rollup_node
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter:(tez_counter ())
@@ -11916,11 +11801,10 @@ let test_crac_orig_two_txs_two_blocks =
        distinct KT1s"
     ~tags:["cross_block"]
   @@
-  fun ~sc_rollup_address
-      ~sc_rollup_node
-      ~l1_contracts
+  fun ~sc_rollup_node
       ~sequencer
       ~client
+      ~client_tezlink
       ~evm_version
       ~sender
       ~source
@@ -11931,10 +11815,8 @@ let test_crac_orig_two_txs_two_blocks =
   let prefix = "CRAC-ORIG-BLK" in
   let* _, kt1_callee_1 =
     crac_orig_originate_create_on_run
-      ~sc_rollup_address
-      ~sc_rollup_node
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter:(tez_counter ())
@@ -11942,18 +11824,16 @@ let test_crac_orig_two_txs_two_blocks =
   in
   let* _, kt1_callee_2 =
     crac_orig_originate_create_on_run
-      ~sc_rollup_address
-      ~sc_rollup_node
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter:(tez_counter ())
       protocol
   in
-  (* The two callees were originated via the native delayed-inbox path
-     (real per-op hash); their addresses must already be distinct — this
-     guards the fixture itself. *)
+  (* The two callees were originated via the native tezlink-injection
+     path (real per-op hash); their addresses must already be distinct —
+     this guards the fixture itself. *)
   Check.(
     (kt1_callee_1 <> kt1_callee_2)
       string
@@ -12061,11 +11941,10 @@ let test_crac_orig_two_cracs_one_tx =
        distinct KT1s"
     ~tags:["intra_tx"]
   @@
-  fun ~sc_rollup_address
-      ~sc_rollup_node
-      ~l1_contracts
+  fun ~sc_rollup_node
       ~sequencer
       ~client
+      ~client_tezlink
       ~evm_version
       ~sender
       ~source
@@ -12077,10 +11956,8 @@ let test_crac_orig_two_cracs_one_tx =
   Log.debug ~prefix "Originate Michelson CREATE_CONTRACT callee #1" ;
   let* _, kt1_callee_1 =
     crac_orig_originate_create_on_run
-      ~sc_rollup_address
-      ~sc_rollup_node
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter:(tez_counter ())
@@ -12089,10 +11966,8 @@ let test_crac_orig_two_cracs_one_tx =
   Log.debug ~prefix "Originate Michelson CREATE_CONTRACT callee #2" ;
   let* _, kt1_callee_2 =
     crac_orig_originate_create_on_run
-      ~sc_rollup_address
-      ~sc_rollup_node
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter:(tez_counter ())
@@ -12227,11 +12102,10 @@ let test_crac_evm_deep_recurse_then_michelson_oog =
       "CRAC: deep EVM recursion then Michelson diverging lambda returns OOG"
     ~tags:["stack_overflow"; "oog"]
   @@
-  fun ~sc_rollup_address
-      ~sc_rollup_node
-      ~l1_contracts
+  fun ~sc_rollup_node
       ~sequencer
       ~client
+      ~client_tezlink
       ~evm_version
       ~sender
       ~source
@@ -12242,11 +12116,9 @@ let test_crac_evm_deep_recurse_then_michelson_oog =
   let prefix = "CRAC" in
   Log.debug ~prefix "Originate diverging_lambda Michelson contract" ;
   let* _lambda_hex, lambda_kt1 =
-    TezContract.originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    TezContract.originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter:(tez_counter ())
