@@ -341,7 +341,7 @@ pub mod interpret_cost {
     use tezos_crypto_rs::CryptoError;
     use thiserror::Error;
 
-    use super::{AsGasCost, BigIntByteSize, CompareError, CostOverflow, Log2i, OutOfGas};
+    use super::{AsGasCost, BigIntByteSize, CompareError, CostOverflow, OutOfGas};
     use crate::ast::{Micheline, Or, Ticket, TypedValue};
 
     pub const DIP: u32 = 10;
@@ -967,72 +967,109 @@ pub mod interpret_cost {
         ((w >> 4) + (w >> 5) + (w >> 6) + (w >> 7) + (w >> 8) + 65).as_gas_cost()
     }
 
+    /// Comparable byte size of a key, the size axis of the benchmarked
+    /// collection lookup models. Mirrors the protocol's
+    /// `Gas_comparable_input_size.size_of_comparable_value`, walked
+    /// iteratively.
+    fn comparable_size(k: &TypedValue) -> Result<u64, CostOverflow> {
+        use TypedValue as V;
+        let mut total = Checked::from(0u64);
+        let mut stack: Vec<&TypedValue> = vec![k];
+        while let Some(v) = stack.pop() {
+            let sz: u64 = match v {
+                // integer leaves floor, as the protocol's
+                // Gas_comparable_input_size.integer (Z.numbits / 8)
+                V::Nat(n) => n.bits() / 8,
+                V::Int(n) => n.bits() / 8,
+                V::Timestamp(t) => t.bits() / 8,
+                V::Unit => 1,
+                V::Bool(_) => 1,
+                V::Mutez(_) => 8,
+                V::String(s) => s.len() as u64,
+                V::Bytes(b) => b.len() as u64,
+                V::Pair(l, r) => {
+                    stack.push(l.as_ref());
+                    stack.push(r.as_ref());
+                    1
+                }
+                V::Option(o) => {
+                    if let Some(x) = o {
+                        stack.push(x.as_ref());
+                    }
+                    1
+                }
+                V::Or(or) => {
+                    match or {
+                        Or::Left(x) | Or::Right(x) => stack.push(x.as_ref()),
+                    }
+                    1
+                }
+                // public key hash size (tag byte + 20-byte hash) plus the
+                // entrypoint length, as in the protocol's `address`
+                V::Address(a) => 21 + a.entrypoint.as_bytes().len() as u64,
+                V::ChainId(..) => 4,
+                V::Key(k) => match k {
+                    PublicKey::Ed25519(..) => 33,
+                    PublicKey::Secp256k1(..) | PublicKey::P256(..) => 34,
+                    PublicKey::Bls(..) => 49,
+                },
+                V::Signature(s) => match s {
+                    crate::ast::Signature::Bls(..) => 96,
+                    _ => 64,
+                },
+                V::KeyHash(_) => 21,
+                // non-comparable values cannot be collection keys
+                _ => 0,
+            };
+            total = total + sz;
+        }
+        total.ok_or(CostOverflow)
+    }
+
+    /// `comparable_size(key) * log2(size + 1)`, the variable of every
+    /// benchmarked collection lookup model.
+    fn lookup_var(k: &TypedValue, size: usize) -> Result<Checked<u64>, CompareError> {
+        let s1 = comparable_size(k)?;
+        // the protocol's log2 is 1 + numbits, i.e. ilog2 + 2
+        let log = (Checked::from(size as u64) + 1).ok_or(CostOverflow)?.ilog2() + 2;
+        Ok(Checked::from(s1) * (log as u64))
+    }
+
+    // corresponds to cost_N_IMap_mem in the Tezos protocol
     pub fn map_mem(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
-        map_get(k, map_size)
+        let w = lookup_var(k, map_size)?;
+        Ok(((w >> 4) + (w >> 5) + (w >> 8) + (w >> 9) + 40).as_gas_cost()?)
     }
 
+    // Single model for GET and MEM, as the protocol's map_get = map_mem
+    // alias; the dedicated cost_N_IMap_get fit is the same minus its
+    // w >> 9 term.
     pub fn map_get(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
-        // NB: this doesn't copy the tezos model exactly; tezos model uses
-        //
-        // 80 + sizeof(key)*log2(map.size)
-        //
-        // this seems dubious, from first principles and dimensional analysis,
-        // this seems more probable:
-        //
-        // 80 + cost_of_compare(key)*log2(map.size + 1)
-        //
-        // "+ 1" is from the observation that a lookup in a map of size 1 does
-        // exactly one comparison.
-        let map_size = Checked::from(map_size);
-        let compare_cost = compare(k, k)?;
-        let size_log = (map_size + 1).ok_or(CostOverflow)?.log2i()?;
-        let lookup_cost = Checked::from(compare_cost) * size_log;
-        Ok((80 + lookup_cost).as_gas_cost()?)
+        map_mem(k, map_size)
     }
 
+    // corresponds to cost_N_ISet_mem in the Tezos protocol
     pub fn set_mem(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
-        // NB: same considerations as for map_get
-        let compare_cost = compare(k, k)?;
-        let size_log = (Checked::from(map_size) + 1).ok_or(CostOverflow)?.log2i()?;
-        let lookup_cost = Checked::from(compare_cost) * size_log;
-        Ok((115 + lookup_cost).as_gas_cost()?)
+        let w = lookup_var(k, map_size)?;
+        Ok(((w >> 3) + (w >> 4) + (w >> 5) + (w >> 6) + 40).as_gas_cost()?)
     }
 
+    // corresponds to cost_N_IMap_update in the Tezos protocol
     pub fn map_update(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
-        // NB: same considerations as for map_get
-        let map_size = Checked::from(map_size);
-        let compare_cost = compare(k, k)?;
-        let size_log = (map_size + 1).ok_or(CostOverflow)?.log2i()?;
-        let lookup_cost = Checked::from(compare_cost) * size_log;
-        // NB: 2 factor copied from Tezos protocol, in principle it should
-        // reflect update vs get overhead.
-        Ok((80 + 2 * lookup_cost).as_gas_cost()?)
+        let w = lookup_var(k, map_size)?;
+        Ok(((w * 4) + (w >> 2) + 55).as_gas_cost()?)
     }
 
+    // corresponds to cost_N_ISet_update in the Tezos protocol
     pub fn set_update(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
-        // NB: same considerations as for map_update
-        let compare_cost = compare(k, k)?;
-        let size_log = (Checked::from(map_size) + 1).ok_or(CostOverflow)?.log2i()?;
-        let lookup_cost = Checked::from(compare_cost) * size_log;
-        // coefficient larger than in case of Map looks suspicious, something
-        // to benchmark later
-        Ok((130 + 2 * lookup_cost).as_gas_cost()?)
+        let w = lookup_var(k, map_size)?;
+        Ok(((w * 3) + (w >> 1) + (w >> 2) + 60).as_gas_cost()?)
     }
 
+    // corresponds to cost_N_IMap_get_and_update in the Tezos protocol
     pub fn map_get_and_update(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
-        // NB: same considerations as for map_get
-        let compare_cost = compare(k, k)?;
-        let size_log = (Checked::from(map_size) + 1).ok_or(CostOverflow)?.log2i()?;
-        let lookup_cost = Checked::from(compare_cost) * size_log;
-        // NB: 3 factor copied from Tezos protocol, in principle it should
-        // reflect update vs get overhead, but it seems like an overestimation,
-        // get_and_update should cost almost exactly the same as update, any
-        // observable difference would be in the constant term.
-        //
-        // However, note that this function is also reused for big_map version
-        // of GET_AND_UPDATE, wherein it's more justified. That is to say, take
-        // care when updating this.
-        Ok((80 + 3 * lookup_cost).as_gas_cost()?)
+        let w = lookup_var(k, map_size)?;
+        Ok(((w * 4) + (w >> 2) + (w >> 3) + 80).as_gas_cost()?)
     }
 
     /// Measures size of Michelson using several metrics.

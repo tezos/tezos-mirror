@@ -2635,7 +2635,11 @@ fn interpret_one<'a>(
                 let key_rc = pop_rc!();
                 pop_ref!(map, BigMap);
                 let len = map.len_for_gas();
-                // the protocol deliberately uses map costs for the overlay
+                // Charged with the map costs, as the protocol deliberately
+                // does: the Big_map models include storage carbonations that
+                // Tezos X charges separately at the kernel boundary, and the
+                // overlay compares real keys (hashing only happens
+                // kernel-side).
                 ctx.gas().consume(interpret_cost::map_mem(&key_rc, len)?)?;
                 let result = map.mem(&key_rc, *ctx.lazy_storage())?;
                 stack.push(V::Bool(result));
