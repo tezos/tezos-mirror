@@ -476,8 +476,13 @@ pub mod interpret_cost {
     // corresponds to cost_N_IApply in the Tezos protocol (the generated
     // model merges the recursive and non-recursive cases)
     pub const APPLY: u32 = 85;
-    pub const TICKET: u32 = 10;
-    pub const READ_TICKET: u32 = 10;
+    // correspond to cost_N_ITicket / cost_N_IRead_ticket in the Tezos
+    // protocol.
+    // TODO(L2-1557): these benchmarked constants (~3.6/3.9 us flat) look
+    // very high for building/unfolding a ticket value; re-check the
+    // micro-benchmarks.
+    pub const TICKET: u32 = 3580;
+    pub const READ_TICKET: u32 = 3935;
     pub const BALANCE: u32 = 60;
     pub const CONTRACT: u32 = 115;
     pub const LEVEL: u32 = 85;
@@ -562,15 +567,23 @@ pub mod interpret_cost {
     pub const CREATE_CONTRACT: u32 = 60;
     pub const VIEW: u32 = 65; // corresponds to cost_N_IView_synthesized in the Tezos protocol
 
+    // corresponds to cost_N_IJoin_tickets in the Tezos protocol
     pub fn join_tickets(t1: &Ticket, t2: &Ticket) -> Result<u32, CompareError> {
-        compare(&t1.content, &t2.content)?;
-        Ok(add_num(&t1.amount, &t2.amount)?)
+        let w1 = Checked::from(std::cmp::max(
+            t1.amount.byte_size(),
+            t2.amount.byte_size(),
+        ));
+        let w2 = Checked::from(std::cmp::min(
+            comparable_size(&t1.content)?,
+            comparable_size(&t2.content)?,
+        ));
+        Ok(((w1 >> 3) + (w1 >> 5) + (w2 >> 3) + (w2 >> 7) + 245).as_gas_cost()?)
     }
 
+    // corresponds to cost_N_ISplit_ticket in the Tezos protocol
     pub fn split_ticket(amount1: &BigUint, amount2: &BigUint) -> Result<u32, CostOverflow> {
-        use std::mem::size_of_val;
-        let sz = Checked::from(std::cmp::max(size_of_val(amount1), size_of_val(amount2)));
-        (40 + (sz >> 1)).as_gas_cost()
+        let w = Checked::from(std::cmp::max(amount1.byte_size(), amount2.byte_size()));
+        ((w >> 2) + (w >> 7) + 475).as_gas_cost()
     }
 
     fn dropn(n: u16) -> Result<u32, CostOverflow> {
