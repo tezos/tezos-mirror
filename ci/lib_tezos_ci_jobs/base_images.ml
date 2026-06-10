@@ -130,6 +130,14 @@ module Files = struct
     ]
     @ build_script
 
+  let rust_sdk_bindings =
+    [
+      "images/base-images/Dockerfile.rust-sdk-bindings";
+      (* script used in Dockerfile *)
+      "images/scripts/install_sccache_static.sh";
+    ]
+    @ build_script
+
   let alpine_docker_ci =
     [
       "images/base-images/Dockerfile.alpine-docker-ci";
@@ -306,12 +314,12 @@ let jobs ?start_job ?(changeset = false) () =
   (* base images: deb and rpm distros *)
   let job_debian_based_images =
     let changes =
-      (* we need the [debian] base job if we have [debian-homebrew] or
-         [debian-rust] jobs *)
+      (* we need the [debian] base job if we have jobs of
+         images based on top of it *)
       Changeset.make
         (Files.debian_base @ Files.debian_homebrew @ Files.debian_rust_build
        @ Files.merge_script @ Files.debian_build @ Files.merge_script
-       @ Files.debian_systemd @ Files.debian_jsonnet)
+       @ Files.debian_systemd @ Files.debian_jsonnet @ Files.rust_sdk_bindings)
     in
     make_job_base_image_distribution ~changes Distribution.Debian
   in
@@ -566,6 +574,18 @@ let jobs ?start_job ?(changeset = false) () =
       ~changes:(Changeset.make (Files.debian_jsonnet @ Files.debian_base))
       "images/base-images/Dockerfile.debian-jsonnet"
   in
+  (* rust-sdk-bindings: based on [debian:trixie] *)
+  let job_rust_sdk_bindings_base_images =
+    make_job_base_images
+      ~__POS__
+      ~image_name:"debian-rust-sdk-bindings"
+      ~base_name:(Pipeline_dep "debian")
+      ~dependencies:(Dependent [Job job_debian_based_images])
+      ~matrix:[("RELEASE", ["trixie"])]
+      ~compilation:Amd64_only
+      ~changes:(Changeset.make (Files.rust_sdk_bindings @ Files.debian_base))
+      "images/base-images/Dockerfile.rust-sdk-bindings"
+  in
   [
     job_debian_based_images;
     job_ubuntu_based_images;
@@ -580,6 +600,7 @@ let jobs ?start_job ?(changeset = false) () =
     job_debian_systemd_base_images;
     job_ubuntu_systemd_base_images;
     job_jsonnet_base_images;
+    job_rust_sdk_bindings_base_images;
     job_ci_release_based_images;
   ]
   @
