@@ -27,7 +27,7 @@
   -open Tezos_error_monad.TzLwtreslib
   -open Tezos_dal_node_lib
   -open Tezos_test_helpers)
- (modules test_storage))
+ (modules test_storage test_skip_shards))
 
 (executable
  (name main)

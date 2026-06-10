@@ -1087,6 +1087,263 @@ let test_dal_node_snapshot_version_check ~operators _protocol parameters
        fresh_node_2
        wrong_version_tar)
 
+(** Tests that the snapshot --skip-shards CLI flag is honored on both export
+    and import, for both the plain-directory and tar-archive formats.
+
+    After publishing slots so the source DAL node stores both slot and shard
+    data, the test:
+    1. Exports with --skip-shards to a plain directory and verifies that no
+       shard file is written under [store/shard_store/], while the slot store
+       does contain files.
+    2. Exports with --skip-shards to a tar archive and verifies that no entry
+       under [shard_store/] is present in the archive, while slot entries are.
+    3. Exports a complete (with-shards) snapshot to a plain directory, imports
+       it with --skip-shards into a fresh DAL node, and verifies that the
+       imported store contains no shard files.
+    4. Exports a complete (with-shards) tar archive, imports it with
+       --skip-shards into a fresh DAL node, and verifies that the imported
+       store contains slot files but no shard files. *)
+let test_dal_node_snapshot_skip_shards ~operators _protocol parameters cryptobox
+    node client dal_node =
+  let store_subdir = "store" in
+  let shard_subdir =
+    Filename.concat store_subdir Tezos_dal_node_lib.Store.Stores_dirs.shard
+  in
+  let slot_subdir =
+    Filename.concat store_subdir Tezos_dal_node_lib.Store.Stores_dirs.slot
+  in
+  (* [count_files_recursive dir] returns the number of regular files reachable
+     under [dir]. Returns 0 when [dir] does not exist. *)
+  let rec count_files_recursive dir =
+    if not (Sys.file_exists dir) then 0
+    else if not (Sys.is_directory dir) then 1
+    else
+      Sys.readdir dir |> Array.to_list
+      |> List.fold_left
+           (fun acc entry ->
+             acc + count_files_recursive (Filename.concat dir entry))
+           0
+  in
+  (* Set up source data: publish a slot at each level so the DAL node stores
+     both slot and shard data for the operator profile. *)
+  let* start = Lwt.map succ (Node.get_level node) in
+  let stop =
+    start + 3 + parameters.Dal_common.Parameters.attestation_lag
+    + Tezos_dal_node_lib.Constants.validation_slack + 2
+  in
+  let wait_dal_processed = wait_for_layer1_final_block dal_node (stop - 2) in
+  let* _published =
+    publish_and_bake
+      ~slots:operators
+      ~from_level:start
+      ~to_level:stop
+      parameters
+      cryptobox
+      node
+      client
+      dal_node
+  in
+  let* () = wait_dal_processed in
+  let endpoint = Node.as_rpc_endpoint node in
+  let min_published_level = Int32.of_int start in
+  let max_published_level = Int32.of_int stop in
+  (* Step 1: export with --skip-shards to a plain directory. The destination
+     should contain slot data but no shard data. *)
+  let plain_dst = Temp.dir "dal-snapshot-skip-shards-plain" in
+  let* () =
+    Dal_node.snapshot_export
+      ~skip_shards:true
+      ~min_published_level
+      ~max_published_level
+      ~endpoint
+      dal_node
+      plain_dst
+  in
+  let plain_shard_dir = Filename.concat plain_dst shard_subdir in
+  let plain_slot_dir = Filename.concat plain_dst slot_subdir in
+  let plain_shard_count = count_files_recursive plain_shard_dir in
+  let plain_slot_count = count_files_recursive plain_slot_dir in
+  Check.((plain_shard_count = 0) ~__LOC__ int)
+    ~error_msg:
+      "Plain-directory export with --skip-shards still wrote %L shard files \
+       (expected 0)" ;
+  Check.((plain_slot_count > 0) ~__LOC__ int)
+    ~error_msg:
+      "Plain-directory export with --skip-shards wrote %L slot files (expected \
+       > 0)" ;
+  (* Step 2: export with --skip-shards to a tar archive. The archive must not
+     contain any entry under [shard_store/]. *)
+  let tar_base = Temp.file "dal-snapshot-skip-shards-tar" in
+  let* () =
+    Dal_node.snapshot_export
+      ~compress:true
+      ~skip_shards:true
+      ~min_published_level
+      ~max_published_level
+      ~endpoint
+      dal_node
+      tar_base
+  in
+  let tar_file = tar_base ^ ".tar" in
+  let tar_listing_file = Temp.file "dal-snapshot-skip-shards-tar.list" in
+  let rc =
+    Sys.command (Printf.sprintf "tar tf %s > %s" tar_file tar_listing_file)
+  in
+  if rc <> 0 then Test.fail "tar tf failed (exit code %d)" rc ;
+  let tar_entries =
+    let ic = open_in tar_listing_file in
+    let rec loop acc =
+      match input_line ic with
+      | exception End_of_file ->
+          close_in ic ;
+          List.rev acc
+      | line -> loop (line :: acc)
+    in
+    loop []
+  in
+  let shard_entries =
+    List.filter
+      (fun e ->
+        String.length e
+        >= String.length Tezos_dal_node_lib.Store.Stores_dirs.shard
+        && String.equal
+             (String.sub
+                e
+                0
+                (String.length Tezos_dal_node_lib.Store.Stores_dirs.shard))
+             Tezos_dal_node_lib.Store.Stores_dirs.shard)
+      tar_entries
+  in
+  let slot_entries =
+    List.filter
+      (fun e ->
+        String.length e
+        >= String.length Tezos_dal_node_lib.Store.Stores_dirs.slot
+        && String.equal
+             (String.sub
+                e
+                0
+                (String.length Tezos_dal_node_lib.Store.Stores_dirs.slot))
+             Tezos_dal_node_lib.Store.Stores_dirs.slot)
+      tar_entries
+  in
+  Check.((List.length shard_entries = 0) ~__LOC__ int)
+    ~error_msg:
+      "Tar export with --skip-shards still contains %L shard entries (expected \
+       0)" ;
+  Check.((List.length slot_entries > 0) ~__LOC__ int)
+    ~error_msg:
+      "Tar export with --skip-shards contains %L slot entries (expected > 0)" ;
+  (* Step 3: import with --skip-shards from a normal (full) snapshot. The
+     destination store must end up without any shard file. *)
+  let full_dst = Temp.dir "dal-snapshot-with-shards-plain" in
+  let* () =
+    Dal_node.snapshot_export
+      ~min_published_level
+      ~max_published_level
+      ~endpoint
+      dal_node
+      full_dst
+  in
+  let full_shard_count =
+    count_files_recursive (Filename.concat full_dst shard_subdir)
+  in
+  Check.((full_shard_count > 0) ~__LOC__ int)
+    ~error_msg:
+      "Source full snapshot is expected to contain shard files but contains %L \
+       (test setup error)" ;
+  let fresh_dal_node = Dal_node.create ~node () in
+  let* () = Dal_node.init_config ~operator_profiles:operators fresh_dal_node in
+  let* () =
+    Dal_node.snapshot_import
+      ~no_check:true
+      ~skip_shards:true
+      ~endpoint
+      fresh_dal_node
+      full_dst
+  in
+  let imported_shard_dir =
+    Filename.concat (Dal_node.data_dir fresh_dal_node) shard_subdir
+  in
+  let imported_shard_count = count_files_recursive imported_shard_dir in
+  Check.((imported_shard_count = 0) ~__LOC__ int)
+    ~error_msg:
+      "Import with --skip-shards still wrote %L shard files into the \
+       destination (expected 0)" ;
+  (* Step 4: export a complete (with-shards) tar archive and import it with
+     --skip-shards. Unlike the step-2 archive, this source tar does contain
+     shard entries, so the destination having none genuinely exercises
+     shard-skipping on the tar import path; slot entries (gated by
+     [is_slot_entry]) must still be imported. *)
+  let full_tar_base = Temp.file "dal-snapshot-with-shards-tar" in
+  let* () =
+    Dal_node.snapshot_export
+      ~compress:true
+      ~min_published_level
+      ~max_published_level
+      ~endpoint
+      dal_node
+      full_tar_base
+  in
+  let full_tar_file = full_tar_base ^ ".tar" in
+  let full_tar_listing = Temp.file "dal-snapshot-with-shards-tar.list" in
+  let rc =
+    Sys.command (Printf.sprintf "tar tf %s > %s" full_tar_file full_tar_listing)
+  in
+  if rc <> 0 then Test.fail "tar tf failed (exit code %d)" rc ;
+  let full_tar_shard_entries =
+    let ic = open_in full_tar_listing in
+    let rec loop acc =
+      match input_line ic with
+      | exception End_of_file ->
+          close_in ic ;
+          List.rev acc
+      | line -> loop (line :: acc)
+    in
+    loop []
+    |> List.filter (fun e ->
+           String.length e
+           >= String.length Tezos_dal_node_lib.Store.Stores_dirs.shard
+           && String.equal
+                (String.sub
+                   e
+                   0
+                   (String.length Tezos_dal_node_lib.Store.Stores_dirs.shard))
+                Tezos_dal_node_lib.Store.Stores_dirs.shard)
+  in
+  Check.((List.length full_tar_shard_entries > 0) ~__LOC__ int)
+    ~error_msg:
+      "Source full tar is expected to contain shard entries but contains %L \
+       (test setup error)" ;
+  let tar_dst_dal_node = Dal_node.create ~node () in
+  let* () =
+    Dal_node.init_config ~operator_profiles:operators tar_dst_dal_node
+  in
+  let* () =
+    Dal_node.snapshot_import
+      ~no_check:true
+      ~skip_shards:true
+      ~endpoint
+      tar_dst_dal_node
+      full_tar_file
+  in
+  let tar_imported_data_dir = Dal_node.data_dir tar_dst_dal_node in
+  let tar_imported_shard_count =
+    count_files_recursive (Filename.concat tar_imported_data_dir shard_subdir)
+  in
+  let tar_imported_slot_count =
+    count_files_recursive (Filename.concat tar_imported_data_dir slot_subdir)
+  in
+  Check.((tar_imported_shard_count = 0) ~__LOC__ int)
+    ~error_msg:
+      "Tar import with --skip-shards wrote %L shard files into the destination \
+       (expected 0)" ;
+  Check.((tar_imported_slot_count > 0) ~__LOC__ int)
+    ~error_msg:
+      "Tar import with --skip-shards wrote %L slot files into the destination \
+       (expected > 0)" ;
+  unit
+
 let test_dal_node_startup ~__FILE__ =
   Protocol.register_test
     ~__FILE__
@@ -3144,6 +3401,15 @@ let register ~__FILE__ ~protocols =
     ~history_mode:Full
     "dal node snapshot import rejects missing or wrong version"
     (test_dal_node_snapshot_version_check ~operators:[0; 3])
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["snapshot"; "skip_shards"]
+    ~operator_profiles:[0; 3]
+    ~l1_history_mode:(Custom Node.Archive)
+    ~history_mode:Full
+    "dal node snapshot export/import honour --skip-shards"
+    (test_dal_node_snapshot_skip_shards ~operators:[0; 3])
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~__FILE__

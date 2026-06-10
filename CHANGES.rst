@@ -97,5 +97,9 @@ DAL node
 - The DAL node now stops if it detects that a registered attester attested a slot
   containing traps, preventing further reward loss. (MR :gl:`!21544`)
 
+- Added a ``--skip-shards`` flag to the ``snapshot export`` and ``snapshot
+  import`` commands. When set, shards are neither exported nor imported,
+  producing smaller snapshots for nodes that only need slot data.
+
 Miscellaneous
 -------------
