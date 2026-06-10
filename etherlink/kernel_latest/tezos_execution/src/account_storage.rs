@@ -24,8 +24,28 @@ use tezos_smart_rollup::{
 };
 use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_storage::{read_nom_value, read_optional_nom_value, store_bin};
+use tezos_storage::{
+    read_nom_value, read_nom_value_bounded, read_optional_nom_value,
+    read_optional_nom_value_bounded, store_bin,
+};
 use tezosx_interfaces::Origin;
+
+/// Upper bound, in bytes, on a `Narith`-encoded balance or counter.
+/// Both hold values that fit in a `u64` in practice — balance is bounded
+/// by total supply, counters by the operation count — and a `Narith` of
+/// a `u64` is at most 10 bytes. 32 leaves generous headroom and matches
+/// the gas upper-bound convention (see `COUNTER_SIZE` in `lib.rs`).
+///
+/// Used to read each field in a single `store_read` host call instead of
+/// the `store_value_size` + `store_read` pair that `store_read_all`
+/// performs. See [`read_optional_nom_value_bounded`].
+const NARITH_FIELD_MAX_BYTES: usize = 32;
+
+/// Upper bound, in bytes, on an encoded [`Manager`]. The largest variant
+/// is `Revealed(PublicKey)`: 1 byte for the manager tag plus a public
+/// key whose largest variant is BLS, at 1 (algorithm tag) + 48 bytes.
+/// 64 leaves headroom over that 50-byte maximum.
+const MANAGER_MAX_BYTES: usize = 64;
 
 // This enum is inspired of `src/proto_alpha/lib_protocol/manager_repr.ml`
 // A manager can be:
@@ -53,7 +73,10 @@ pub trait TezlinkAccount {
         host: &impl StorageV1,
     ) -> Result<Narith, tezos_storage::error::Error> {
         let path = context::account::balance_path(self)?;
-        Ok(read_optional_nom_value(host, &path)?.unwrap_or(0_u64.into()))
+        Ok(
+            read_optional_nom_value_bounded(host, &path, NARITH_FIELD_MAX_BYTES)?
+                .unwrap_or(0_u64.into()),
+        )
     }
 
     /// Set the **balance** of an account in Mutez held by the account.
@@ -111,7 +134,10 @@ pub trait TezosImplicitAccount: TezlinkAccount + Sized {
         host: &impl StorageV1,
     ) -> Result<Narith, tezos_storage::error::Error> {
         let path = context::account::counter_path(self)?;
-        Ok(read_optional_nom_value(host, &path)?.unwrap_or(0_u64.into()))
+        Ok(
+            read_optional_nom_value_bounded(host, &path, NARITH_FIELD_MAX_BYTES)?
+                .unwrap_or(0_u64.into()),
+        )
     }
 
     /// Set the **counter** for the Tezlink account.
@@ -141,7 +167,7 @@ pub trait TezosImplicitAccount: TezlinkAccount + Sized {
         host: &impl StorageV1,
     ) -> Result<Manager, tezos_storage::error::Error> {
         let path = context::account::manager_path(self)?;
-        let manager: Manager = read_nom_value(host, &path)?;
+        let manager: Manager = read_nom_value_bounded(host, &path, MANAGER_MAX_BYTES)?;
         Ok(manager)
     }
 

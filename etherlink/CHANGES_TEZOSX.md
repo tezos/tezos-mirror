@@ -108,6 +108,9 @@
   hardcode entrypoint annotations, and forbids changing the storage type
   (which would brick every alias at its next execution). No governance
   trigger is wired yet. (!22157)
+- Improved the performance of reading an implicit account's balance,
+  counter, and manager in the Michelson runtime by reducing the number
+  of durable-storage accesses each read performs. (!22137)
 - Expose a contract's storage-space watermarks through two read-only
   RPCs, `GET .../contracts/<id>/storage/used_space` and `.../paid_space`,
   mirroring L1's `get_used_storage_space` / `get_paid_storage_space`

@@ -268,19 +268,15 @@ pub fn store_bin(
     Ok(())
 }
 
-/// Return a potential decoded value using NomReader
-/// at the given `path`
-pub fn read_nom_value<T: for<'a> NomReader<'a>>(
-    host: &impl StorageV1,
-    path: &impl Path,
-) -> Result<T, Error> {
-    let bytes = host.store_read_all(path)?;
-    let result = T::nom_read(&bytes);
+/// Decode a complete `NomReader` value out of `bytes`, rejecting both
+/// incomplete parses and trailing data.
+fn decode_nom_value<T: for<'a> NomReader<'a>>(bytes: &[u8]) -> Result<T, Error> {
+    let result = T::nom_read(bytes);
     // The finish function may panic if the parser is a *streaming parser* that has not enough data.
     // To be sure we don't panic, verify if the result is complete
     if is_incomplete(&result) {
         let incomplete_error =
-            DecodeError::from_error_kind(bytes.as_ref(), nom::error::ErrorKind::Eof);
+            DecodeError::from_error_kind(bytes, nom::error::ErrorKind::Eof);
         return Err(incomplete_error.into());
     }
     // Finish the parsing because we can't panic now
@@ -294,6 +290,36 @@ pub fn read_nom_value<T: for<'a> NomReader<'a>>(
     Ok(value)
 }
 
+/// Return a potential decoded value using NomReader
+/// at the given `path`
+pub fn read_nom_value<T: for<'a> NomReader<'a>>(
+    host: &impl StorageV1,
+    path: &impl Path,
+) -> Result<T, Error> {
+    let bytes = host.store_read_all(path)?;
+    decode_nom_value(&bytes)
+}
+
+/// Like [`read_nom_value`], but reads at most `max_bytes` in a single
+/// `store_read` host call rather than first querying the value size and
+/// then reading the whole value. Saves one `store_value_size` host call
+/// per read.
+///
+/// `max_bytes` MUST be a proven upper bound on the encoded size of `T`
+/// at this path. The host truncates the read to `max_bytes`, so an
+/// undersized bound silently feeds a partial value to the decoder, which
+/// then errors as incomplete or as having trailing data — it never
+/// returns a wrong value, but it does turn a readable value into an
+/// error.
+pub fn read_nom_value_bounded<T: for<'a> NomReader<'a>>(
+    host: &impl StorageV1,
+    path: &impl Path,
+    max_bytes: usize,
+) -> Result<T, Error> {
+    let bytes = host.store_read(path, 0, max_bytes)?;
+    decode_nom_value(&bytes)
+}
+
 /// Return an optional decoded value using NomReader
 /// at the given `path`
 pub fn read_optional_nom_value<T: for<'a> NomReader<'a>>(
@@ -305,5 +331,85 @@ pub fn read_optional_nom_value<T: for<'a> NomReader<'a>>(
         Ok(Some(value))
     } else {
         Ok(None)
+    }
+}
+
+/// Like [`read_optional_nom_value`], but reads at most `max_bytes` in a
+/// single `store_read` host call. A missing path yields `Ok(None)`,
+/// avoiding the extra `store_has` probe — so this is one host call where
+/// [`read_optional_nom_value`] needs two (or three, counting the
+/// `store_value_size` inside `store_read_all`).
+///
+/// See [`read_nom_value_bounded`] for the `max_bytes` contract.
+pub fn read_optional_nom_value_bounded<T: for<'a> NomReader<'a>>(
+    host: &impl StorageV1,
+    path: &impl Path,
+    max_bytes: usize,
+) -> Result<Option<T>, Error> {
+    match host.store_read(path, 0, max_bytes) {
+        Ok(bytes) => decode_nom_value(&bytes).map(Some),
+        Err(RuntimeError::PathNotFound) => Ok(None),
+        Err(err) => Err(err.into()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tezos_data_encoding::types::Narith;
+    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_smart_rollup_host::path::RefPath;
+
+    const PATH: RefPath = RefPath::assert_from(b"/some/value");
+
+    /// A value read back through a generous bound matches what was
+    /// written — the bound being larger than the value is the normal
+    /// case and must not corrupt the read.
+    #[test]
+    fn bounded_read_matches_written_value() {
+        let mut host = MockKernelHost::default();
+        let value: Narith = 123_456_u64.into();
+        store_bin(&value, &mut host, &PATH).unwrap();
+
+        let read: Narith = read_nom_value_bounded(&host, &PATH, 32).unwrap();
+        assert_eq!(value, read);
+
+        let read_opt: Option<Narith> =
+            read_optional_nom_value_bounded(&host, &PATH, 32).unwrap();
+        assert_eq!(Some(value), read_opt);
+    }
+
+    /// A missing path yields `None` from the optional variant without a
+    /// separate `store_has` probe, and an error from the non-optional
+    /// variant.
+    #[test]
+    fn bounded_read_missing_path() {
+        let host = MockKernelHost::default();
+
+        let read_opt: Option<Narith> =
+            read_optional_nom_value_bounded(&host, &PATH, 32).unwrap();
+        assert_eq!(None, read_opt);
+
+        let read: Result<Narith, _> = read_nom_value_bounded(&host, &PATH, 32);
+        assert!(read.is_err());
+    }
+
+    /// A bound smaller than the encoded value truncates the read, so the
+    /// decoder sees a partial value: it must fail loudly rather than
+    /// return a wrong value. `128` encodes to two `Narith` bytes
+    /// (`0x80 0x01`); reading a single byte leaves the continuation bit
+    /// set with no follow-up byte.
+    #[test]
+    fn bounded_read_too_small_bound_fails() {
+        let mut host = MockKernelHost::default();
+        let value: Narith = 128_u64.into();
+        store_bin(&value, &mut host, &PATH).unwrap();
+
+        let read: Result<Narith, _> = read_nom_value_bounded(&host, &PATH, 1);
+        assert!(read.is_err());
+
+        let read_opt: Result<Option<Narith>, _> =
+            read_optional_nom_value_bounded(&host, &PATH, 1);
+        assert!(read_opt.is_err());
     }
 }
