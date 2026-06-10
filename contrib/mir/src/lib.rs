@@ -216,9 +216,12 @@ mod tests {
             Gas::default().milligas().unwrap() - ctx.gas.milligas().unwrap(),
             // 14 × `interpret_cost::FRAME_PUSH` (100 milligas) reflects the
             // worklist-growth pushes the iterative driver does on the
-            // FIBONACCI_SRC run (IF / DIP / EXEC bodies); the remaining
-            // 1287 milligas is L1-coherent.
-            1287 + 14 * crate::gas::interpret_cost::FRAME_PUSH
+            // FIBONACCI_SRC run (IF / DIP / EXEC bodies). The remaining 9736
+            // milligas reflects the stack-manipulation costs re-benchmarked on
+            // the MIR interpreter (L2-1553); it no longer matches L1 (it was
+            // 1287 before re-pricing). The jump is dominated by the `DUP n`
+            // instructions in the loop, now charged a flat 840 each.
+            9736 + 14 * crate::gas::interpret_cost::FRAME_PUSH
         );
     }
 
