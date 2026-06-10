@@ -158,7 +158,7 @@ pub mod context;
 pub mod enshrined_contracts;
 mod gas;
 pub mod mir_ctx;
-mod storage_fees;
+pub mod storage_fees;
 mod validate;
 
 /// Where an internal operation entered the current frame's tree.

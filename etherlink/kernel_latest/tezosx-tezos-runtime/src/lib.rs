@@ -24,8 +24,8 @@ use tezos_execution::{
     cross_runtime_transfer,
     enshrined_contracts::CracError,
     mir_ctx::{clear_temporary_big_maps, InterpretContext, OperationCtx, TcCtx},
-    originate_contract, typecheck_code_and_storage, CracTransferError, OriginationNonce,
-    TezlinkOperationGas,
+    originate_contract, storage_fees, typecheck_code_and_storage, CracTransferError,
+    OriginationNonce, TezlinkOperationGas,
 };
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKeyHash;
@@ -1255,14 +1255,31 @@ impl RuntimeInterface for TezosRuntime {
         // separate AppliedOperation for the alias materialization;
         // it surfaces only as an internal op of the enclosing CRAC.
         let internal_op = build_alias_origination_internal(&null_pkh, script, receipt);
+
+        let alias_storage_cost =
+            storage_fees::compute_internal_op_storage_fees(&internal_op).map_err(|e| {
+                TezosXRuntimeError::Custom(format!(
+                    "Failed to compute storage fees for the alias forwarder origination: {e:?}"
+                ))
+            })?;
+
+        let alias_storage_cost = u64::try_from(alias_storage_cost).map_err(|e| {
+            TezosXRuntimeError::ConversionError(format!(
+                "Alias storage cost does not fit in u64: {e}"
+            ))
+        })?;
+
         journal
             .michelson
             .push_pending_alias_origination_internal(internal_op);
 
-        // TODO(L2-1519): compute the mutez cost of the bytes written
-        // here and set `delegated_storage_cost` to `Some(cost)` so the
-        // caller can absorb it.
-        Ok((kt1_str, AliasResolution::build(remaining)))
+        Ok((
+            kt1_str,
+            AliasResolution::build_with_delegated_storage_cost(
+                remaining,
+                alias_storage_cost,
+            ),
+        ))
     }
 
     fn compute_alias(&self, native_address: &[u8]) -> Result<String, TezosXRuntimeError> {
