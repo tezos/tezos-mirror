@@ -32,6 +32,11 @@ Release".
 General
 -------
 
+- Fixed a file descriptor leak in the RPC client: the connection of each
+  followed HTTP redirect was never released. This affected every Octez
+  executable issuing RPC calls through an endpoint answering redirects
+  (e.g. behind a reverse proxy).
+
 Node
 ----
 
