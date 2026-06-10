@@ -1846,9 +1846,6 @@ module CracRunnerWrapper = struct
               ?gas
               runner
           in
-          let* () =
-            Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-          in
           return gas_used
       end
 
@@ -1912,9 +1909,6 @@ module CracRunnerWrapper = struct
               ~value
               runner
           in
-          let* () =
-            Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-          in
           return gas_used
 
         let call_run_catch_with_gas_limit ?expected_status ?(value = Wei.zero)
@@ -1928,9 +1922,6 @@ module CracRunnerWrapper = struct
               ~value
               ~gas_limit
               runner
-          in
-          let* () =
-            Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
           in
           return gas_used
 
@@ -1974,9 +1965,6 @@ module CracRunnerWrapper = struct
               ~nonce:(evm_nonce ())
               ~value
               runner
-          in
-          let* () =
-            Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
           in
           return gas_used
 
@@ -2022,9 +2010,6 @@ module CracRunnerWrapper = struct
               ~value
               runner
           in
-          let* () =
-            Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-          in
           return gas_used
 
         let check_result ~expected_hex (`Evm_runner runner) =
@@ -2062,9 +2047,6 @@ module CracRunnerWrapper = struct
               ~value
               runner
           in
-          let* () =
-            Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-          in
           return gas_used
 
         let call_run_catch ?expected_status ?gas ?(value = Wei.zero)
@@ -2078,9 +2060,6 @@ module CracRunnerWrapper = struct
               ~nonce:(evm_nonce ())
               ~value
               runner
-          in
-          let* () =
-            Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
           in
           return gas_used
 
@@ -3151,9 +3130,6 @@ let test_crac_evm_to_tez_materializes_alias =
   let* evm_main =
     EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge, false)] ()
   in
-  let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-  in
   let* before = contracts () in
   let* _ = EvmRunner.call_run evm_main in
   let* after = contracts () in
@@ -3184,9 +3160,6 @@ let test_crac_evm_to_tez_revert_drops_alias =
   let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_reverter in
   let* evm_main =
     EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge, false)] ()
-  in
-  let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
   in
   let* before = contracts () in
   let* _ = EvmRunner.call_run ~expected_status:false evm_main in
@@ -3567,9 +3540,6 @@ let test_crac_tez_to_evm_block_observables_visible =
       ()
   in
   let read_slot pos = Rpc.get_storage_at ~address:probe_addr ~pos sequencer in
-  let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-  in
   Log.debug ~prefix "Send native EVM tx to probe (observables -> slots 0-3)" ;
   let* raw_tx =
     Cast.craft_tx
@@ -3584,9 +3554,6 @@ let test_crac_tez_to_evm_block_observables_visible =
   in
   let*@ _tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
   let*@ _block_number = Rpc.produce_block sequencer in
-  let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-  in
   Log.debug ~prefix "Read native observables from slots 0-3 and block header" ;
   let*@ native_basefee_hex = read_slot "0x0" in
   let*@ native_gaslimit_hex = read_slot "0x1" in
@@ -5917,8 +5884,8 @@ let michelson_head_level sequencer =
   return JSON.(head |-> "level" |> as_int)
 
 (** Fetch manager operations from the most recent non-empty Tezlink block.
-    bake_until_sync may advance the head past the block containing the
-    CRAC receipt, so we scan backwards from [head]. *)
+    Blocks produced after the CRAC may advance the head past the block
+    containing the CRAC receipt, so we scan backwards from [head]. *)
 let fetch_recent_michelson_manager_ops sequencer =
   let* head = michelson_head_level sequencer in
   let rec find_ops level =
@@ -7229,9 +7196,6 @@ let test_crac_receipt_separate_tx_two_cracs =
   in
   let*@ _tx_hash_2 = Rpc.send_raw_transaction ~raw_tx:raw_tx_2 sequencer in
   let*@ _block_number = Rpc.produce_block sequencer in
-  let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-  in
   (* Verify both Tez contracts were called *)
   let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_1 in
   let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_2 in
@@ -11657,7 +11621,7 @@ let test_crac_orig_two_txs_one_block =
        distinct KT1s"
     ~tags:["collision"]
   @@
-  fun ~sc_rollup_node
+  fun ~sc_rollup_node:_
       ~sequencer
       ~client
       ~client_tezlink
@@ -11734,9 +11698,6 @@ let test_crac_orig_two_txs_one_block =
   Log.debug ~prefix "Produce ONE block containing both txs" ;
   let*@ _block_number = Rpc.produce_block sequencer in
   let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-  in
-  let* () =
     EvmCrossRuntimeRunnerTez.check_storage
       ~sequencer
       ~expected_counter:2
@@ -11801,7 +11762,7 @@ let test_crac_orig_two_txs_two_blocks =
        distinct KT1s"
     ~tags:["cross_block"]
   @@
-  fun ~sc_rollup_node
+  fun ~sc_rollup_node:_
       ~sequencer
       ~client
       ~client_tezlink
@@ -11869,9 +11830,6 @@ let test_crac_orig_two_txs_two_blocks =
       ~address:bridge_1
   in
   let*@ _b1 = Rpc.produce_block sequencer in
-  let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-  in
   let* ops1 = fetch_recent_michelson_manager_ops sequencer in
   let child_1 =
     crac_orig_child_kt1_for_callee
@@ -11888,9 +11846,6 @@ let test_crac_orig_two_txs_two_blocks =
       ~address:bridge_2
   in
   let*@ _b2 = Rpc.produce_block sequencer in
-  let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-  in
   let* ops2 = fetch_recent_michelson_manager_ops sequencer in
   let child_2 =
     crac_orig_child_kt1_for_callee
@@ -11941,7 +11896,7 @@ let test_crac_orig_two_cracs_one_tx =
        distinct KT1s"
     ~tags:["intra_tx"]
   @@
-  fun ~sc_rollup_node
+  fun ~sc_rollup_node:_
       ~sequencer
       ~client
       ~client_tezlink
@@ -12023,9 +11978,6 @@ let test_crac_orig_two_cracs_one_tx =
       ~address:main_addr
   in
   let*@ _block_number = Rpc.produce_block sequencer in
-  let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-  in
   let* ops = fetch_recent_michelson_manager_ops sequencer in
   let op_list = JSON.(ops |> as_list) in
   Log.info
