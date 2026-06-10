@@ -9,7 +9,8 @@
    - Vulnerability detection in Docker images. *)
 
 open Gitlab_ci.Util
-open Tezos_ci
+module Images = Tezos_ci.Images
+module Pipeline = Tezos_ci.Pipeline
 module CI = Cacio.Shared
 
 let build_images =
@@ -187,6 +188,7 @@ let child_pipeline =
       "A child pipeline of 'before_merging' to launch the security scans for \
        the images on the master branch"
     ~jobs:
-      (if container_scanning_flag then
-         job_datadog_pipeline_trace :: Cacio.get_jobs Schedule_security_scans
-       else [job_datadog_pipeline_trace])
+      (if Tezos_ci.container_scanning_flag then
+         Tezos_ci.job_datadog_pipeline_trace
+         :: Cacio.get_jobs Schedule_security_scans
+       else [Tezos_ci.job_datadog_pipeline_trace])
