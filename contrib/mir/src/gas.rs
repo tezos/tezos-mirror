@@ -1066,7 +1066,10 @@ pub mod interpret_cost {
     }
 
     fn micheline_encoding_by_size(size: MichelineSize) -> Result<u32, CostOverflow> {
-        (size.nodes_num * 100 + size.zariths * 25 + size.str_byte * 10).as_gas_cost()
+        // The per-node cost corresponds to the benchmarked
+        // N_IPack_micheline_nodes parameter; the per-byte components are not
+        // in the re-benchmarked set.
+        (size.nodes_num * 125 + size.zariths * 25 + size.str_byte * 10).as_gas_cost()
     }
 
     /// Iterative tree fold over `Micheline` so the size accounting (and
@@ -1222,9 +1225,11 @@ pub mod interpret_cost {
         ((size >> 2) + (size >> 3) + (size >> 4) + size + 90).as_gas_cost()
     }
 
-    pub fn unpack(bytes: &[u8]) -> Result<u32, CostOverflow> {
-        let size = Checked::from(bytes.len());
-        (260 + (size >> 1)).as_gas_cost()
+    // corresponds to cost_N_IUnpack in the Tezos protocol. The model is
+    // flat: the per-byte work is carried by the carbonated Micheline decode
+    // and typecheck that UNPACK also charges.
+    pub fn unpack(_bytes: &[u8]) -> Result<u32, CostOverflow> {
+        Ok(140)
     }
 
     pub fn pair_n(size: usize) -> Result<u32, CostOverflow> {
@@ -1262,25 +1267,26 @@ pub mod unparsing_cost {
     use crate::ast::annotations::Annotation;
     use checked::Checked;
 
-    /// Cost for allocating a Micheline node: 100mg.
-    pub const NODE: u32 = 100;
+    /// Cost for allocating a Micheline node: 125 mg (the benchmarked
+    /// N_IPack_micheline_nodes parameter).
+    pub const NODE: u32 = 125;
 
-    /// Cost for allocating a Micheline Int node: 100 mg + 25 mg/byte.
+    /// Cost for allocating a Micheline Int node: 125 mg + 25 mg/byte.
     pub fn int(i: &BigInt) -> Result<u32, CostOverflow> {
         let size = Checked::from(i.byte_size());
-        (100 + size * 25).as_gas_cost()
+        (125 + size * 25).as_gas_cost()
     }
 
-    /// Cost for allocating a Micheline String node: 100 mg + 10 mg/byte
+    /// Cost for allocating a Micheline String node: 125 mg + 10 mg/byte
     pub fn string(string: &str) -> Result<u32, CostOverflow> {
         let size = Checked::from(string.len());
-        (100 + size * 10).as_gas_cost()
+        (125 + size * 10).as_gas_cost()
     }
 
-    /// Cost for allocating a Micheline Bytes node: 100mg + 10 mg/byte
+    /// Cost for allocating a Micheline Bytes node: 125 mg + 10 mg/byte
     pub fn bytes(bytes: &[u8]) -> Result<u32, CostOverflow> {
         let size = Checked::from(bytes.len());
-        (100 + size * 10).as_gas_cost()
+        (125 + size * 10).as_gas_cost()
     }
 
     /// Cost for allocating a Micheline annotation: 10 mg/byte. No
