@@ -397,10 +397,14 @@ pub mod interpret_cost {
     pub const SUB_MUTEZ: u32 = 55;
     // Re-benchmarked on the MIR interpreter (`cost_N_IUnit`).
     pub const UNIT: u32 = 55;
-    pub const AND_BOOL: u32 = 10;
-    pub const OR_BOOL: u32 = 10;
-    pub const XOR_BOOL: u32 = 15;
-    pub const NOT_BOOL: u32 = 10;
+    // corresponds to cost_N_IAnd in the Tezos protocol
+    pub const AND_BOOL: u32 = 45;
+    // corresponds to cost_N_IOr in the Tezos protocol
+    pub const OR_BOOL: u32 = 45;
+    // corresponds to cost_N_IXor in the Tezos protocol
+    pub const XOR_BOOL: u32 = 45;
+    // corresponds to cost_N_INot in the Tezos protocol
+    pub const NOT_BOOL: u32 = 40;
     pub const CAR: u32 = 15;
     pub const CDR: u32 = 20;
     pub const PAIR: u32 = 10;
@@ -648,84 +652,92 @@ pub mod interpret_cost {
         (65 + (sz >> 3) + (sz >> 7)).as_gas_cost()
     }
 
-    /// Cost for `AND` on numbers and bytearrays
-    pub fn and_num(
+    // corresponds to cost_N_IAnd_int_nat in the Tezos protocol
+    pub fn and_int_nat(
         i1: &impl BigIntByteSize,
         i2: &impl BigIntByteSize,
     ) -> Result<u32, CostOverflow> {
-        let sz = Checked::from(Ord::min(i1.byte_size(), i2.byte_size()));
-        (35 + (sz >> 1)).as_gas_cost()
+        let w = Checked::from(Ord::min(i1.byte_size(), i2.byte_size()));
+        ((w >> 2) + (w >> 6) + 65).as_gas_cost()
     }
 
+    // corresponds to cost_N_IAnd_nat in the Tezos protocol
+    pub fn and_nat(
+        i1: &impl BigIntByteSize,
+        i2: &impl BigIntByteSize,
+    ) -> Result<u32, CostOverflow> {
+        let w = Checked::from(Ord::min(i1.byte_size(), i2.byte_size()));
+        ((w >> 3) + (w >> 5) + (w >> 7) + 65).as_gas_cost()
+    }
+
+    // corresponds to cost_N_IAnd_bytes in the Tezos protocol
     pub fn and_bytes(b1: &[u8], b2: &[u8]) -> Result<u32, CostOverflow> {
-        let sz = Checked::from(Ord::min(b1.len(), b2.len()));
-        (35 + (sz >> 1)).as_gas_cost()
+        let w = Checked::from(Ord::min(b1.len(), b2.len()));
+        (w + (w >> 2) + (w >> 3) + 70).as_gas_cost()
     }
 
+    // corresponds to cost_N_IOr_nat in the Tezos protocol
     pub fn or_num(i1: &impl BigIntByteSize, i2: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
-        let sz = Checked::from(Ord::min(i1.byte_size(), i2.byte_size()));
-        (35 + (sz >> 1)).as_gas_cost()
+        let w = Checked::from(Ord::max(i1.byte_size(), i2.byte_size()));
+        ((w >> 4) + (w >> 5) + (w >> 6) + (w >> 7) + (w >> 8) + (w >> 9) + 65).as_gas_cost()
     }
 
+    // corresponds to cost_N_IOr_bytes in the Tezos protocol
     pub fn or_bytes(b1: &[u8], b2: &[u8]) -> Result<u32, CostOverflow> {
-        // NB: Tezos takes maximum of the sizes, but in our implementation only
-        // touches bytes in two vectors intersection. So taking the same formula
-        // as in [and_bytes].
-        let sz = Checked::from(Ord::min(b1.len(), b2.len()));
-        (35 + (sz >> 1)).as_gas_cost()
+        let w = Checked::from(Ord::max(b1.len(), b2.len()));
+        (w + (w >> 2) + (w >> 4) + (w >> 5) + 65).as_gas_cost()
     }
 
+    // corresponds to cost_N_IXor_nat in the Tezos protocol
     pub fn xor_nat(i1: &BigUint, i2: &BigUint) -> Result<u32, CostOverflow> {
-        let sz = Checked::from(Ord::min(i1.byte_size(), i2.byte_size()));
-        (35 + (sz >> 1)).as_gas_cost()
+        let w = Checked::from(Ord::max(i1.byte_size(), i2.byte_size()));
+        ((w >> 4) + (w >> 5) + (w >> 6) + (w >> 7) + (w >> 8) + (w >> 9) + 70).as_gas_cost()
     }
 
+    // corresponds to cost_N_IXor_bytes in the Tezos protocol
     pub fn xor_bytes(b1: &[u8], b2: &[u8]) -> Result<u32, CostOverflow> {
-        let sz = Checked::from(Ord::min(b1.len(), b2.len()));
-        (40 + (sz >> 1)).as_gas_cost()
+        let w = Checked::from(Ord::max(b1.len(), b2.len()));
+        (w + (w >> 1) + (w >> 3) + 60).as_gas_cost()
     }
 
+    // corresponds to cost_N_INot_int in the Tezos protocol
     pub fn not_num<T: BigIntByteSize>(n: &T) -> Result<u32, CostOverflow> {
         let sz = Checked::from(n.byte_size());
-        (25 + (sz >> 1)).as_gas_cost()
+        ((sz >> 4) + (sz >> 6) + (sz >> 7) + (sz >> 8) + 90).as_gas_cost()
     }
 
+    // corresponds to cost_N_INot_bytes in the Tezos protocol
     pub fn not_bytes(b: &[u8]) -> Result<u32, CostOverflow> {
         let sz = Checked::from(b.len());
-        (30 + (sz >> 1)).as_gas_cost()
+        ((sz >> 4) + (sz >> 5) + (sz >> 7) + (sz >> 9) + 40).as_gas_cost()
     }
 
+    // corresponds to cost_N_ILsl_nat in the Tezos protocol
     pub fn lsl_nat(i1: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
-        let sz = i1.byte_size();
-        let w1 = sz >> 1;
-        Checked::from(w1 + 130).as_gas_cost()
+        let sz = Checked::from(i1.byte_size());
+        ((sz >> 3) + (sz >> 6) + (sz >> 8) + 85).as_gas_cost()
     }
 
+    // corresponds to cost_N_ILsl_bytes in the Tezos protocol
     pub fn lsl_bytes(i1: &[u8], i2: &usize) -> Result<u32, CostOverflow> {
-        let size_1 = i1.len();
-        let size_2 = *i2;
-        let w1 = if size_2 > 0 {
-            ((size_2 - 1) >> 4) + (size_1 >> 1)
-        } else {
-            size_1 >> 1
-        };
-        Checked::from(w1 + (size_1 >> 2) + 65).as_gas_cost()
+        let s1 = Checked::from(i1.len());
+        let w1 = Checked::from(i2.saturating_sub(1));
+        ((w1 >> 8) + (w1 >> 10) + (w1 >> 12) + (w1 >> 13)
+            + (s1 >> 4) + (s1 >> 5) + s1
+            + 120)
+        .as_gas_cost()
     }
 
+    // corresponds to cost_N_ILsr_nat in the Tezos protocol
     pub fn lsr_nat(i1: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
-        let sz = i1.byte_size();
-        Checked::from((sz >> 1) + 45).as_gas_cost()
+        let sz = Checked::from(i1.byte_size());
+        ((sz >> 3) + (sz >> 7) + 85).as_gas_cost()
     }
 
+    // corresponds to cost_N_ILsr_bytes in the Tezos protocol
     pub fn lsr_bytes(i1: &[u8], i2: &usize) -> Result<u32, CostOverflow> {
-        let size_1 = i1.len();
-        let size_2 = *i2;
-        let w1 = if size_1 >= (size_2 >> 3) {
-            Checked::from(size_1 - (size_2 >> 3))
-        } else {
-            Checked::from(0usize)
-        };
-        ((w1 >> 1) + (w1 >> 2) + 55).as_gas_cost()
+        let w1 = Checked::from(i1.len().saturating_sub(*i2 >> 3));
+        (w1 + (w1 >> 4) + 90).as_gas_cost()
     }
 
     pub fn mul_int(
@@ -1127,10 +1139,10 @@ pub mod interpret_cost {
         (265 + ((size >> 4) + size)).as_gas_cost()
     }
 
+    // corresponds to cost_N_INeg in the Tezos protocol
     pub fn neg_int(int: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
-        // NB: taken from the protocol, this doesn't fit with MIR implementation.
         let size = Checked::from(int.byte_size());
-        (25 + (size >> 1)).as_gas_cost()
+        ((size >> 4) + (size >> 6) + (size >> 7) + (size >> 8) + 55).as_gas_cost()
     }
 
     pub fn abs(int: &impl BigIntByteSize) -> Result<u32, CostOverflow> {

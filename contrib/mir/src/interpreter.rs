@@ -2156,13 +2156,13 @@ fn interpret_one<'a>(
             overloads::And::NatNat => {
                 let o1 = pop!(V::Nat);
                 let o2 = top_mut!(V::Nat);
-                ctx.gas().consume(interpret_cost::and_num(&o1, o2)?)?;
+                ctx.gas().consume(interpret_cost::and_nat(&o1, o2)?)?;
                 *o2 &= o1;
             }
             overloads::And::IntNat => {
                 let o1 = pop!(V::Int);
                 let o2 = pop!(V::Nat);
-                ctx.gas().consume(interpret_cost::and_num(&o1, &o2)?)?;
+                ctx.gas().consume(interpret_cost::and_int_nat(&o1, &o2)?)?;
                 let res = BigUint::try_from(o1 & BigInt::from(o2))
                     // safe, `neg` & `pos` = `pos`
                     .unwrap();
