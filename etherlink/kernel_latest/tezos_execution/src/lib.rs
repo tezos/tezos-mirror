@@ -308,6 +308,7 @@ fn finalize_and_burn<Host, M, A>(
     payer: &A,
     storage_limit: &Narith,
     balance_updates: Vec<BalanceUpdate>,
+    delegated_storage_cost: u64,
     result: Result<M::Success, ApplyOperationError>,
     mut internal_operation_results: Vec<TaggedInternalOp>,
 ) -> OperationResult<M>
@@ -325,6 +326,15 @@ where
         &mut content,
         internal_operation_results,
     );
+    // TODO(L2-1520): render the dedicated balance-updates for the delegated cost.
+    let burn_outcome = burn_outcome.and_then(|()| {
+        storage_fees::burn_storage_cost(
+            host,
+            payer,
+            &mut storage_limit_remaining,
+            delegated_storage_cost,
+        )
+    });
     if let Err(errors) = burn_outcome {
         log!(Debug, "Storage burn failed: {errors:?}");
         content.backtrack_if_applied_with_errors(errors.into());
@@ -2042,6 +2052,7 @@ where
                 source_account,
                 storage_limit,
                 balance_updates,
+                0,
                 reveal_result.map_err(Into::into),
                 internal_operations_receipts,
             ))
@@ -2119,6 +2130,7 @@ where
                 source_account,
                 storage_limit,
                 balance_updates,
+                operation_ctx.delegated_storage_cost,
                 transfer_result.map_err(Into::into),
                 internal_operations_receipts,
             ))
@@ -2150,6 +2162,7 @@ where
                     source_account,
                     storage_limit,
                     balance_updates,
+                    0,
                     origination_result.map_err(|e| e.into()),
                     internal_operations_receipts,
                 ),

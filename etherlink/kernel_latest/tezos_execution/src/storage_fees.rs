@@ -107,6 +107,40 @@ fn storage_fee_for_bytes(nb_consumed_bytes: &Zarith) -> Result<BigUint, Transfer
     Ok(BigUint::from(COST_PER_BYTES) * bytes)
 }
 
+/// Charge `mutez_cost` against the payer.
+///
+/// - Deducts `mutez_cost / COST_PER_BYTES` from `storage_limit_remaining`;
+///   overshoot raises `OperationQuotaExceeded`.
+/// - Burns the mutez against the payer's balance; insufficient balance raises
+///   `CannotPayStorageFee`.
+///
+/// No-op on `mutez_cost == 0`.
+pub fn burn_storage_cost<Host: StorageV1>(
+    host: &mut Host,
+    payer: &impl TezlinkAccount,
+    storage_limit_remaining: &mut BigUint,
+    mutez_cost: u64,
+) -> Result<(), ApplyOperationError> {
+    if mutez_cost == 0 {
+        return Ok(());
+    }
+
+    let nb_consumed_bytes = BigUint::from(mutez_cost / COST_PER_BYTES);
+
+    *storage_limit_remaining = storage_limit_remaining
+        .checked_sub(&nb_consumed_bytes)
+        .ok_or(ApplyOperationError::OperationQuotaExceeded)?;
+
+    let to_burn = BigUint::from(mutez_cost);
+    burn_tez(host, payer, &to_burn).map_err(|err| match err {
+        TransferError::BalanceTooLow(btl) => {
+            ApplyOperationError::CannotPayStorageFee(btl)
+        }
+        other => ApplyOperationError::Transfer(other),
+    })?;
+    Ok(())
+}
+
 /// Charge the payer for the storage allocated by `success`: walk the
 /// per-kind byte-burn sequence (debiting the payer and decrementing
 /// `storage_limit_remaining` at each step), then render the
@@ -1253,5 +1287,69 @@ mod tests {
         });
         let expected = BigUint::from((7_u64 + ORIGINATION_SIZE) * COST_PER_BYTES);
         assert_eq!(compute_internal_op_storage_fees(&op).unwrap(), expected);
+    }
+
+    #[test]
+    fn burn_storage_cost_zero_is_noop() {
+        let mut host = MockKernelHost::default();
+        let payer = init_payer(&mut host, 1_000_000);
+        let mut storage_limit_remaining = BigUint::from(100u64);
+        burn_storage_cost(&mut host, &payer, &mut storage_limit_remaining, 0).unwrap();
+        assert_eq!(storage_limit_remaining, BigUint::from(100u64));
+        assert_eq!(payer.balance(&host).unwrap(), 1_000_000_u64.into());
+    }
+
+    #[test]
+    fn burn_storage_cost_within_limit_debits_payer() {
+        let mut host = MockKernelHost::default();
+        let payer = init_payer(&mut host, 1_000_000);
+        // Pick V = 10 × COST_PER_BYTES to land exactly on 10 bytes.
+        let mutez_cost: u64 = 10 * COST_PER_BYTES;
+        let mut storage_limit_remaining = BigUint::from(100u64);
+        burn_storage_cost(&mut host, &payer, &mut storage_limit_remaining, mutez_cost)
+            .expect("absorption must succeed when limit and balance suffice");
+        assert_eq!(storage_limit_remaining, BigUint::from(90u64));
+        assert_eq!(
+            payer.balance(&host).unwrap(),
+            (1_000_000_u64 - mutez_cost).into()
+        );
+    }
+
+    #[test]
+    fn burn_storage_cost_overshoot_returns_quota_exceeded() {
+        let mut host = MockKernelHost::default();
+        let payer = init_payer(&mut host, 1_000_000);
+        // 10 bytes worth of cost, but the budget only allows 9.
+        let mutez_cost: u64 = 10 * COST_PER_BYTES;
+        let mut storage_limit_remaining = BigUint::from(9u64);
+        let err = burn_storage_cost(
+            &mut host,
+            &payer,
+            &mut storage_limit_remaining,
+            mutez_cost,
+        )
+        .expect_err("overshoot must surface OperationQuotaExceeded");
+        assert!(matches!(err, ApplyOperationError::OperationQuotaExceeded));
+        assert_eq!(
+            payer.balance(&host).unwrap(),
+            1_000_000_u64.into(),
+            "payer balance must be untouched when the limit check rejects the burn"
+        );
+    }
+
+    #[test]
+    fn burn_storage_cost_insolvent_returns_cannot_pay() {
+        let mut host = MockKernelHost::default();
+        let payer = init_payer(&mut host, 5);
+        let mutez_cost: u64 = 10 * COST_PER_BYTES;
+        let mut storage_limit_remaining = BigUint::from(100u64);
+        let err = burn_storage_cost(
+            &mut host,
+            &payer,
+            &mut storage_limit_remaining,
+            mutez_cost,
+        )
+        .expect_err("insufficient balance must surface CannotPayStorageFee");
+        assert!(matches!(err, ApplyOperationError::CannotPayStorageFee(_)));
     }
 }
