@@ -410,13 +410,20 @@ pub mod interpret_cost {
     pub const NOT_BOOL: u32 = 40;
     pub const CAR: u32 = 15;
     pub const CDR: u32 = 20;
-    pub const PAIR: u32 = 10;
+    // corresponds to cost_N_ICons_pair in the Tezos protocol
+    pub const PAIR: u32 = 20;
     pub const UNPAIR: u32 = 60;
-    pub const SOME: u32 = 10;
-    pub const NONE: u32 = 10;
+    // corresponds to cost_N_ICons_some in the Tezos protocol
+    pub const SOME: u32 = 20;
+    // corresponds to cost_N_ICons_none in the Tezos protocol
+    pub const NONE: u32 = 65;
     pub const AMOUNT: u32 = 65;
     pub const NIL: u32 = 60;
-    pub const CONS: u32 = 15;
+    // corresponds to cost_N_ICons_list in the Tezos protocol
+    // TODO(L2-1548): the benchmarked constant (~840 ns flat) looks like a
+    // measurement artefact (same as N_IDupN, see TODO(L2-1553) on dupn);
+    // re-check the micro-benchmarks.
+    pub const CONS: u32 = 845;
     pub const EMPTY_SET: u32 = 60;
     // correspond to cost_N_IString_size / cost_N_IBytes_size in the Tezos
     // protocol.
