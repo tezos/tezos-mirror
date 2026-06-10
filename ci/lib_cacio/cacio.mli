@@ -467,6 +467,11 @@ type global_pipeline =
   | Debian_daily
   (* Security scan pipelines *)
   | Schedule_security_scans
+  (* Base images pipelines *)
+  (* TODO: consider migrating base images to a [Cacio.Make] component instead,
+     which would allow using [register_scheduled_pipeline] and avoid adding
+     a [global_pipeline] variant for it. *)
+  | Base_images_daily
 
 (** Add jobs to a given global pipeline. *)
 val register_jobs : global_pipeline -> (trigger * job) list -> unit

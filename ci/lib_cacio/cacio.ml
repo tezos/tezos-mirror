@@ -878,6 +878,11 @@ type global_pipeline =
   | Debian_daily
   (* Security scan pipelines *)
   | Schedule_security_scans
+  (* Base images pipelines *)
+  (* TODO: consider migrating base images to a [Cacio.Make] component instead,
+     which would allow using [register_scheduled_pipeline] and avoid adding
+     a [global_pipeline] variant for it. *)
+  | Base_images_daily
 
 let global_jobs : (global_pipeline, trigger * job) Hashtbl.t =
   Hashtbl.create 128
@@ -918,6 +923,8 @@ let get_jobs pipeline =
       convert_jobs ~interruptible_publish:true ~with_condition:false jobs
   | Debian_partial ->
       convert_jobs ~interruptible_publish:true ~with_condition:false jobs
+  | Base_images_daily ->
+      convert_jobs ~interruptible_pipeline:false ~with_condition:false jobs
   | _ -> convert_jobs ~with_condition:false jobs
 
 let release_tag_rexes = ref String_set.empty

@@ -393,7 +393,8 @@ let () =
     "base_images.daily"
     base_images_daily
     ~jobs:
-      (Tezos_ci.job_datadog_pipeline_trace :: Base_images.jobs ()
+      (Tezos_ci.job_datadog_pipeline_trace
+       :: (Base_images.jobs () @ Cacio.get_jobs Base_images_daily)
       |> List.map (with_interruptible false))
     ~description:
       "Daily pipeline containing all Base Images jobs (build and merge)." ;
