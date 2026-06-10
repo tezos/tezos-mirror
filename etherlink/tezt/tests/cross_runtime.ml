@@ -60,11 +60,21 @@ module EvmContract = struct
     let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
     let*@ _block_number = Rpc.produce_block sequencer in
     let*@ receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
+    let* receipt =
+      match receipt with
+      | Some receipt -> return receipt
+      | None ->
+          (* The receipt may not be indexed yet right after
+             [produce_block]; retry before failing. *)
+          Test_helpers.wait_for_transaction_receipt
+            ~evm_node:sequencer
+            ~transaction_hash:tx_hash
+            ()
+    in
     match receipt with
-    | Some {contractAddress = Some addr; status = true; _} -> return addr
-    | Some {status = false; _} ->
-        Test.fail "Contract deployment transaction failed"
-    | _ -> Test.fail "No receipt or no contract address for deployment tx"
+    | {contractAddress = Some addr; status = true; _} -> return addr
+    | {status = false; _} -> Test.fail "Contract deployment transaction failed"
+    | _ -> Test.fail "No contract address for deployment tx"
 
   (** [deploy_solidity_contract ~sequencer ~sender ~nonce ~contract ()]
    *  compiles and deploys a Solidity contract. *)
