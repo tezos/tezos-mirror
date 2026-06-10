@@ -16,6 +16,11 @@
 
 open Rpc.Syntax
 
+(** Foreign endpoint of the tezlink RPC served by [evm_node]. *)
+let tezlink_foreign_endpoint_from_evm_node evm_node =
+  let evm_node_endpoint = Evm_node.rpc_endpoint_record evm_node in
+  {evm_node_endpoint with Endpoint.path = "/tezlink"}
+
 module EvmContract = struct
   let tezosx_evm_chain_id = 1337
 
@@ -275,59 +280,13 @@ module TezContract = struct
         in
         return consumed
 
-  (** [read_michelson_contract_storage sc_rollup_node contract_hex] reads the
-   *  storage of an originated Michelson contract from the durable storage,
-   *  given its hex-encoded [Contract_repr.t] key. *)
-  let read_michelson_contract_storage sc_rollup_node contract_hex =
-    let path =
-      sf "%s/%s/data/storage" tezosx_michelson_contracts_index contract_hex
-    in
-    Sc_rollup_node.RPC.call sc_rollup_node
-    @@ Sc_rollup_rpc.get_global_block_durable_state_value
-         ~pvm_kind:"wasm_2_0_0"
-         ~operation:Sc_rollup_rpc.Value
-         ~key:path
-         ()
-
-  (** [decode_michelson_contract_address hex] decodes a hex-encoded
-   *  [Contract_repr.t] into a b58check KT1 address string. *)
-  let decode_michelson_contract_address hex =
-    let module C = Tezos_protocol_alpha.Protocol.Contract_repr in
-    Hex.to_bytes (`Hex hex)
-    |> Data_encoding.Binary.of_bytes_exn C.encoding
-    |> C.to_b58check
-
-  (** [decode_micheline_storage hex_str] decodes a hex string from the durable
-   *  storage into a Micheline [JSON.u] value. Returns [None] if decoding
-   *  fails. *)
-  let decode_micheline_storage hex_str =
-    let module S = Tezos_protocol_alpha.Protocol.Script_repr in
-    Data_encoding.Binary.of_bytes_opt
-      S.expr_encoding
-      (Hex.to_bytes (`Hex hex_str))
-    |> Option.map (fun e ->
-           Data_encoding.Json.(
-             construct S.expr_encoding e
-             |> to_string
-             |> JSON.parse ~origin:"decode_micheline_storage"))
-
-  (** Reads and decodes the storage of the Michelson contract identified
-   *  by [contract_hex].  Fails if the storage is missing or cannot be
-   *  decoded. *)
-  let get_storage ~sc_rollup_node contract_hex =
-    let* storage_raw =
-      read_michelson_contract_storage sc_rollup_node contract_hex
-    in
-    match storage_raw with
-    | None ->
-        let kt1 = decode_michelson_contract_address contract_hex in
-        Test.fail "Storage not found for contract %s" kt1
-    | Some hex_str -> (
-        match decode_micheline_storage hex_str with
-        | None ->
-            let kt1 = decode_michelson_contract_address contract_hex in
-            Test.fail "Storage failed to be decoded for contract %s" kt1
-        | Some storage -> return storage)
+  (** Reads the decoded Micheline storage of the Michelson contract
+   *  identified by [contract_address] (a b58check KT1 address) from the
+   *  tezlink RPC of [sequencer]. *)
+  let get_storage ~sequencer contract_address =
+    RPC_core.call
+      (tezlink_foreign_endpoint_from_evm_node sequencer)
+      (RPC.get_chain_block_context_contract_storage ~id:contract_address ())
 end
 
 (** Contracts *)
@@ -816,9 +775,9 @@ module TezCrossRuntimeRunnerEvm = struct
       protocol
 
   (** Asserts that the contract's [counter] equals [expected_counter]. *)
-  let check_storage ~sc_rollup_node ~expected_counter
-      (cross_runtime_run_tez_hex, _cross_runtime_run_tez_address) =
-    let* storage = get_storage ~sc_rollup_node cross_runtime_run_tez_hex in
+  let check_storage ~sequencer ~expected_counter
+      (_cross_runtime_run_tez_hex, cross_runtime_run_tez_address) =
+    let* storage = get_storage ~sequencer cross_runtime_run_tez_address in
     (* Pair(nat %count, string %destination) *)
     let counter = JSON.(storage |-> "args" |=> 0 |-> "int" |> as_int) in
     Check.(
@@ -868,9 +827,9 @@ module TezCrossRuntimeHttpCallEvm = struct
       ?init_balance
       protocol
 
-  let check_storage ~sc_rollup_node ~expected_counter
-      (contract_hex, _contract_address) =
-    let* storage = get_storage ~sc_rollup_node contract_hex in
+  let check_storage ~sequencer ~expected_counter
+      (_contract_hex, contract_address) =
+    let* storage = get_storage ~sequencer contract_address in
     (* Pair(nat %count, string %destination) *)
     let counter = JSON.(storage |-> "args" |=> 0 |-> "int" |> as_int) in
     Check.(
@@ -911,9 +870,9 @@ module TezCrossRuntimeHttpCallTezCallback = struct
       ?init_balance
       protocol
 
-  let check_counter ~sc_rollup_node ~expected_counter
-      (contract_hex, _contract_address) =
-    let* storage = get_storage ~sc_rollup_node contract_hex in
+  let check_counter ~sequencer ~expected_counter
+      (_contract_hex, contract_address) =
+    let* storage = get_storage ~sequencer contract_address in
     (* Pair(nat %count, Pair(string %destination, option bytes)) *)
     let counter = JSON.(storage |-> "args" |=> 0 |-> "int" |> as_int) in
     Check.(
@@ -923,9 +882,9 @@ module TezCrossRuntimeHttpCallTezCallback = struct
           "Expected TezCrossRuntimeHttpCallTezCallback `count` %R but got %L") ;
     unit
 
-  let check_result ~sc_rollup_node ~expected_bytes
-      (contract_hex, _contract_address) =
-    let* storage = get_storage ~sc_rollup_node contract_hex in
+  let check_result ~sequencer ~expected_bytes
+      (_contract_hex, contract_address) =
+    let* storage = get_storage ~sequencer contract_address in
     (* Storage: Pair(count, Pair(destination, option bytes)) *)
     let result_node = JSON.(storage |-> "args" |=> 1 |-> "args" |=> 1) in
     (match expected_bytes with
@@ -976,9 +935,9 @@ module TezCrossRuntimeHttpCallTez = struct
       ?init_balance
       protocol
 
-  let check_storage ~sc_rollup_node ~expected_counter
-      (contract_hex, _contract_address) =
-    let* storage = get_storage ~sc_rollup_node contract_hex in
+  let check_storage ~sequencer ~expected_counter
+      (_contract_hex, contract_address) =
+    let* storage = get_storage ~sequencer contract_address in
     (* Pair(nat %count, string %destination) *)
     let counter = JSON.(storage |-> "args" |=> 0 |-> "int" |> as_int) in
     Check.(
@@ -1016,9 +975,9 @@ module TezMultiRunCaller = struct
       protocol
 
   (** Asserts that the contract's [counter] equals [expected_counter]. *)
-  let check_storage ~sc_rollup_node ~expected_counter
-      (multi_run_caller_hex, _multi_run_caller_address) =
-    let* storage = get_storage ~sc_rollup_node multi_run_caller_hex in
+  let check_storage ~sequencer ~expected_counter
+      (_multi_run_caller_hex, multi_run_caller_address) =
+    let* storage = get_storage ~sequencer multi_run_caller_address in
     (* Pair(int %counter, Pair(bool %willRevert, list address %callees)) *)
     let counter = JSON.(storage |-> "args" |=> 0 |-> "int" |> as_int) in
     Check.(
@@ -1217,8 +1176,8 @@ module TezCallbackRunnerEvm = struct
       protocol
 
   (** Asserts that the contract's [counter] equals [expected_counter]. *)
-  let check_counter ~sc_rollup_node ~expected_counter (hex, _addr) =
-    let* storage = get_storage ~sc_rollup_node hex in
+  let check_counter ~sequencer ~expected_counter (_hex, addr) =
+    let* storage = get_storage ~sequencer addr in
     (* Pair(nat %count, Pair(string %dest, ...)) *)
     let counter = JSON.(storage |-> "args" |=> 0 |-> "int" |> as_int) in
     Check.(
@@ -1231,8 +1190,8 @@ module TezCallbackRunnerEvm = struct
    *  [None] means the result should be [None] (callback did not fire
    *  or was reverted).  [Some hex] means the result should be
    *  [Some <hex>]. *)
-  let check_result ~sc_rollup_node ~expected_bytes (hex, _addr) =
-    let* storage = get_storage ~sc_rollup_node hex in
+  let check_result ~sequencer ~expected_bytes (_hex, addr) =
+    let* storage = get_storage ~sequencer addr in
     (* Storage: Pair(count, Pair(dest, Pair(sig, Pair(params, result)))) *)
     let result_node =
       JSON.(
@@ -2279,7 +2238,7 @@ module CracRunnerWrapper = struct
         let check_storage ~expected_counter
             (`Tez_runner (runner_hex, runner_address)) =
           TezCrossRuntimeRunnerEvm.check_storage
-            ~sc_rollup_node
+            ~sequencer
             ~expected_counter
             (runner_hex, runner_address)
       end
@@ -2305,7 +2264,7 @@ module CracRunnerWrapper = struct
         let check_storage ~expected_counter
             (`Tez_runner (runner_hex, runner_address)) =
           TezCrossRuntimeHttpCallEvm.check_storage
-            ~sc_rollup_node
+            ~sequencer
             ~expected_counter
             (runner_hex, runner_address)
       end
@@ -2331,7 +2290,7 @@ module CracRunnerWrapper = struct
         let check_storage ~expected_counter
             (`Tez_runner (runner_hex, runner_address)) =
           TezCrossRuntimeHttpCallTez.check_storage
-            ~sc_rollup_node
+            ~sequencer
             ~expected_counter
             (runner_hex, runner_address)
       end
@@ -2357,14 +2316,14 @@ module CracRunnerWrapper = struct
         let check_counter ~expected_counter
             (`Tez_runner (runner_hex, runner_address)) =
           TezCrossRuntimeHttpCallTezCallback.check_counter
-            ~sc_rollup_node
+            ~sequencer
             ~expected_counter
             (runner_hex, runner_address)
 
         let check_result ~expected_bytes
             (`Tez_runner (runner_hex, runner_address)) =
           TezCrossRuntimeHttpCallTezCallback.check_result
-            ~sc_rollup_node
+            ~sequencer
             ~expected_bytes
             (runner_hex, runner_address)
       end
@@ -2394,7 +2353,7 @@ module CracRunnerWrapper = struct
         let check_storage ~expected_counter
             (`Tez_runner (runner_hex, runner_address)) =
           TezMultiRunCaller.check_storage
-            ~sc_rollup_node
+            ~sequencer
             ~expected_counter
             (runner_hex, runner_address)
       end
@@ -2732,14 +2691,14 @@ module CracRunnerWrapper = struct
         let check_counter ~expected_counter
             (`Tez_runner (runner_hex, runner_address)) =
           TezCallbackRunnerEvm.check_counter
-            ~sc_rollup_node
+            ~sequencer
             ~expected_counter
             (runner_hex, runner_address)
 
         let check_result ~expected_bytes
             (`Tez_runner (runner_hex, runner_address)) =
           TezCallbackRunnerEvm.check_result
-            ~sc_rollup_node
+            ~sequencer
             ~expected_bytes
             (runner_hex, runner_address)
       end
@@ -3277,9 +3236,10 @@ let test_crac_evm_to_tez_materializes_alias =
   @@ fun (module Wrapper) ->
   let open Wrapper in
   let contracts () =
-    Delayed_inbox.subkeys
-      TezContract.tezosx_michelson_contracts_index
-      (Delayed_inbox.Sc_rollup_node sc_rollup_node)
+    let*@! contracts =
+      Rpc.state_subkeys sequencer TezContract.tezosx_michelson_contracts_index
+    in
+    return contracts
   in
   let* tez_runner = TezMultiRunCaller.originate () in
   let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_runner in
@@ -3310,9 +3270,10 @@ let test_crac_evm_to_tez_revert_drops_alias =
   @@ fun (module Wrapper) ->
   let open Wrapper in
   let contracts () =
-    Delayed_inbox.subkeys
-      TezContract.tezosx_michelson_contracts_index
-      (Delayed_inbox.Sc_rollup_node sc_rollup_node)
+    let*@! contracts =
+      Rpc.state_subkeys sequencer TezContract.tezosx_michelson_contracts_index
+    in
+    return contracts
   in
   let* tez_reverter = TezMultiRunCaller.originate ~revert:true () in
   let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_reverter in
