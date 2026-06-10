@@ -29,10 +29,14 @@ val current_snapshot_version : int
     in the config file.
 
     [progress_display_mode] controls whether progress bars are displayed during
-    the export. Defaults to [Auto] (display only when stdout is a TTY). *)
+    the export. Defaults to [Auto] (display only when stdout is a TTY).
+
+    When [skip_shards] is [true], shard data is not included in the snapshot.
+    Defaults to [false]. *)
 val export :
   ?compress:bool ->
   ?progress_display_mode:Animation.progress_display_mode ->
+  ?skip_shards:bool ->
   data_dir:string ->
   config_file:string ->
   endpoint:Uri.t option ->
@@ -49,10 +53,14 @@ val export :
     [path] is treated as a plain data directory.
 
     [progress_display_mode] controls whether progress bars are displayed during
-    the import. Defaults to [Auto] (display only when stdout is a TTY). *)
+    the import. Defaults to [Auto] (display only when stdout is a TTY).
+
+    When [skip_shards] is [true], shard entries from the snapshot are not
+    imported. Defaults to [false]. *)
 val import :
   ?check:bool ->
   ?progress_display_mode:Animation.progress_display_mode ->
+  ?skip_shards:bool ->
   data_dir:string ->
   config_file:string ->
   endpoint:Uri.t option ->
@@ -61,3 +69,17 @@ val import :
   slots:int list option ->
   string ->
   unit tzresult Lwt.t
+
+module Internal_for_tests : sig
+  (** [is_shard_entry filename] returns [true] iff [filename], as it would
+      appear inside a snapshot tar archive, is a shard entry.
+
+      Exposed for testing the [--skip-shards] filtering logic. *)
+  val is_shard_entry : string -> bool
+
+  (** [is_slot_entry filename] returns [true] iff [filename], as it would
+      appear inside a snapshot tar archive, is a slot entry.
+
+      Exposed for testing the [--skip-shards] filtering logic. *)
+  val is_slot_entry : string -> bool
+end

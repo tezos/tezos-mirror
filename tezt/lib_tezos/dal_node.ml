@@ -643,21 +643,33 @@ let snapshot_aux cmd dal_node ?extra ?endpoint ?min_published_level
        ?slots
        output_file)
 
-let spawn_snapshot_export t ?(compress = false) =
-  let extra = if compress then ["--compress"] else [] in
+let spawn_snapshot_export t ?(compress = false) ?(skip_shards = false) =
+  let extra =
+    (if compress then ["--compress"] else [])
+    @ if skip_shards then ["--skip-shards"] else []
+  in
   spawn_snapshot_aux "export" t ~extra
 
-let snapshot_export t ?(compress = false) =
-  let extra = if compress then ["--compress"] else [] in
+let snapshot_export t ?(compress = false) ?(skip_shards = false) =
+  let extra =
+    (if compress then ["--compress"] else [])
+    @ if skip_shards then ["--skip-shards"] else []
+  in
   snapshot_aux "export" t ~extra
 
-let spawn_snapshot_import t ?(no_check = false) =
-  let no_check_args = if no_check then ["--no-check"] else [] in
-  spawn_snapshot_aux ~extra:no_check_args "import" t
+let spawn_snapshot_import t ?(no_check = false) ?(skip_shards = false) =
+  let extra =
+    (if no_check then ["--no-check"] else [])
+    @ if skip_shards then ["--skip-shards"] else []
+  in
+  spawn_snapshot_aux ~extra "import" t
 
-let snapshot_import t ?(no_check = false) =
-  let no_check_args = if no_check then ["--no-check"] else [] in
-  snapshot_aux ~extra:no_check_args "import" t
+let snapshot_import t ?(no_check = false) ?(skip_shards = false) =
+  let extra =
+    (if no_check then ["--no-check"] else [])
+    @ if skip_shards then ["--skip-shards"] else []
+  in
+  snapshot_aux ~extra "import" t
 
 module Proxy = struct
   type answer = [`Response of string | `Stream of Cohttp_lwt.Body.t]
