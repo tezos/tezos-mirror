@@ -3,6 +3,36 @@
 Changelog
 '''''''''
 
+Version 25.0
+============
+
+General
+-------
+
+- Fixed a file descriptor leak in the RPC client: the connection of each
+  followed HTTP redirect was never released. This affected every Octez
+  executable issuing RPC calls through an endpoint answering redirects
+  (e.g. behind a reverse proxy). (MR :gl:`!22138`)
+
+Data Availability Layer (DAL)
+------------------------------
+
+DAL node
+~~~~~~~~
+
+- Added a ``--skip-shards`` flag to the ``snapshot export`` and ``snapshot
+  import`` commands. When set, shards are neither exported nor imported,
+  producing smaller snapshots for nodes that only need slot data. (MR
+  :gl:`!21937`)
+
+- **Breaking change**: The DAL node RPC server now binds to ``127.0.0.1:10732``
+  by default instead of ``0.0.0.0:10732``. Operators who need to expose the RPC
+  interface publicly must explicitly pass ``--rpc-addr 0.0.0.0:10732``. When
+  bound to a non-loopback address, a warning is emitted and a restrictive ACL is
+  applied (only safe/read-only endpoints are accessible). The ACL can be
+  overridden per-bind-address via the new ``acl`` field in ``config.json``,
+  using the same policy syntax as the L1 node's ``rpc.acl``. (MR :gl:`!21743`)
+
 Version 25.0~rc1
 ================
 
