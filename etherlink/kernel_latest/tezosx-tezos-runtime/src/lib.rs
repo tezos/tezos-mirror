@@ -821,6 +821,7 @@ where
             )
         }
     };
+    let received_delegated_storage_cost = operation_ctx.delegated_storage_cost;
     // Persist the post-execution origination index back to the
     // journal on every path (success, failure, OOG): MIR has had
     // its mutable borrow of `nonce` released by `cross_runtime_transfer`
@@ -949,9 +950,18 @@ where
         journal.michelson.push_pending_crac_receipt(receipt);
     };
     *consumed_milligas = gas.total_milligas_consumed().into();
+
+    let delegated_storage_cost =
+        result.own_storage_cost + received_delegated_storage_cost;
+
+    let delegated_storage_cost = u64::try_from(delegated_storage_cost).map_err(|e| {
+        TezosXRuntimeError::ConversionError(format!(
+            "Delegated storage cost does not fit in u64: {e}"
+        ))
+    })?;
+
     Ok(ExecuteRequestOutcome {
-        // TODO: set it to the frame's delegated storage fees accumulation
-        delegated_storage_cost: 0,
+        delegated_storage_cost,
     })
 }
 

@@ -1283,6 +1283,13 @@ fn gw<E: ToString>(e: E) -> TransferError {
 pub struct CrossRuntimeTransferResult {
     pub target: TransferTarget,
     pub internal_receipts: Vec<InternalOperationSum>,
+    /// Standalone storage cost — in mutez — of the internal
+    /// operations the sub-execution emitted directly. Excludes
+    /// operations surfaced from inner CRAC sub-executions (their
+    /// cost is reported upward by those sub-executions through
+    /// their own `X-Tezos-Storage-Cost` header, accumulated on the
+    /// caller frame's [`OperationCtx::delegated_storage_cost`]).
+    pub own_storage_cost: BigUint,
 }
 
 /// Error from [`cross_runtime_transfer`], carrying both the transfer
@@ -1373,9 +1380,22 @@ where
                     .michelson
                     .checkpoint_commit(tc_ctx.host, checkpoint_index)
                     .map_err(|e| CracTransferError::from(gw(e)))?;
+
+                let target: TransferTarget = success.into();
+                let own_storage_cost =
+                    storage_fees::compute_storage_fees::<TransferContent>(&target)?;
+                let own_storage_cost: BigUint = internal_receipts
+                    .iter()
+                    .filter(|t| matches!(t.origin, InternalOpOrigin::Own))
+                    .try_fold(own_storage_cost, |acc, t| {
+                        let fee = storage_fees::compute_internal_op_storage_fees(&t.op)?;
+                        Ok::<BigUint, TransferError>(acc + fee)
+                    })?;
+
                 Ok(CrossRuntimeTransferResult {
-                    target: success.into(),
+                    target,
                     internal_receipts: untag_internals(internal_receipts),
+                    own_storage_cost,
                 })
             } else {
                 // revert: restore the snapshot

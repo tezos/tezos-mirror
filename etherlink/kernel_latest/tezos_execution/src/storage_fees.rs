@@ -47,7 +47,7 @@ fn burn_storage_fee<Host: StorageV1>(
 ) -> Result<StorageFee, ApplyOperationError> {
     let nb_consumed_bytes = BigUint::try_from(&nb_consumed_bytes.0).map_err(
         |e: num_bigint::TryFromBigIntError<()>| {
-            ApplyOperationError::Transfer(TransferError::FailedToComputeBalanceUpdate(
+            ApplyOperationError::Transfer(TransferError::StorageFeesConversion(
                 e.to_string(),
             ))
         },
@@ -94,6 +94,17 @@ fn compute_storage_balance_updates(
     };
 
     Ok(vec![source_update, block_fees])
+}
+
+/// Returns the mutez cost of allocating `nb_consumed_bytes`:
+/// `nb_consumed_bytes × COST_PER_BYTES`. Pure: no payer debit, no
+/// `storage_limit` consumption, no host access. Errors on a
+/// negative-sign `Zarith` (cannot happen on a receipt's
+/// `paid_storage_size_diff`).
+fn storage_fee_for_bytes(nb_consumed_bytes: &Zarith) -> Result<BigUint, TransferError> {
+    let bytes = BigUint::try_from(&nb_consumed_bytes.0)
+        .map_err(|e| TransferError::StorageFeesConversion(e.to_string()))?;
+    Ok(BigUint::from(COST_PER_BYTES) * bytes)
 }
 
 /// Charge the payer for the storage allocated by `success`: walk the
@@ -170,6 +181,47 @@ pub fn burn_internal_op_storage_fees<Host: StorageV1>(
         InternalOperationSum::Event(meta) => {
             burn_internal_meta_storage_fees(host, payer, storage_limit_remaining, meta)
         }
+    }
+}
+
+pub fn compute_storage_fees<M: OperationStorageFees>(
+    success: &M::Success,
+) -> Result<BigUint, TransferError> {
+    let mut total = BigUint::ZERO;
+    let _: M::StorageFees = M::build_storage_fees(success, |bytes| {
+        let fee = storage_fee_for_bytes(bytes)?;
+        total += &fee;
+        Ok::<StorageFee, TransferError>(StorageFee(fee))
+    })?;
+    Ok(total)
+}
+
+fn compute_content_storage_fees<M: OperationStorageFees>(
+    content: &ContentResult<M>,
+) -> Result<BigUint, TransferError> {
+    match content {
+        ContentResult::Applied(success) => compute_storage_fees::<M>(success),
+        _ => Ok(BigUint::ZERO),
+    }
+}
+
+fn compute_internal_meta_storage_fees<M: OperationStorageFees>(
+    meta: &InternalContentWithMetadata<M>,
+) -> Result<BigUint, TransferError> {
+    compute_content_storage_fees(&meta.result)
+}
+
+/// Sum the per-kind storage-fee components of a single internal
+/// operation, dispatching on its [`InternalOperationSum`] variant.
+pub fn compute_internal_op_storage_fees(
+    op: &InternalOperationSum,
+) -> Result<BigUint, TransferError> {
+    match op {
+        InternalOperationSum::Transfer(meta) => compute_internal_meta_storage_fees(meta),
+        InternalOperationSum::Origination(meta) => {
+            compute_internal_meta_storage_fees(meta)
+        }
+        InternalOperationSum::Event(meta) => compute_internal_meta_storage_fees(meta),
     }
 }
 
@@ -1122,5 +1174,84 @@ mod tests {
         )
         .expect_err("any positive burn against a zero remainder must fail");
         assert_eq!(trace, ApplyOperationError::OperationQuotaExceeded);
+    }
+
+    /// Transfer with growth + allocation: sum is
+    /// `(paid_storage_size_diff + ORIGINATION_SIZE) × COST_PER_BYTES`.
+    #[test]
+    fn compute_transfer_growth_and_alloc() {
+        let content = applied_transfer(TransferSuccess {
+            paid_storage_size_diff: 10_u64.into(),
+            allocated_destination_contract: true,
+            ..Default::default()
+        });
+        let expected = BigUint::from((10_u64 + ORIGINATION_SIZE) * COST_PER_BYTES);
+        assert_eq!(compute_content_storage_fees(&content).unwrap(), expected);
+    }
+
+    /// Transfer with no growth and no allocation: zero.
+    #[test]
+    fn compute_transfer_no_growth_no_alloc_is_zero() {
+        let content = applied_transfer(TransferSuccess::default());
+        assert_eq!(
+            compute_content_storage_fees(&content).unwrap(),
+            BigUint::ZERO
+        );
+    }
+
+    /// Origination always pays the slot, plus content when grown.
+    #[test]
+    fn compute_origination_content_plus_slot() {
+        let content = applied_origination(origination_success(38));
+        let expected = BigUint::from((38_u64 + ORIGINATION_SIZE) * COST_PER_BYTES);
+        assert_eq!(compute_content_storage_fees(&content).unwrap(), expected);
+    }
+
+    /// Reveal allocates nothing — compute returns zero.
+    #[test]
+    fn compute_reveal_is_zero() {
+        let content: ContentResult<RevealContent> =
+            ContentResult::Applied(RevealSuccess {
+                consumed_milligas: 0_u64.into(),
+            });
+        assert_eq!(
+            compute_content_storage_fees(&content).unwrap(),
+            BigUint::ZERO
+        );
+    }
+
+    /// Non-Applied content (Failed, BackTracked, Skipped) yields
+    /// zero — there is no Applied allocation to bill.
+    #[test]
+    fn compute_non_applied_is_zero() {
+        let content: ContentResult<TransferContent> =
+            ContentResult::Failed(ApplyOperationErrors { errors: vec![] });
+        assert_eq!(
+            compute_content_storage_fees(&content).unwrap(),
+            BigUint::ZERO
+        );
+    }
+
+    /// Internal-op dispatcher hits the per-kind summation through
+    /// the [`InternalOperationSum`] variants.
+    #[test]
+    fn compute_internal_op_dispatches_per_kind() {
+        let mut host = MockKernelHost::default();
+        let payer = init_payer(&mut host, 0);
+        let op = InternalOperationSum::Origination(InternalContentWithMetadata {
+            sender: payer.contract(),
+            nonce: 0,
+            content: OriginationContent {
+                balance: 0_u64.into(),
+                delegate: None,
+                script: Script {
+                    code: vec![],
+                    storage: vec![],
+                },
+            },
+            result: ContentResult::Applied(origination_success(7)),
+        });
+        let expected = BigUint::from((7_u64 + ORIGINATION_SIZE) * COST_PER_BYTES);
+        assert_eq!(compute_internal_op_storage_fees(&op).unwrap(), expected);
     }
 }

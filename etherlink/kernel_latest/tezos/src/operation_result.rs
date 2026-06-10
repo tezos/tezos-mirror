@@ -165,6 +165,8 @@ pub enum TransferError {
     MirNarithToAmountError(String),
     #[error("Transactions of 0 tez towards a contract without code are forbidden")]
     EmptyImplicitTransfer,
+    #[error("Failed to convert storage fees: {0}")]
+    StorageFeesConversion(String),
     #[error("Gas exhaustion")]
     OutOfGas(#[from] gas::OutOfGas),
     #[error("Unexpected deposit error: {0}")]
