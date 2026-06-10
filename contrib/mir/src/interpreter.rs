@@ -7665,7 +7665,7 @@ mod interpreter_tests {
         );
         assert_eq!(
             start_milligas - ctx.gas().milligas().unwrap(),
-            interpret_cost::NOW + interpret_cost::INTERPRET_RET
+            interpret_cost::IMPLICIT_ACCOUNT + interpret_cost::INTERPRET_RET
         );
     }
 
