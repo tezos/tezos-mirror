@@ -367,8 +367,10 @@ pub mod interpret_cost {
     // the entries directly (no such setup), so a flat cost matches MIR's work.
     pub const ITER: u32 = 20;
     pub const SWAP: u32 = 10;
-    pub const INT_NAT: u32 = 10;
-    pub const ISNAT: u32 = 10;
+    // corresponds to cost_N_IInt_nat in the Tezos protocol
+    pub const INT_NAT: u32 = 3630;
+    // corresponds to cost_N_IIs_nat in the Tezos protocol
+    pub const ISNAT: u32 = 2465;
     pub const INT_BLS_FR: u32 = 115;
     // Re-benchmarked on the MIR interpreter (`cost_N_IPush`).
     pub const PUSH: u32 = 60;
@@ -1121,24 +1123,28 @@ pub mod interpret_cost {
         (50 + (size >> 4) + (size >> 6) + (size >> 8) + (size >> 9)).as_gas_cost()
     }
 
+    // corresponds to cost_N_IInt_bytes in the Tezos protocol
     pub fn int_bytes(size: usize) -> Result<u32, CostOverflow> {
         let size = Checked::from(size);
-        (20 + ((size >> 1) + (size * 2))).as_gas_cost()
+        ((size >> 1) + (size >> 2) + (size >> 5) + (size >> 6) + 50).as_gas_cost()
     }
 
+    // corresponds to cost_N_INat_bytes in the Tezos protocol
     pub fn nat_bytes(size: usize) -> Result<u32, CostOverflow> {
         let size = Checked::from(size);
-        (45 + ((size >> 1) + (size * 2))).as_gas_cost()
+        ((size >> 1) + (size >> 6) + 55).as_gas_cost()
     }
 
+    // corresponds to cost_N_IBytes_int in the Tezos protocol
     pub fn bytes_int(int: &BigInt) -> Result<u32, CostOverflow> {
         let size = Checked::from(int.byte_size());
-        (90 + (size * 3)).as_gas_cost()
+        ((size >> 1) + (size >> 3) + (size >> 4) + size + 100).as_gas_cost()
     }
 
+    // corresponds to cost_N_IBytes_nat in the Tezos protocol
     pub fn bytes_nat(int: &BigUint) -> Result<u32, CostOverflow> {
         let size = Checked::from(int.byte_size());
-        (75 + (size * 3)).as_gas_cost()
+        ((size >> 2) + (size >> 3) + (size >> 4) + size + 90).as_gas_cost()
     }
 
     pub fn unpack(bytes: &[u8]) -> Result<u32, CostOverflow> {

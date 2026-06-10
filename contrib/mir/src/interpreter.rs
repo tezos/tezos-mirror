@@ -2358,7 +2358,7 @@ fn interpret_one<'a>(
         },
         I::Nat => {
             pop_ref!(i, Bytes);
-            ctx.gas().consume(interpret_cost::int_bytes(i.len())?)?;
+            ctx.gas().consume(interpret_cost::nat_bytes(i.len())?)?;
             stack.push(V::Nat(BigUint::from_bytes_be(i)))
         }
         I::Bytes(overload) => match overload {
