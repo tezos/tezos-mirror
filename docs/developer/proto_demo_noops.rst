@@ -665,14 +665,21 @@ For completeness, we show below the node’s trace at startup::
    Nov 24 13:56:37.384 NOTICE | p2p initialization: bootstrapping
    Nov 24 13:56:37.397 NOTICE | p2p initialization: p2p_maintenance_started
    Nov 24 13:56:37.809 NOTICE | external validator initialized
-   Nov 24 13:56:37.809 NOTICE | initializing irmin context at
+   Nov 24 13:56:37.809 NOTICE | initializing brasaia context at
    Nov 24 13:56:37.809 NOTICE |   /tmp/tezos-node[...]
+   Nov 24 13:56:38.469   WARN | protocol
+   Nov 24 13:56:38.469   WARN |   PsGXQmSv1UDDm2brdEFsuJCHjajS9Cv8mp44w93wNS2TpXFSvTC
+   Nov 24 13:56:38.469   WARN |   won't be stored: wrong hash
    Nov 24 13:56:38.770 NOTICE | activate chain NetXdQprcVkpaWU
    Nov 24 13:56:38.770 NOTICE | chain is bootstrapped
    Nov 24 13:56:38.770 NOTICE | synchronisation status: synced
    Nov 24 13:56:38.771 NOTICE | starting local RPC server on
    Nov 24 13:56:38.771 NOTICE |   ::ffff:127.0.0.1:18731 (acl = AllowAll)
    Nov 24 13:56:38.771 NOTICE | the Tezos node is now running
+
+.. note::
+
+   The warning above about a wrong hash for a past embedded protocol can be safely ignored.
 
 After the protocol activation command, the shell-level traces show::
 
