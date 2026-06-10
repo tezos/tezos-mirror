@@ -457,7 +457,8 @@ pub mod interpret_cost {
     pub const SET_DELEGATE: u32 = 75;
     pub const LAMBDA: u32 = 10;
     pub const EXEC: u32 = 10;
-    pub const HASH_KEY: u32 = 605;
+    // corresponds to cost_N_IHash_key in the Tezos protocol
+    pub const HASH_KEY: u32 = 215;
     // slight deviation from the protocol: in the protocol, APPLY costs differer
     // depending on whether a lambda is recursive; here this distinction doesn't
     // make a lot of sense.
@@ -1097,15 +1098,18 @@ pub mod interpret_cost {
         Crypto(#[from] CryptoError),
     }
 
+    // correspond to cost_N_ICheck_signature_{ed25519,secp256k1,p256} in the
+    // Tezos protocol. BLS is not part of the re-benchmarked set; its arm
+    // keeps the previous total (including the former 32 * len serialization
+    // surcharge, now folded in).
     pub fn check_signature(k: &PublicKey, msg: &[u8]) -> Result<u32, CryptoError> {
         let len = msg.len().min(u32::MAX as usize) as u32;
-        let serialization_cost = len << 5;
-        let checked_cost = match k {
-            PublicKey::Ed25519(..) => 65_800 + ((len >> 3) + len),
-            PublicKey::Secp256k1(..) => 51_600 + ((len >> 3) + len),
-            PublicKey::P256(..) => 341_000 + ((len >> 3) + len),
+        let cost = match k {
+            PublicKey::Ed25519(..) => 48_395 + ((len >> 4) + (len >> 5) + len),
+            PublicKey::Secp256k1(..) => 183_265 + ((len >> 3) + len),
+            PublicKey::P256(..) => 487_855 + ((len >> 3) + len),
             #[cfg(feature = "bls")]
-            PublicKey::Bls(..) => 1_570_000 + (len * 3),
+            PublicKey::Bls(..) => 1_570_000 + (len * 35),
             #[cfg(not(feature = "bls"))]
             PublicKey::Bls(..) => {
                 return Err(CryptoError::Unsupported(
@@ -1114,7 +1118,7 @@ pub mod interpret_cost {
             }
         };
 
-        Ok(serialization_cost + checked_cost)
+        Ok(cost)
     }
 
     pub fn slice(length: usize) -> Result<u32, CostOverflow> {
@@ -1125,34 +1129,34 @@ pub mod interpret_cost {
         ((Checked::from(length) >> 1) + 25).as_gas_cost()
     }
 
+    // corresponds to cost_N_IBlake2b in the Tezos protocol
     pub fn blake2b(msg: &[u8]) -> Result<u32, CostOverflow> {
-        /* fun size -> (430. + (1.125 * size)) */
         let size = Checked::from(msg.len());
-        (Checked::from(430) + ((size >> 3) + size)).as_gas_cost()
+        ((size >> 4) + (size >> 5) + size + 245).as_gas_cost()
     }
 
+    // corresponds to cost_N_IKeccak in the Tezos protocol
     pub fn keccak(msg: &[u8]) -> Result<u32, CostOverflow> {
-        /* fun size -> (1350. + (8.25 * size)) */
         let size = Checked::from(msg.len());
-        (Checked::from(1350) + ((size >> 2) + (size * 8))).as_gas_cost()
+        ((size >> 1) + (size >> 2) + (size >> 3) + (size >> 4) + (size * 2) + 550).as_gas_cost()
     }
 
+    // corresponds to cost_N_ISha256 in the Tezos protocol
     pub fn sha256(msg: &[u8]) -> Result<u32, CostOverflow> {
-        /* fun size -> (600. + (4.75 * size)) */
         let size = Checked::from(msg.len());
-        (Checked::from(600) + ((size >> 2) + ((size >> 1) + (size * 4)))).as_gas_cost()
+        ((size >> 1) + (size >> 2) + (size >> 4) + (size * 3) + 350).as_gas_cost()
     }
 
+    // corresponds to cost_N_ISha3 in the Tezos protocol
     pub fn sha3(msg: &[u8]) -> Result<u32, CostOverflow> {
-        /* fun size -> (1350. + (8.25 * size)) */
         let size = Checked::from(msg.len());
-        (Checked::from(1350) + ((size >> 2) + (size * 8))).as_gas_cost()
+        ((size >> 1) + (size >> 2) + (size >> 3) + (size >> 4) + (size * 2) + 545).as_gas_cost()
     }
 
+    // corresponds to cost_N_ISha512 in the Tezos protocol
     pub fn sha512(msg: &[u8]) -> Result<u32, CostOverflow> {
-        /* fun size -> (680. + (3. * size)) */
         let size = Checked::from(msg.len());
-        (Checked::from(680) + (size * 3)).as_gas_cost()
+        ((size >> 2) + (size >> 3) + (size * 2) + 455).as_gas_cost()
     }
 
     pub fn pairing_check(size: usize) -> Result<u32, CostOverflow> {
