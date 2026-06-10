@@ -350,12 +350,18 @@ pub mod interpret_cost {
     pub const DROP: u32 = 20;
     // Re-benchmarked on the MIR interpreter (`cost_N_IDup`).
     pub const DUP: u32 = 45;
-    pub const GT: u32 = 10;
-    pub const GE: u32 = 10;
-    pub const EQ: u32 = 10;
-    pub const NEQ: u32 = 10;
-    pub const LE: u32 = 10;
-    pub const LT: u32 = 10;
+    // correspond to cost_N_IGt / IGe / IEq / INeq / ILe / ILt in the Tezos
+    // protocol.
+    // TODO(L2-1554): these benchmarked constants (~1.1-1.2 us flat) look like
+    // measurement artefacts: each instruction pops an int and tests its sign.
+    // Same family as N_IDupN / N_ICons_list / N_IList_size; re-check the
+    // micro-benchmarks.
+    pub const GT: u32 = 1130;
+    pub const GE: u32 = 1145;
+    pub const EQ: u32 = 1115;
+    pub const NEQ: u32 = 1185;
+    pub const LE: u32 = 1210;
+    pub const LT: u32 = 1150;
     pub const IF: u32 = 10;
     pub const IF_NONE: u32 = 10;
     pub const IF_CONS: u32 = 855;
@@ -769,9 +775,9 @@ pub mod interpret_cost {
     pub fn compare(v1: &TypedValue, v2: &TypedValue) -> Result<u32, CompareError> {
         use TypedValue as V;
         let cmp_bytes = |s1: u64, s2: u64| -> Result<u32, CompareError> {
-            // Approximating 35 + 0.024413 x term
-            let v = Checked::from(std::cmp::min(s1, s2));
-            Ok((35 + (v >> 6) + (v >> 7)).as_gas_cost()?)
+            // corresponds to cost_N_ICompare in the Tezos protocol
+            let w = Checked::from(std::cmp::min(s1, s2).saturating_sub(1));
+            Ok(((w >> 5) + (w >> 6) + (w >> 8) + 85).as_gas_cost()?)
         };
         const ADDRESS_SIZE: u64 = 20 + 31; // hash size + max entrypoint size
         const CMP_CHAIN_ID: u32 = 30;
