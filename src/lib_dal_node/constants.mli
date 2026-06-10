@@ -100,3 +100,6 @@ val time_to_join_new_topics_in_levels : minimal_block_delay:int -> int
    to keep shards for about 10 minutes. 150 blocks is 10 minutes on Ghostnet, 20
    minutes on Mainnet. *)
 val shard_retention_period_in_levels : int
+
+(** The chain id of the Tezos mainnet. *)
+val mainnet_chain_id : Chain_id.t

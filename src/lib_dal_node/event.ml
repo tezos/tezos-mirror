@@ -1435,6 +1435,31 @@ open struct
       ~msg:"failed to close the store: {error}"
       ~level:Warning
       ("error", Error_monad.trace_encoding)
+
+  let l1_history_check_bypassed =
+    declare_2
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"l1_history_check_bypassed"
+      ~msg:
+        "the L1 node stores block data for {stored_cycles} cycles, but the DAL \
+         node requires at least {minimal_cycles}; continuing anyway because \
+         --ignore-l1-history-check is set. The DAL node may behave incorrectly \
+         if it needs to fetch data from levels the L1 node has already pruned."
+      ~level:Warning
+      ("stored_cycles", Data_encoding.int31)
+      ("minimal_cycles", Data_encoding.int31)
+
+  let ignore_l1_history_check_refused_on_mainnet =
+    declare_0
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"ignore_l1_history_check_refused_on_mainnet"
+      ~msg:
+        "--ignore-l1-history-check was set but is not honored on mainnet; the \
+         L1 history check will be enforced as usual"
+      ~level:Warning
+      ()
 end
 
 (* DAL node event emission functions *)
@@ -1848,3 +1873,9 @@ let emit_publish_crosses_migration ~published_level ~migration_level
     (published_level, migration_level, attested_level)
 
 let emit_closing_store_failed errs = emit closing_store_failed errs
+
+let emit_l1_history_check_bypassed ~stored_cycles ~minimal_cycles =
+  emit l1_history_check_bypassed (stored_cycles, minimal_cycles)
+
+let emit_ignore_l1_history_check_refused_on_mainnet () =
+  emit ignore_l1_history_check_refused_on_mainnet ()
