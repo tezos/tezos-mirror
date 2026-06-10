@@ -88,6 +88,14 @@ val get_filename : file -> string
     in a tar. *)
 val get_file_size : file -> int64
 
+(** [member_name_is_safe name] returns [true] iff [name], a path read from a
+    tar archive header, is a valid relative path that cannot resolve outside
+    the directory it is extracted into: it is relative (not absolute) and
+    contains no "." or ".." path component. Callers extracting an archive
+    (e.g. snapshot import) should reject members for which this returns
+    [false] to prevent writes outside the extraction directory. *)
+val member_name_is_safe : string -> bool
+
 (** [get_raw_input_fd tar] returns the file descriptor to read
     directly in the tar file. It is no recommended to use it. *)
 val get_raw_input_fd : i -> Lwt_unix.file_descr
@@ -116,6 +124,20 @@ val load_file : i -> file -> string Lwt.t
     Warning, this function loads the whole data in memory *)
 val load_from_filename : i -> filename:string -> string option Lwt.t
 
+module Internal_for_test : sig
+  (** [append_raw_member ~file ~member_name ~data] appends a new member to the
+      uncompressed tar archive at [file], overwriting the EOF zero-blocks and
+      rewriting them after the entry.  The [member_name] is NOT validated against
+      {!member_name_is_safe} — this function is intended exclusively for tests
+      that need to append archive members with non-canonical names in order to
+      verify that the import layer rejects them. *)
+  val append_raw_member :
+    file:string -> member_name:string -> data:string -> unit Lwt.t
+end
+
 (** [copy_to_file tar file ~dst ~buffer_size] copies the [file] from the [tar]
-    into new file designated by [dst]. *)
+    into new file designated by [dst]. Raises [Invalid_argument] if the
+    archive member name is invalid (absolute path or contains ".." components),
+    as a defense-in-depth guard that fires even when the caller omits an
+    explicit {!member_name_is_safe} check. *)
 val copy_to_file : i -> file -> dst:string -> buffer_size:int -> unit Lwt.t

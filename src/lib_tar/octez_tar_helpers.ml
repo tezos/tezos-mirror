@@ -270,11 +270,14 @@ type i = {
   mutable data_pos : Int64.t;
   fd : Lwt_unix.file_descr;
   mutable files : file list option;
+  archive_size : Int64.t;
 }
 
 let open_in ~file =
   let open Lwt_syntax in
   let* fd = Lwt_unix.openfile file Unix.[O_RDONLY] ro_file_perm in
+  let* stat = Lwt_unix.LargeFile.fstat fd in
+  let archive_size = stat.Lwt_unix.LargeFile.st_size in
   (* We need to retrieve the first header's length. [Tar] will shift
      the offset to the data location in the file: we can infer the
      length from it. *)
@@ -282,7 +285,7 @@ let open_in ~file =
   let* data_pos = Lwt_unix.LargeFile.lseek fd 0L SEEK_CUR in
   let* _ = Lwt_unix.LargeFile.lseek fd 0L SEEK_SET in
   let files = None in
-  Lwt.return {current_pos = 0L; data_pos; fd; files}
+  Lwt.return {current_pos = 0L; data_pos; fd; files; archive_size}
 
 let close_in t =
   Lwt.catch
@@ -343,14 +346,44 @@ let get_filename {header; _} = header.Tar.Header.file_name
 
 let get_file_size {header; _} = header.Tar.Header.file_size
 
+(* [member_name_is_safe name] checks that [name], a path read from a tar
+   archive header, is a valid relative path that cannot resolve outside the
+   directory it is extracted into: it must be relative (not absolute) and must
+   not contain any "." or ".." path component. This guards archive extraction
+   (e.g. snapshot import) against members whose names resolve outside the
+   extraction directory. *)
+let member_name_is_safe name =
+  Filename.is_relative name
+  && List.for_all
+       (fun segment ->
+         not
+           (String.equal segment Filename.current_dir_name
+           || String.equal segment Filename.parent_dir_name))
+       (String.split_on_char '/' name)
+
 (*[get_raw tar file] loads the [file] from [tar] in memory *)
 let get_raw t {header; data_ofs} =
   let open Lwt_syntax in
   let* _ = Lwt_unix.LargeFile.lseek t.fd data_ofs SEEK_SET in
-  let data_size = Int64.to_int header.file_size in
-  let buf = Bytes.create data_size in
-  let* _ = Lwt_unix.read t.fd buf 0 data_size in
-  Lwt.return (Bytes.unsafe_to_string buf)
+  let file_size = header.Tar.Header.file_size in
+  (* The file size comes from the tar header and is unvalidated: an
+     archive can announce an arbitrary size for a small file. Bound it
+     against the readable bytes remaining in the archive (from [data_ofs] to
+     end-of-file) to turn a potential memory-amplification crash into a clean
+     failure. *)
+  let max_readable = Int64.sub t.archive_size data_ofs in
+  if Int64.compare file_size 0L < 0 || Int64.compare file_size max_readable > 0
+  then
+    Lwt.fail
+      (Invalid_argument
+         (Format.asprintf
+            "Octez_tar_helpers.get_raw: invalid tar header file size %Ld"
+            file_size))
+  else
+    let data_size = Int64.to_int file_size in
+    let buf = Bytes.create data_size in
+    let* _ = Lwt_unix.read t.fd buf 0 data_size in
+    Lwt.return (Bytes.unsafe_to_string buf)
 
 let get_raw_input_fd {fd; _} = fd
 
@@ -414,12 +447,51 @@ let load_from_filename t ~filename =
       Lwt.return_some str
   | None -> Lwt.return_none
 
+(* Appends a new member to an existing uncompressed tar archive at [file],
+   overwriting the two EOF zero-blocks and rewriting them after the new entry.
+   The [member_name] is NOT validated — this function exists solely to let tests
+   append archive members with non-canonical names to verify that the
+   import layer rejects them. *)
+let append_raw_member ~file ~member_name ~data =
+  let open Lwt_syntax in
+  let* fd = Lwt_unix.openfile file Unix.[O_RDWR] rw_file_perm in
+  Lwt.finalize
+    (fun () ->
+      (* Seek just before the two 512-byte EOF zero-blocks at the end. *)
+      let* size = Lwt_unix.LargeFile.lseek fd 0L SEEK_END in
+      let eof_pos = Int64.sub size 1024L in
+      let* _ = Lwt_unix.LargeFile.lseek fd eof_pos SEEK_SET in
+      let data_size = Int64.of_int (String.length data) in
+      let header = Header.make member_name data_size in
+      let* () = HW.write header fd in
+      let* () = Writer.really_write fd (Cstruct.of_string data) in
+      let padding_len = Header.compute_zero_padding_length header in
+      let* () =
+        if padding_len > 0 then
+          Writer.really_write fd (Cstruct.create padding_len)
+        else Lwt.return_unit
+      in
+      let* () = Writer.really_write fd Header.zero_block in
+      Writer.really_write fd Header.zero_block)
+    (fun () -> Lwt_unix.close fd)
+
 let copy_to_file tar {header; data_ofs} ~dst ~buffer_size =
   let open Lwt_syntax in
-  let* _ = Lwt_unix.LargeFile.lseek tar.fd data_ofs SEEK_SET in
-  let* fd =
-    Lwt_unix.openfile dst Unix.[O_WRONLY; O_CREAT; O_TRUNC] rw_file_perm
-  in
-  Lwt.finalize
-    (fun () -> copy_n tar.fd fd header.Tar.Header.file_size ~buffer_size)
-    (fun () -> Lwt_unix.close fd)
+  if not (member_name_is_safe header.Tar.Header.file_name) then
+    Lwt.fail
+      (Invalid_argument
+         (Format.asprintf
+            "Octez_tar_helpers.copy_to_file: invalid archive member name %S"
+            header.Tar.Header.file_name))
+  else
+    let* _ = Lwt_unix.LargeFile.lseek tar.fd data_ofs SEEK_SET in
+    let* fd =
+      Lwt_unix.openfile dst Unix.[O_WRONLY; O_CREAT; O_TRUNC] rw_file_perm
+    in
+    Lwt.finalize
+      (fun () -> copy_n tar.fd fd header.Tar.Header.file_size ~buffer_size)
+      (fun () -> Lwt_unix.close fd)
+
+module Internal_for_test = struct
+  let append_raw_member = append_raw_member
+end
