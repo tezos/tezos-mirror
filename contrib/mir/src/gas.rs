@@ -399,7 +399,7 @@ pub mod interpret_cost {
     pub const UNPAIR: u32 = 60;
     pub const SOME: u32 = 10;
     pub const NONE: u32 = 10;
-    pub const AMOUNT: u32 = 10;
+    pub const AMOUNT: u32 = 65;
     pub const NIL: u32 = 60;
     pub const CONS: u32 = 15;
     pub const EMPTY_SET: u32 = 60;
@@ -410,10 +410,10 @@ pub mod interpret_cost {
     pub const SIZE_MAP: u32 = 10;
     pub const EMPTY_MAP: u32 = 60;
     pub const EMPTY_BIG_MAP: u32 = 60;
-    pub const CHAIN_ID: u32 = 15;
+    pub const CHAIN_ID: u32 = 65;
     pub const PACK: u32 = 0;
     pub const SELF: u32 = 10;
-    pub const ADDRESS: u32 = 10;
+    pub const ADDRESS: u32 = 60;
     pub const LEFT: u32 = 20;
     pub const RIGHT: u32 = 20;
 
@@ -427,8 +427,8 @@ pub mod interpret_cost {
     pub const MAP_MAP: u32 = 20;
 
     // Gas costs obtained from https://gitlab.com/tezos/tezos/-/blob/9875fbebe032a8c5ce62b3b3cb1588ca9855a37e/src/proto_017_PtNairob/lib_protocol/michelson_v1_gas_costs_generated.ml
-    pub const TRANSFER_TOKENS: u32 = 60;
-    pub const SET_DELEGATE: u32 = 60;
+    pub const TRANSFER_TOKENS: u32 = 120;
+    pub const SET_DELEGATE: u32 = 75;
     pub const LAMBDA: u32 = 10;
     pub const EXEC: u32 = 10;
     pub const HASH_KEY: u32 = 605;
@@ -438,19 +438,19 @@ pub mod interpret_cost {
     pub const APPLY: u32 = 140;
     pub const TICKET: u32 = 10;
     pub const READ_TICKET: u32 = 10;
-    pub const BALANCE: u32 = 10;
-    pub const CONTRACT: u32 = 30;
-    pub const LEVEL: u32 = 10;
-    pub const MIN_BLOCK_TIME: u32 = 20;
-    pub const SELF_ADDRESS: u32 = 10;
-    pub const SENDER: u32 = 10;
-    pub const SOURCE: u32 = 10;
-    pub const NOW: u32 = 10;
-    pub const IMPLICIT_ACCOUNT: u32 = 10;
-    pub const IS_IMPLICIT_ACCOUNT: u32 = 10;
-    pub const VOTING_POWER: u32 = 640;
-    pub const TOTAL_VOTING_POWER: u32 = 450;
-    pub const EMIT: u32 = 30;
+    pub const BALANCE: u32 = 60;
+    pub const CONTRACT: u32 = 115;
+    pub const LEVEL: u32 = 85;
+    pub const MIN_BLOCK_TIME: u32 = 60;
+    pub const SELF_ADDRESS: u32 = 70;
+    pub const SENDER: u32 = 75;
+    pub const SOURCE: u32 = 70;
+    pub const NOW: u32 = 75;
+    pub const IMPLICIT_ACCOUNT: u32 = 65;
+    pub const IS_IMPLICIT_ACCOUNT: u32 = 65;
+    pub const VOTING_POWER: u32 = 45;
+    pub const TOTAL_VOTING_POWER: u32 = 75;
+    pub const EMIT: u32 = 75;
 
     pub const INTERPRET_RET: u32 = 130; // corresponds to cost_N_IHalt in the Tezos protocol: charged at the end of every code block, like L1's terminal IHalt
 
@@ -520,7 +520,7 @@ pub mod interpret_cost {
     pub const LOOP_LEFT_ENTER: u32 = 10; // corresponds to KLoop_in_left in the Tezos protocol
     pub const LOOP_EXIT: u32 = 15;
     pub const CREATE_CONTRACT: u32 = 60;
-    pub const VIEW: u32 = 1460; // corresponds to cost_N_IView_synthesized in the Tezos protocol
+    pub const VIEW: u32 = 65; // corresponds to cost_N_IView_synthesized in the Tezos protocol
 
     pub fn join_tickets(t1: &Ticket, t2: &Ticket) -> Result<u32, CompareError> {
         compare(&t1.content, &t2.content)?;
