@@ -1281,8 +1281,8 @@ let test_denunciation_next_cycle protocol dal_parameters cryptobox node client
 (**  [test_e2e_trap_faulty_dal_node] verifies a scenario where a
      [faulty_delegate] misbehaves. Specifically, it:
 
-     - Creates a DAL node [proxy] whose role is to mimick the honest
-       [dal_node] by forwarding to the honest DAL node each RPC call,
+     - Creates a DAL node [proxy] whose role is to mimick the baker-facing
+       [baker_dal_node] by forwarding to the honest DAL node each RPC call,
        except for the attestable-slots endpoints for the [faulty_delegate]:
          - the streamed RPC [/profiles/<tz>/monitor/attestable_slots], where
            the proxy rewrites the JSON stream so that, at
@@ -1331,6 +1331,21 @@ let test_e2e_trap_faulty_dal_node protocol dal_parameters _cryptobox node client
   let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
   let target_attested_level = (2 * blocks_per_cycle) + 1 in
   let faulty_delegate = Constant.bootstrap1.Account.public_key_hash in
+  (* Split the DAL roles across two nodes. [dal_node] plays the pure-accuser
+     role: the baker never talks to it, so its [Controller_profiles.attesters]
+     stays empty and [check_self_accusation] returns early, letting it inject
+     the denunciation against [faulty_delegate]. [baker_dal_node] is fronted
+     by the proxy and receives the baker's attester registrations; it will
+     self-stop when the trap attestation is processed. It is peered with
+     [dal_node] so shards published on [dal_node] propagate via gossip. *)
+  let baker_dal_node = Dal_node.create ~name:"baker-facing-dal-node" ~node () in
+  let* () =
+    Dal_node.init_config
+      ~peers:[Dal_node.listen_addr dal_node]
+      ~operator_profiles:[0]
+      baker_dal_node
+  in
+  let* () = Dal_node.run baker_dal_node ~wait_ready:true in
   let proxy =
     Dal_node.Proxy.make
       ~name:"proxy-dal-node"
@@ -1347,7 +1362,7 @@ let test_e2e_trap_faulty_dal_node protocol dal_parameters _cryptobox node client
       ()
   in
   let () =
-    Dal_node.Proxy.run ~honest_dal_node:dal_node ~faulty_dal_node proxy
+    Dal_node.Proxy.run ~honest_dal_node:baker_dal_node ~faulty_dal_node proxy
   in
   let dal_node_endpoint =
     Dal_node.as_rpc_endpoint faulty_dal_node |> Endpoint.as_string
@@ -1405,9 +1420,20 @@ let test_e2e_trap_faulty_dal_node protocol dal_parameters _cryptobox node client
         else None)
   in
   let* () =
-    repeat blocks_per_cycle (fun () ->
+    (* First iteration bakes the block at [target_attested_level]: the proxy
+       rewrites attestable_slots so [faulty_delegate] attests the trap.
+       [baker_dal_node] self-stops once it processes this block. *)
+    let wait = wait_for_layer1_final_block dal_node (!level - 1) in
+    let* () = bake_for ~dal_node_endpoint client in
+    incr level ;
+    let* () = wait in
+    (* Remaining iterations skip the DAL endpoint: [baker_dal_node] is
+       shutting down, and an honest attestable_slots response would in any
+       case be "nothing attestable" (traps_fraction = 1), so no DAL
+       attestations would have been included. *)
+    repeat (blocks_per_cycle - 1) (fun () ->
         let wait = wait_for_layer1_final_block dal_node (!level - 1) in
-        let* () = bake_for ~dal_node_endpoint client in
+        let* () = bake_for client in
         incr level ;
         let* () = wait in
         unit)
@@ -1594,6 +1620,94 @@ let test_denunciation_when_all_bakers_attest protocol dal_parameters _cryptobox
   in
   unit
 
+(* Test that the DAL node stops when it detects that a registered attester
+   attested a slot containing trapped shards.
+
+   Steps:
+   1. Set up L1 + DAL node (operator on slot 0) with traps_fraction=1 (all
+      shards are traps).
+   2. Register [bootstrap1] as attester on the DAL node.
+   3. Publish a slot and bake through the attestation lag.
+   4. Manually inject an attestation that attests the trapped slot,
+      bypassing the baker's trap filter.
+   5. Bake to include the attestation, then bake 2 more blocks so it becomes
+      finalized.
+   6. Verify that the DAL node emits the trap detection event for the
+      correct delegate, then stops with exit code 2. *)
+let test_stop_node_on_trapped_attestation protocol dal_parameters _cryptobox
+    node client dal_node =
+  let slot_index = 0 in
+  let attester = Constant.bootstrap1 in
+  let attestation_lag = dal_parameters.Dal.Parameters.attestation_lag in
+  let slot_size = dal_parameters.cryptobox.slot_size in
+  Log.info "Registering attester profile on DAL node" ;
+  let* () =
+    Dal_RPC.(
+      call dal_node
+      @@ patch_profiles [Attester attester.public_key_hash; Operator slot_index])
+  in
+  Log.info "Publishing slot" ;
+  let slot = Helpers.make_slot ~slot_size "trap_test_content" in
+  let* _commitment =
+    Helpers.publish_and_store_slot
+      client
+      dal_node
+      attester
+      ~index:slot_index
+      slot
+  in
+  let* () = bake_for client in
+  let* published_level = Node.get_level node in
+  (* Bake enough so the commitment block is finalized (2 more blocks), then
+     wait for the DAL node to catch up. This ensures traps are registered
+     before we inject the attestation. *)
+  let* () = bake_for ~count:2 client in
+  let* () = wait_for_layer1_final_block dal_node published_level in
+  (* Bake the remaining blocks to reach the attestation window. *)
+  let remaining = attestation_lag - 3 in
+  let* () = if remaining > 0 then bake_for ~count:remaining client else unit in
+  Log.info "Injecting attestation for trapped slot" ;
+  let dal_node_exit = Dal_node.wait dal_node in
+  let trap_event =
+    Dal_node.wait_for
+      dal_node
+      "dal_registered_attester_attested_trap.v0"
+      (fun e ->
+        let open JSON in
+        let delegate = e |-> "attester" |> as_string in
+        if delegate = attester.public_key_hash then Some () else None)
+  in
+  let other_delegates =
+    List.map
+      (fun key -> key.Account.public_key_hash)
+      (different_delegates attester.Account.public_key_hash)
+  in
+  let* _attestation, _op_hash =
+    inject_dal_attestation_exn
+      ~protocol
+      ~signer:attester
+      (Slots [slot_index])
+      client
+      dal_parameters
+      (Node.as_rpc_endpoint node)
+  in
+  Log.info "Baking to include attestation and finalize" ;
+  let* () = bake_for ~delegates:(`For other_delegates) client in
+  let* () = bake_for ~count:2 client in
+  Log.info "Waiting for trap detection event" ;
+  let* () = trap_event in
+  Log.info "Waiting for DAL node to stop" ;
+  let* status = dal_node_exit in
+  (match status with
+  | WEXITED 2 -> Log.info "DAL node stopped with expected exit code 2"
+  | WEXITED code ->
+      Test.fail
+        ~__LOC__
+        "DAL node exited with code %d, expected 2 (trapped attester)"
+        code
+  | _ -> Test.fail ~__LOC__ "Expected WEXITED, got signal termination") ;
+  unit
+
 let register ~__FILE__ ~protocols =
   scenario_with_layer1_and_dal_nodes
     ~__FILE__
@@ -1657,4 +1771,12 @@ let register ~__FILE__ ~protocols =
     ~all_bakers_attest_activation_threshold:Q.(Z.one /// Z.of_int 2)
     "Trap is denounced when all bakers attest"
     test_denunciation_when_all_bakers_attest
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["traps"; "stop"]
+    ~operator_profiles:[0]
+    ~traps_fraction:Q.one
+    "stop node when registered attester attests traps"
+    test_stop_node_on_trapped_attestation
     protocols
