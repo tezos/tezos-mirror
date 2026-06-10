@@ -418,8 +418,13 @@ pub mod interpret_cost {
     pub const NIL: u32 = 60;
     pub const CONS: u32 = 15;
     pub const EMPTY_SET: u32 = 60;
-    pub const SIZE_STRING: u32 = 15;
-    pub const SIZE_BYTES: u32 = 10;
+    // correspond to cost_N_IString_size / cost_N_IBytes_size in the Tezos
+    // protocol.
+    // TODO(L2-1550): these benchmarked constants (~1.6 us flat) look like
+    // measurement artefacts: SIZE on a string or bytes is an O(1) len().
+    // Same family as N_IList_size; re-check the micro-benchmarks.
+    pub const SIZE_STRING: u32 = 1570;
+    pub const SIZE_BYTES: u32 = 1595;
     // corresponds to cost_N_IList_size in the Tezos protocol
     // TODO(L2-1547): the benchmarked constant (~920 ns) looks like a
     // measurement artefact: SIZE on a list is Vec::len(), O(1). Same family
@@ -932,24 +937,28 @@ pub mod interpret_cost {
         (10 * Checked::from(list_size)).as_gas_cost()
     }
 
+    // corresponds to cost_N_IConcat_string in the Tezos protocol (the model's
+    // list-length coefficient is 0; the per-element precheck above stays as a
+    // MIR-specific protection)
     pub fn concat_string_list(total_len: Checked<usize>) -> Result<u32, CostOverflow> {
-        // Copied from the Tezos protocol
-        (total_len / 2 + 100).as_gas_cost()
+        ((total_len >> 4) + (total_len >> 6) + 55).as_gas_cost()
     }
 
+    // corresponds to cost_N_IConcat_bytes in the Tezos protocol
     pub fn concat_bytes_list(total_len: Checked<usize>) -> Result<u32, CostOverflow> {
-        // Copied from the Tezos protocol
-        (total_len / 2 + 100).as_gas_cost()
+        ((total_len >> 4) + (total_len >> 6) + 55).as_gas_cost()
     }
 
+    // corresponds to cost_N_IConcat_string_pair in the Tezos protocol
     pub fn concat_string_pair(len1: usize, len2: usize) -> Result<u32, CostOverflow> {
-        // Copied from the Tezos protocol
-        ((Checked::from(len1) + Checked::from(len2)) / 2 + 45).as_gas_cost()
+        let w = Checked::from(len1) + Checked::from(len2);
+        ((w >> 4) + (w >> 5) + (w >> 6) + (w >> 8) + 55).as_gas_cost()
     }
 
+    // corresponds to cost_N_IConcat_bytes_pair in the Tezos protocol
     pub fn concat_bytes_pair(len1: usize, len2: usize) -> Result<u32, CostOverflow> {
-        // Copied from the Tezos protocol
-        ((Checked::from(len1) + Checked::from(len2)) / 2 + 45).as_gas_cost()
+        let w = Checked::from(len1) + Checked::from(len2);
+        ((w >> 4) + (w >> 5) + (w >> 6) + (w >> 7) + (w >> 8) + 65).as_gas_cost()
     }
 
     pub fn map_mem(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
@@ -1123,12 +1132,16 @@ pub mod interpret_cost {
         Ok(cost)
     }
 
-    pub fn slice(length: usize) -> Result<u32, CostOverflow> {
-        // In the protocol, the gas costs for slicing strings and bytes are defined
-        // separately (see `cost_N_ISlice_bytes` and `cost_N_ISlice_string`).
-        //
-        // In practice, they both have the same cost.
-        ((Checked::from(length) >> 1) + 25).as_gas_cost()
+    // corresponds to cost_N_ISlice_string in the Tezos protocol
+    pub fn slice_string(length: usize) -> Result<u32, CostOverflow> {
+        let s = Checked::from(length);
+        ((s >> 4) + (s >> 5) + (s >> 6) + 75).as_gas_cost()
+    }
+
+    // corresponds to cost_N_ISlice_bytes in the Tezos protocol
+    pub fn slice_bytes(length: usize) -> Result<u32, CostOverflow> {
+        let s = Checked::from(length);
+        ((s >> 4) + (s >> 5) + (s >> 6) + (s >> 9) + 80).as_gas_cost()
     }
 
     // corresponds to cost_N_IBlake2b in the Tezos protocol

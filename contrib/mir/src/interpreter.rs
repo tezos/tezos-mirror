@@ -2854,14 +2854,14 @@ fn interpret_one<'a>(
             let result = match overload {
                 overloads::Slice::String => {
                     pop_ref!(str, String);
-                    ctx.gas().consume(interpret_cost::slice(str.len())?)?;
+                    ctx.gas().consume(interpret_cost::slice_string(str.len())?)?;
                     validate_bounds(offset, length, str.len())
                         .and_then(|range| str.get(range))
                         .map(|str| V::String(str.to_string()))
                 }
                 overloads::Slice::Bytes => {
                     pop_ref!(bytes, Bytes);
-                    ctx.gas().consume(interpret_cost::slice(bytes.len())?)?;
+                    ctx.gas().consume(interpret_cost::slice_bytes(bytes.len())?)?;
                     validate_bounds(offset, length, bytes.len())
                         .and_then(|range| bytes.get(range))
                         .map(|bytes| V::Bytes(bytes.to_owned()))
