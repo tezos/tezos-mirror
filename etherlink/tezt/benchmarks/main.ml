@@ -10,6 +10,7 @@ let () =
   Etherlink_benchmark_lib.Benchmark_utils.parse_cli () ;
   Evm_node_capacity.register () ;
   Snailtracer.register () ;
-  Uniswap.register ()
+  Uniswap.register () ;
+  Michelson_call.register ()
 
 let () = Test.run ()
