@@ -332,6 +332,13 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
                         Cohttp_lwt.Body.to_string ansbody >>= fun body ->
                         return (`Too_many_redirects body)
                     | Ok new_redirect_status ->
+                        (* The redirect response itself is discarded: its
+                           body must be drained because the underlying
+                           connection is only released once the body has
+                           been fully consumed. Otherwise, each followed
+                           redirect leaks the file descriptor of its
+                           connection. *)
+                        Cohttp_lwt.Body.drain_body ansbody >>= fun () ->
                         generic_call_loop
                           meth
                           new_redirect_status
