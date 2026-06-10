@@ -247,6 +247,17 @@ module Worker = Octez_telemetry.Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 
+(* The kernel deserializes V1 blueprints (a per-transaction runtime tag plus a
+   version marker) once the storage version is recent enough and at least one
+   Tezos X runtime is enabled; otherwise it uses the Legacy format. *)
+let blueprint_version (head_info : Evm_context.head) :
+    Sequencer_blueprint.blueprint_version =
+  if
+    head_info.storage_version >= 48
+    && not (List.is_empty head_info.tezosx_runtimes)
+  then V1
+  else Legacy
+
 let take_delayed_transactions evm_state maximum_number_of_chunks =
   let open Lwt_result_syntax in
   let maximum_cumulative_size =
@@ -273,17 +284,12 @@ let produce_block_with_transactions ~signer ~timestamp ~transactions_and_objects
     (Blueprint_events.blueprint_production
        head_info.Evm_context.next_blueprint_number)
   @@ fun () ->
-  let storage_version = head_info.storage_version in
-  let tezosx_runtimes = head_info.tezosx_runtimes in
-  let blueprint_version : Sequencer_blueprint.blueprint_version =
-    if storage_version >= 48 && not (List.is_empty tezosx_runtimes) then V1
-    else Legacy
-  in
+  let version = blueprint_version head_info in
   let chunks =
     Sequencer_blueprint.make_blueprint_chunks
       ~number:head_info.next_blueprint_number
       {
-        version = blueprint_version;
+        version;
         parent_hash = head_info.current_block_hash;
         delayed_transactions = delayed_hashes;
         transactions;
@@ -327,11 +333,16 @@ let produce_empty_block ~signer ~timestamp head_info =
   (* (Seq.length hashes) is always zero, this is only to be "future" proof *)
   return (`Block_produced (Seq.length hashes))
 
-let validate_etherlink_tx ~maximum_cumulative_size
+let validate_etherlink_tx ~version ~maximum_cumulative_size
     (validation_state : Validation_types.validation_state) raw_tx
     (tx_object : Transaction_object.t) =
   let open Lwt_result_syntax in
-  let new_size = validation_state.current_size + String.length raw_tx in
+  let new_size =
+    validation_state.current_size
+    + Sequencer_blueprint.encoded_transaction_size
+        ~version
+        (Broadcast.Evm raw_tx)
+  in
   if new_size > maximum_cumulative_size then return `Stop
   else
     let* validation_state_res =
@@ -347,11 +358,16 @@ let validate_etherlink_tx ~maximum_cumulative_size
         let*! () = Block_producer_events.transaction_rejected hash msg in
         return (`Drop msg)
 
-let validate_tezlink_op ~maximum_cumulative_size
+let validate_tezlink_op ~version ~maximum_cumulative_size
     (state : Validation_types.validation_state) raw_op
     (operation : Tezos_types.Operation.t) =
   let open Lwt_result_syntax in
-  let new_size = state.current_size + String.length raw_op in
+  let new_size =
+    state.current_size
+    + Sequencer_blueprint.encoded_transaction_size
+        ~version
+        (Broadcast.Michelson raw_op)
+  in
   if new_size > maximum_cumulative_size then return `Stop
   else if not (Tezlink_prevalidation.gas_limit_could_fit state operation) then
     return `Stop
@@ -433,6 +449,7 @@ let pop_valid_tx ?michelson_hard_gas_limit_per_block
     let* initial_validation_state =
       init_validation_state ?michelson_hard_gas_limit_per_block head_info
     in
+    let version = blueprint_version head_info in
     let* l =
       Tx_queue.pop_transactions
         ~maximum_cumulative_size
@@ -440,12 +457,14 @@ let pop_valid_tx ?michelson_hard_gas_limit_per_block
           match tx_object with
           | Tx_queue_types.Evm tx_object ->
               validate_etherlink_tx
+                ~version
                 ~maximum_cumulative_size
                 validation_state
                 raw_tx
                 tx_object
           | Tx_queue_types.Michelson operation ->
               validate_tezlink_op
+                ~version
                 ~maximum_cumulative_size
                 validation_state
                 raw_tx
@@ -472,12 +491,38 @@ let produce_block_if_needed ~signer ~timestamp ~delayed_hashes
   let n = List.length transactions_and_objects + List.length delayed_hashes in
   if n > 0 then
     let* confirmed_txs =
-      produce_block_with_transactions
-        ~signer
-        ~timestamp
-        ~transactions_and_objects
-        ~delayed_hashes
-        head_info
+      protect
+        ~on_error:(fun errs ->
+          (* The transactions selected by [pop_valid_tx] were optimistically
+             moved to the tx_queue's pending pool. If block production fails
+             (e.g. the kernel rejects a blueprint that exceeds the maximum
+             number of chunks), sweep the pending pool so the offending batch
+             does not stay pending forever and permanently stall block
+             production. *)
+          let open Lwt_syntax in
+          let* sweep_result =
+            Tx_queue.confirm_transactions
+              ~clear_pending_queue_after:true
+              ~confirmed_txs:Seq.empty
+          in
+          let* () =
+            match sweep_result with
+            | Ok () -> return_unit
+            | Error sweep_errs ->
+                (* The sweep is the liveness safeguard: if it fails the
+                   pending pool is left untouched and the sequencer may stall.
+                   Surface it before re-raising the original error. *)
+                Block_producer_events.pending_pool_sweep_failed
+                  (Format.asprintf "%a" pp_print_trace sweep_errs)
+          in
+          Lwt.return_error errs)
+        (fun () ->
+          produce_block_with_transactions
+            ~signer
+            ~timestamp
+            ~transactions_and_objects
+            ~delayed_hashes
+            head_info)
     in
     let* () =
       Tx_queue.confirm_transactions ~clear_pending_queue_after ~confirmed_txs
@@ -789,14 +834,15 @@ let preconfirm_delayed_transactions
   in
   return (remaining_cumulative_size, preconfirmation_state)
 
-let preconfirm_transaction ~maximum_cumulative_size validation_state ~raw_tx
-    transaction_object =
+let preconfirm_transaction ~version ~maximum_cumulative_size validation_state
+    ~raw_tx transaction_object =
   let open Lwt_result_syntax in
   let* res, tx_hash, wrapped_raw_tx =
     match transaction_object with
     | Tx_queue_types.Evm tx_object ->
         let* res =
           validate_etherlink_tx
+            ~version
             ~maximum_cumulative_size
             validation_state
             raw_tx
@@ -806,6 +852,7 @@ let preconfirm_transaction ~maximum_cumulative_size validation_state ~raw_tx
     | Tx_queue_types.Michelson operation ->
         let* res =
           validate_tezlink_op
+            ~version
             ~maximum_cumulative_size
             validation_state
             raw_tx
@@ -835,6 +882,7 @@ let preconfirm_transactions ?michelson_hard_gas_limit_per_block
       maximum_number_of_chunks
   in
   let*! head_info = Evm_context.head_info () in
+  let version = blueprint_version head_info in
   Octez_telemetry.Trace.add_attrs (fun () ->
       [Telemetry.Attributes.Block.number head_info.next_blueprint_number]) ;
   let* validation_state, preconfirmation_state =
@@ -868,6 +916,7 @@ let preconfirm_transactions ?michelson_hard_gas_limit_per_block
       (raw_tx, transaction_object) =
     let* hash, res =
       preconfirm_transaction
+        ~version
         ~maximum_cumulative_size
         validation_state
         ~raw_tx

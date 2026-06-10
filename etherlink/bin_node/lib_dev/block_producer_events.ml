@@ -71,6 +71,16 @@ module Event = struct
       ~msg:"block production is sunset ahead of the change of sequencer"
       ~level:Notice
       ()
+
+  let pending_pool_sweep_failed =
+    declare_1
+      ~section
+      ~name:"block_producer_pending_pool_sweep_failed"
+      ~msg:
+        "failed to clear the pending transaction pool after a block production \
+         failure, the sequencer may stall: {error}"
+      ~level:Warning
+      ("error", Data_encoding.string)
 end
 
 let transaction_selected ~hash =
@@ -89,3 +99,6 @@ let operation_rejected op_hash error =
   Internal_event.Simple.emit Event.operation_rejected (op_hash, error)
 
 let sunset () = Internal_event.Simple.emit Event.sunset ()
+
+let pending_pool_sweep_failed error =
+  Internal_event.Simple.emit Event.pending_pool_sweep_failed error

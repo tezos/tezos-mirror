@@ -93,8 +93,19 @@ let max_chunk_size =
   Message_format.usable_size_in_message - blueprint_number_size - nb_chunks_size
   - chunk_index_size - rlp_tags_size - signature_size
 
+(* Upper bound on the per-blueprint RLP framing that surrounds the
+   transactions: the optional V1 version byte, the parent hash, the timestamp,
+   the (possibly empty) delayed-transaction list, and the outer- and
+   messages-list length prefixes (≈ 52 bytes in the worst case). The block
+   producer reserves this from the chunk budget so that a transaction batch
+   that fits the budget never serializes to more chunks than allowed: without
+   it, a batch whose cumulative transaction size lands within the framing of
+   the budget would still overflow into one extra chunk and be rejected by the
+   kernel (see L2-1509). *)
+let blueprint_framing_overhead = 256
+
 let maximum_usable_space_in_blueprint chunks_count =
-  chunks_count * max_chunk_size
+  (chunks_count * max_chunk_size) - blueprint_framing_overhead
 
 let maximum_chunks_per_l1_level = 512 * 1024 / 4096
 
@@ -116,6 +127,9 @@ let encode_transaction ~version (tx : Broadcast.common_transaction) =
       let raw = match tx with Evm raw -> raw | Michelson raw -> raw in
       Value (Bytes.of_string raw)
   | V1 -> Value (Bytes.of_string (tag_transaction tx))
+
+let encoded_transaction_size ~version (tx : Broadcast.common_transaction) =
+  Bytes.length (Rlp.encode (encode_transaction ~version tx))
 
 type kernel_blueprint = {
   version : blueprint_version;
