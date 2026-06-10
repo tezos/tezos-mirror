@@ -457,12 +457,11 @@ pub mod interpret_cost {
     pub const MAP_OPTION_SOME: u32 = 10;
     // corresponds to cost_N_IOpt_map_none in the Tezos protocol
     pub const MAP_OPTION_NONE: u32 = 35;
-    // See `cost_N_IList_map` in the Tezos protocol
-    pub const MAP_LIST: u32 = 20;
-    // L1's `cost_N_IMap_map` is size-dependent because it folds the `map` into
-    // a list of key-value pairs first. MIR iterates the map's entries directly
-    // (no such setup), so a flat cost matches MIR's actual work.
-    pub const MAP_MAP: u32 = 20;
+    // corresponds to cost_N_IList_map in the Tezos protocol
+    pub const MAP_LIST: u32 = 70;
+    // corresponds to cost_N_IMap_map in the Tezos protocol. The MIR
+    // micro-benchmarks confirm the flat cost (fitted size coefficient is 0).
+    pub const MAP_MAP: u32 = 45;
 
     // Gas costs obtained from https://gitlab.com/tezos/tezos/-/blob/9875fbebe032a8c5ce62b3b3cb1588ca9855a37e/src/proto_017_PtNairob/lib_protocol/michelson_v1_gas_costs_generated.ml
     pub const TRANSFER_TOKENS: u32 = 120;
