@@ -808,7 +808,10 @@ let register () =
   register_originated_opt_field ~chunked:true S.script (fun c v ->
       let* _, v = Contract.get_script c v in
       match v with
-      | None | Some (Script.Native _) -> return_none
+      | None -> return_none
+      | Some (Script.Native {kind; storage}) ->
+          let*? s = Script_native_synthesis.of_native c kind ~storage in
+          return_some s
       | Some (Script.Script s) -> return_some s) ;
   register_originated_opt_field ~chunked:true S.storage (fun ctxt contract ->
       let* ctxt, script = Contract.get_script ctxt contract in
