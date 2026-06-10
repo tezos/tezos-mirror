@@ -64,6 +64,9 @@
 
 ### Michelson Runtime
 
+- Bootstrap contracts injected at genesis now have their `used_bytes`
+  / `paid_bytes` storage space initialised to the size they
+  occupy. (!22089)
 - Expose a contract's storage-space watermarks through two read-only
   RPCs, `GET .../contracts/<id>/storage/used_space` and `.../paid_space`,
   mirroring L1's `get_used_storage_space` / `get_paid_storage_space`

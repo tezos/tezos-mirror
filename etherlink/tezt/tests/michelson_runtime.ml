@@ -750,6 +750,35 @@ let test_paid_space_rpc =
     ~error_msg:"Expected null for a non-existent tz1" ;
   unit
 
+let test_bootstrap_contract_storage_space =
+  let contract = Tezt_etherlink.Michelson_contracts.concat_hello () in
+  register_tezosx_test
+    ~title:"Bootstrap contract storage space initialised at genesis"
+    ~tags:["rpc"; "storage"; "bootstrap"; "used_space"; "paid_space"]
+    ~bootstrap_contracts:[contract]
+  @@ fun {sequencer; _} _protocol ->
+  let foreign_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let code_size = 66 in
+  let initial_storage_size = 17 in
+  let expected_space = code_size + initial_storage_size in
+  let* used_space =
+    RPC_core.call foreign_endpoint
+    @@ RPC.get_chain_block_context_contract_storage_used_space contract.address
+  in
+  let* paid_space =
+    RPC_core.call foreign_endpoint
+    @@ RPC.get_chain_block_context_contract_storage_paid_space contract.address
+  in
+  Check.(
+    (used_space = expected_space)
+      int
+      ~error_msg:"Expected bootstrap used_space %R, got %L") ;
+  Check.(
+    (paid_space = expected_space)
+      int
+      ~error_msg:"Expected bootstrap paid_space %R, got %L") ;
+  unit
+
 let test_chain_id =
   register_tezosx_test
     ~title:"Test of the chain_id rpc"
@@ -2283,8 +2312,6 @@ let test_long_batch =
 let test_internal_operation =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
   let faucet = Tezt_etherlink.Michelson_contracts.faucet_contract () in
-  (* code + storage size = 81 bytes. *)
-  let bootstrap_contract_first_use_burn = 81 * 250 in
   register_tezosx_test
     ~title:"Internal operation"
     ~tags:["internal"; "operation"]
@@ -2309,10 +2336,7 @@ let test_internal_operation =
     Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
   in
   Check.(
-    (Tez.to_mutez balance
-    = Tez.to_mutez bootstrap_balance
-      + Tez.(to_mutez one)
-      - bootstrap_contract_first_use_burn)
+    (Tez.to_mutez balance = Tez.to_mutez bootstrap_balance + Tez.(to_mutez one))
       int)
     ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
   unit
@@ -5473,6 +5497,7 @@ let () =
   test_storage_rpc [Alpha] ;
   test_used_space_rpc [Alpha] ;
   test_paid_space_rpc [Alpha] ;
+  test_bootstrap_contract_storage_space [Alpha] ;
   test_produceBlock [Alpha] ;
   test_hash_rpc [Alpha] ;
   test_script_rpc [Alpha] ;
