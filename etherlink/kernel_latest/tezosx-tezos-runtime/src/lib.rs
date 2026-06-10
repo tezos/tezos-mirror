@@ -23,7 +23,7 @@ use tezos_execution::{
     context::Context,
     cross_runtime_transfer,
     enshrined_contracts::CracError,
-    mir_ctx::{clear_temporary_big_maps, OperationCtx, TcCtx},
+    mir_ctx::{clear_temporary_big_maps, InterpretContext, OperationCtx, TcCtx},
     originate_contract, typecheck_code_and_storage, CracTransferError, OriginationNonce,
     TezlinkOperationGas,
 };
@@ -692,6 +692,7 @@ where
         context: &context,
         operation_gas: &mut gas,
         big_map_diff: BTreeMap::new(),
+        interpret_context: InterpretContext::new(),
         next_temporary_id: &mut next_temp_id,
     };
     // Resume the inbound-CRAC origination nonce from the Michelson
@@ -1141,6 +1142,7 @@ impl RuntimeInterface for TezosRuntime {
                 context: &context,
                 operation_gas: &mut gas,
                 big_map_diff: BTreeMap::new(),
+                interpret_context: InterpretContext::new(),
                 next_temporary_id: &mut next_temp_id,
             };
             let parser = mir::parser::Parser::new();

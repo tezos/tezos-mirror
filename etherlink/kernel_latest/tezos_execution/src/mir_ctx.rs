@@ -21,7 +21,7 @@ use mir::{
     context::{CtxTrait, TypecheckingCtx},
     gas::Gas,
 };
-use num_bigint::BigUint;
+use num_bigint::{BigInt, BigUint};
 use tezos_crypto_rs::blake2b::digest_256;
 use tezos_crypto_rs::hash::{ChainId, ContractKt1Hash, OperationHash, ScriptExprHash};
 use tezos_data_encoding::enc::BinWriter;
@@ -39,11 +39,43 @@ use tezos_tezlink::lazy_storage_diff::{
 use tezos_tezlink::operation_result::TransferError;
 use typed_arena::Arena;
 
+pub struct InterpretContext {
+    lazy_storage_size_diff: Zarith,
+}
+
+impl InterpretContext {
+    pub fn new() -> Self {
+        Self {
+            lazy_storage_size_diff: 0.into(),
+        }
+    }
+
+    /// Accumulate `delta` into the lazy-storage size diff. No-op on
+    /// temporary big-maps.
+    pub fn record_lazy_storage_size_diff(&mut self, id: &BigMapId, delta: &Zarith) {
+        if !id.is_temporary() {
+            self.lazy_storage_size_diff.0 += &delta.0;
+        }
+    }
+
+    /// Return the accumulated lazy-storage size delta and reset it to zero.
+    pub fn take_lazy_storage_size_diff(&mut self) -> Zarith {
+        std::mem::replace(&mut self.lazy_storage_size_diff, 0.into())
+    }
+}
+
+impl Default for InterpretContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct TcCtx<'operation, Host: StorageV1, C: Context> {
     pub host: &'operation mut Host,
     pub context: &'operation C,
     pub operation_gas: &'operation mut crate::gas::TezlinkOperationGas,
     pub big_map_diff: BTreeMap<Zarith, StorageDiff>,
+    pub interpret_context: InterpretContext,
     pub next_temporary_id: &'operation mut BigMapId,
 }
 
@@ -259,7 +291,7 @@ impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> CtxTrait<'
         0u32.into()
     }
 
-    fn now(&self) -> num_bigint::BigInt {
+    fn now(&self) -> BigInt {
         i64::from(*self.operation_ctx.now).into()
     }
 
@@ -1111,6 +1143,12 @@ impl BigMapKeys {
 /// Value from `src/proto_023_PtSeouLo/lib_protocol/lazy_storage_diff.ml`.
 const BYTES_SIZE_FOR_BIG_MAP_KEY: u64 = 65;
 
+/// Flat per-big-map forfait L1 charges to cover the on-disk cost of
+/// the big-map slot itself (independent of entries).
+///
+/// Value from `src/proto_023_PtSeouLo/lib_protocol/lazy_storage_diff.ml`.
+const BYTES_SIZE_FOR_EMPTY: u64 = 33;
+
 /// Reconstruct the `total_bytes` counter for a big-map allocated
 /// before the counter existed. Walks the persisted keys list and
 /// sums `BYTES_SIZE_FOR_BIG_MAP_KEY` plus each value's stored size,
@@ -1219,16 +1257,19 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         match value {
             None => {
                 if self.host.store_has(&value_path)?.is_some() {
-                    let previous_value_size =
-                        self.host.store_value_size(&value_path)? as u64;
+                    let previous_value_size: BigInt =
+                        self.host.store_value_size(&value_path)?.into();
                     self.host.store_delete(&value_path)?;
                     BigMapKeys::remove_key(self.host, self.context, id, &key_hashed)?;
 
                     let current = total_bytes(self.host, self.context, id)?;
-                    let new_total_bytes = Zarith(
-                        current.0 - (BYTES_SIZE_FOR_BIG_MAP_KEY + previous_value_size),
+                    let lazy_storage_size_diff = Zarith(
+                        -(BigInt::from(BYTES_SIZE_FOR_BIG_MAP_KEY) + previous_value_size),
                     );
+                    let new_total_bytes = Zarith(current.0 + &lazy_storage_size_diff.0);
                     set_total_bytes(self.host, self.context, id, &new_total_bytes)?;
+                    self.interpret_context
+                        .record_lazy_storage_size_diff(id, &lazy_storage_size_diff);
                 }
 
                 // Write the update in the big_map_diff
@@ -1240,21 +1281,25 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
                 let encoded = v
                     .into_micheline_optimized_legacy(&arena, self.gas())?
                     .encode(&mut self.operation_gas.remaining)??;
-                let new_value_size = encoded.len() as u64;
+                let new_value_size: BigInt = encoded.len().into();
                 let current = total_bytes(self.host, self.context, id)?;
-                let new_total_bytes = match self.host.store_value_size(&value_path) {
+                let lazy_storage_size_diff = match self.host.store_value_size(&value_path)
+                {
                     Err(RuntimeError::PathNotFound) => {
                         // We should write the key in the list only if it's an add in the big_map not an update
                         BigMapKeys::add_key(self.host, self.context, id, &key_hashed)?;
-                        Zarith(current.0 + (BYTES_SIZE_FOR_BIG_MAP_KEY + new_value_size))
+                        Zarith(BYTES_SIZE_FOR_BIG_MAP_KEY + new_value_size)
                     }
                     Ok(previous_value_size) => {
-                        let previous_value_size = previous_value_size as u64;
-                        Zarith(current.0 + new_value_size - previous_value_size)
+                        let previous_value_size: BigInt = previous_value_size.into();
+                        Zarith(new_value_size - previous_value_size)
                     }
                     Err(err) => return Err(err.into()),
                 };
+                let new_total_bytes = Zarith(current.0 + &lazy_storage_size_diff.0);
                 set_total_bytes(self.host, self.context, id, &new_total_bytes)?;
+                self.interpret_context
+                    .record_lazy_storage_size_diff(id, &lazy_storage_size_diff);
 
                 self.host.store_write_all(&value_path, &encoded)?;
 
@@ -1291,6 +1336,11 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         self.host
             .store_write_all(&key_type_path, &key_type_encoded)?;
 
+        self.interpret_context.record_lazy_storage_size_diff(
+            &id,
+            &Zarith(BigInt::from(BYTES_SIZE_FOR_EMPTY)),
+        );
+
         // Write in the diff that there was an allocation
         self.big_map_diff_alloc(id.value.clone(), key_type_encoded, value_type_encoded);
         Ok(id)
@@ -1325,6 +1375,10 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
 
         let source_total_bytes = total_bytes(self.host, self.context, id)?;
         set_total_bytes(self.host, self.context, &dest_id, &source_total_bytes)?;
+        self.interpret_context.record_lazy_storage_size_diff(
+            &dest_id,
+            &Zarith(BigInt::from(BYTES_SIZE_FOR_EMPTY) + source_total_bytes.0),
+        );
 
         // Write in the diff that there was a copy
         self.big_map_diff_copy(dest_id.value.clone(), id.value.clone());
@@ -1332,6 +1386,11 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
     }
 
     fn big_map_remove(&mut self, id: &BigMapId) -> Result<(), LazyStorageError> {
+        let total = total_bytes(self.host, self.context, id)?;
+        self.interpret_context.record_lazy_storage_size_diff(
+            id,
+            &Zarith(-(BigInt::from(BYTES_SIZE_FOR_EMPTY) + total.0)),
+        );
         remove_big_map(self.host, self.context, id)?;
 
         // Write in the diff that there was a remove
@@ -1363,6 +1422,7 @@ pub mod tests {
                 context: $context,
                 operation_gas: &mut operation_gas,
                 big_map_diff: BTreeMap::new(),
+                interpret_context: $crate::mir_ctx::InterpretContext::new(),
                 next_temporary_id: &mut BigMapId { value: (-1).into() },
             };
         };
@@ -2381,6 +2441,232 @@ pub mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn interpret_context_alloc_permanent_adds_33() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let _ = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        assert_eq!(
+            ctx.interpret_context.lazy_storage_size_diff,
+            BYTES_SIZE_FOR_EMPTY.into()
+        );
+    }
+
+    #[test]
+    fn interpret_context_alloc_temporary_is_zero() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let _ = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
+        assert_eq!(ctx.interpret_context.lazy_storage_size_diff, 0.into());
+    }
+
+    #[test]
+    fn interpret_context_insert_permanent_adds_65_plus_value_size() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        let value = TypedValue::String("hello".into());
+        let value_size = encoded_size(&value);
+        ctx.big_map_update(&id, TypedValue::int(1), Some(value))
+            .unwrap();
+        assert_eq!(
+            ctx.interpret_context.lazy_storage_size_diff,
+            (BYTES_SIZE_FOR_EMPTY + BYTES_SIZE_FOR_BIG_MAP_KEY + value_size).into()
+        );
+    }
+
+    #[test]
+    fn interpret_context_overwrite_permanent_adds_value_size_diff() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        let small = TypedValue::String("hi".into());
+        let big = TypedValue::String("hello, world".into());
+        let small_size = encoded_size(&small);
+        let big_size: BigInt = encoded_size(&big).into();
+        ctx.big_map_update(&id, TypedValue::int(1), Some(small))
+            .unwrap();
+        assert_eq!(
+            ctx.interpret_context.lazy_storage_size_diff,
+            (BYTES_SIZE_FOR_EMPTY + BYTES_SIZE_FOR_BIG_MAP_KEY + small_size).into()
+        );
+        ctx.interpret_context.lazy_storage_size_diff = 0.into();
+        ctx.big_map_update(&id, TypedValue::int(1), Some(big))
+            .unwrap();
+        assert_eq!(
+            ctx.interpret_context.lazy_storage_size_diff,
+            (big_size - small_size).into()
+        );
+    }
+
+    #[test]
+    fn interpret_context_delete_permanent_subtracts_65_plus_prev_size() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        let value = TypedValue::String("hello".into());
+        let value_size = encoded_size(&value);
+        ctx.big_map_update(&id, TypedValue::int(1), Some(value))
+            .unwrap();
+        ctx.interpret_context.lazy_storage_size_diff = 0.into();
+        ctx.big_map_update(&id, TypedValue::int(1), None).unwrap();
+        assert_eq!(
+            ctx.interpret_context.lazy_storage_size_diff,
+            Zarith(BigInt::from(
+                -((BYTES_SIZE_FOR_BIG_MAP_KEY + value_size) as i64)
+            ))
+        );
+    }
+
+    #[test]
+    fn interpret_context_copy_permanent_adds_33_plus_source_total() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let src = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        let v1 = TypedValue::String("a".into());
+        let v2 = TypedValue::String("bb".into());
+        let v1_size = encoded_size(&v1);
+        let v2_size = encoded_size(&v2);
+        ctx.big_map_update(&src, TypedValue::int(1), Some(v1))
+            .unwrap();
+        ctx.big_map_update(&src, TypedValue::int(2), Some(v2))
+            .unwrap();
+        let src_total = (2 * BYTES_SIZE_FOR_BIG_MAP_KEY + v1_size + v2_size) as i64;
+        ctx.interpret_context.lazy_storage_size_diff = 0.into();
+        let _dest = ctx.big_map_copy(&src, false).unwrap();
+        assert_eq!(
+            ctx.interpret_context.lazy_storage_size_diff,
+            Zarith(BigInt::from(BYTES_SIZE_FOR_EMPTY as i64 + src_total))
+        );
+    }
+
+    #[test]
+    fn interpret_context_copy_promotes_temp_to_perm_adds_33_plus_total() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        // Create a temporary big-map and fill it — no accumulator activity
+        // for the alloc nor the updates (the id is in the temp range).
+        let temp_src = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
+        let v1 = TypedValue::String("a".into());
+        let v2 = TypedValue::String("bb".into());
+        let v1_size = encoded_size(&v1);
+        let v2_size = encoded_size(&v2);
+        ctx.big_map_update(&temp_src, TypedValue::int(1), Some(v1))
+            .unwrap();
+        ctx.big_map_update(&temp_src, TypedValue::int(2), Some(v2))
+            .unwrap();
+        assert_eq!(
+            ctx.interpret_context.lazy_storage_size_diff,
+            Zarith(BigInt::from(0)),
+            "alloc and updates on a temp big-map must not accumulate"
+        );
+
+        let src_total = (2 * BYTES_SIZE_FOR_BIG_MAP_KEY + v1_size + v2_size) as i64;
+        // Promote temp -> permanent. This is what MIR's
+        // `dump_big_map_updates` does at the contract-storage boundary
+        // when the final storage references a freshly-allocated
+        // big-map: it calls `big_map_copy(temp_id, temporary=false)`.
+        let _perm_dest = ctx.big_map_copy(&temp_src, false).unwrap();
+        assert_eq!(
+            ctx.interpret_context.lazy_storage_size_diff,
+            Zarith(BigInt::from(BYTES_SIZE_FOR_EMPTY as i64 + src_total)),
+            "temp→perm promotion must contribute 33 + total_bytes(temp_src)"
+        );
+    }
+
+    #[test]
+    fn interpret_context_copy_temporary_is_zero() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let src = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        ctx.interpret_context.lazy_storage_size_diff = 0.into();
+        let _dest = ctx.big_map_copy(&src, true).unwrap();
+        assert_eq!(
+            ctx.interpret_context.lazy_storage_size_diff,
+            Zarith(BigInt::from(0))
+        );
+    }
+
+    #[test]
+    fn interpret_context_remove_permanent_subtracts_33_plus_total() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        let value = TypedValue::String("hello".into());
+        let value_size = encoded_size(&value);
+        ctx.big_map_update(&id, TypedValue::int(1), Some(value))
+            .unwrap();
+        ctx.interpret_context.lazy_storage_size_diff = 0.into();
+        ctx.big_map_remove(&id).unwrap();
+        assert_eq!(
+            ctx.interpret_context.lazy_storage_size_diff,
+            Zarith(BigInt::from(
+                -((BYTES_SIZE_FOR_EMPTY + BYTES_SIZE_FOR_BIG_MAP_KEY + value_size)
+                    as i64)
+            ))
+        );
+    }
+
+    #[test]
+    fn interpret_context_update_on_temporary_skipped() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let id = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
+        ctx.big_map_update(
+            &id,
+            TypedValue::int(1),
+            Some(TypedValue::String("hi".into())),
+        )
+        .unwrap();
+        assert_eq!(
+            ctx.interpret_context.lazy_storage_size_diff,
+            Zarith(BigInt::from(0))
+        );
+    }
+
+    #[test]
+    fn interpret_context_clear_temporaries_does_not_touch_accumulator() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let perm = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        ctx.big_map_update(
+            &perm,
+            TypedValue::int(1),
+            Some(TypedValue::String("perm".into())),
+        )
+        .unwrap();
+        let _ = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
+        let before_clear = ctx.interpret_context.lazy_storage_size_diff.clone();
+        clear_temporary_big_maps(ctx.host, ctx.context, ctx.next_temporary_id).unwrap();
+        assert_eq!(
+            ctx.interpret_context.lazy_storage_size_diff, before_clear,
+            "clear_temporary_big_maps must not touch the accumulator",
+        );
+    }
+
+    #[test]
+    fn interpret_context_take_resets_to_zero() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let _ = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        let first = ctx.interpret_context.take_lazy_storage_size_diff();
+        assert!(first.0 > BigInt::from(0));
+        let second = ctx.interpret_context.take_lazy_storage_size_diff();
+        assert_eq!(second, Zarith(BigInt::from(0)));
     }
 }
 

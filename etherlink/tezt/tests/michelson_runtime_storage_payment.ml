@@ -73,6 +73,39 @@ module Contract = struct
       let arg = sf {|Pair (Pair "%s" "%s") "%s"|} dest1 dest2 new_storage in
       Client.transfer ~arg ~receiver:address
   end
+
+  module Update_big_map = struct
+    let prg = contract_prg ["opcodes"; "update_big_map"]
+
+    let originate ~initial_storage =
+      Client.originate_contract ~init:initial_storage ~prg
+
+    let call ~updates address = Client.transfer ~arg:updates ~receiver:address
+  end
+
+  module Big_map_write = struct
+    let prg = contract_prg ["mini_scenarios"; "big_map_write"]
+
+    let originate () = Client.originate_contract ~init:"Unit" ~prg
+
+    let call ~param address = Client.transfer ~arg:param ~receiver:address
+  end
+
+  module Big_map_store = struct
+    let prg = contract_prg ["mini_scenarios"; "big_map_store"]
+
+    let originate ?(init = "{}") () = Client.originate_contract ~init ~prg
+
+    let call address = Client.transfer ~arg:"Unit" ~receiver:address
+  end
+
+  module Receiver_store = struct
+    let prg = contract_prg ["big_maps"; "receiver_store"]
+
+    let originate () = Client.originate_contract ~init:"{}" ~prg
+
+    let call ~param address = Client.transfer ~arg:param ~receiver:address
+  end
 end
 
 module BalanceUpdate = struct
@@ -874,6 +907,369 @@ let test_partial_internal_storage_limit_overshoot_backtracks_all () =
          (expected %R)") ;
   unit
 
+(** Scenario: a single call applies three [UPDATE] branches (insert,
+    overwrite, delete) to the storage big-map. The receipt's
+    [paid_storage_size_diff] reflects only the lazy-storage delta of
+    this call:
+
+    - insert  "a" → Some "new":      +(65 + encoded("new"))     = +73
+    - delete  "d" → None:            −(65 + encoded("x"))       = −71
+    - overw.  "k" "old" → "longer":  encoded("longer") − encoded("old") = +3
+
+    Net = +5. Values are Micheline-encoded strings (tag + 4-byte
+    length + bytes), so encoded("s") = 5 + len(s). *)
+let test_big_map_update_insert_overwrite_delete () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~title:"big_map UPDATE: insert + overwrite + delete in one call"
+    ~tags:["transfer"; "big_map"; "receipt"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun evm_node ->
+  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
+  let* tez_client = tezlink_client_from_evm_node evm_node () in
+
+  let initial_storage = {|Pair { Elt "d" "x" ; Elt "k" "old" } Unit|} in
+  let* kt1 =
+    Contract.Update_big_map.originate
+      ~alias:"update_big_map"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~burn_cap:Tez.one
+      ~initial_storage
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block evm_node in
+
+  let updates =
+    {|{ Elt "a" (Some "new") ; Elt "d" None ; Elt "k" (Some "longer") }|}
+  in
+  let* () =
+    Contract.Update_big_map.call
+      ~amount:Tez.zero
+      ~fee:Tez.one
+      ~giver:Constant.bootstrap1.alias
+      ~burn_cap:Tez.one
+      ~updates
+      kt1
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block evm_node in
+
+  let* content = get_first_manager_operations_content ~tez_endpoint in
+  let paid_storage_size_diff =
+    Tezos_JSON.get_operation_content_paid_storage_size_diff content
+  in
+  let expected_delta = 73 + 3 - 71 in
+  Check.(
+    (paid_storage_size_diff = expected_delta)
+      int
+      ~error_msg:
+        "Expected paid_storage_size_diff %R (insert 73 + overwrite 3 − delete \
+         71), got %L") ;
+
+  let operation_result = Tezos_JSON.get_operation_result content in
+  let balance_updates = Tezos_JSON.balance_updates_of_result operation_result in
+  let variable_burn = paid_storage_size_diff * cost_per_byte in
+  Check.is_true
+    (BalanceUpdate.has_storage_fees_burn_pair
+       ~payer:Constant.bootstrap1.public_key_hash
+       ~burn:variable_burn
+       balance_updates)
+    ~error_msg:
+      (sf
+         "Expected the big-map delta to burn %d mutez to the storage-fees sink \
+          on bootstrap1"
+         variable_burn) ;
+  unit
+
+(** Scenario: a contract takes a big-map as parameter, [UPDATE]s it,
+    then [DROP]s the result. The parameter big-map is allocated as a
+    temporary inside the contract; the [UPDATE] also runs on a
+    temporary id. Neither operation should contribute to the
+    accumulator, so [paid_storage_size_diff] is zero and [storage_size]
+    is unchanged from origination. *)
+let test_temp_big_map_dropped_no_charge () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~title:"big_map temp: parameter big-map dropped does not charge"
+    ~tags:["transfer"; "big_map"; "receipt"; "temporary"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun evm_node ->
+  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
+  let* tez_client = tezlink_client_from_evm_node evm_node () in
+
+  let* kt1 =
+    Contract.Big_map_write.originate
+      ~alias:"big_map_write"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~burn_cap:Tez.one
+      ()
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block evm_node in
+
+  let* origination_storage_size =
+    let* content = get_first_manager_operations_content ~tez_endpoint in
+    return (Tezos_JSON.get_operation_content_storage_size content)
+  in
+
+  let* () =
+    Contract.Big_map_write.call
+      ~amount:Tez.zero
+      ~fee:Tez.one
+      ~giver:Constant.bootstrap1.alias
+      ~burn_cap:Tez.one
+      ~param:"{ Elt 1 1 }"
+      kt1
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block evm_node in
+
+  let* content = get_first_manager_operations_content ~tez_endpoint in
+  let paid_storage_size_diff =
+    Tezos_JSON.get_operation_content_paid_storage_size_diff content
+  in
+  let storage_size = Tezos_JSON.get_operation_content_storage_size content in
+  Check.(
+    (paid_storage_size_diff = 0)
+      int
+      ~error_msg:"Expected paid_storage_size_diff = 0 on temp big-map, got %L") ;
+  Check.(
+    (storage_size = origination_storage_size)
+      int
+      ~error_msg:"Expected storage_size %R (unchanged by temp big-map), got %L") ;
+  unit
+
+(** Scenario: a contract drops its storage big-map and returns a
+    freshly built [EMPTY_BIG_MAP] as the new storage. MIR emits a
+    [big_map_remove] of the old (perm) id and a
+    [big_map_copy(temp, perm)] of the new — when the old is empty,
+    these two cancel: −(33 + 0) + (33 + 0) = 0.
+
+    Receipt: [paid_storage_size_diff = 0] and [storage_size] unchanged
+    from origination. *)
+let test_big_map_replacement_symmetric () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~title:"big_map replacement: remove + temp→perm promotion cancel on empty"
+    ~tags:["transfer"; "big_map"; "receipt"; "promotion"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun evm_node ->
+  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
+  let* tez_client = tezlink_client_from_evm_node evm_node () in
+
+  let* kt1 =
+    Contract.Big_map_store.originate
+      ~alias:"big_map_store"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~burn_cap:Tez.one
+      ()
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block evm_node in
+
+  let* origination_storage_size =
+    let* content = get_first_manager_operations_content ~tez_endpoint in
+    return (Tezos_JSON.get_operation_content_storage_size content)
+  in
+
+  let* () =
+    Contract.Big_map_store.call
+      ~amount:Tez.zero
+      ~fee:Tez.one
+      ~giver:Constant.bootstrap1.alias
+      ~burn_cap:Tez.one
+      kt1
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block evm_node in
+
+  let* content = get_first_manager_operations_content ~tez_endpoint in
+  let paid_storage_size_diff =
+    Tezos_JSON.get_operation_content_paid_storage_size_diff content
+  in
+  let storage_size = Tezos_JSON.get_operation_content_storage_size content in
+  Check.(
+    (paid_storage_size_diff = 0)
+      int
+      ~error_msg:
+        "Expected paid_storage_size_diff = 0 on empty-empty replacement, got %L") ;
+  Check.(
+    (storage_size = origination_storage_size)
+      int
+      ~error_msg:
+        "Expected storage_size %R (unchanged by empty-empty replacement), got \
+         %L") ;
+  unit
+
+(** Scenario: a contract stores the non-empty big-map it receives as
+    parameter, dropping the empty big-map it was originated with. The
+    parameter map is materialised as a temporary; storing it promotes it
+    to permanent via [big_map_copy(temp, perm)] — contributing
+    [+(33 + total_bytes)] — while the old empty map is dropped via
+    [big_map_remove] [−(33 + 0)]. The two 33-byte slot forfaits cancel,
+    so [paid_storage_size_diff] equals the aggregated entry size of the
+    stored map:
+
+    - "a" → 0x01:   65 + encoded(0x01)   = 65 + 6 = 71
+    - "b" → 0x0203: 65 + encoded(0x0203) = 65 + 7 = 72
+
+    Net = +143. Bytes are Micheline-encoded (tag + 4-byte length + bytes),
+    so encoded(b) = 5 + len(b). *)
+let test_big_map_nonempty_promotion_burns_content () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~title:
+      "big_map promotion: storing a non-empty parameter map bills its content"
+    ~tags:["transfer"; "big_map"; "receipt"; "promotion"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun evm_node ->
+  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
+  let* tez_client = tezlink_client_from_evm_node evm_node () in
+
+  let* kt1 =
+    Contract.Receiver_store.originate
+      ~alias:"receiver_store"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~burn_cap:Tez.one
+      ()
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block evm_node in
+
+  let param = {|{ Elt "a" 0x01 ; Elt "b" 0x0203 }|} in
+  let* () =
+    Contract.Receiver_store.call
+      ~amount:Tez.zero
+      ~fee:Tez.one
+      ~giver:Constant.bootstrap1.alias
+      ~burn_cap:Tez.one
+      ~param
+      kt1
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block evm_node in
+
+  let* content = get_first_manager_operations_content ~tez_endpoint in
+  let paid_storage_size_diff =
+    Tezos_JSON.get_operation_content_paid_storage_size_diff content
+  in
+  let expected_delta = 65 + 6 + (65 + 7) in
+  Check.(
+    (paid_storage_size_diff = expected_delta)
+      int
+      ~error_msg:
+        "Expected paid_storage_size_diff %R (promotion of a 2-entry map; the \
+         33-byte slot forfaits cancel), got %L") ;
+
+  (* The promoted content is burned to the storage-fees sink, exactly as
+     L1 charges lazy storage. *)
+  let operation_result = Tezos_JSON.get_operation_result content in
+  let balance_updates = Tezos_JSON.balance_updates_of_result operation_result in
+  let variable_burn = paid_storage_size_diff * cost_per_byte in
+  Check.is_true
+    (BalanceUpdate.has_storage_fees_burn_pair
+       ~payer:Constant.bootstrap1.public_key_hash
+       ~burn:variable_burn
+       balance_updates)
+    ~error_msg:
+      (sf
+         "Expected the promoted big-map content to burn %d mutez to the \
+          storage-fees sink on bootstrap1"
+         variable_burn) ;
+  unit
+
+(** Originating with a non-empty initial big-map bills the inherited
+    content; replacing that big-map with a fresh [EMPTY_BIG_MAP] in a
+    follow-up call refunds the content symmetrically. *)
+let test_big_map_replacement_nonempty_burns_content () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~title:
+      "big_map replacement: non-empty initial big-map billed at origination, \
+       content burned on replacement"
+    ~tags:["transfer"; "big_map"; "receipt"; "origination"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun evm_node ->
+  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
+  let* tez_client = tezlink_client_from_evm_node evm_node () in
+
+  let* _kt1_empty =
+    Contract.Big_map_store.originate
+      ~alias:"big_map_store_empty"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~burn_cap:Tez.one
+      ()
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block evm_node in
+  let* empty_origination_storage_size =
+    let* content = get_first_manager_operations_content ~tez_endpoint in
+    return (Tezos_JSON.get_operation_content_storage_size content)
+  in
+
+  let* kt1 =
+    Contract.Big_map_store.originate
+      ~init:"{ Elt 1 1 }"
+      ~alias:"big_map_store_nonempty"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~burn_cap:Tez.one
+      ()
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block evm_node in
+  let* nonempty_origination_storage_size =
+    let* content = get_first_manager_operations_content ~tez_endpoint in
+    return (Tezos_JSON.get_operation_content_storage_size content)
+  in
+
+  (* The 33-byte big-map slot forfait is present in both originations
+     and cancels in the delta; only the per-entry forfait (65) and the
+     encoded size of [nat 1] (2 bytes) remain. *)
+  let lazy_entry_delta = 65 + 2 in
+  Check.(
+    (nonempty_origination_storage_size - empty_origination_storage_size
+    = lazy_entry_delta)
+      int
+      ~error_msg:"Expected nonempty origination storage_size delta = %R, got %L") ;
+
+  let net_delta = -(33 + (65 + 2)) + 33 in
+  let* () =
+    Contract.Big_map_store.call
+      ~amount:Tez.zero
+      ~fee:Tez.one
+      ~giver:Constant.bootstrap1.alias
+      ~burn_cap:Tez.one
+      kt1
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block evm_node in
+
+  let* content = get_first_manager_operations_content ~tez_endpoint in
+  let paid_storage_size_diff =
+    Tezos_JSON.get_operation_content_paid_storage_size_diff content
+  in
+  let storage_size = Tezos_JSON.get_operation_content_storage_size content in
+  Check.(
+    (paid_storage_size_diff = 0)
+      int
+      ~error_msg:"Expected paid_storage_size_diff = 0, got %L") ;
+  Check.(
+    (storage_size = nonempty_origination_storage_size + net_delta)
+      int
+      ~error_msg:"Expected storage_size = %R, got %L") ;
+  unit
+
 let () =
   test_origination_receipt_exposes_storage_fields () ;
   test_transfer_with_growth_exposes_delta () ;
@@ -881,4 +1277,9 @@ let () =
   test_transfer_to_fresh_implicit_burns_slot () ;
   test_two_internal_transfers_burn_each () ;
   test_partial_internal_burn_failure_backtracks_all () ;
-  test_partial_internal_storage_limit_overshoot_backtracks_all ()
+  test_partial_internal_storage_limit_overshoot_backtracks_all () ;
+  test_big_map_update_insert_overwrite_delete () ;
+  test_temp_big_map_dropped_no_charge () ;
+  test_big_map_replacement_symmetric () ;
+  test_big_map_nonempty_promotion_burns_content () ;
+  test_big_map_replacement_nonempty_burns_content ()

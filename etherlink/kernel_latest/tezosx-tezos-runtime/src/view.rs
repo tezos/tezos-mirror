@@ -32,7 +32,7 @@ use tezos_execution::account_storage::{
     TezlinkAccount, TezlinkOriginatedAccount, TezosOriginatedAccount,
 };
 use tezos_execution::context::Context;
-use tezos_execution::mir_ctx::{Ctx, ExecCtx, OperationCtx, TcCtx};
+use tezos_execution::mir_ctx::{Ctx, ExecCtx, InterpretContext, OperationCtx, TcCtx};
 use tezos_execution::{OriginationNonce, TezlinkOperationGas};
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKeyHash;
@@ -230,6 +230,7 @@ where
         context: &context,
         operation_gas: &mut gas,
         big_map_diff: BTreeMap::new(),
+        interpret_context: InterpretContext::new(),
         next_temporary_id: &mut next_temp_id,
     };
     // Views have no notion of origination or of a running batch: no

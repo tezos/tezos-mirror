@@ -59,8 +59,8 @@ use crate::context::Context;
 use crate::gas::Cost;
 pub use crate::gas::TezlinkOperationGas;
 use crate::mir_ctx::{
-    clear_temporary_big_maps, convert_big_map_diff, BlockCtx, Ctx, ExecCtx, OperationCtx,
-    TcCtx,
+    clear_temporary_big_maps, convert_big_map_diff, BlockCtx, Ctx, ExecCtx,
+    InterpretContext, OperationCtx, TcCtx,
 };
 
 /// Result of applying a single operation within a batch.
@@ -791,9 +791,20 @@ where
             consume_storage_read_milligas(tc_ctx.operation_gas, 3, COUNTER_SIZE)
                 .map_err(TransferError::OutOfGas)?;
 
-            dest_account
-                .set_storage(tc_ctx.host, &new_storage)
-                .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
+            // `interpret_context` holds this operation's lazy-storage size
+            // delta, accumulated by the `LazyStorage` hooks during execution.
+            // Like `big_map_diff`, it is a per-operation value carried on the
+            // batch-lifetime `TcCtx` and drained at each operation boundary;
+            // the drain also resets it, so every frame (this transfer, and the
+            // origination path) starts empty and no separate reset is needed.
+            // TODO(L2-1481): make this draining structurally safe so a hook
+            // firing without a matching drain cannot be silently mispriced.
+            let lazy_storage_size_diff =
+                tc_ctx.interpret_context.take_lazy_storage_size_diff();
+            let storage_size_diff =
+                dest_account
+                    .set_storage(tc_ctx.host, &new_storage)
+                    .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
 
             // In L1, the receipt of an operation only shows its own gas
             // consumption, i.e. it does not include that of its internal
@@ -809,7 +820,11 @@ where
                 used_bytes,
                 allocated_bytes: paid_storage_size_diff,
             } = dest_account
-                .update_storage_space(tc_ctx.host)
+                .update_storage_space(
+                    tc_ctx.host,
+                    storage_size_diff,
+                    lazy_storage_size_diff,
+                )
                 .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
 
             match execute_internal_operations(
@@ -1180,6 +1195,16 @@ where
     let (new_storage, lazy_storage_diff) =
         handle_storage_with_big_maps(ctx, script_storage)?;
 
+    // Drain the lazy-storage size delta accumulated by the big-map hooks in
+    // `handle_storage_with_big_maps`, on the same footing as the transfer path
+    // (and as `big_map_diff`): every frame drains its per-operation accumulator
+    // so the next one starts empty. The delta is the contribution of the
+    // big-maps present in the initial storage; it is folded into the contract's
+    // initial `used_bytes` by `init` below.
+    // TODO(L2-1481): make this draining structurally safe so a hook firing
+    // without a matching drain cannot be silently mispriced.
+    let lazy_storage_size_diff = ctx.interpret_context.take_lazy_storage_size_diff();
+
     // Set the storage of the contract
     let smart_contract = ctx
         .context
@@ -1206,7 +1231,7 @@ where
         used_bytes: total_size,
         allocated_bytes: paid_storage_size_diff,
     } = smart_contract
-        .init(ctx.host, script_code, &new_storage)
+        .init(ctx.host, script_code, &new_storage, lazy_storage_size_diff)
         .map_err(|_| OriginationError::CantInitContract)?;
 
     // There's this line in the origination `assert (Compare.Z.(total_size >= Z.zero)) ;`
@@ -1246,9 +1271,6 @@ where
         balance_updates,
         originated_contracts: vec![Originated { contract }],
         consumed_milligas: ctx.operation_gas.get_and_reset_milligas_consumed()?,
-        // TODO(L2-1281): `lazy_storage_size` stays at zero — the receipt
-        // undercharges originations with big-maps in their initial
-        // storage (remaining half of L2-325).
         storage_size: total_size,
         paid_storage_size_diff,
         lazy_storage_diff,
@@ -1674,6 +1696,7 @@ where
         context,
         operation_gas: &mut gas,
         big_map_diff: BTreeMap::new(),
+        interpret_context: InterpretContext::new(),
         next_temporary_id,
     };
     let parser = Parser::new();
@@ -1967,6 +1990,17 @@ mod tests {
             FAILWITH
         }"#;
 
+    // Contract whose storage is `pair (big_map string string) unit`.
+    // Used by big-map origination billing tests.
+    static BIG_MAP_UNIT_SCRIPT: &str = r#"
+        parameter unit;
+        storage (pair (big_map string string) unit);
+        code {
+            CDR;
+            NIL operation;
+            PAIR
+        }"#;
+
     static SCRIPT_EMITING_INTERNAL_TRANSFER: &str = r#"
         parameter (list address);
         storage unit;
@@ -2223,6 +2257,7 @@ mod tests {
                     .encode(&mut Gas::default())
                     .unwrap()
                     .unwrap(),
+                0.into(),
             )
             .expect("Account initialisation should have succeeded");
 
@@ -6543,7 +6578,7 @@ mod tests {
             .expect("ContractKt1Hash b58 conversion should have succeeded");
         let receiver_addr = ContractKt1Hash::from_base58_check(CONTRACT_2)
             .expect("ContractKt1Hash b58 conversion should have succeeded");
-        init_account(ctx.host, &tz1.pkh, 1000);
+        init_account(ctx.host, &tz1.pkh, 10_000_000);
         reveal_account(ctx.host, tz1);
 
         let parser = Parser::new();
@@ -6572,7 +6607,7 @@ mod tests {
             15,
             1,
             21040,
-            5,
+            60_000,
             tz1.clone(),
             10.into(),
             Contract::Originated(sender_addr.clone()),
@@ -7144,7 +7179,7 @@ mod tests {
             0,
             2,
             21040,
-            5,
+            60_000,
             tz1.clone(),
             0.into(),
             Contract::Originated(second_sender_contract),
@@ -8429,5 +8464,217 @@ mod tests {
             50_u64.into(),
             "Destination should be unchanged after failed transfer"
         );
+    }
+
+    fn origination_success_from_receipts(
+        receipts: &[OperationWithMetadata],
+        index: usize,
+    ) -> &OriginationSuccess {
+        match &receipts[index].receipt {
+            OperationResultSum::Origination(OperationResult {
+                result: ContentResult::Applied(success),
+                ..
+            }) => success,
+            other => {
+                panic!("Expected Applied Origination at index {index}, got: {other:?}")
+            }
+        }
+    }
+
+    /// Origination receipt exposes the contribution of the big-maps
+    /// present in the initial storage.
+    #[test]
+    fn test_origination_bills_initial_big_map() {
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+        init_account(&mut host, &src.pkh, 10_000_000);
+        reveal_account(&mut host, &src);
+
+        let parser = mir::parser::Parser::new();
+        let code = parser
+            .parse_top_level(BIG_MAP_UNIT_SCRIPT)
+            .expect("Failed to parse BIG_MAP_UNIT_SCRIPT")
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+        let storage = parser
+            .parse(r#"Pair { Elt "k" "v" } Unit"#)
+            .expect("Failed to parse initial storage")
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+
+        let operation = make_origination_operation(
+            15,
+            1,
+            100_000,
+            10_000,
+            src.clone(),
+            0,
+            Script {
+                code: code.clone(),
+                storage,
+            },
+        );
+
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &NotWiredRegistry,
+                &mut TezosXJournal::default(),
+                &context::TezlinkContext::init_context(),
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect("validate_and_apply_operation must not return a kernel error"),
+        );
+
+        assert_eq!(receipts.len(), 1, "Expected one receipt");
+        let success = origination_success_from_receipts(&receipts, 0);
+
+        let empty_storage = parser
+            .parse(r#"Pair {} Unit"#)
+            .expect("Failed to parse empty storage")
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+
+        let mut host2 = MockKernelHost::default();
+        let src2 = bootstrap2();
+        init_account(&mut host2, &src2.pkh, 10_000_000);
+        reveal_account(&mut host2, &src2);
+
+        let operation2 = make_origination_operation(
+            15,
+            1,
+            100_000,
+            10_000,
+            src2.clone(),
+            0,
+            Script {
+                code,
+                storage: empty_storage,
+            },
+        );
+
+        let receipts2 = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host2,
+                &NotWiredRegistry,
+                &mut TezosXJournal::default(),
+                &context::TezlinkContext::init_context(),
+                OperationHash::default(),
+                operation2,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect("baseline origination must not fail"),
+        );
+
+        assert_eq!(receipts2.len(), 1, "Expected one baseline receipt");
+        let baseline = origination_success_from_receipts(&receipts2, 0);
+
+        // The 33-byte slot forfait is present in both originations and
+        // cancels in the delta; only the per-key forfait + value size remain.
+        let expected_delta: u64 = 65 + 6;
+        let delta = success.storage_size.0.clone() - baseline.storage_size.0.clone();
+        assert_eq!(delta, expected_delta.into());
+
+        assert_eq!(success.paid_storage_size_diff, success.storage_size);
+    }
+
+    /// Two back-to-back originations on the same `TcCtx` must each
+    /// reflect only their own big-map content — the accumulator must
+    /// be drained between them, not shared.
+    #[test]
+    fn test_origination_anti_contamination() {
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+        init_account(&mut host, &src.pkh, 20_000_000);
+        reveal_account(&mut host, &src);
+
+        let parser = mir::parser::Parser::new();
+        let code = parser
+            .parse_top_level(BIG_MAP_UNIT_SCRIPT)
+            .expect("Failed to parse BIG_MAP_UNIT_SCRIPT")
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+        let storage_a = parser
+            .parse(r#"Pair { Elt "a" "x" } Unit"#)
+            .expect("Failed to parse storage A")
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+        let storage_b = parser
+            .parse(r#"Pair { Elt "b" "yy" } Unit"#)
+            .expect("Failed to parse storage B")
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+
+        let batch = make_operation(
+            15,
+            1,
+            200_000,
+            20_000,
+            src.clone(),
+            vec![
+                OperationContent::Origination(OriginationContent {
+                    balance: 0.into(),
+                    delegate: None,
+                    script: Script {
+                        code: code.clone(),
+                        storage: storage_a,
+                    },
+                }),
+                OperationContent::Origination(OriginationContent {
+                    balance: 0.into(),
+                    delegate: None,
+                    script: Script {
+                        code,
+                        storage: storage_b,
+                    },
+                }),
+            ],
+        );
+
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &NotWiredRegistry,
+                &mut TezosXJournal::default(),
+                &context::TezlinkContext::init_context(),
+                OperationHash::default(),
+                batch,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect("validate_and_apply_operation must not return a kernel error"),
+        );
+
+        assert_eq!(receipts.len(), 2);
+        let success_a = origination_success_from_receipts(&receipts, 0);
+        let success_b = origination_success_from_receipts(&receipts, 1);
+
+        assert_eq!(success_a.paid_storage_size_diff, success_a.storage_size);
+        assert_eq!(success_b.paid_storage_size_diff, success_b.storage_size);
+
+        // A and B differ only by `enc("yy") - enc("x") = 1`. Any other
+        // value would mean the accumulator leaked between originations.
+        let size_a = success_a.storage_size.0.clone();
+        let size_b = success_b.storage_size.0.clone();
+        assert_eq!(size_b - size_a, 1u64.into());
     }
 }
