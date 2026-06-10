@@ -31,16 +31,43 @@ DUMP_FILE_PREFIX="teztale_${DATABASE}_dump"
 
 # Convert date to start and end timestamps (epoch)
 # Use GNU date if available (gdate on macOS), otherwise plain date
-if command -v gdate >/dev/null 2>&1; then
-  DATE_BIN=gdate
+if command -v gdate > /dev/null 2>&1; then
+  DATE_BIN="gdate"
 else
-  DATE_BIN=date
+  DATE_BIN="date"
 fi
 
 START_TS=$("$DATE_BIN" -d "$DATE-01" +%s)
 END_TS=$("$DATE_BIN" -d "$DATE-01 +1 month" +%s)
 
 echo "Dumping data from timestamp $START_TS to $END_TS [$DATABASE]"
+
+# Feature-detect optional tables so the script also works against older schemas.
+# dal_shard_assignments was added later; absent on pre-DAL teztale DBs.
+HAS_DAL_SHARDS=$(psql -tA "$CONN_STRING" -c \
+  "SELECT to_regclass('public.dal_shard_assignments') IS NOT NULL;" 2> /dev/null |
+  tr -d '[:space:]')
+
+if [ "$HAS_DAL_SHARDS" = "t" ]; then
+  echo "[$DATABASE] dal_shard_assignments present — including in dump"
+  SQL_DAL_DROP_VIEW="DROP VIEW IF EXISTS monthly_view_dal_shard_assignments CASCADE;"
+  SQL_DAL_CREATE_VIEW="CREATE VIEW monthly_view_dal_shard_assignments AS
+SELECT dsa.* FROM dal_shard_assignments dsa
+JOIN monthly_view_endorsing_rights er ON er.id = dsa.endorsing_right;"
+  SQL_DAL_SUMMARY="    (SELECT COUNT(*) FROM monthly_view_dal_shard_assignments) as dal_shard_assignments_count,"
+  SQL_DAL_TEMP_TABLE="DROP TABLE IF EXISTS temp_monthly_view_dal_shard_assignments;
+CREATE TABLE temp_monthly_view_dal_shard_assignments AS TABLE monthly_view_dal_shard_assignments;"
+  SQL_DAL_DROP_TEMP="DROP TABLE IF EXISTS temp_monthly_view_dal_shard_assignments;"
+  PG_DUMP_DAL_FLAG="--table=temp_monthly_view_dal_shard_assignments"
+else
+  echo "[$DATABASE] dal_shard_assignments not found — skipping DAL view (older schema)"
+  SQL_DAL_DROP_VIEW=""
+  SQL_DAL_CREATE_VIEW=""
+  SQL_DAL_SUMMARY=""
+  SQL_DAL_TEMP_TABLE=""
+  SQL_DAL_DROP_TEMP=""
+  PG_DUMP_DAL_FLAG=""
+fi
 
 echo "Create views for the month's data and related records  [$DATABASE]"
 psql -q "$CONN_STRING" << EOF
@@ -53,7 +80,7 @@ DROP VIEW IF EXISTS monthly_view_operations CASCADE;
 DROP VIEW IF EXISTS monthly_view_operations_reception CASCADE;
 DROP VIEW IF EXISTS monthly_view_operations_inclusion CASCADE;
 DROP VIEW IF EXISTS monthly_view_endorsing_rights CASCADE;
-DROP VIEW IF EXISTS monthly_view_dal_shard_assignments CASCADE;
+${SQL_DAL_DROP_VIEW}
 DROP VIEW IF EXISTS monthly_view_delegates CASCADE;
 DROP VIEW IF EXISTS monthly_view_cycles CASCADE;
 DROP VIEW IF EXISTS monthly_view_missing_blocks CASCADE;
@@ -92,10 +119,8 @@ SELECT er.* FROM endorsing_rights er
 WHERE er.level >= (SELECT MIN(level) FROM monthly_view_blocks)
 AND er.level <= (SELECT MAX(level) FROM monthly_view_blocks);
 
--- Create view for related DAL shard assignments
-CREATE VIEW monthly_view_dal_shard_assignments AS
-SELECT dsa.* FROM dal_shard_assignments dsa
-JOIN monthly_view_endorsing_rights er ON er.id = dsa.endorsing_right;
+-- Create view for related DAL shard assignments (only when the table exists)
+${SQL_DAL_CREATE_VIEW}
 
 -- Create view for related delegates
 CREATE VIEW monthly_view_delegates AS
@@ -140,7 +165,7 @@ SELECT
     (SELECT COUNT(*) FROM monthly_view_operations) as operation_count,
     (SELECT COUNT(*) FROM monthly_view_operations_reception) as operation_reception_count,
     (SELECT COUNT(*) FROM monthly_view_endorsing_rights) as endorsing_rights_count,
-    (SELECT COUNT(*) FROM monthly_view_dal_shard_assignments) as dal_shard_assignments_count,
+${SQL_DAL_SUMMARY}
     (SELECT COUNT(*) FROM monthly_view_delegates) as delegate_count,
     (SELECT COUNT(*) FROM monthly_view_cycles) as cycle_count,
     (SELECT COUNT(*) FROM monthly_view_missing_blocks) as missing_block_count,
@@ -179,8 +204,7 @@ CREATE TABLE temp_monthly_view_operations_inclusion AS TABLE monthly_view_operat
 DROP TABLE IF EXISTS temp_monthly_view_endorsing_rights;
 CREATE TABLE temp_monthly_view_endorsing_rights AS TABLE monthly_view_endorsing_rights;
 
-DROP TABLE IF EXISTS temp_monthly_view_dal_shard_assignments;
-CREATE TABLE temp_monthly_view_dal_shard_assignments AS TABLE monthly_view_dal_shard_assignments;
+${SQL_DAL_TEMP_TABLE}
 
 DROP TABLE IF EXISTS temp_monthly_view_delegates;
 CREATE TABLE temp_monthly_view_delegates AS TABLE monthly_view_delegates;
@@ -223,7 +247,7 @@ pg_dump \
   --table=temp_monthly_view_operations_reception \
   --table=temp_monthly_view_operations_inclusion \
   --table=temp_monthly_view_endorsing_rights \
-  --table=temp_monthly_view_dal_shard_assignments \
+  ${PG_DUMP_DAL_FLAG} \
   --table=temp_monthly_view_delegates \
   --table=temp_monthly_view_cycles \
   --table=temp_monthly_view_missing_blocks \
@@ -239,7 +263,7 @@ DROP VIEW IF EXISTS monthly_view_operations CASCADE;
 DROP VIEW IF EXISTS monthly_view_operations_reception CASCADE;
 DROP VIEW IF EXISTS monthly_view_operations_inclusion CASCADE;
 DROP VIEW IF EXISTS monthly_view_endorsing_rights CASCADE;
-DROP VIEW IF EXISTS monthly_view_dal_shard_assignments CASCADE;
+${SQL_DAL_DROP_VIEW}
 DROP VIEW IF EXISTS monthly_view_delegates CASCADE;
 DROP VIEW IF EXISTS monthly_view_cycles CASCADE;
 DROP VIEW IF EXISTS monthly_view_missing_blocks CASCADE;
@@ -252,7 +276,7 @@ DROP TABLE IF EXISTS temp_monthly_view_operations;
 DROP TABLE IF EXISTS temp_monthly_view_operations_reception;
 DROP TABLE IF EXISTS temp_monthly_view_operations_inclusion;
 DROP TABLE IF EXISTS temp_monthly_view_endorsing_rights;
-DROP TABLE IF EXISTS temp_monthly_view_dal_shard_assignments;
+${SQL_DAL_DROP_TEMP}
 DROP TABLE IF EXISTS temp_monthly_view_delegates;
 DROP TABLE IF EXISTS temp_monthly_view_cycles;
 DROP TABLE IF EXISTS temp_monthly_view_missing_blocks;
