@@ -260,7 +260,7 @@ fn burn_pass<Host, M, A>(
 ) -> (Vec<InternalOperationSum>, Result<(), ApplyOperationError>)
 where
     Host: StorageV1,
-    M: storage_fees::StorageFeesBurn,
+    M: storage_fees::OperationStorageFees,
     A: TezlinkAccount,
 {
     let parent_outcome = storage_fees::burn_content_storage_fees::<_, M>(
@@ -313,7 +313,7 @@ fn finalize_and_burn<Host, M, A>(
 ) -> OperationResult<M>
 where
     Host: StorageV1,
-    M: storage_fees::StorageFeesBurn,
+    M: storage_fees::OperationStorageFees,
     A: TezlinkAccount,
 {
     let mut content = finalize_statuses::<M>(result, &mut internal_operation_results);
