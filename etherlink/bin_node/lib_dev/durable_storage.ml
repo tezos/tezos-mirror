@@ -89,6 +89,26 @@ module EVM_account_info = struct
                 Hex.(show @@ of_bytes b)))
 end
 
+(** Aggregated originated-contract storage-accounting record, written by
+    the Michelson runtime kernel at [michelson_contract_info]. Mirrors the
+    kernel's [OriginatedContractInfo]: [code_size] and [storage_size] as
+    [n], then [used_bytes] and [paid_bytes] as [z], concatenated. *)
+type michelson_contract_info = {
+  code_size : Z.t;
+  storage_size : Z.t;
+  used_bytes : Z.t;
+  paid_bytes : Z.t;
+}
+
+let michelson_contract_info_encoding =
+  let open Data_encoding in
+  conv
+    (fun {code_size; storage_size; used_bytes; paid_bytes} ->
+      (code_size, storage_size, used_bytes, paid_bytes))
+    (fun (code_size, storage_size, used_bytes, paid_bytes) ->
+      {code_size; storage_size; used_bytes; paid_bytes})
+    (tup4 n n z z)
+
 (* Typed path GADT — see [.mli] for the capability semantics. *)
 
 (** Phantom capability markers for [path]: [rw] is read+write+delete, [ro] is
@@ -204,8 +224,10 @@ type ('a, 'cap) path =
   (* The single shared Michelson implementation backing every alias. *)
   | Tezos_alias_implementation :
       (Tezlink_imports.Imported_context.Script.expr, ro) path
-  | Tezos_contract_used_bytes : Tezos_types.Contract.t -> (Z.t, ro) path
-  | Tezos_contract_paid_bytes : Tezos_types.Contract.t -> (Z.t, ro) path
+  (* Aggregated storage-accounting record of an originated contract. *)
+  | Tezos_contract_info :
+      Tezos_types.Contract.t
+      -> (michelson_contract_info, ro) path
   | Tezos_big_map_value :
       Tezlink_imports.Imported_context.Big_map.Id.t
       * Tezlink_imports.Imported_protocol.Script_expr_hash.t
@@ -715,19 +737,11 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
             safe_binary_decode
               Tezlink_imports.Imported_context.Script.expr_encoding;
         }
-  | Tezos_contract_used_bytes contract ->
+  | Tezos_contract_info contract ->
       static_ro
         {
-          path = Durable_storage_path.michelson_contract_used_bytes contract;
-          (* The kernel stores the watermark as a signed Zarith
-             ([Data_encoding.z]); it may be negative. *)
-          decode = safe_binary_decode Data_encoding.z;
-        }
-  | Tezos_contract_paid_bytes contract ->
-      static_ro
-        {
-          path = Durable_storage_path.michelson_contract_paid_bytes contract;
-          decode = safe_binary_decode Data_encoding.z;
+          path = Durable_storage_path.michelson_contract_info contract;
+          decode = safe_binary_decode michelson_contract_info_encoding;
         }
   | Tezos_big_map_value (id, key_hash) ->
       static_ro
@@ -900,6 +914,20 @@ let read_contract_code contract state =
       let* is_alias = read_opt (Tezos_contract_origin contract) state in
       if is_alias = Some true then read_opt Tezos_alias_implementation state
       else return_none
+
+let michelson_contract_used_storage_space contract state =
+  let open Lwt_result_syntax in
+  let* info_opt = read_opt (Tezos_contract_info contract) state in
+  match info_opt with
+  | Some {used_bytes; _} -> return used_bytes
+  | None -> return Z.zero
+
+let michelson_contract_paid_storage_space contract state =
+  let open Lwt_result_syntax in
+  let* info_opt = read_opt (Tezos_contract_info contract) state in
+  match info_opt with
+  | Some {paid_bytes; _} -> return paid_bytes
+  | None -> return Z.zero
 
 let write : type a.
     (a, [> `Write]) path -> a -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t =

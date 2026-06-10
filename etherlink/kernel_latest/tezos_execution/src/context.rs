@@ -253,13 +253,17 @@ pub mod code {
     /// reader and the writer of the record can never drift apart.
     pub const ORIGIN_PATH: RefPath = RefPath::assert_from(b"/origin");
 
-    const CODE_SIZE_PATH: RefPath = RefPath::assert_from(b"/len/code");
+    /// Aggregated storage-accounting record: holds [code_size],
+    /// [storage_size], [used_bytes] and [paid_bytes] in a single value, so
+    /// they can be read and written with one host call. The code and storage
+    /// *blobs* (`/data/code`, `/data/storage`) stay separate.
+    const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
 
-    const STORAGE_SIZE_PATH: RefPath = RefPath::assert_from(b"/len/storage");
-
-    const PAID_BYTES_PATH: RefPath = RefPath::assert_from(b"/paid_bytes");
-
-    const USED_BYTES_PATH: RefPath = RefPath::assert_from(b"/used_bytes");
+    pub fn info_path<A: TezosOriginatedAccount>(
+        account: &A,
+    ) -> Result<OwnedPath, PathError> {
+        concat(account.path(), &INFO_PATH)
+    }
 
     pub fn code_path<A: TezosOriginatedAccount>(
         account: &A,
@@ -277,30 +281,6 @@ pub mod code {
         account: &A,
     ) -> Result<OwnedPath, PathError> {
         concat(account.path(), &ORIGIN_PATH)
-    }
-
-    pub fn code_size_path<A: TezosOriginatedAccount>(
-        account: &A,
-    ) -> Result<OwnedPath, PathError> {
-        concat(account.path(), &CODE_SIZE_PATH)
-    }
-
-    pub fn storage_size_path<A: TezosOriginatedAccount>(
-        account: &A,
-    ) -> Result<OwnedPath, PathError> {
-        concat(account.path(), &STORAGE_SIZE_PATH)
-    }
-
-    pub fn paid_bytes_path<A: TezosOriginatedAccount>(
-        account: &A,
-    ) -> Result<OwnedPath, PathError> {
-        concat(account.path(), &PAID_BYTES_PATH)
-    }
-
-    pub fn used_bytes_path<A: TezosOriginatedAccount>(
-        account: &A,
-    ) -> Result<OwnedPath, PathError> {
-        concat(account.path(), &USED_BYTES_PATH)
     }
 }
 

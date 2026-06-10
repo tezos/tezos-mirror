@@ -50,17 +50,11 @@ val michelson_contract_origin : Tezos_types.Contract.t -> path
     ([/tez/tez_accounts/contracts/index/<hex>/balance]). *)
 val michelson_contract_balance : Tezos_types.Contract.t -> path
 
-(** [michelson_contract_used_bytes contract] is the durable storage path of
-    [contract]'s [used_bytes] watermark — the current total storage size
-    accounted to the contract
-    ([/tez/tez_accounts/contracts/index/<hex>/used_bytes]). *)
-val michelson_contract_used_bytes : Tezos_types.Contract.t -> path
-
-(** [michelson_contract_paid_bytes contract] is the durable storage path of
-    [contract]'s [paid_bytes] watermark — the monotonic high-water-mark of
-    bytes already paid for
-    ([/tez/tez_accounts/contracts/index/<hex>/paid_bytes]). *)
-val michelson_contract_paid_bytes : Tezos_types.Contract.t -> path
+(** [michelson_contract_info contract] is the durable storage path of
+    [contract]'s aggregated storage-accounting record — the
+    [code_size]/[storage_size]/[used_bytes]/[paid_bytes] bundle
+    ([/tez/tez_accounts/contracts/index/<hex>/info]). *)
+val michelson_contract_info : Tezos_types.Contract.t -> path
 
 (** [tezos_big_map_value id key_hash] is the durable storage path of
     big_map [id]'s value at [key_hash]

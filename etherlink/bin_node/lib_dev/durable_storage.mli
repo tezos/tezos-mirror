@@ -46,6 +46,17 @@ type ro = [`Read]
 
 type read_delete = [`Read | `Delete]
 
+(** Aggregated originated-contract storage-accounting record, written by the
+    Michelson runtime kernel. Mirrors the kernel's [OriginatedContractInfo]:
+    [code_size] and [storage_size] as [n], then [used_bytes] and
+    [paid_bytes] as [z], concatenated. *)
+type michelson_contract_info = {
+  code_size : Z.t;
+  storage_size : Z.t;
+  used_bytes : Z.t;
+  paid_bytes : Z.t;
+}
+
 type ('a, 'cap) path =
   | Raw_path : string -> (bytes, rw) path
   | Chain_id : (L2_types.chain_id, ro) path
@@ -147,8 +158,9 @@ type ('a, 'cap) path =
   | Tezos_contract_origin : Tezos_types.Contract.t -> (bool, ro) path
   | Tezos_alias_implementation :
       (Tezlink_imports.Imported_context.Script.expr, ro) path
-  | Tezos_contract_used_bytes : Tezos_types.Contract.t -> (Z.t, ro) path
-  | Tezos_contract_paid_bytes : Tezos_types.Contract.t -> (Z.t, ro) path
+  | Tezos_contract_info :
+      Tezos_types.Contract.t
+      -> (michelson_contract_info, ro) path
   | Tezos_big_map_value :
       Tezlink_imports.Imported_context.Big_map.Id.t
       * Tezlink_imports.Imported_protocol.Script_expr_hash.t
@@ -200,6 +212,19 @@ val read_contract_code :
   Tezos_types.Contract.t ->
   Pvm.State.t ->
   Tezlink_imports.Imported_context.Script.expr option tzresult Lwt.t
+
+(** [michelson_contract_used_storage_space contract state] is [contract]'s
+    [used_bytes] storage watermark, read from the aggregated
+    storage-accounting record written by the Michelson runtime kernel,
+    defaulting to [Z.zero] when the record is absent. *)
+val michelson_contract_used_storage_space :
+  Tezos_types.Contract.t -> Pvm.State.t -> Z.t tzresult Lwt.t
+
+(** [michelson_contract_paid_storage_space contract state] is [contract]'s
+    [paid_bytes] storage watermark, read from the same aggregated record as
+    {!michelson_contract_used_storage_space}. *)
+val michelson_contract_paid_storage_space :
+  Tezos_types.Contract.t -> Pvm.State.t -> Z.t tzresult Lwt.t
 
 (** [write p value state] encodes [value] and stores it at [p]. *)
 val write : ('a, rw) path -> 'a -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t

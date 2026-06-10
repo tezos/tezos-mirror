@@ -178,10 +178,7 @@ let make (ctxt : Evm_ro_context.t) =
       | Originated _ ->
           let* state = get_state ~block in
           let* used =
-            Durable_storage.read_or_default
-              ~default:Z.zero
-              (Tezos_contract_used_bytes c)
-              state
+            Durable_storage.michelson_contract_used_storage_space c state
           in
           return_some used
 
@@ -193,10 +190,7 @@ let make (ctxt : Evm_ro_context.t) =
       | Originated _ ->
           let* state = get_state ~block in
           let* paid =
-            Durable_storage.read_or_default
-              ~default:Z.zero
-              (Tezos_contract_paid_bytes c)
-              state
+            Durable_storage.michelson_contract_paid_storage_space c state
           in
           return_some paid
 

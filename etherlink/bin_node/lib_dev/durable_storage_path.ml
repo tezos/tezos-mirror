@@ -143,11 +143,7 @@ let michelson_contract_origin contract =
 let michelson_contract_balance contract =
   michelson_contract_dir contract ^ "/balance"
 
-let michelson_contract_used_bytes contract =
-  michelson_contract_dir contract ^ "/used_bytes"
-
-let michelson_contract_paid_bytes contract =
-  michelson_contract_dir contract ^ "/paid_bytes"
+let michelson_contract_info contract = michelson_contract_dir contract ^ "/info"
 
 let tezos_big_map_dir id =
   tezos_big_map_root ^ "/"

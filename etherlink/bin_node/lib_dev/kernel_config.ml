@@ -293,17 +293,6 @@ let make_tezos_bootstrap_instr tez_bootstrap_balance
 let make_tezos_bootstrap_contracts_instr tez_bootstrap_balance contracts =
   contracts
   |> List.map (fun (address, script, storage) ->
-         let encode_len (s : string) =
-           s |> String.length |> Z.of_int
-           |> Data_encoding.Binary.to_string_exn Data_encoding.n
-         in
-
-         let encode_hexa_with_len x =
-           let encoded = encode_hexa x in
-           let encoded_len = encode_len encoded in
-           (encoded, encoded_len)
-         in
-
          let path_prefix =
            Durable_storage_path.michelson_contract_dir address
            |> String.split_on_char '/' |> clean_path
@@ -315,17 +304,25 @@ let make_tezos_bootstrap_contracts_instr tez_bootstrap_balance contracts =
              tez_bootstrap_balance
          in
 
-         let encoded_script, encoded_script_len = encode_hexa_with_len script in
-         let encoded_storage, encoded_storage_len =
-           encode_hexa_with_len storage
-         in
+         let encoded_script = encode_hexa script in
+         let encoded_storage = encode_hexa storage in
 
-         (* Initialise the storage space to the bytes the contract occupies
-            (code + storage), instead of zero. *)
-         let initial_used_bytes =
-           String.length encoded_script + String.length encoded_storage
-           |> Z.of_int
-           |> Data_encoding.Binary.to_string_exn Data_encoding.z
+         (* Aggregated storage-accounting record, mirroring the kernel's
+            [OriginatedContractInfo]: [code_size] and [storage_size] as
+            [n], then [used_bytes] and [paid_bytes] as [z]. The contract's
+            [code_size] / [storage_size] are the byte lengths of the
+            blobs stored at [data/code] / [data/storage]; [used_bytes] and
+            [paid_bytes] are initialised to the bytes the contract
+            occupies (code + storage), instead of zero, so the first
+            operation touching a genesis contract is not billed a storage
+            burn for state present since genesis. *)
+         let code_size = String.length encoded_script in
+         let storage_size = String.length encoded_storage in
+         let encoded_info =
+           let used_bytes = Z.of_int (code_size + storage_size) in
+           Data_encoding.Binary.to_string_exn
+             Data_encoding.(tup4 n n z z)
+             (Z.of_int code_size, Z.of_int storage_size, used_bytes, used_bytes)
          in
 
          let instr key value = make_instr ~path_prefix (Some (key, value)) in
@@ -333,11 +330,8 @@ let make_tezos_bootstrap_contracts_instr tez_bootstrap_balance contracts =
          [
            ("balance", encoded_balance);
            ("data/code", encoded_script);
-           ("len/code", encoded_script_len);
            ("data/storage", encoded_storage);
-           ("len/storage", encoded_storage_len);
-           ("used_bytes", initial_used_bytes);
-           ("paid_bytes", initial_used_bytes);
+           ("info", encoded_info);
          ]
          |> List.concat_map (fun (k, v) -> instr k v))
   |> List.flatten
