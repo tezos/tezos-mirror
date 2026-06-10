@@ -25,14 +25,26 @@ let register ~title promise =
   Test.register ~__FILE__ ~title ~tags @@ fun () ->
   match Lwt_unix.fork () with
   | 0 -> (
+      (* The child must terminate with [Unix._exit], not [Stdlib.exit].
+         Under Tezt's multi-process scheduler this child is itself a fork of a
+         Tezt worker and never calls [exec], so it inherits the worker's
+         [at_exit] handlers and scheduler pipe fds. [Stdlib.exit] would run
+         those handlers -- notably Lwt's, which (because [lwt_io] registers a
+         [flush_all] hook via [Lwt_main.at_exit]) re-enters [Lwt_main.run]. That
+         re-entry iterates the inherited, forked libev engine, which is in an
+         undefined post-fork state and can hang -- leaving the parent blocked in
+         [waitpid] and the scheduler pipe open until the test timeout. (This is
+         not about Eio: [Lwt_eio.with_event_loop] restores the previous engine
+         on exit, so the Eio loop is already gone by this point.) [Unix._exit]
+         skips all of it and just reports the result via the exit code. *)
       match
         Tezos_base_unix.Event_loop.main_run
           ~process_name:title
           ~eio:true
           promise
       with
-      | () -> exit 0
-      | exception _ -> exit 1)
+      | () -> Unix._exit 0
+      | exception _ -> Unix._exit 1)
   | pid -> (
       let* _, status = Lwt_unix.waitpid [] pid in
       match status with
