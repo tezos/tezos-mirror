@@ -1761,7 +1761,7 @@ fn interpret_one<'a>(
             overloads::Mul::NatNat => {
                 let x1 = pop!(V::Nat);
                 let x2 = pop!(V::Nat);
-                ctx.gas().consume(interpret_cost::mul_int(&x1, &x2)?)?;
+                ctx.gas().consume(interpret_cost::mul_nat(&x1, &x2)?)?;
                 let res = x1 * x2;
                 stack.push(V::Nat(res));
             }

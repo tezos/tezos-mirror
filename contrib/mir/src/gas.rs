@@ -337,7 +337,6 @@ impl BigIntByteSize for BigUint {
 pub mod interpret_cost {
     use checked::Checked;
     use num_bigint::{BigInt, BigUint};
-    use num_traits::Zero;
     use tezos_crypto_rs::public_key::PublicKey;
     use tezos_crypto_rs::CryptoError;
     use thiserror::Error;
@@ -387,10 +386,14 @@ pub mod interpret_cost {
     pub const MUL_BLS_G1: u32 = 103000;
     pub const MUL_BLS_G2: u32 = 220000;
     pub const MUL_BLS_FR: u32 = 45;
-    pub const MUL_TEZ_NAT: u32 = 50;
-    pub const MUL_NAT_TEZ: u32 = MUL_TEZ_NAT; // should be the same always
-    pub const EDIV_TEZ_TEZ: u32 = 80;
-    pub const EDIV_TEZ_NAT: u32 = 70;
+    // corresponds to cost_N_IMul_teznat in the Tezos protocol
+    pub const MUL_TEZ_NAT: u32 = 60;
+    // corresponds to cost_N_IMul_nattez in the Tezos protocol
+    pub const MUL_NAT_TEZ: u32 = 65;
+    // corresponds to cost_N_IEdiv_tez in the Tezos protocol
+    pub const EDIV_TEZ_TEZ: u32 = 120;
+    // corresponds to cost_N_IEdiv_teznat in the Tezos protocol
+    pub const EDIV_TEZ_NAT: u32 = 125;
     pub const NEG_FR: u32 = 30;
     pub const NEG_G1: u32 = 50;
     pub const NEG_G2: u32 = 70;
@@ -742,20 +745,31 @@ pub mod interpret_cost {
         (w1 + (w1 >> 4) + 90).as_gas_cost()
     }
 
+    // corresponds to cost_N_IMul_int in the Tezos protocol
     pub fn mul_int(
         i1: &impl BigIntByteSize,
         i2: &impl BigIntByteSize,
     ) -> Result<u32, CostOverflow> {
         let a = Checked::from(i1.byte_size()) + Checked::from(i2.byte_size());
-        // log2 is ill-defined for zero, hence this check
-        let v0 = if a.is_zero() {
-            Checked::from(0)
-        } else {
-            a * (a.ok_or(CostOverflow)?.log2i()? as u64)
-        };
-        (55 + (v0 >> 1) + (v0 >> 2) + (v0 >> 4)).as_gas_cost()
+        // the protocol's log2 is 1 + numbits, i.e. ilog2 + 2
+        let log = (a + 1).ok_or(CostOverflow)?.ilog2() + 2;
+        let v0 = a * (log as u64);
+        ((v0 * 5) + 85).as_gas_cost()
     }
 
+    // corresponds to cost_N_IMul_nat in the Tezos protocol
+    pub fn mul_nat(
+        i1: &impl BigIntByteSize,
+        i2: &impl BigIntByteSize,
+    ) -> Result<u32, CostOverflow> {
+        let a = Checked::from(i1.byte_size()) + Checked::from(i2.byte_size());
+        // the protocol's log2 is 1 + numbits, i.e. ilog2 + 2
+        let log = (a + 1).ok_or(CostOverflow)?.ilog2() + 2;
+        let v0 = a * (log as u64);
+        ((v0 * 4) + (v0 >> 1) + (v0 >> 2) + (v0 >> 3) + 85).as_gas_cost()
+    }
+
+    // corresponds to cost_N_IEdiv_int in the Tezos protocol
     pub fn ediv_int(
         i1: &impl BigIntByteSize,
         i2: &impl BigIntByteSize,
@@ -767,10 +781,16 @@ pub mod interpret_cost {
         } else {
             Checked::from(0u64)
         };
-        ((w1 * 12) + (((w1 >> 10) + (w1 >> 13)) * size_2) + (size_1 >> 2) + size_1 + 150)
+        ((w1 * 3)
+            + (((w1 >> 6) + (w1 >> 8) + (w1 >> 10)) * size_2)
+            + (size_1 >> 2)
+            + (size_1 >> 3)
+            + (size_1 >> 7)
+            + 70)
             .as_gas_cost()
     }
 
+    // corresponds to cost_N_IEdiv_nat in the Tezos protocol
     pub fn ediv_nat(
         i1: &impl BigIntByteSize,
         i2: &impl BigIntByteSize,
@@ -782,7 +802,14 @@ pub mod interpret_cost {
         } else {
             Checked::from(0u64)
         };
-        ((w1 * 12) + (((w1 >> 10) + (w1 >> 13)) * size_2) + (size_1 >> 2) + size_1 + 150)
+        ((w1 * 3)
+            + (((w1 >> 6) + (w1 >> 8) + (w1 >> 10)) * size_2)
+            + (w1 >> 3)
+            + (size_1 >> 3)
+            + (size_1 >> 4)
+            + (size_1 >> 5)
+            + (size_1 >> 7)
+            + 70)
             .as_gas_cost()
     }
 
