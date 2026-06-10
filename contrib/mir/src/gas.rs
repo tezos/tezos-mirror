@@ -407,9 +407,18 @@ pub mod interpret_cost {
     pub const EMPTY_SET: u32 = 60;
     pub const SIZE_STRING: u32 = 15;
     pub const SIZE_BYTES: u32 = 10;
-    pub const SIZE_LIST: u32 = 10;
-    pub const SIZE_SET: u32 = 10;
-    pub const SIZE_MAP: u32 = 10;
+    // corresponds to cost_N_IList_size in the Tezos protocol
+    // TODO(L2-1547): the benchmarked constant (~920 ns) looks like a
+    // measurement artefact: SIZE on a list is Vec::len(), O(1). Same family
+    // as the ~840 ns constants (N_IDupN, N_ICons_list, N_IIf_cons); re-check
+    // the micro-benchmarks.
+    pub const SIZE_LIST: u32 = 920;
+    // corresponds to cost_N_ISet_size in the Tezos protocol
+    // TODO(L2-1547): ~110 ns for BTreeSet::len() also looks too high;
+    // re-check the micro-benchmarks.
+    pub const SIZE_SET: u32 = 110;
+    // corresponds to cost_N_IMap_size in the Tezos protocol
+    pub const SIZE_MAP: u32 = 45;
     pub const EMPTY_MAP: u32 = 60;
     pub const EMPTY_BIG_MAP: u32 = 60;
     pub const CHAIN_ID: u32 = 65;
