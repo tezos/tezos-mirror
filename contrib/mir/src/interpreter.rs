@@ -1387,15 +1387,16 @@ fn interpret_step<'a, 'b, 'c>(
                 }
             }
             overloads::Map::Option => {
-                ctx.gas().consume(interpret_cost::MAP_OPTION)?;
                 let option = pop_v!(V::Option);
                 match option {
                     Some(elem) => {
+                        ctx.gas().consume(interpret_cost::MAP_OPTION_SOME)?;
                         ctx.gas().consume(interpret_cost::PUSH)?;
                         stack.push(elem);
                         Ok(StepResult::OpenMapOption(mk_body(body)))
                     }
                     None => {
+                        ctx.gas().consume(interpret_cost::MAP_OPTION_NONE)?;
                         stack.push(V::new_option(None));
                         Ok(StepResult::Done)
                     }
@@ -4730,7 +4731,7 @@ mod interpreter_tests {
             1,
             stk![V::new_option(Some(V::int(1)))],
             stk![V::new_option(Some(V::new_option(Some(V::int(1)))))],
-            interpret_cost::MAP_OPTION,
+            interpret_cost::MAP_OPTION_SOME,
         );
 
         test(

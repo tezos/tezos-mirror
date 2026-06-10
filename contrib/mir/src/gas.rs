@@ -438,8 +438,10 @@ pub mod interpret_cost {
     pub const LEFT: u32 = 20;
     pub const RIGHT: u32 = 20;
 
-    // See `cost_N_IOpt_map` in the Tezos protocol
-    pub const MAP_OPTION: u32 = 10;
+    // corresponds to cost_N_IOpt_map_some in the Tezos protocol
+    pub const MAP_OPTION_SOME: u32 = 10;
+    // corresponds to cost_N_IOpt_map_none in the Tezos protocol
+    pub const MAP_OPTION_NONE: u32 = 35;
     // See `cost_N_IList_map` in the Tezos protocol
     pub const MAP_LIST: u32 = 20;
     // L1's `cost_N_IMap_map` is size-dependent because it folds the `map` into
