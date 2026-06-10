@@ -455,14 +455,16 @@ pub mod interpret_cost {
     // Gas costs obtained from https://gitlab.com/tezos/tezos/-/blob/9875fbebe032a8c5ce62b3b3cb1588ca9855a37e/src/proto_017_PtNairob/lib_protocol/michelson_v1_gas_costs_generated.ml
     pub const TRANSFER_TOKENS: u32 = 120;
     pub const SET_DELEGATE: u32 = 75;
-    pub const LAMBDA: u32 = 10;
+    // Lambda creation cost (`cost_N_ILambda_lam` / `cost_N_ILambda_lamrec`).
+    // A single constant for both forms, the worst case of the two models
+    // (lam 80, lamrec 75), as the protocol charges.
+    pub const LAMBDA: u32 = 80;
     pub const EXEC: u32 = 10;
     // corresponds to cost_N_IHash_key in the Tezos protocol
     pub const HASH_KEY: u32 = 215;
-    // slight deviation from the protocol: in the protocol, APPLY costs differer
-    // depending on whether a lambda is recursive; here this distinction doesn't
-    // make a lot of sense.
-    pub const APPLY: u32 = 140;
+    // corresponds to cost_N_IApply in the Tezos protocol (the generated
+    // model merges the recursive and non-recursive cases)
+    pub const APPLY: u32 = 85;
     pub const TICKET: u32 = 10;
     pub const READ_TICKET: u32 = 10;
     pub const BALANCE: u32 = 60;
