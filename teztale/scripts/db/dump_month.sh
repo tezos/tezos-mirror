@@ -2,6 +2,21 @@
 
 # Usage: ./dump_month.sh YYYY-MM output_directory
 # Example: ./dump_month.sh 2024-01 /path/to/dumps
+#
+# The dump is streamed through a compressor: the uncompressed SQL (tens of
+# GB for recent months) never lands on any disk. Artifacts are staged on
+# local disk (LOCAL_DIR) and only the final .bz2 files are copied to
+# output_directory, which may be a FUSE-mounted object store (s3fs):
+# writing large files there directly stages them in the local cache and
+# fails with ENOSPC once the backing disk is full.
+#
+# Environment variables:
+#   TEZTALE_CONFIG  — teztale config file (default /nomadic/conf/teztale-config.json)
+#   LOCAL_DIR       — local staging directory (default ~/teztale_exports/staging)
+#   FORCE           — set to 1 to re-dump a month whose outputs already exist
+#   ALLOW_UNCOVERED — set to 1 to proceed even if the DB contains tables not
+#                     covered by the monthly views (their data would be
+#                     missing from the dump)
 
 if [ "$#" -ne 2 ]; then
   echo "Usage: $0 YYYY-MM output_directory"
@@ -25,9 +40,27 @@ DATABASE=$(echo "${CONN_STRING}" | awk -F'/' '{print $NF}' | awk -F'\\?' '{print
 
 DATE=$1
 OUTPUT_DIR=$2
-mkdir -p "$OUTPUT_DIR"
+LOCAL_DIR="${LOCAL_DIR:-$HOME/teztale_exports/staging}"
+mkdir -p "$OUTPUT_DIR" "$LOCAL_DIR"
 
 DUMP_FILE_PREFIX="teztale_${DATABASE}_dump"
+F_DUMP="${DUMP_FILE_PREFIX}_${DATE}.dump.bz2"           # table names rewritten (restore-ready)
+F_TMP="${DUMP_FILE_PREFIX}_${DATE}.dump_tmp_tables.bz2" # raw temp_monthly_view_* names
+F_SCHEMA="${DUMP_FILE_PREFIX}_${DATE}.schema.bz2"
+
+# Idempotency: skip months already exported (FORCE=1 to re-dump)
+if [ "${FORCE:-0}" != "1" ] && [ -s "$OUTPUT_DIR/$F_DUMP" ] && [ -s "$OUTPUT_DIR/$F_TMP" ] && [ -s "$OUTPUT_DIR/$F_SCHEMA" ]; then
+  echo "Skipping $DATE: all three outputs already exist in $OUTPUT_DIR (set FORCE=1 to redo)"
+  exit 0
+fi
+
+# Disk guard on the LOCAL staging dir (largest month so far stages ~11GB)
+REQUIRED_GB="${REQUIRED_GB:-30}"
+AVAIL_GB=$(df -Pk "$LOCAL_DIR" | awk 'NR==2 {print int($4/1048576)}')
+if [ -n "$AVAIL_GB" ] && [ "$AVAIL_GB" -lt "$REQUIRED_GB" ]; then
+  echo "Error: need ${REQUIRED_GB}G free in $LOCAL_DIR, have ${AVAIL_GB}G"
+  exit 1
+fi
 
 # Convert date to start and end timestamps (epoch)
 # Use GNU date if available (gdate on macOS), otherwise plain date
@@ -54,11 +87,10 @@ if [ "$HAS_DAL_SHARDS" = "t" ]; then
   SQL_DAL_CREATE_VIEW="CREATE VIEW monthly_view_dal_shard_assignments AS
 SELECT dsa.* FROM dal_shard_assignments dsa
 JOIN monthly_view_endorsing_rights er ON er.id = dsa.endorsing_right;"
-  SQL_DAL_SUMMARY="    (SELECT COUNT(*) FROM monthly_view_dal_shard_assignments) as dal_shard_assignments_count,"
+  SQL_DAL_SUMMARY="    (SELECT COUNT(*) FROM temp_monthly_view_dal_shard_assignments) as dal_shard_assignments_count,"
   SQL_DAL_TEMP_TABLE="DROP TABLE IF EXISTS temp_monthly_view_dal_shard_assignments;
 CREATE TABLE temp_monthly_view_dal_shard_assignments AS TABLE monthly_view_dal_shard_assignments;"
   SQL_DAL_DROP_TEMP="DROP TABLE IF EXISTS temp_monthly_view_dal_shard_assignments;"
-  PG_DUMP_DAL_FLAG="--table=temp_monthly_view_dal_shard_assignments"
 else
   echo "[$DATABASE] dal_shard_assignments not found — skipping DAL view (older schema)"
   SQL_DAL_DROP_VIEW=""
@@ -66,7 +98,32 @@ else
   SQL_DAL_SUMMARY=""
   SQL_DAL_TEMP_TABLE=""
   SQL_DAL_DROP_TEMP=""
-  PG_DUMP_DAL_FLAG=""
+fi
+
+# Completeness guard: every base table in the DB must be covered by a monthly
+# view below, otherwise its data would be silently missing from the dump.
+COVERED_TABLES=(blocks blocks_reception cycles delegates endorsing_rights missing_blocks nodes operations operations_inclusion operations_reception)
+if [ "$HAS_DAL_SHARDS" = "t" ]; then
+  COVERED_TABLES+=(dal_shard_assignments)
+fi
+ACTUAL_TABLES=$(psql -At "$CONN_STRING" -c \
+  "SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename NOT LIKE 'temp_monthly_view_%' ORDER BY 1")
+UNCOVERED=$(comm -23 <(echo "$ACTUAL_TABLES" | sort) <(printf '%s\n' "${COVERED_TABLES[@]}" | sort))
+if [ -n "$UNCOVERED" ]; then
+  echo "ERROR: tables present in the DB but NOT covered by the monthly views:"
+  echo "$UNCOVERED"
+  echo "Their data would be MISSING from the dump. Add views for them (or set ALLOW_UNCOVERED=1 to override)."
+  if [ "${ALLOW_UNCOVERED:-0}" != "1" ]; then
+    exit 1
+  fi
+fi
+
+# Check to see if pbzip2 is already on path; if so, set BZIP_BIN appropriately
+# Otherwise, default to standard bzip2 binary
+if type -P pbzip2 > /dev/null 2>&1; then
+  BZIP_BIN="pbzip2"
+else
+  BZIP_BIN="bzip2"
 fi
 
 echo "Create views for the month's data and related records  [$DATABASE]"
@@ -157,20 +214,6 @@ WHERE n.id IN (
     SELECT source FROM monthly_view_missing_blocks
 );
 
--- Create a summary view to verify data integrity
-CREATE VIEW monthly_view_data_summary AS
-SELECT
-    (SELECT COUNT(*) FROM monthly_view_blocks) as block_count,
-    (SELECT COUNT(*) FROM monthly_view_blocks_reception) as block_reception_count,
-    (SELECT COUNT(*) FROM monthly_view_operations) as operation_count,
-    (SELECT COUNT(*) FROM monthly_view_operations_reception) as operation_reception_count,
-    (SELECT COUNT(*) FROM monthly_view_endorsing_rights) as endorsing_rights_count,
-${SQL_DAL_SUMMARY}
-    (SELECT COUNT(*) FROM monthly_view_delegates) as delegate_count,
-    (SELECT COUNT(*) FROM monthly_view_cycles) as cycle_count,
-    (SELECT COUNT(*) FROM monthly_view_missing_blocks) as missing_block_count,
-    (SELECT COUNT(*) FROM monthly_view_nodes) as nodes_count;
-
 COMMIT;
 EOF
 
@@ -228,32 +271,44 @@ if [ $exit_code_2 -ne 0 ]; then
   exit 1
 fi
 
-# Display summary of the data to be dumped
+# Display summary of the data to be dumped. Counting the materialized tables
+# is cheap (seq scans); counting the views would re-run every expensive join.
 echo "Data summary before dump [$DATABASE]:"
-psql -q "$CONN_STRING" -P pager=off -c "SELECT * FROM monthly_view_data_summary;"
+psql -q "$CONN_STRING" -P pager=off -c "
+SELECT
+    (SELECT COUNT(*) FROM temp_monthly_view_blocks) as block_count,
+    (SELECT COUNT(*) FROM temp_monthly_view_blocks_reception) as block_reception_count,
+    (SELECT COUNT(*) FROM temp_monthly_view_operations) as operation_count,
+    (SELECT COUNT(*) FROM temp_monthly_view_operations_reception) as operation_reception_count,
+    (SELECT COUNT(*) FROM temp_monthly_view_endorsing_rights) as endorsing_rights_count,
+${SQL_DAL_SUMMARY}
+    (SELECT COUNT(*) FROM temp_monthly_view_delegates) as delegate_count,
+    (SELECT COUNT(*) FROM temp_monthly_view_cycles) as cycle_count,
+    (SELECT COUNT(*) FROM temp_monthly_view_missing_blocks) as missing_block_count,
+    (SELECT COUNT(*) FROM temp_monthly_view_nodes) as nodes_count;"
 
-echo "Dump the views [$DATABASE]"
+# Build --table args from what was actually materialized, so a future added
+# view can never be forgotten in a hardcoded list.
+TABLE_ARGS=()
+while IFS= read -r t; do
+  TABLE_ARGS+=("--table=$t")
+done < <(psql -At "$CONN_STRING" -c \
+  "SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename LIKE 'temp_monthly_view_%' ORDER BY 1")
+echo "Dumping ${#TABLE_ARGS[@]} tables: ${TABLE_ARGS[*]}"
+
+echo "Dump the views, streamed into $BZIP_BIN (no uncompressed file is ever written) [$DATABASE]"
+set -o pipefail
 pg_dump \
   "$CONN_STRING" \
   --format plain \
   --column-inserts \
-  --file "$OUTPUT_DIR/${DUMP_FILE_PREFIX}_${DATE}.dump" \
   --verbose \
   --no-owner \
   --data-only \
-  --table=temp_monthly_view_blocks \
-  --table=temp_monthly_view_blocks_reception \
-  --table=temp_monthly_view_operations \
-  --table=temp_monthly_view_operations_reception \
-  --table=temp_monthly_view_operations_inclusion \
-  --table=temp_monthly_view_endorsing_rights \
-  ${PG_DUMP_DAL_FLAG} \
-  --table=temp_monthly_view_delegates \
-  --table=temp_monthly_view_cycles \
-  --table=temp_monthly_view_missing_blocks \
-  --table=temp_monthly_view_nodes
-
+  "${TABLE_ARGS[@]}" |
+  "${BZIP_BIN}" > "$LOCAL_DIR/$F_TMP"
 exit_code_3=$?
+set +o pipefail
 
 echo "Clean up views [$DATABASE]"
 psql -q "$CONN_STRING" << EOF
@@ -285,25 +340,41 @@ DROP TABLE IF EXISTS temp_monthly_view_nodes;
 EOF
 
 if [ $exit_code_3 -ne 0 ]; then
-  echo "Error: pg_dump failed with exit code $exit_code_3 [$DATABASE]"
+  echo "Error: pg_dump pipeline failed with exit code $exit_code_3 [$DATABASE]"
+  rm -f "$LOCAL_DIR/$F_TMP"
   exit $exit_code_3
 fi
 
-echo "Successfully created dump at $OUTPUT_DIR/${DUMP_FILE_PREFIX}_${DATE}.dump"
-
-echo "Dumping schema ${OUTPUT_DIR}/${DUMP_FILE_PREFIX}_${DATE}.schema"
-pg_dump --schema-only "${CONN_STRING}" > "${OUTPUT_DIR}/${DUMP_FILE_PREFIX}_${DATE}.schema"
-
-cp "$OUTPUT_DIR/${DUMP_FILE_PREFIX}_${DATE}.dump" "$OUTPUT_DIR/${DUMP_FILE_PREFIX}_${DATE}.dump_tmp_tables"
-sed -i 's/temp_monthly_view_//g' "$OUTPUT_DIR/${DUMP_FILE_PREFIX}_${DATE}.dump"
-
-# Check to see if pbzip2 is already on path; if so, set BZIP_BIN appropriately
-type -P pbzip2 &> /dev/null && export BZIP_BIN="pbzip2"
-# Otherwise, default to standard bzip2 binary
-if [ -z "${BZIP_BIN}" ]; then
-  export BZIP_BIN="bzip2"
+echo "Producing restore-ready variant (table names rewritten, streamed)"
+set -o pipefail
+if ! "${BZIP_BIN}" -dc "$LOCAL_DIR/$F_TMP" | sed 's/temp_monthly_view_//g' | "${BZIP_BIN}" > "$LOCAL_DIR/$F_DUMP"; then
+  echo "Error: rename/recompress pipeline failed"
+  rm -f "$LOCAL_DIR/$F_DUMP"
+  exit 1
 fi
 
-echo "compressing  ${OUTPUT_DIR}/${DUMP_FILE_PREFIX}_${DATE}.{dump,schema,dump_tmp_tables} ..."
-${BZIP_BIN} -v "${OUTPUT_DIR}/${DUMP_FILE_PREFIX}_${DATE}.{dump,schema,dump_tmp_tables}"
-echo "compression done of ${OUTPUT_DIR}/${DUMP_FILE_PREFIX}_${DATE}.{dump,schema,dump_tmp_tables}"
+echo "Dumping schema to $F_SCHEMA"
+if ! pg_dump --schema-only "${CONN_STRING}" | "${BZIP_BIN}" > "$LOCAL_DIR/$F_SCHEMA"; then
+  echo "Error: schema dump failed"
+  rm -f "$LOCAL_DIR/$F_SCHEMA"
+  exit 1
+fi
+set +o pipefail
+
+echo "Publishing to $OUTPUT_DIR"
+for f in "$F_TMP" "$F_DUMP" "$F_SCHEMA"; do
+  if ! cp "$LOCAL_DIR/$f" "$OUTPUT_DIR/$f"; then
+    echo "Error: copy of $f to $OUTPUT_DIR failed"
+    exit 1
+  fi
+  src_size=$(wc -c < "$LOCAL_DIR/$f")
+  dst_size=$(wc -c < "$OUTPUT_DIR/$f")
+  if [ "$src_size" -ne "$dst_size" ]; then
+    echo "Error: size mismatch for $f (local $src_size vs destination $dst_size)"
+    exit 1
+  fi
+  echo "  $f : $dst_size bytes OK"
+done
+rm -f "$LOCAL_DIR/$F_TMP" "$LOCAL_DIR/$F_DUMP" "$LOCAL_DIR/$F_SCHEMA"
+
+echo "Successfully exported $DATE to $OUTPUT_DIR"
