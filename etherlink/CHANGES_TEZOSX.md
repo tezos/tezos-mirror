@@ -64,6 +64,11 @@
 
 ### Michelson Runtime
 
+- Re-priced the gas costs of many Michelson instructions
+  from the values inherited from L1 (a Tallinn-era snapshot) to values
+  re-benchmarked directly on the MIR (Rust) interpreter. This changes the
+  gas reported on receipts and `eth_estimateGas` for any Michelson script
+  using these instructions. (L2-1553 and others to come)
 - Big-map usage now counts toward a contract's storage footprint, so
   receipts and storage burn cover big-maps the same way they do on
   L1. (!22040)

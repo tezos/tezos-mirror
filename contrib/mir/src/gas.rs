@@ -346,8 +346,10 @@ pub mod interpret_cost {
     use crate::ast::{Micheline, Or, Ticket, TypedValue};
 
     pub const DIP: u32 = 10;
-    pub const DROP: u32 = 10;
-    pub const DUP: u32 = 10;
+    // Re-benchmarked on the MIR interpreter (`cost_N_IDrop`).
+    pub const DROP: u32 = 20;
+    // Re-benchmarked on the MIR interpreter (`cost_N_IDup`).
+    pub const DUP: u32 = 45;
     pub const GT: u32 = 10;
     pub const GE: u32 = 10;
     pub const EQ: u32 = 10;
@@ -369,7 +371,8 @@ pub mod interpret_cost {
     pub const INT_NAT: u32 = 10;
     pub const ISNAT: u32 = 10;
     pub const INT_BLS_FR: u32 = 115;
-    pub const PUSH: u32 = 10;
+    // Re-benchmarked on the MIR interpreter (`cost_N_IPush`).
+    pub const PUSH: u32 = 60;
     pub const ADD_TEZ: u32 = 20;
     pub const ADD_BLS_FR: u32 = 30;
     pub const ADD_BLS_G1: u32 = 900;
@@ -385,7 +388,8 @@ pub mod interpret_cost {
     pub const NEG_G1: u32 = 50;
     pub const NEG_G2: u32 = 70;
     pub const SUB_MUTEZ: u32 = 15;
-    pub const UNIT: u32 = 10;
+    // Re-benchmarked on the MIR interpreter (`cost_N_IUnit`).
+    pub const UNIT: u32 = 55;
     pub const AND_BOOL: u32 = 10;
     pub const OR_BOOL: u32 = 10;
     pub const XOR_BOOL: u32 = 15;
@@ -531,9 +535,22 @@ pub mod interpret_cost {
     }
 
     fn dropn(n: u16) -> Result<u32, CostOverflow> {
-        // Approximates 30 + 2.713108*n, copied from the Tezos protocol
-        let n = Checked::from(n as u32);
-        (30 + n * 2 + (n >> 1) + (n >> 3)).as_gas_cost()
+        // `cost_N_IDropN`, re-benchmarked on the MIR interpreter. Piecewise
+        // model with segments split at depths 300 and 400. The model's `S.sub`
+        // is saturating, hence `saturating_sub` (a plain `Checked` subtraction
+        // would underflow to an error below the segment thresholds).
+        let n = n as u32;
+        let w3 = std::cmp::min(300, n);
+        let w1 = std::cmp::min(400, n).saturating_sub(300);
+        let w2 = n.saturating_sub(400);
+        let w1 = Checked::from(w1);
+        let w2 = Checked::from(w2);
+        let w3 = Checked::from(w3);
+        ((w1 >> 1) + (w1 >> 2) + (w1 >> 4) + (w1 >> 5)
+            + (w2 >> 1) + (w2 >> 2) + (w2 >> 3) + (w2 >> 6)
+            + (w3 >> 1) + (w3 >> 2) + (w3 >> 4) + (w3 >> 6)
+            + 10)
+        .as_gas_cost()
     }
 
     pub fn drop(mb_n: Option<u16>) -> Result<u32, CostOverflow> {
@@ -541,9 +558,10 @@ pub mod interpret_cost {
     }
 
     fn dipn(n: u16) -> Result<u32, CostOverflow> {
-        // Approximates 15 + 4.05787663635*n, copied from the Tezos protocol
+        // `cost_N_IDipN`, re-benchmarked on the MIR interpreter: max(10, ~0.305*n).
         let n = Checked::from(n as u32);
-        (15 + n * 4).as_gas_cost()
+        let cost = ((n >> 2) + (n >> 5) + (n >> 6) + (n >> 7)).as_gas_cost()?;
+        Ok(cost.max(10))
     }
 
     pub fn dip(mb_n: Option<u16>) -> Result<u32, CostOverflow> {
@@ -559,20 +577,37 @@ pub mod interpret_cost {
         ((n + 1) * 10).as_gas_cost()
     }
 
-    fn dupn(n: u16) -> Result<u32, CostOverflow> {
-        // Approximates 20 + 1.222263*n, copied from the Tezos protocol
-        let n = Checked::from(n as u32);
-        (20 + n + (n >> 2)).as_gas_cost()
+    fn dupn(_n: u16) -> Result<u32, CostOverflow> {
+        // `cost_N_IDupN`, re-benchmarked on the MIR interpreter: the measured
+        // slope is ~0, so the cost is size-independent and charged as a flat
+        // constant.
+        //
+        // TODO(L2-1553): check the micro-benchmark results for `N_IDupN`.
+        // This 840 looks wrong. The fitted model is a flat constant (~835.8 ns,
+        // slope ~0), which is physically implausible: `DUP n` does the same work
+        // as `DUP` (clone) plus an O(n) stack walk, so it should start close to
+        // `DUP` (= 45) and grow slightly with n, not jump to 840 for every n.
+        // The flat ~840 ns const smells of `Timer_latency` contamination /
+        // scatter in the raw bench (cf. report_mir_interpreter PDF). This creates
+        // a discontinuity: `DUP` = 45 but `DUP 1` = `DUP 2` = ... = 840, even
+        // though `DUP 1` is semantically identical to `DUP` (both duplicate the
+        // top). MIR routes `DUP 1` -> DupN exactly like L1 (script_ir_translator
+        // `I_DUP [n]` -> `IDup_n` even for n = 1), so this is not a MIR bug but a
+        // benchmark/model problem to fix upstream (re-fit `N_IDupN` so it is
+        // continuous with `N_IDup`), then regenerate and re-port here.
+        Ok(840)
     }
 
     pub fn dig(n: u16) -> Result<u32, CostOverflow> {
+        // `cost_N_IDig`, re-benchmarked on the MIR interpreter: 10 + ~0.227*n.
         let n = Checked::from(n as u32);
-        (30 + 6 * n + (n >> 1) + (n >> 2)).as_gas_cost()
+        ((n >> 3) + (n >> 4) + (n >> 5) + (n >> 7) + 10).as_gas_cost()
     }
 
     pub fn dug(n: u16) -> Result<u32, CostOverflow> {
+        // `cost_N_IDug`, re-benchmarked on the MIR interpreter: 10 + ~0.207*n.
         let n = Checked::from(n as u32);
-        (35 + 6 * n + (n >> 1) + (n >> 2)).as_gas_cost()
+        ((n >> 3) + (n >> 4) + (n >> 6) + (n >> 8) + 10).as_gas_cost()
     }
 
     pub fn dup(mb_n: Option<u16>) -> Result<u32, CostOverflow> {
