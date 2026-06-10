@@ -1,0 +1,361 @@
+
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/script'
+{ "code":
+    [ { "prim": "parameter",
+        "args":
+          [ { "prim": "or",
+              "args":
+                [ { "prim": "or",
+                    "args":
+                      [ { "prim": "or",
+                          "args":
+                            [ { "prim": "or",
+                                "args":
+                                  [ { "prim": "unit",
+                                      "annots": [ "%deposit" ] },
+                                    { "prim": "nat",
+                                      "annots": [ "%redeem" ] } ] },
+                              { "prim": "key_hash",
+                                "annots": [ "%finalize_redeem" ] } ] },
+                        { "prim": "or",
+                          "args":
+                            [ { "prim": "option",
+                                "args":
+                                  [ { "prim": "pair",
+                                      "args":
+                                        [ { "prim": "nat" },
+                                          { "prim": "nat" } ] } ],
+                                "annots": [ "%register_delegate" ] },
+                              { "prim": "or",
+                                "args":
+                                  [ { "prim": "pair",
+                                      "args":
+                                        [ { "prim": "nat" },
+                                          { "prim": "nat" } ],
+                                      "annots":
+                                        [ "%update_delegate_parameters" ] },
+                                    { "prim": "unit",
+                                      "annots": [ "%unregister_delegate" ] } ] } ] } ] },
+                  { "prim": "or",
+                    "args":
+                      [ { "prim": "or",
+                          "args":
+                            [ { "prim": "list",
+                                "args":
+                                  [ { "prim": "pair",
+                                      "args":
+                                        [ { "prim": "address" },
+                                          { "prim": "list",
+                                            "args":
+                                              [ { "prim": "pair",
+                                                  "args":
+                                                    [ { "prim": "address" },
+                                                      { "prim": "nat" },
+                                                      { "prim": "nat" } ] } ] } ] } ],
+                                "annots": [ "%transfer" ] },
+                              { "prim": "pair",
+                                "args":
+                                  [ { "prim": "list",
+                                      "args":
+                                        [ { "prim": "pair",
+                                            "args":
+                                              [ { "prim": "address" },
+                                                { "prim": "nat" } ] } ] },
+                                    { "prim": "contract",
+                                      "args":
+                                        [ { "prim": "list",
+                                            "args":
+                                              [ { "prim": "pair",
+                                                  "args":
+                                                    [ { "prim": "pair",
+                                                        "args":
+                                                          [ { "prim":
+                                                                "address" },
+                                                            { "prim": "nat" } ] },
+                                                      { "prim": "nat" } ] } ] } ] } ],
+                                "annots": [ "%balance_of" ] } ] },
+                        { "prim": "or",
+                          "args":
+                            [ { "prim": "or",
+                                "args":
+                                  [ { "prim": "list",
+                                      "args":
+                                        [ { "prim": "pair",
+                                            "args":
+                                              [ { "prim": "address" },
+                                                { "prim": "address" },
+                                                { "prim": "nat" },
+                                                { "prim": "or",
+                                                  "args":
+                                                    [ { "prim": "nat" },
+                                                      { "prim": "nat" } ] } ] } ],
+                                      "annots": [ "%approve" ] },
+                                    { "prim": "list",
+                                      "args":
+                                        [ { "prim": "or",
+                                            "args":
+                                              [ { "prim": "pair",
+                                                  "args":
+                                                    [ { "prim": "address" },
+                                                      { "prim": "address" },
+                                                      { "prim": "nat" } ] },
+                                                { "prim": "pair",
+                                                  "args":
+                                                    [ { "prim": "address" },
+                                                      { "prim": "address" },
+                                                      { "prim": "nat" } ] } ] } ],
+                                      "annots": [ "%update_operators" ] } ] },
+                              { "prim": "or",
+                                "args":
+                                  [ { "prim": "or",
+                                      "args":
+                                        [ { "prim": "list",
+                                            "args":
+                                              [ { "prim": "pair",
+                                                  "args":
+                                                    [ { "prim": "option",
+                                                        "args":
+                                                          [ { "prim":
+                                                                "contract",
+                                                              "args":
+                                                                [ { "prim":
+                                                                    "list",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "address" },
+                                                                    { "prim":
+                                                                    "list",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "ticket",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat" },
+                                                                    { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "bytes" } ] } ] } ] } ] } ] } ] } ] } ] },
+                                                      { "prim": "list",
+                                                        "args":
+                                                          [ { "prim": "pair",
+                                                              "args":
+                                                                [ { "prim":
+                                                                    "address" },
+                                                                  { "prim":
+                                                                    "list",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "address" },
+                                                                    { "prim":
+                                                                    "nat" },
+                                                                    { "prim":
+                                                                    "nat" } ] } ] } ] } ] } ] } ],
+                                            "annots": [ "%export_ticket" ] },
+                                          { "prim": "list",
+                                            "args":
+                                              [ { "prim": "pair",
+                                                  "args":
+                                                    [ { "prim": "address" },
+                                                      { "prim": "list",
+                                                        "args":
+                                                          [ { "prim":
+                                                                "ticket",
+                                                              "args":
+                                                                [ { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat" },
+                                                                    { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "bytes" } ] } ] } ] } ] } ] } ],
+                                            "annots": [ "%import_ticket" ] } ] },
+                                    { "prim": "or",
+                                      "args":
+                                        [ { "prim": "pair",
+                                            "args":
+                                              [ { "prim": "list",
+                                                  "args":
+                                                    [ { "prim": "pair",
+                                                        "args":
+                                                          [ { "prim":
+                                                                "address" },
+                                                            { "prim": "nat" },
+                                                            { "prim": "nat" } ] } ] },
+                                                { "prim": "lambda",
+                                                  "args":
+                                                    [ { "prim": "list",
+                                                        "args":
+                                                          [ { "prim":
+                                                                "ticket",
+                                                              "args":
+                                                                [ { "prim":
+                                                                    "pair",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "nat" },
+                                                                    { "prim":
+                                                                    "option",
+                                                                    "args":
+                                                                    [ { "prim":
+                                                                    "bytes" } ] } ] } ] } ] },
+                                                      { "prim": "list",
+                                                        "args":
+                                                          [ { "prim":
+                                                                "operation" } ] } ] } ],
+                                            "annots": [ "%lambda_export" ] },
+                                          { "prim": "ticket",
+                                            "args":
+                                              [ { "prim": "pair",
+                                                  "args":
+                                                    [ { "prim": "nat" },
+                                                      { "prim": "option",
+                                                        "args":
+                                                          [ { "prim": "bytes" } ] } ] } ],
+                                            "annots":
+                                              [ "%import_ticket_from_implicit" ] } ] } ] } ] } ] } ] } ] },
+      { "prim": "storage",
+        "args":
+          [ { "prim": "pair",
+              "args":
+                [ { "prim": "big_map",
+                    "args": [ { "prim": "address" }, { "prim": "nat" } ] },
+                  { "prim": "nat" },
+                  { "prim": "big_map",
+                    "args":
+                      [ { "prim": "address" },
+                        { "prim": "map",
+                          "args":
+                            [ { "prim": "address" },
+                              { "prim": "option",
+                                "args": [ { "prim": "nat" } ] } ] } ] },
+                  { "prim": "big_map",
+                    "args":
+                      [ { "prim": "nat" },
+                        { "prim": "pair",
+                          "args":
+                            [ { "prim": "nat" },
+                              { "prim": "map",
+                                "args":
+                                  [ { "prim": "string" },
+                                    { "prim": "bytes" } ] } ] } ] } ] } ] },
+      { "prim": "code",
+        "args":
+          [ [ { "prim": "DROP" },
+              { "prim": "PUSH",
+                "args":
+                  [ { "prim": "string" },
+                    { "string": "native contract: no Michelson code" } ] },
+              { "prim": "FAILWITH" } ] ] },
+      { "prim": "view",
+        "args":
+          [ { "string": "get_allowance" },
+            { "prim": "pair",
+              "args":
+                [ { "prim": "address" }, { "prim": "address" },
+                  { "prim": "nat" } ] }, { "prim": "nat" },
+            [ { "prim": "DROP" },
+              { "prim": "PUSH",
+                "args":
+                  [ { "prim": "string" },
+                    { "string": "native contract: no Michelson code" } ] },
+              { "prim": "FAILWITH" } ] ] },
+      { "prim": "view",
+        "args":
+          [ { "string": "get_balance" },
+            { "prim": "pair",
+              "args": [ { "prim": "address" }, { "prim": "nat" } ] },
+            { "prim": "nat" },
+            [ { "prim": "DROP" },
+              { "prim": "PUSH",
+                "args":
+                  [ { "prim": "string" },
+                    { "string": "native contract: no Michelson code" } ] },
+              { "prim": "FAILWITH" } ] ] },
+      { "prim": "view",
+        "args":
+          [ { "string": "get_token_metadata" }, { "prim": "nat" },
+            { "prim": "map",
+              "args": [ { "prim": "string" }, { "prim": "bytes" } ] },
+            [ { "prim": "DROP" },
+              { "prim": "PUSH",
+                "args":
+                  [ { "prim": "string" },
+                    { "string": "native contract: no Michelson code" } ] },
+              { "prim": "FAILWITH" } ] ] },
+      { "prim": "view",
+        "args":
+          [ { "string": "get_total_supply" }, { "prim": "nat" },
+            { "prim": "nat" },
+            [ { "prim": "DROP" },
+              { "prim": "PUSH",
+                "args":
+                  [ { "prim": "string" },
+                    { "string": "native contract: no Michelson code" } ] },
+              { "prim": "FAILWITH" } ] ] },
+      { "prim": "view",
+        "args":
+          [ { "string": "is_operator" },
+            { "prim": "pair",
+              "args":
+                [ { "prim": "address" }, { "prim": "address" },
+                  { "prim": "nat" } ] }, { "prim": "bool" },
+            [ { "prim": "DROP" },
+              { "prim": "PUSH",
+                "args":
+                  [ { "prim": "string" },
+                    { "string": "native contract: no Michelson code" } ] },
+              { "prim": "FAILWITH" } ] ] },
+      { "prim": "view",
+        "args":
+          [ { "string": "is_token" }, { "prim": "nat" }, { "prim": "bool" },
+            [ { "prim": "DROP" },
+              { "prim": "PUSH",
+                "args":
+                  [ { "prim": "string" },
+                    { "string": "native contract: no Michelson code" } ] },
+              { "prim": "FAILWITH" } ] ] } ],
+  "storage":
+    { "prim": "Pair",
+      "args":
+        [ [],
+          { "prim": "Pair",
+            "args":
+              [ { "int": "0" },
+                { "prim": "Pair",
+                  "args":
+                    [ [],
+                      [ { "prim": "Elt",
+                          "args":
+                            [ { "int": "0" },
+                              { "prim": "Pair",
+                                "args":
+                                  [ { "int": "0" },
+                                    [ { "prim": "Elt",
+                                        "args":
+                                          [ { "string": "decimals" },
+                                            { "bytes": "36" } ] },
+                                      { "prim": "Elt",
+                                        "args":
+                                          [ { "string": "name" },
+                                            { "bytes": "5374616b65642054657a" } ] },
+                                      { "prim": "Elt",
+                                        "args":
+                                          [ { "string": "symbol" },
+                                            { "bytes": "7354657a" } ] },
+                                      { "prim": "Elt",
+                                        "args":
+                                          [ { "string": "tokenKind" },
+                                            { "bytes": "66756e6769626c65" } ] } ] ] } ] } ] ] } ] } ] } }

@@ -1105,6 +1105,24 @@ let get_chain_block_context_contract_script ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "context"; "contracts"; id; "script"]
     Fun.id
 
+let post_chain_block_context_contract_script_normalized ?(chain = "main")
+    ?(block = "head") ~id ~data () =
+  make
+    POST
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "contracts";
+      id;
+      "script";
+      "normalized";
+    ]
+    ~data
+    Fun.id
+
 let get_chain_block_context_contract_storage ?(chain = "main") ?(block = "head")
     ~id () =
   make

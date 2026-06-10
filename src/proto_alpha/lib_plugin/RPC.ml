@@ -2595,22 +2595,28 @@ module Contract = struct
       (fun ctxt contract () (unparsing_mode, normalize_types) ->
         get_contract contract @@ fun contract ->
         let* ctxt, script = Contract.get_script ctxt contract in
+        let parse_and_unparse ctxt script =
+          let ctxt = Gas.set_unlimited ctxt in
+          let+ script, _ctxt =
+            Script_ir_translator.parse_and_unparse_michelson_script_unaccounted
+              ctxt
+              ~legacy:true
+              ~allow_forged_tickets_in_storage:true
+              ~allow_forged_lazy_storage_id_in_storage:true
+              unparsing_mode
+              ~normalize_types
+              script
+          in
+          Some script
+        in
         match script with
-        | None | Some (Script.Native _) -> return_none
-        | Some (Script.Script script) ->
-            let ctxt = Gas.set_unlimited ctxt in
-            let+ script, _ctxt =
-              Script_ir_translator
-              .parse_and_unparse_michelson_script_unaccounted
-                ctxt
-                ~legacy:true
-                ~allow_forged_tickets_in_storage:true
-                ~allow_forged_lazy_storage_id_in_storage:true
-                unparsing_mode
-                ~normalize_types
-                script
+        | None -> return_none
+        | Some (Script.Native {kind; storage}) ->
+            let*? script =
+              Script_native_synthesis.of_native ctxt kind ~storage
             in
-            Some script) ;
+            parse_and_unparse ctxt script
+        | Some (Script.Script script) -> parse_and_unparse ctxt script) ;
     Registration.register1
       ~chunked:false
       S.get_used_storage_space
