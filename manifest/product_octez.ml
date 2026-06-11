@@ -3259,6 +3259,19 @@ let octez_smart_rollup_wasm_in_memory =
         octez_merkle_proof_encoding;
       ]
 
+let _octez_smart_rollup_wasm_dual_state =
+  octez_lib
+    "smart-rollup-wasm-dual-state"
+    ~internal_name:"tezos_smart_rollup_wasm_dual_state"
+    ~path:"src/lib_smart_rollup_wasm_dual_state"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_scoru_wasm;
+        octez_riscv_nds_common;
+        lazy_containers;
+      ]
+
 let octez_scoru_wasm_fast =
   octez_l2_lib
     "scoru-wasm-fast"
