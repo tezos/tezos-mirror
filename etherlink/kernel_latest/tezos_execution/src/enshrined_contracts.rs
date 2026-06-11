@@ -23,7 +23,9 @@ use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::block::AppliedOperation;
-use tezos_tezlink::operation_result::{InternalOperationSum, TransferError};
+use tezos_tezlink::operation_result::{
+    ApplyOperationError, ContentResult, InternalOperationSum, TransferError,
+};
 use tezosx_interfaces::{
     gas::convert as convert_gas,
     headers::{format_tez_from_mutez, parse_u64_opt},
@@ -334,7 +336,7 @@ const TEZOSX_GATEWAY_BASE_COST_MILLIGAS: u64 = 100_000;
 /// allocation, callback/selector assembly, ...).
 ///
 /// TODO(L2-1165): replace with a benchmarked value.
-const TEZOSX_GATEWAY_PER_BYTE_MILLIGAS: u64 = 300;
+pub(crate) const TEZOSX_GATEWAY_PER_BYTE_MILLIGAS: u64 = 300;
 
 /// Surcharge when amount > 0 (balance reset after value transfer).
 /// Equivalent to SSTORE non-zero→zero (5,000 EVM gas × 100).
@@ -477,6 +479,47 @@ pub(crate) fn charge_persisted_error(
     match charge_gateway_payload_gas(operation_gas, persisted_len) {
         Ok(()) => CracError::Operation(error),
         Err(_oog) => CracError::Operation(TransferError::OutOfGas(mir::gas::OutOfGas)),
+    }
+}
+
+/// Meter the persisted error bodies in `internal_receipts` that will land in
+/// the failed CRAC receipt BSON sink, charging
+/// `TEZOSX_GATEWAY_PER_BYTE_MILLIGAS` per byte of the Debug-rendered
+/// `ApplyOperationError` body for each `ContentResult::Failed` entry.
+///
+/// This closes the bypass by which an attacker-controlled internal-op
+/// FAILWITH payload routes unmetered into the persisted receipt.  The BSON
+/// sink serialises every non-`PastError` `ApplyOperationError` as
+/// `format!("{error:?}")`, so that is the length we charge.
+///
+/// On gas exhaustion the oversized `Failed` body is replaced with
+/// `Failed(ApplyOperationError::OutOfGas(...).into())` so the internal-op
+/// entry survives with a bounded body, and the failed CRAC receipt is still
+/// produced (the internal-op entry is always preserved even on OOG).
+/// `Applied`, `Skipped`, and `BackTracked` entries are left untouched.
+pub(crate) fn charge_internal_receipt_bodies(
+    operation_gas: &mut crate::gas::TezlinkOperationGas,
+    receipts: &mut [InternalOperationSum],
+) {
+    macro_rules! meter_failed {
+        ($r:expr) => {
+            if let ContentResult::Failed(ref errors) = $r.result {
+                let len: usize =
+                    errors.errors.iter().map(|e| format!("{e:?}").len()).sum();
+                if charge_gateway_payload_gas(operation_gas, len).is_err() {
+                    $r.result = ContentResult::Failed(
+                        ApplyOperationError::OutOfGas(mir::gas::OutOfGas).into(),
+                    );
+                }
+            }
+        };
+    }
+    for receipt in receipts.iter_mut() {
+        match receipt {
+            InternalOperationSum::Transfer(r) => meter_failed!(r),
+            InternalOperationSum::Origination(r) => meter_failed!(r),
+            InternalOperationSum::Event(r) => meter_failed!(r),
+        }
     }
 }
 
