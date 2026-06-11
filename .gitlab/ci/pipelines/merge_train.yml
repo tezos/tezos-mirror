@@ -361,57 +361,6 @@ images.debian-rust.merge:
     RELEASE: trixie
     IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/debian-rust
 
-images.ubuntu-build.merge:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: build
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - images/base-images/Dockerfile.debian
-    - images/base-images/Dockerfile.debian-build
-    - images/scripts/install-gcloud.sh
-    - images/scripts/install_datadog_static.sh
-    - images/scripts/install_opam_static.sh
-    - images/scripts/install_sccache_static.sh
-    - opam/virtual/dream-httpaf.opam.locked
-    - opam/virtual/dream.opam.locked
-    - opam/virtual/octez-deps.opam.locked
-    - opam/virtual/release-tools-deps.opam.locked
-    - scripts/ci/build-base-images.sh
-    - scripts/ci/docker-merge-base-images.sh
-    - scripts/install_build_deps.rust.sh
-    - scripts/install_build_deps.sh
-    - scripts/kiss-fetch.sh
-    - scripts/kiss-logs.sh
-    - scripts/version.sh
-    when: on_success
-  needs:
-  - images.ubuntu-build
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - scripts/ci/docker-merge-base-images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    DOCKER_VERSION: 28.5.1
-    IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/ubuntu-build
-  parallel:
-    matrix:
-    - RELEASE:
-      - "22.04"
-      - "24.04"
-      - "26.04"
-
 select_tezts:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: build
@@ -1370,6 +1319,7 @@ images.ubuntu-build:
     - opam/virtual/octez-deps.opam.locked
     - opam/virtual/release-tools-deps.opam.locked
     - scripts/ci/build-base-images.sh
+    - scripts/ci/docker-merge-base-images.sh
     - scripts/install_build_deps.rust.sh
     - scripts/install_build_deps.sh
     - scripts/kiss-fetch.sh
@@ -1407,6 +1357,58 @@ images.ubuntu-build:
       TAGS:
       - gcp_very_high_cpu
       - gcp_arm64
+
+images.ubuntu-build.merge:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - images/base-images/Dockerfile.debian
+    - images/base-images/Dockerfile.debian-build
+    - images/scripts/install-gcloud.sh
+    - images/scripts/install_datadog_static.sh
+    - images/scripts/install_opam_static.sh
+    - images/scripts/install_sccache_static.sh
+    - opam/virtual/dream-httpaf.opam.locked
+    - opam/virtual/dream.opam.locked
+    - opam/virtual/octez-deps.opam.locked
+    - opam/virtual/release-tools-deps.opam.locked
+    - scripts/ci/build-base-images.sh
+    - scripts/ci/docker-merge-base-images.sh
+    - scripts/install_build_deps.rust.sh
+    - scripts/install_build_deps.sh
+    - scripts/kiss-fetch.sh
+    - scripts/kiss-logs.sh
+    - scripts/version.sh
+    when: on_success
+  needs:
+  - images.ubuntu-build
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - scripts/ci/docker-merge-base-images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DOCKER_VERSION: 28.5.1
+    IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/ubuntu-build
+  parallel:
+    matrix:
+    - RELEASE:
+      - "22.04"
+      - "24.04"
+      - "26.04"
 
 images.debian-systemd:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621

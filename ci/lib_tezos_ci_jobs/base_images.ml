@@ -560,22 +560,6 @@ let job_debian_build_based_images_merge =
     ~needs:[(Cacio.Job, job_debian_build_based_images)]
     "images.debian-build.merge"
 
-let make_job_ubuntu_build_base_images ?start_job ?(changeset = false) () =
-  let dep_ubuntu = make_job_ubuntu_based_images () in
-  make_job_base_images
-    ?start_job
-    ~changeset
-    ~__POS__
-    ~image_name:"ubuntu-build"
-    ~base_name:(Pipeline_dep "ubuntu")
-    ~dependencies:(Dependent [Job dep_ubuntu])
-    ~matrix:Distribution.(release_matrix Ubuntu)
-    ~compilation:Native
-    ~changes:
-      (Changeset.make
-         (Files.debian_build @ Files.debian_base @ Files.merge_script))
-    "images/base-images/Dockerfile.debian-build"
-
 (* ── Cacio: ubuntu-build ─────────────────────────────────────────────────── *)
 
 let job_ubuntu_build_based_images =
@@ -591,29 +575,19 @@ let job_ubuntu_build_based_images =
     ~needs_legacy:[(Cacio.Job, make_job_ubuntu_based_images ())]
     "images.ubuntu-build"
 
-let make_job_ubuntu_build_base_images_merge ?(changeset = false) () =
-  let dep_build = make_job_ubuntu_build_base_images () in
-  job_docker_authenticated
+(* ── Cacio: ubuntu-build.merge ───────────────────────────────────────────── *)
+
+let job_ubuntu_build_based_images_merge =
+  docker_job
+    ~extra_variables:
+      [("IMAGE_NAME", "${GCP_REGISTRY}/tezos/tezos/ubuntu-build")]
+    ~script:["scripts/ci/docker-merge-base-images.sh"]
     ~__POS__
-    ~name:"images.ubuntu-build.merge"
-    ~stage:Stages.build
-    ~dependencies:(Dependent [Job dep_build])
-    ~rules:
-      (if changeset then
-         [
-           job_rule
-             ~changes:
-               (Changeset.encode
-                  (Changeset.make
-                     (Files.merge_script @ Files.debian_build
-                    @ Files.debian_base)))
-             ~when_:On_success
-             ();
-         ]
-       else [job_rule ~when_:On_success ()])
+    ~description:"Merge ubuntu-build base image manifests"
     ~parallel:(Matrix [Distribution.(release_matrix Ubuntu)])
-    ~variables:[("IMAGE_NAME", "${GCP_REGISTRY}/tezos/tezos/ubuntu-build")]
-    ["scripts/ci/docker-merge-base-images.sh"]
+    ~only_if_changed:Files.(merge_script @ debian_build @ debian_base)
+    ~needs:[(Cacio.Job, job_ubuntu_build_based_images)]
+    "images.ubuntu-build.merge"
 
 (* ── Systemd images ──────────────────────────────────────────────────────── *)
 
@@ -696,7 +670,6 @@ let jobs ?start_job ?(changeset = false) () =
     make_job_ubuntu_based_images ?start_job ~changeset ();
     make_job_rust_based_images ?start_job ~changeset ();
     make_job_rust_based_images_merge ~changeset ();
-    make_job_ubuntu_build_base_images_merge ~changeset ();
   ]
   @
   if enable_rpm_images then
@@ -721,6 +694,7 @@ let () =
       (Cacio.Auto, job_debian_build_based_images);
       (Cacio.Auto, job_debian_build_based_images_merge);
       (Cacio.Auto, job_ubuntu_build_based_images);
+      (Cacio.Auto, job_ubuntu_build_based_images_merge);
     ]
   in
   Cacio.register_merge_request_jobs jobs ;
