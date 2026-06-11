@@ -26,6 +26,13 @@
 
 ### Execution changes
 
+- The WASM runtime's `store_read` host function now clamps a read that
+  asks for more bytes than the value holds to the bytes actually present,
+  instead of failing it with `Store_invalid_access`. This matches the
+  rollup PVM (`Durable.read_value_exn`) and the host-function contract
+  ("read up to `num_bytes`"); the two implementations previously diverged
+  on over-reads, which could make the node and the rollup disagree. (!22141)
+
 ### Storage changes
 
 ### Documentation changes
