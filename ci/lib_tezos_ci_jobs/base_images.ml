@@ -576,6 +576,21 @@ let make_job_ubuntu_build_base_images ?start_job ?(changeset = false) () =
          (Files.debian_build @ Files.debian_base @ Files.merge_script))
     "images/base-images/Dockerfile.debian-build"
 
+(* ── Cacio: ubuntu-build ─────────────────────────────────────────────────── *)
+
+let job_ubuntu_build_based_images =
+  base_image_job
+    ~image_name:"ubuntu-build"
+    ~base_name:(Pipeline_dep "ubuntu")
+    ~matrix:Distribution.(release_matrix Ubuntu)
+    ~compilation:Native
+    "images/base-images/Dockerfile.debian-build"
+    ~__POS__
+    ~description:"Build ubuntu-build base images"
+    ~only_if_changed:Files.(debian_build @ debian_base)
+    ~needs_legacy:[(Cacio.Job, make_job_ubuntu_based_images ())]
+    "images.ubuntu-build"
+
 let make_job_ubuntu_build_base_images_merge ?(changeset = false) () =
   let dep_build = make_job_ubuntu_build_base_images () in
   job_docker_authenticated
@@ -681,7 +696,6 @@ let jobs ?start_job ?(changeset = false) () =
     make_job_ubuntu_based_images ?start_job ~changeset ();
     make_job_rust_based_images ?start_job ~changeset ();
     make_job_rust_based_images_merge ~changeset ();
-    make_job_ubuntu_build_base_images ?start_job ~changeset ();
     make_job_ubuntu_build_base_images_merge ~changeset ();
   ]
   @
@@ -706,6 +720,7 @@ let () =
       (Cacio.Auto, job_ubuntu_systemd_based_images);
       (Cacio.Auto, job_debian_build_based_images);
       (Cacio.Auto, job_debian_build_based_images_merge);
+      (Cacio.Auto, job_ubuntu_build_based_images);
     ]
   in
   Cacio.register_merge_request_jobs jobs ;
