@@ -409,54 +409,42 @@ let job_ci_release_based_images =
     ~only_if_changed:Files.(ci_releases @ debian_base)
     "images.ci-release"
 
-(* This base image differs from the others in its build process: it is
-   bootstrapped directly from the upstream Docker Hub [docker:<version>]
-   image (declared in {!Images_external.upstream_docker}) rather than from
-   another internal base image (e.g. [debian:<release>]).
-   The resulting image includes the Docker daemon, gcloud CLI, hadolint
-   and regctl — it is the standard Docker-in-Docker image for CI jobs.
-   The changeset is also different to ensure this image is always up-to-date *)
-let make_job_docker_ci_based_images ?start_job ?(changeset = false) () =
+(* ── Cacio: alpine-docker-ci ─────────────────────────────────────────────── *)
+
+(* This job is special: it bootstraps from the upstream docker:<version> image
+   (not alpine-docker-ci itself) and has a custom build procedure. *)
+let job_docker_ci_based_images =
   let docker_version = Images.Base_images.docker_version in
-  let variables =
-    [
-      ("RELEASE", docker_version);
-      ("DISTRIBUTION", "alpine-docker-ci");
-      ("IMAGE_PATH", "");
-      ("GCLOUD_VERSION", "543.0.0");
-      ("HADOLINT_VERSION", "2.10.0");
-      ("DOCKER_VERSION", docker_version);
-      ("REGCTL_VERSION", "v0.4.3");
-      ("PLATFORM", "linux/amd64,linux/arm64");
-      ("CI_DOCKER_HUB", "false");
-    ]
-  in
-  job
-    ~rules:
-      (if changeset then
-         [
-           job_rule
-             ~changes:Changeset.(encode (make Files.alpine_docker_ci))
-             ~when_:On_success
-             ();
-         ]
-       else [job_rule ~when_:On_success ()])
-    ~tag:Gcp_very_high_cpu
+  CI.job
+    "images.alpine-docker-ci"
     ~__POS__
+    ~description:
+      "Build alpine-docker-ci base images (bootstrapped from upstream docker)"
+    ~stage:Cacio.Build
     ~image:Images.upstream_docker
-    ~variables
     ~services:[{name = Images.Base_images.dind_service}]
-    ~stage:Stages.build
-    ?dependencies:(Option.map (fun j -> Dependent [Job j]) start_job)
-    ~name:"images.alpine-docker-ci"
-    [
-      (* minimal set of tools needed to bootstrap the docker-ci image *)
-      "images/scripts/install-gcloud-apk.sh";
-      "export PATH=$PATH:/google-cloud-sdk/bin";
-      "scripts/ci/docker_initialize.sh";
-      "scripts/ci/build-base-images.sh \
-       images/base-images/Dockerfile.alpine-docker-ci";
-    ]
+    ~tag:Gcp_very_high_cpu
+    ~only_if_changed:Files.alpine_docker_ci
+    ~variables:
+      [
+        ("RELEASE", docker_version);
+        ("DISTRIBUTION", "alpine-docker-ci");
+        ("IMAGE_PATH", "");
+        ("GCLOUD_VERSION", "543.0.0");
+        ("HADOLINT_VERSION", "2.10.0");
+        ("DOCKER_VERSION", docker_version);
+        ("REGCTL_VERSION", "v0.4.3");
+        ("PLATFORM", "linux/amd64,linux/arm64");
+        ("CI_DOCKER_HUB", "false");
+      ]
+    ~script:
+      [
+        "images/scripts/install-gcloud-apk.sh";
+        "export PATH=$PATH:/google-cloud-sdk/bin";
+        "scripts/ci/docker_initialize.sh";
+        "scripts/ci/build-base-images.sh \
+         images/base-images/Dockerfile.alpine-docker-ci";
+      ]
 
 (* ── Rust family ────────────────────────────────────────────────────────── *)
 
@@ -703,7 +691,6 @@ let jobs ?start_job ?(changeset = false) () =
     make_job_rust_based_images ?start_job ~changeset ();
     make_job_rust_based_images_merge ~changeset ();
     make_job_debian_homebrew_base_images ?start_job ~changeset ();
-    make_job_docker_ci_based_images ?start_job ~changeset ();
     make_job_debian_build_base_images ?start_job ~changeset ();
     make_job_debian_build_base_images_merge ~changeset ();
     make_job_ubuntu_build_base_images ?start_job ~changeset ();
@@ -724,7 +711,12 @@ let jobs ?start_job ?(changeset = false) () =
 (* ── Cacio pipeline registrations ───────────────────────────────────────── *)
 
 let () =
-  let jobs = [(Cacio.Auto, job_ci_release_based_images)] in
+  let jobs =
+    [
+      (Cacio.Auto, job_ci_release_based_images);
+      (Cacio.Auto, job_docker_ci_based_images);
+    ]
+  in
   Cacio.register_merge_request_jobs jobs ;
   Cacio.register_jobs Cacio.Base_images_daily jobs
 

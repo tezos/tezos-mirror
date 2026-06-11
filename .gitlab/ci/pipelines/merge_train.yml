@@ -429,47 +429,6 @@ images.debian-homebrew:
     - RELEASE:
       - trixie
 
-images.alpine-docker-ci:
-  image: docker:28.5.1@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  stage: build
-  tags:
-  - gcp_very_high_cpu
-  rules:
-  - changes:
-    - images/base-images/Dockerfile.alpine-docker-ci
-    - images/scripts/install-gcloud-apk.sh
-    - images/scripts/install_datadog_static.sh
-    - scripts/ci/build-base-images.sh
-    - scripts/ci/docker_initialize.sh
-    when: on_success
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - images/scripts/install-gcloud-apk.sh
-  - export PATH=$PATH:/google-cloud-sdk/bin
-  - scripts/ci/docker_initialize.sh
-  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.alpine-docker-ci
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    RELEASE: 28.5.1
-    DISTRIBUTION: alpine-docker-ci
-    IMAGE_PATH: ""
-    GCLOUD_VERSION: 543.0.0
-    HADOLINT_VERSION: 2.10.0
-    DOCKER_VERSION: 28.5.1
-    REGCTL_VERSION: v0.4.3
-    PLATFORM: linux/amd64,linux/arm64
-    CI_DOCKER_HUB: "false"
-
 images.debian-build:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: build
@@ -1610,6 +1569,48 @@ images.ci-release:
     matrix:
     - RELEASE:
       - trixie
+
+images.alpine-docker-ci:
+  image: docker:28.5.1@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  rules:
+  - changes:
+    - images/base-images/Dockerfile.alpine-docker-ci
+    - images/scripts/install-gcloud-apk.sh
+    - images/scripts/install_datadog_static.sh
+    - scripts/ci/build-base-images.sh
+    - scripts/ci/docker_initialize.sh
+    when: on_success
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - images/scripts/install-gcloud-apk.sh
+  - export PATH=$PATH:/google-cloud-sdk/bin
+  - scripts/ci/docker_initialize.sh
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.alpine-docker-ci
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    RELEASE: 28.5.1
+    DISTRIBUTION: alpine-docker-ci
+    IMAGE_PATH: ""
+    GCLOUD_VERSION: 543.0.0
+    HADOLINT_VERSION: 2.10.0
+    DOCKER_VERSION: 28.5.1
+    REGCTL_VERSION: v0.4.3
+    PLATFORM: linux/amd64,linux/arm64
+    CI_DOCKER_HUB: "false"
 
 sanity_ci:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci/build:amd64--master
