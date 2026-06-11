@@ -42,6 +42,12 @@ let remove_0x s =
   if String.starts_with ~prefix:"0x" s then String.sub s 2 (String.length s - 2)
   else s
 
+let evm_alias_of_tezos_address address =
+  let hash =
+    Tezos_crypto.Hacl.Hash.Keccak_256.digest (Bytes.of_string address)
+  in
+  add_0x (Hex.show (Hex.of_bytes (Bytes.sub hash 0 20)))
+
 let mapping_position index map_position =
   Tezos_crypto.Hacl.Hash.Keccak_256.digest
     (Hex.to_bytes

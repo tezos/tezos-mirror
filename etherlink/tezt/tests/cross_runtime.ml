@@ -1097,27 +1097,43 @@ module EvmIdentityRecorder = struct
   let deploy =
     deploy_solidity_contract ~contract:Solidity_contracts.crac_identity_recorder
 
+  let parse_address_slot raw =
+    let strip_0x = Test_helpers.remove_0x in
+    let s = strip_0x raw in
+    (* Storage slot is 32 bytes (64 hex chars); address is the last 20
+       bytes (40 hex chars). *)
+    let len = String.length s in
+    if len >= 40 then String.sub s (len - 40) 40 else String.make 40 '0'
+
   (** Asserts that [lastSender] (slot 0) equals [expected_sender]
    *  (lowercase hex, no [0x] prefix on either side). *)
   let check_last_sender ~sequencer ~expected_sender contract =
     let*@ raw = Rpc.get_storage_at ~address:contract ~pos:"0x0" sequencer in
-    let strip_0x = Test_helpers.remove_0x in
-    let parse_address slot =
-      let s = strip_0x slot in
-      (* Storage slot is 32 bytes (64 hex chars); address is the last 20
-         bytes (40 hex chars). *)
-      let len = String.length s in
-      let lo =
-        if len >= 40 then String.sub s (len - 40) 40 else String.make 40 '0'
-      in
-      String.lowercase_ascii lo
+    let actual = String.lowercase_ascii (parse_address_slot raw) in
+    let expected =
+      String.lowercase_ascii (Test_helpers.remove_0x expected_sender)
     in
-    let actual = parse_address raw in
-    let expected = String.lowercase_ascii (strip_0x expected_sender) in
     Check.(
       (actual = expected)
         string
         ~error_msg:"Expected IdentityRecorder.lastSender %R but got %L") ;
+    unit
+
+  (** Asserts that [lastOrigin] (slot 1, [tx.origin]) equals
+   *  [expected_origin] (lowercase hex, no [0x] prefix on either side).
+   *  On a two-hop CRAC round-trip the kernel forwards the CRAC originator
+   *  as [tx.origin], so this slot holds the ORIGINAL EVM caller that
+   *  initiated the chain. *)
+  let check_last_origin ~sequencer ~expected_origin contract =
+    let*@ raw = Rpc.get_storage_at ~address:contract ~pos:"0x1" sequencer in
+    let actual = String.lowercase_ascii (parse_address_slot raw) in
+    let expected =
+      String.lowercase_ascii (Test_helpers.remove_0x expected_origin)
+    in
+    Check.(
+      (actual = expected)
+        string
+        ~error_msg:"Expected IdentityRecorder.lastOrigin %R but got %L") ;
     unit
 end
 
@@ -1419,6 +1435,51 @@ module TezAlwaysSucceedsUnit = struct
       ~init_storage_data:"Unit"
       ?init_balance
       protocol
+end
+
+(** Michelson contract that records the [SENDER] of each incoming call
+ *  into its single [address] storage slot.  Used in the CRAC
+ *  address-identity tests to observe the Michelson-side immediate
+ *  caller — e.g. the KT1 alias under which an EVM contract calls into
+ *  Michelson. *)
+module TezCracSenderRecorder = struct
+  open TezContract
+
+  (** Originates [crac_sender_recorder.tz] with initial storage set to
+   *  [init_addr] (any placeholder address, e.g. the gateway address). *)
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~init_addr () =
+    originate_contract_via_tezlink
+      ~client
+      ~client_tezlink
+      ~sequencer
+      ~source
+      ~counter
+      ~script_name:["mini_scenarios"; "crac_sender_recorder"]
+      ~init_storage_data:(sf {|"%s"|} init_addr)
+      ?init_balance
+      protocol
+
+  (** Reads the stored address from [crac_sender_recorder.tz] and asserts
+   *  it equals [expected_sender].  The storage is a single Micheline
+   *  [address] node in optimized binary form, serialized as
+   *  [{bytes: "<hex>"}] in JSON, where the hex is a [Contract_repr.t] in
+   *  binary encoding.  We decode those bytes to a b58check string before
+   *  comparing. *)
+  let check_stored_sender ~sequencer ~expected_sender contract_address =
+    let* storage = get_storage ~sequencer contract_address in
+    let bytes_hex = JSON.(storage |-> "bytes" |> as_string) in
+    let actual =
+      let module C = Tezos_protocol_alpha.Protocol.Contract_repr in
+      Hex.to_bytes (`Hex bytes_hex)
+      |> Data_encoding.Binary.of_bytes_exn C.encoding
+      |> C.to_b58check
+    in
+    Check.(
+      (actual = expected_sender)
+        string
+        ~error_msg:"CRAC round-trip: expected Michelson SENDER %R but got %L") ;
+    unit
 end
 
 (** Michelson contract that emits a single user [EMIT] op on [%run]
@@ -1723,6 +1784,14 @@ module CracRunnerWrapper = struct
       val originate : ?init_balance:int -> unit -> tez_runner Lwt.t
     end
 
+    module TezCracSenderRecorder : sig
+      val originate :
+        ?init_balance:int -> init_addr:string -> unit -> tez_runner Lwt.t
+
+      val check_stored_sender :
+        expected_sender:string -> tez_runner -> unit Lwt.t
+    end
+
     module TezEmitter : sig
       val originate : ?init_balance:int -> unit -> tez_runner Lwt.t
     end
@@ -1775,6 +1844,8 @@ module CracRunnerWrapper = struct
       val deploy : unit -> evm_runner Lwt.t
 
       val check_last_sender : expected_sender:string -> evm_runner -> unit Lwt.t
+
+      val check_last_origin : expected_origin:string -> evm_runner -> unit Lwt.t
     end
 
     module EvmEvents : sig
@@ -2366,6 +2437,30 @@ module CracRunnerWrapper = struct
           return (`Tez_runner (runner_hex, runner))
       end
 
+      module TezCracSenderRecorder = struct
+        let originate ?init_balance ~init_addr () =
+          let* runner_hex, runner =
+            TezCracSenderRecorder.originate
+              ~client
+              ~client_tezlink
+              ~sequencer
+              ~source
+              ~counter:(tez_counter ())
+              ~protocol
+              ?init_balance
+              ~init_addr
+              ()
+          in
+          return (`Tez_runner (runner_hex, runner))
+
+        let check_stored_sender ~expected_sender
+            (`Tez_runner (_, runner_address)) =
+          TezCracSenderRecorder.check_stored_sender
+            ~sequencer
+            ~expected_sender
+            runner_address
+      end
+
       module TezEmitter = struct
         let originate ?init_balance () =
           let* runner_hex, runner =
@@ -2542,6 +2637,12 @@ module CracRunnerWrapper = struct
           EvmIdentityRecorder.check_last_sender
             ~sequencer
             ~expected_sender
+            runner
+
+        let check_last_origin ~expected_origin (`Evm_runner runner) =
+          EvmIdentityRecorder.check_last_origin
+            ~sequencer
+            ~expected_origin
             runner
       end
 
@@ -12232,6 +12333,725 @@ let test_crac_evm_deep_recurse_then_michelson_oog =
   in
   unit
 
+(* ── Address-identity (round-trip / path-independence) tests ─────────── *)
+
+let evm_alias_of_tezos_address = Test_helpers.evm_alias_of_tezos_address
+
+(** Reads the [/origin] classification record of EVM account
+ *  [evm_address] from the sequencer's durable storage.  Returns the
+ *  raw hex payload, or [None] if the account has no record. *)
+let read_evm_origin ~sequencer evm_address =
+  let*@ origin =
+    Rpc.state_value
+      sequencer
+      (Durable_storage_path.origin Kernel.Latest evm_address)
+  in
+  return origin
+
+(** Asserts that EVM account [evm_address] has no [/origin] record. *)
+let check_evm_origin_absent ~sequencer evm_address =
+  let* origin = read_evm_origin ~sequencer evm_address in
+  Check.(
+    (origin = None)
+      (option string)
+      ~error_msg:"Expected no /origin record but found %L") ;
+  unit
+
+(** Asserts that EVM account [evm_address] has an [/origin] record whose
+ *  payload embeds [native_address] (as the hex of its UTF-8 bytes). *)
+let check_evm_origin_records_alias ~sequencer ~native_address evm_address =
+  let* origin = read_evm_origin ~sequencer evm_address in
+  match origin with
+  | None ->
+      Test.fail
+        "Expected an /origin record for %s (alias of %s), found none"
+        evm_address
+        native_address
+  | Some payload ->
+      let native_hex = Hex.(show (of_string native_address)) in
+      if not (String.lowercase_ascii payload =~ rex native_hex) then
+        Test.fail
+          "/origin record %s of %s does not embed native address %s (hex %s)"
+          payload
+          evm_address
+          native_address
+          native_hex ;
+      unit
+
+(** Four-hop TEZ→EVM→TEZ→EVM CRAC: the original tz1's EVM alias appears as
+ *  [tx.origin] at the final EVM recorder (originator axis), while [msg.sender]
+ *  is the TEZ bridge's EVM alias (immediate-caller axis).
+ *
+ *    Chain: bootstrap5 (tz1) → gateway/%call_evm → evm_A → tez_B → evm_C
+ *
+ *  Entering EVM materialises [E = evm_alias(tz1)] and records
+ *  [origin(E) = Alias{Tezos, tz1}].  Hopping back into Tezos must resolve
+ *  [E] transitively to the original [tz1] (round-trip), and the final hop
+ *  back into EVM re-derives [tx.origin = E] from it.  If the middle hop
+ *  blind-derived instead of round-tripping, the final hop would derive
+ *  the alias of a fresh KT1 and the PRIMARY assertion would fail.
+ *
+ *  PRIMARY assertion: [lastOrigin] (slot 1) at evm_C =
+ *    [evm_alias_of_tezos_address(source.public_key_hash)] — the tz1's EVM alias.
+ *  SECONDARY assertion: [lastSender] (slot 0) = EVM alias of tez_B, the
+ *    immediate Tezos caller at the last hop.
+ *  Negative: a fresh EVM recorder that was never targeted holds the initial zero
+ *    address for both slots.
+ *)
+let test_crac_roundtrip_tz1_via_evm_back_to_tezos () =
+  register_crac_runner_test
+    ~title:
+      "CRAC address-identity: TEZ→EVM→TEZ→EVM round-trip tx.origin recovers \
+       tz1 EVM alias"
+    ~tags:["address_identity"; "round_trip"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "ADDR-RT-TZ1" in
+  let original_tz1 = source.public_key_hash in
+  (* E = evm_alias(tz1): the expected tx.origin at the final EVM recorder. *)
+  let expected_origin = evm_alias_of_tezos_address original_tz1 in
+  Log.info
+    "%s: original tz1 = %s, expected tx.origin (E) = %s"
+    prefix
+    original_tz1
+    expected_origin ;
+  (* evm_C: leaf EVM IdentityRecorder *)
+  Log.debug ~prefix "Deploy EVM IdentityRecorder (evm_C, leaf)" ;
+  let* evm_recorder = EvmIdentityRecorder.deploy () in
+  (* tez_B: TEZ→EVM bridge targeting evm_C *)
+  Log.debug ~prefix "Originate TEZ bridge (tez_B) targeting evm_C" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_recorder in
+  let (`Tez_runner (_, tez_bridge_kt1)) = tez_bridge in
+  Log.info "%s: tez_bridge KT1 (tez_B) = %s" prefix tez_bridge_kt1 ;
+  (* evm_alias(tez_B) — expected msg.sender at evm_C: the immediate Tezos
+     caller's deterministic alias. *)
+  let expected_sender = evm_alias_of_tezos_address tez_bridge_kt1 in
+  Log.info "%s: expected msg.sender at evm_C = %s" prefix expected_sender ;
+  (* evm_A: EVM→TEZ bridge targeting tez_B *)
+  Log.debug ~prefix "Deploy EVM bridge (evm_A) targeting tez_B" ;
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_bridge in
+  let (`Evm_runner evm_bridge_addr) = evm_bridge in
+  Log.info "%s: evm_bridge address (evm_A) = %s" prefix evm_bridge_addr ;
+  (* Fire: tz1 → gateway → evm_A → tez_B → evm_C *)
+  Log.debug
+    ~prefix
+    "Fire tz1→gateway CRAC into evm_A (→ tez_B → evm_C recorder)" ;
+  let* () =
+    Gateway.call_evm
+      ~evm_target:evm_bridge
+      ~method_sig:"run()"
+      ~abi_params:""
+      ()
+  in
+  (* PRIMARY: tx.origin at the EVM recorder = evm_alias(tz1).
+     The originator only survives the EVM→TEZ→EVM hops via transitive
+     resolution. *)
+  Log.debug ~prefix "PRIMARY: verify tx.origin at evm_C = evm_alias(tz1)" ;
+  let* () =
+    EvmIdentityRecorder.check_last_origin ~expected_origin evm_recorder
+  in
+  (* SECONDARY: msg.sender at the EVM recorder = evm_alias(tez_B).
+     tez_B is the immediate Tezos caller; its EVM alias is the
+     deterministic derivation of its KT1. *)
+  Log.debug ~prefix "SECONDARY: verify msg.sender at evm_C = evm_alias(tez_B)" ;
+  let* () =
+    EvmIdentityRecorder.check_last_sender ~expected_sender evm_recorder
+  in
+  (* Negative: a fresh EVM recorder that was never targeted holds the initial
+     zero address (EvmIdentityRecorder initialises both slots to zero). *)
+  Log.debug
+    ~prefix
+    "Negative: fresh recorder holds zero address (never targeted)" ;
+  let* other_recorder = EvmIdentityRecorder.deploy () in
+  let zero_address = String.make 40 '0' in
+  let* () =
+    EvmIdentityRecorder.check_last_origin
+      ~expected_origin:zero_address
+      other_recorder
+  in
+  let* () =
+    EvmIdentityRecorder.check_last_sender
+      ~expected_sender:zero_address
+      other_recorder
+  in
+  unit
+
+(** Two-hop EVM→TEZ→EVM CRAC: the original EVM transaction signer is
+ *  recovered as [tx.origin] at the return hop (originator axis), while
+ *  [msg.sender] is the TEZ bridge's EVM alias (immediate-caller axis).
+ *
+ *    Chain: sender (EOA) → evm_bridge ~callMichelson~> tez_bridge
+ *      --gateway/%call_evm--> evm_recorder
+ *
+ *  Crossing into Tezos materialises the signer's KT1 alias and records
+ *  [origin(KT1) = Alias{Ethereum, signer}].  The return hop must resolve
+ *  that KT1 back to the original signer (round-trip); a blind derivation
+ *  would surface a fresh EVM address instead and fail the PRIMARY
+ *  assertion.
+ *
+ *  PRIMARY assertion: [lastOrigin] (slot 1) at the EVM recorder =
+ *    [sender.address] (the EVM tx signer, not evm_bridge_addr).
+ *  SECONDARY assertion: [lastSender] (slot 0) = EVM alias of tez_bridge,
+ *    the immediate Tezos caller.
+ *  Negative: a fresh EVM recorder that was never targeted holds the initial
+ *  zero address for both slots.
+ *)
+let test_crac_roundtrip_evm_via_michelson_back_to_evm () =
+  register_crac_runner_test
+    ~title:
+      "CRAC address-identity: EVM→TEZ→EVM round-trip tx.origin recovers EVM tx \
+       signer"
+    ~tags:["address_identity"; "round_trip"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "ADDR-RT-EVM" in
+  Log.debug ~prefix "Deploy EVM IdentityRecorder (leaf)" ;
+  let* evm_recorder = EvmIdentityRecorder.deploy () in
+  Log.debug ~prefix "Originate TEZ bridge targeting the EVM recorder" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_recorder in
+  let (`Tez_runner (_, tez_bridge_kt1)) = tez_bridge in
+  (* The EVM alias of the TEZ bridge is deterministic: keccak256(utf8(kt1))[0..20].
+     Compute the golden value from the KT1 address. *)
+  let expected_sender = evm_alias_of_tezos_address tez_bridge_kt1 in
+  Log.info
+    "%s: tez_bridge KT1 = %s, expected EVM sender = %s"
+    prefix
+    tez_bridge_kt1
+    expected_sender ;
+  Log.debug ~prefix "Deploy EVM bridge targeting the TEZ bridge" ;
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_bridge in
+  let (`Evm_runner evm_bridge_addr) = evm_bridge in
+  Log.info "%s: evm_bridge address = %s" prefix evm_bridge_addr ;
+  (* The originator axis resolves to the EVM transaction signer
+     (sender.address), not evm_bridge_addr; the round-trip recovers it at
+     the return hop. *)
+  let expected_origin = sender.address in
+  Log.info "%s: expected tx.origin at recorder = %s" prefix expected_origin ;
+  Log.debug
+    ~prefix
+    "Fire EVM bridge: EVM→TEZ CRAC into tez_bridge, then tez_bridge→EVM CRAC \
+     into recorder" ;
+  (* Use the default gas limit: the round-trip materialises a fresh alias
+     on the return hop, which needs substantially more gas than a plain
+     call. *)
+  let* _ = EvmRunner.call_run evm_bridge in
+  (* PRIMARY: tx.origin at the return hop = sender.address (EVM tx signer). *)
+  Log.debug
+    ~prefix
+    "PRIMARY: verify tx.origin at EVM recorder = sender.address (EVM tx signer)" ;
+  let* () =
+    EvmIdentityRecorder.check_last_origin ~expected_origin evm_recorder
+  in
+  (* SECONDARY: msg.sender is the EVM alias of the TEZ bridge (immediate caller). *)
+  Log.debug
+    ~prefix
+    "SECONDARY: verify msg.sender at EVM recorder = EVM alias of tez_bridge" ;
+  let* () =
+    EvmIdentityRecorder.check_last_sender ~expected_sender evm_recorder
+  in
+  (* Negative: a fresh EVM recorder that was never targeted holds the initial
+     zero address (EvmIdentityRecorder initialises both slots to zero). *)
+  let* other_recorder = EvmIdentityRecorder.deploy () in
+  Log.debug
+    ~prefix
+    "Negative: fresh recorder holds zero address (never targeted by a CRAC)" ;
+  let zero_address = String.make 40 '0' in
+  let* () =
+    EvmIdentityRecorder.check_last_origin
+      ~expected_origin:zero_address
+      other_recorder
+  in
+  let* () =
+    EvmIdentityRecorder.check_last_sender
+      ~expected_sender:zero_address
+      other_recorder
+  in
+  unit
+
+(** Path independence of address identity: the KT1 alias an EVM account
+ *  receives on Tezos is the same regardless of the EVM-level call path
+ *  used to invoke the contract.
+ *
+ *  Path A (direct):
+ *    EVM[evm_bridge] ~CRAC~> TEZ[recorder]
+ *    recorder.storage := KT1_bridge
+ *
+ *  Path B (via outer caller — same bridge, EVM-level indirection):
+ *    EVM[evm_outer] calls EVM[evm_bridge] ~CRAC~> TEZ[recorder]
+ *    recorder.storage := KT1_bridge  (must equal Path A)
+ *
+ *  Between the two paths the recorder is overwritten by a direct tz1
+ *  call, so Path B's assertion can only pass through Path B's own write.
+ *
+ *  [evm_bridge] is the contract whose [callMichelson] fires the CRAC; the
+ *  EVM-level caller ([evm_outer]) is irrelevant to the CRAC identity.
+ *  The alias is recorded on the first CRAC and re-read thereafter; the
+ *  same alias is produced on every subsequent CRAC.
+ *
+ *  Negative: a different EVM bridge (different deployed address) CRACs into
+ *  a separate recorder and produces a DIFFERENT KT1 alias, proving that the
+ *  equality above is non-trivial (alias function is injective).
+ *)
+let test_crac_address_identity_path_independence () =
+  register_crac_runner_test
+    ~title:"CRAC address-identity: EVM caller alias is path-independent"
+    ~tags:["address_identity"; "path_independence"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "ADDR-ID-PATH" in
+  Log.debug ~prefix "Originate TEZ sender recorder" ;
+  let* recorder =
+    TezCracSenderRecorder.originate ~init_addr:gateway_address ()
+  in
+  Log.debug ~prefix "Deploy EVM bridge → recorder" ;
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init recorder in
+  let (`Evm_runner bridge_addr) = evm_bridge in
+  Log.info "%s: evm_bridge address = %s" prefix bridge_addr ;
+  (* ── Path A: direct call → CRAC into recorder. ─────────────────────── *)
+  Log.debug ~prefix "Path A: fire CRAC from evm_bridge directly" ;
+  let* _ = EvmRunner.call_run evm_bridge in
+  let*@ kt1_bridge =
+    Rpc.Tezosx.tez_getEthereumTezosAddress bridge_addr sequencer
+  in
+  Log.info "%s: KT1 alias of evm_bridge = %s" prefix kt1_bridge ;
+  let* () =
+    TezCracSenderRecorder.check_stored_sender
+      ~expected_sender:kt1_bridge
+      recorder
+  in
+  (* ── Scramble: a direct tz1 call overwrites the slot with source.pkh,
+     so Path B's assertion can only pass through Path B's own write. ── *)
+  Log.debug ~prefix "Scramble recorder with a direct tz1 call" ;
+  let* () = TezRunner.call_run recorder in
+  let* () =
+    TezCracSenderRecorder.check_stored_sender
+      ~expected_sender:source.public_key_hash
+      recorder
+  in
+  (* ── Path B: same bridge via outer EVM caller → CRAC into recorder. ── *)
+  Log.debug ~prefix "Deploy EVM outer caller → evm_bridge" ;
+  let* evm_outer =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge, false)] ()
+  in
+  Log.debug ~prefix "Path B: fire CRAC from evm_bridge via outer caller" ;
+  let* _ = EvmRunner.call_run evm_outer in
+  Log.debug ~prefix "Verify recorder holds kt1_bridge again (path-independent)" ;
+  let* () =
+    TezCracSenderRecorder.check_stored_sender
+      ~expected_sender:kt1_bridge
+      recorder
+  in
+  (* ── Negative: a different EVM bridge produces a different KT1 alias. ─ *)
+  Log.debug ~prefix "Negative: originate recorder_b and deploy bridge_b" ;
+  let* recorder_b =
+    TezCracSenderRecorder.originate ~init_addr:gateway_address ()
+  in
+  let* evm_bridge_b = EvmCrossRuntimeRunnerTez.deploy_and_init recorder_b in
+  let (`Evm_runner bridge_b_addr) = evm_bridge_b in
+  Log.debug ~prefix "Negative: fire CRAC from bridge_b to recorder_b" ;
+  let* _ = EvmRunner.call_run evm_bridge_b in
+  let*@ kt1_bridge_b =
+    Rpc.Tezosx.tez_getEthereumTezosAddress bridge_b_addr sequencer
+  in
+  let* () =
+    TezCracSenderRecorder.check_stored_sender
+      ~expected_sender:kt1_bridge_b
+      recorder_b
+  in
+  Check.(
+    (String.lowercase_ascii bridge_b_addr <> String.lowercase_ascii bridge_addr)
+      string
+      ~error_msg:
+        "Sanity: two freshly deployed bridges must have distinct EVM addresses") ;
+  Check.(
+    (kt1_bridge_b <> kt1_bridge)
+      string
+      ~error_msg:
+        "Path-independence negative: different EVM bridge addresses must yield \
+         different KT1 aliases (alias function is injective)") ;
+  unit
+
+(** Legacy fallback (blind derivation): a Tezos address with no recorded
+ *  [origin] triggers the deterministic derivation when it makes a CRAC
+ *  into EVM.  The [msg.sender] seen by the EVM target ON CHAIN must
+ *  equal [keccak256(UTF-8 bytes of the b58check string)[0..20]].
+ *
+ *  [origin(source.pkh)] is unrecorded here because bootstrap accounts are
+ *  installed pre-revealed at genesis (raw account-info write, no origin
+ *  slot) and never send a reveal — and reveal is the only writer of
+ *  [Native] for implicit accounts.  The forward derivation is the same
+ *  formula for unrecorded and [Native] sources, so this test pins the
+ *  derivation formula; its unrecorded-branch coverage holds as long as
+ *  bootstrap accounts stay unrevealed.
+ *
+ *  We assert the ON-CHAIN observation (what the EVM identity recorder
+ *  actually stored as [lastSender]) rather than just comparing two RPC
+ *  return values, which would be a pure-computation tautology.
+ *
+ *  Negative: a different Tezos address (a freshly originated KT1, with
+ *  its own distinct alias) CRACs into a separate EVM recorder and
+ *  records its own golden alias ON CHAIN — distinct from the first.  The
+ *  original recorder is unaffected.
+ *)
+let test_crac_legacy_fallback_blind_derivation () =
+  register_crac_runner_test
+    ~title:"CRAC address-identity: tz1 with no origin uses blind EVM derivation"
+    ~tags:["address_identity"; "legacy_fallback"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "ADDR-ID-BLIND" in
+  (* origin(source.pkh) is unrecorded: bootstrap accounts are pre-revealed
+     at genesis and never reveal, and reveal is the only Native writer for
+     implicit accounts. *)
+  let tz1_addr = source.public_key_hash in
+  let golden_evm_alias = evm_alias_of_tezos_address tz1_addr in
+  Log.info
+    "%s: tz1 = %s, golden EVM alias = %s"
+    prefix
+    tz1_addr
+    golden_evm_alias ;
+  Log.debug ~prefix "Deploy EVM IdentityRecorder" ;
+  let* evm_target = EvmIdentityRecorder.deploy () in
+  Log.debug ~prefix "Send direct tz1→gateway CRAC (blind derivation path)" ;
+  let* () =
+    Gateway.call_evm ~evm_target ~method_sig:"run()" ~abi_params:"" ()
+  in
+  Log.debug
+    ~prefix
+    "Verify ON-CHAIN msg.sender at recorder = golden blind-derived EVM alias" ;
+  (* This is the chain-level observation: the EVM contract recorded the
+     actual msg.sender the kernel forwarded.  If the kernel used a different
+     derivation, this assertion fails. *)
+  let* () =
+    EvmIdentityRecorder.check_last_sender
+      ~expected_sender:golden_evm_alias
+      evm_target
+  in
+  (* Negative: a different Tezos address has its own distinct golden EVM
+     alias.  Originate a fresh TEZ bridge (a new KT1 with a different
+     address) and fire it into a separate EVM recorder.  The on-chain
+     [lastSender] at the new recorder must equal the golden alias of the KT1
+     address — and must differ from [golden_evm_alias] of [tz1_addr]. *)
+  Log.debug ~prefix "Negative: originate a different TEZ bridge (distinct KT1)" ;
+  let* other_evm_target = EvmIdentityRecorder.deploy () in
+  let* other_tez_bridge = TezCrossRuntimeRunnerEvm.originate other_evm_target in
+  let (`Tez_runner (_, other_kt1)) = other_tez_bridge in
+  let other_golden = evm_alias_of_tezos_address other_kt1 in
+  Log.info
+    "%s: other KT1 = %s, other golden EVM alias = %s"
+    prefix
+    other_kt1
+    other_golden ;
+  Check.(
+    (String.lowercase_ascii other_golden
+    <> String.lowercase_ascii golden_evm_alias)
+      string
+      ~error_msg:
+        "Sanity: two distinct Tezos addresses must produce distinct golden EVM \
+         aliases (hash collision would make the test degenerate)") ;
+  Log.debug ~prefix "Negative: fire other_tez_bridge → other_evm_target" ;
+  let* () = TezRunner.call_run other_tez_bridge in
+  Log.debug
+    ~prefix
+    "Negative: verify other_evm_target.lastSender = other_golden (own alias)" ;
+  let* () =
+    EvmIdentityRecorder.check_last_sender
+      ~expected_sender:other_golden
+      other_evm_target
+  in
+  (* The original recorder is unchanged (still holds golden_evm_alias). *)
+  let* () =
+    EvmIdentityRecorder.check_last_sender
+      ~expected_sender:golden_evm_alias
+      evm_target
+  in
+  unit
+
+(** Repair: the first CRAC from a TEZ account whose EVM alias [E] has no
+ *  [/origin] record materialises the alias and records
+ *  [origin(E) = Alias{Tezos, tz1}], enabling the round-trip property
+ *  from that CRAC onward.  The second CRAC reads the persisted record.
+ *
+ *  Four-hop chain (TEZ→EVM→TEZ→EVM):
+ *    TEZ[source/tz1] --tez_bridge.%%run--> EVM[evm_relay]
+ *      ~callMichelson~> TEZ[tez_bridge_2] --%%call_evm--> EVM[evm_recorder]
+ *
+ *  Step 1 (record): [E]'s [/origin] is absent from durable storage before
+ *    the CRAC and present after it — asserted directly via the rollup
+ *    node, observing the [None → Alias] transition.  The middle hop must
+ *    already resolve [E] back to [tz1] against the in-flight record.
+ *  Step 2 (recorded branch): the same chain re-runs against the
+ *    persisted record; the observable is unchanged.  A broken recorded
+ *    branch would mis-resolve the middle hop and change [tx.origin].
+ *
+ *  PRIMARY: [lastOrigin] (slot 1) at the EVM recorder =
+ *    [evm_alias_of_tezos_address(source.public_key_hash)] (both steps).
+ *  SECONDARY: [lastSender] (slot 0) = EVM alias of [tez_bridge_2], the
+ *    immediate Tezos caller at the last hop.
+ *  Negative: a different [tez_bridge_2'] targeting a fresh [evm_recorder']
+ *    records a different [lastSender] but the same [lastOrigin], proving
+ *    the SECONDARY is non-trivial (sender alias is injective in the KT1).
+ *)
+let test_crac_origin_repair_none_to_alias () =
+  register_crac_runner_test
+    ~title:"CRAC address-identity: origin None→Alias after CRAC (repair)"
+    ~tags:["address_identity"; "repair"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "ADDR-ID-REPAIR" in
+  let original_tz1 = source.public_key_hash in
+  (* E = evm_alias(tz1): expected tx.origin at the EVM recorder. *)
+  let expected_origin = evm_alias_of_tezos_address original_tz1 in
+  Log.info
+    "%s: original tz1 = %s, expected tx.origin (E) = %s"
+    prefix
+    original_tz1
+    expected_origin ;
+  (* ── Build the TEZ→EVM→TEZ→EVM chain. ─────────────────────────────────── *)
+  (* leaf: EVM IdentityRecorder *)
+  Log.debug ~prefix "Deploy EVM recorder (leaf, evm_recorder)" ;
+  let* evm_recorder = EvmIdentityRecorder.deploy () in
+  (* tez_bridge_2: TEZ→EVM bridge at hop 3, targeting evm_recorder *)
+  Log.debug ~prefix "Originate tez_bridge_2 → evm_recorder" ;
+  let* tez_bridge_2 = TezCrossRuntimeRunnerEvm.originate evm_recorder in
+  let (`Tez_runner (_, tez_bridge_2_kt1)) = tez_bridge_2 in
+  (* expected msg.sender at evm_recorder = evm_alias(tez_bridge_2_kt1),
+     the immediate Tezos caller's deterministic alias *)
+  let expected_sender = evm_alias_of_tezos_address tez_bridge_2_kt1 in
+  Log.info
+    "%s: tez_bridge_2 KT1 = %s, expected msg.sender = %s"
+    prefix
+    tez_bridge_2_kt1
+    expected_sender ;
+  (* evm_relay: EVM→TEZ bridge at hop 2, targeting tez_bridge_2 *)
+  Log.debug ~prefix "Deploy evm_relay → tez_bridge_2" ;
+  let* evm_relay = EvmCrossRuntimeRunnerTez.deploy_and_init tez_bridge_2 in
+  let (`Evm_runner evm_relay_addr) = evm_relay in
+  Log.info "%s: evm_relay address = %s" prefix evm_relay_addr ;
+  (* tez_bridge: TEZ→EVM bridge at hop 1, targeting evm_relay.
+     Before the first CRAC, [origin(evm_alias(source.pkh))] is None in
+     durable storage (fresh sandbox). *)
+  Log.debug ~prefix "Originate tez_bridge → evm_relay (None branch initially)" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_relay in
+  (* Baseline: E = evm_alias(source.pkh) has no /origin record yet. *)
+  Log.debug ~prefix "Baseline: /origin of evm_alias(tz1) is absent" ;
+  let* () = check_evm_origin_absent ~sequencer expected_origin in
+  (* ── Step 1: first invocation — None branch. ───────────────────────────── *)
+  Log.debug
+    ~prefix
+    "Step 1: fire tez_bridge (origin=None for evm_alias(source.pkh)) → \
+     evm_relay → tez_bridge_2 → evm_recorder" ;
+  let* () = TezRunner.call_run tez_bridge in
+  (* PRIMARY step 1: tx.origin at recorder = evm_alias(source.pkh).
+     The first CRAC records the classification; the round-trip already
+     resolves correctly on the return hop. *)
+  Log.debug
+    ~prefix
+    "Step 1 PRIMARY: verify tx.origin at evm_recorder = evm_alias(tz1)" ;
+  let* () =
+    EvmIdentityRecorder.check_last_origin ~expected_origin evm_recorder
+  in
+  (* SECONDARY step 1: msg.sender at recorder = evm_alias(tez_bridge_2). *)
+  Log.debug
+    ~prefix
+    "Step 1 SECONDARY: verify msg.sender at evm_recorder = \
+     evm_alias(tez_bridge_2)" ;
+  let* () =
+    EvmIdentityRecorder.check_last_sender ~expected_sender evm_recorder
+  in
+  (* The repair is now durable: E's /origin record names the tz1.  This is
+     the direct observation of the None → Alias transition. *)
+  Log.debug ~prefix "Step 1: verify /origin of evm_alias(tz1) records the tz1" ;
+  let* () =
+    check_evm_origin_records_alias
+      ~sequencer
+      ~native_address:original_tz1
+      expected_origin
+  in
+  (* ── Step 2: second invocation — Recorded branch. ─────────────────────── *)
+  (* After step 1, [origin(evm_alias(source.pkh))] is in durable storage.
+     The Recorded branch reads it directly; the result is the same. *)
+  Log.debug
+    ~prefix
+    "Step 2: fire tez_bridge again (Recorded branch — alias now in durable \
+     storage)" ;
+  let* () = TezRunner.call_run tez_bridge in
+  Log.debug
+    ~prefix
+    "Step 2 PRIMARY: verify tx.origin at evm_recorder still = evm_alias(tz1)" ;
+  let* () =
+    EvmIdentityRecorder.check_last_origin ~expected_origin evm_recorder
+  in
+  (* ── Negative: a different tez_bridge_2' → evm_recorder'. ─────────────── *)
+  (* A freshly originated TEZ bridge has its own KT1 address and therefore its
+     own EVM alias (blind-derived).  A CRAC through it produces a different
+     [lastSender] at a fresh recorder, proving the SECONDARY is non-trivial.
+     The [lastOrigin] should still be [evm_alias(tz1)] (same L1 signer). *)
+  Log.debug ~prefix "Negative: deploy fresh evm_recorder_2 and tez_bridge_2b" ;
+  let* evm_recorder_2 = EvmIdentityRecorder.deploy () in
+  let* tez_bridge_2b = TezCrossRuntimeRunnerEvm.originate evm_recorder_2 in
+  let (`Tez_runner (_, tez_bridge_2b_kt1)) = tez_bridge_2b in
+  let other_expected_sender = evm_alias_of_tezos_address tez_bridge_2b_kt1 in
+  Log.info
+    "%s: tez_bridge_2b KT1 = %s, other expected sender = %s"
+    prefix
+    tez_bridge_2b_kt1
+    other_expected_sender ;
+  (* Sanity: the two tez_bridge_2 aliases must differ. *)
+  Check.(
+    (String.lowercase_ascii other_expected_sender
+    <> String.lowercase_ascii expected_sender)
+      string
+      ~error_msg:
+        "Sanity: two distinct KT1 bridges must produce distinct EVM aliases \
+         (otherwise the negative assertion is degenerate)") ;
+  let* evm_relay_2 = EvmCrossRuntimeRunnerTez.deploy_and_init tez_bridge_2b in
+  let* tez_bridge_b = TezCrossRuntimeRunnerEvm.originate evm_relay_2 in
+  Log.debug
+    ~prefix
+    "Negative: fire tez_bridge_b → evm_relay_2 → tez_bridge_2b → evm_recorder_2" ;
+  let* () = TezRunner.call_run tez_bridge_b in
+  (* Same origin (same L1 signer), different sender (different KT1 bridge). *)
+  Log.debug
+    ~prefix
+    "Negative: verify evm_recorder_2.lastOrigin = evm_alias(tz1) (same signer)" ;
+  let* () =
+    EvmIdentityRecorder.check_last_origin ~expected_origin evm_recorder_2
+  in
+  Log.debug
+    ~prefix
+    "Negative: verify evm_recorder_2.lastSender = evm_alias(tez_bridge_2b) \
+     (different bridge, different alias)" ;
+  let* () =
+    EvmIdentityRecorder.check_last_sender
+      ~expected_sender:other_expected_sender
+      evm_recorder_2
+  in
+  unit
+
+(** Journal revert: when the enclosing Michelson operation backtracks, the
+ *  EVM journal is discarded — both the recorder's EVM storage write
+ *  ([lastSender]) and the [/origin] classification staged for the
+ *  originator's EVM alias [E = evm_alias(source.pkh)].  The next
+ *  successful CRAC re-records both.
+ *
+ *  Scenario:
+ *    1. TEZ[reverter ~callees:[tez_bridge]] calls tez_bridge.%run:
+ *         the TEZ→EVM CRAC runs, then a sibling internal op FAILWITHs,
+ *         backtracking the whole operation group.
+ *    2. Verify [lastSender] = zero address (initial state) and that [E]
+ *         has NO [/origin] record — the classification write was unwound
+ *         with the journal.
+ *    3. TEZ[tez_bridge_ok] fires a successful TEZ→EVM CRAC into the same
+ *         recorder.
+ *    4. Verify [lastSender] = golden alias of [tez_bridge_ok_kt1] and
+ *         that [E]'s [/origin] record is now present and names the tz1.
+ *
+ *  The revert in step 1 is caused by a SIBLING internal operation
+ *  ([reverter] emits the call to [tez_bridge] followed by a failing call
+ *  to itself), NOT by a failure inside the CRAC frame: the EVM journal
+ *  is discarded when the enclosing Michelson operation group backtracks,
+ *  regardless of whether the CRAC itself succeeded.
+ *)
+let test_crac_journal_revert_drops_origin () =
+  register_crac_runner_test
+    ~title:
+      "CRAC address-identity: journal revert rolls back classification and \
+       recorder writes"
+    ~tags:["address_identity"; "revert"; "journal"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "ADDR-ID-REVERT" in
+  Log.debug ~prefix "Deploy EVM IdentityRecorder" ;
+  let* evm_recorder = EvmIdentityRecorder.deploy () in
+  Log.debug ~prefix "Originate TEZ bridge targeting EVM recorder" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_recorder in
+  Log.debug
+    ~prefix
+    "Originate outer TEZ reverter (calls tez_bridge, then reverts)" ;
+  let* tez_reverter =
+    TezMultiRunCaller.originate ~revert:true ~callees:[tez_bridge] ()
+  in
+  Log.debug ~prefix "Originate TEZ bridge_ok for the successful CRAC" ;
+  let* tez_bridge_ok = TezCrossRuntimeRunnerEvm.originate evm_recorder in
+  let (`Tez_runner (_, tez_bridge_ok_kt1)) = tez_bridge_ok in
+  let golden_evm_alias = evm_alias_of_tezos_address tez_bridge_ok_kt1 in
+  Log.info "%s: golden EVM alias of tez_bridge_ok = %s" prefix golden_evm_alias ;
+  (* E: the originator's EVM alias, whose /origin classification is staged
+     during each TEZ→EVM CRAC of this test (the L1 signer is [source]). *)
+  let tz1_evm_alias = evm_alias_of_tezos_address source.public_key_hash in
+  (* Baseline: no /origin record before any CRAC. *)
+  Log.debug ~prefix "Baseline: /origin of evm_alias(tz1) is absent" ;
+  let* () = check_evm_origin_absent ~sequencer tz1_evm_alias in
+  (* Step 1: failing CRAC — reverter calls tez_bridge which CRACs to EVM.
+     The EVM records msg.sender, but the outer TEZ FAILWITHs, rolling
+     back the EVM journal.  The EVM tx never commits. *)
+  Log.debug ~prefix "Step 1: TEZ reverter fires TEZ→EVM CRAC (TEZ reverts)" ;
+  let* () = TezRunner.call_run ~gas_limit:500_000 tez_reverter in
+  (* Step 2: verify identity_recorder was NOT updated by the reverted CRAC.
+     EvmIdentityRecorder initialises lastSender to the zero address (0x0).
+     If the revert rolled back the EVM journal, lastSender stays at zero. *)
+  Log.debug
+    ~prefix
+    "Step 2: verify identity_recorder.lastSender = 0x000...0 (revert rolled \
+     back)" ;
+  let zero_address = String.make 40 '0' in
+  let* () =
+    EvmIdentityRecorder.check_last_sender
+      ~expected_sender:zero_address
+      evm_recorder
+  in
+  (* The staged classification was unwound with the journal: E still has
+     no /origin record after the backtracked CRAC. *)
+  Log.debug
+    ~prefix
+    "Step 2: verify /origin of evm_alias(tz1) is still absent (unwound)" ;
+  let* () = check_evm_origin_absent ~sequencer tz1_evm_alias in
+  (* Step 3: succeeding CRAC — tez_bridge_ok calls gateway %%call_evm.
+     This time the CRAC succeeds and msg.sender is persisted. *)
+  Log.debug ~prefix "Step 3: succeeding TEZ→EVM CRAC (tez_bridge_ok)" ;
+  let* () = TezRunner.call_run tez_bridge_ok in
+  (* Step 4: identity_recorder.lastSender must now equal golden_evm_alias. *)
+  Log.debug
+    ~prefix
+    "Step 4: verify lastSender = golden EVM alias of tez_bridge_ok" ;
+  let* () =
+    EvmIdentityRecorder.check_last_sender
+      ~expected_sender:golden_evm_alias
+      evm_recorder
+  in
+  (* The successful CRAC re-recorded the classification durably. *)
+  Log.debug ~prefix "Step 4: verify /origin of evm_alias(tz1) records the tz1" ;
+  let* () =
+    check_evm_origin_records_alias
+      ~sequencer
+      ~native_address:source.public_key_hash
+      tz1_evm_alias
+  in
+  (* Negative: a third TEZ bridge that was never involved in any CRAC.
+     Its first CRAC (to a fresh recorder) would record its own alias, NOT
+     golden_evm_alias.  We verify the original recorder is untouched
+     (still holds golden_evm_alias) and that the new bridge would produce
+     a different alias — ensuring the step 4 assertion above is
+     non-trivial (not accidentally true for all EVM aliases). *)
+  let* other_bridge = TezCrossRuntimeRunnerEvm.originate evm_recorder in
+  let (`Tez_runner (_, other_bridge_kt1)) = other_bridge in
+  let other_golden = evm_alias_of_tezos_address other_bridge_kt1 in
+  Check.(
+    (String.lowercase_ascii other_golden
+    <> String.lowercase_ascii golden_evm_alias)
+      string
+      ~error_msg:
+        "Sanity: a different TEZ bridge must produce a different golden EVM \
+         alias (otherwise the step-4 assertion is degenerate)") ;
+  (* The recorder still holds golden_evm_alias — other_bridge has not CRACed. *)
+  let* () =
+    EvmIdentityRecorder.check_last_sender
+      ~expected_sender:golden_evm_alias
+      evm_recorder
+  in
+  unit
+
 let () =
   test_crac_evm_to_tez () ;
   test_crac_evm_multiple_independent_crossings () ;
@@ -12354,4 +13174,10 @@ let () =
   test_crac_orig_two_txs_one_block () ;
   test_crac_orig_two_txs_two_blocks () ;
   test_crac_orig_two_cracs_one_tx () ;
-  test_crac_evm_deep_recurse_then_michelson_oog [Alpha]
+  test_crac_evm_deep_recurse_then_michelson_oog [Alpha] ;
+  test_crac_roundtrip_tz1_via_evm_back_to_tezos () ;
+  test_crac_roundtrip_evm_via_michelson_back_to_evm () ;
+  test_crac_address_identity_path_independence () ;
+  test_crac_legacy_fallback_blind_derivation () ;
+  test_crac_origin_repair_none_to_alias () ;
+  test_crac_journal_revert_drops_origin ()

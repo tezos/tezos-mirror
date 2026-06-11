@@ -69,6 +69,8 @@ let nonce kernel addr = sf "%s/nonce" (eth_account kernel addr)
 
 let code kernel addr = sf "%s/code" (eth_account kernel addr)
 
+let origin kernel addr = sf "%s/origin" (eth_account kernel addr)
+
 let storage kernel addr ?key () =
   sf
     "%s/storage%s"

@@ -35,6 +35,12 @@ val add_0x : string -> string
 (** [remove_0x s] removes the [0x] prefix in [s] if it is present. *)
 val remove_0x : string -> string
 
+(** [evm_alias_of_tezos_address address] computes the EVM alias the
+    kernel derives for a Tezos address: the first 20 bytes of the
+    Keccak-256 digest of the UTF-8 bytes of the b58check string,
+    returned as a lowercase [0x]-prefixed hex string. *)
+val evm_alias_of_tezos_address : string -> string
+
 (** [mapping_position key map_position] computes the storage position for
     a value in a mapping given its [key] and the position of the map
     itself.

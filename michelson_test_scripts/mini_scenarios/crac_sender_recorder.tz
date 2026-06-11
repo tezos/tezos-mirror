@@ -1,0 +1,14 @@
+parameter (unit %run);
+storage address;
+# Records the SENDER of the current call into storage.
+#
+# Used in CRAC address-identity tests to observe the Michelson-side SENDER
+# after a cross-runtime hop (EVM→TEZ CRAC) and in journal-revert tests.
+#
+# The %run entrypoint is required for compatibility with:
+#   - EvmCrossRuntimeRunnerTez (calls gateway callMichelson(dest, "run", ...))
+#   - TezMultiRunCaller (calls callee.%run)
+#
+# Storage is a single `address` initialised to any placeholder (e.g. the gateway
+# address).  Each call replaces it with SENDER.
+code { DROP; SENDER; NIL operation; PAIR };
