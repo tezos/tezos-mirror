@@ -166,6 +166,13 @@ RPC Changes
   ``non_activated_feature`` error when the ``swrr_new_baker_lottery_enable`` feature
   flag is disabled. (MRs :gl:`!20180`, :gl:`!21618`)
 
+- The contract ``script`` RPC (and its ``script/normalized`` variant) now
+  returns a synthesized Michelson script for native contracts, instead of an
+  empty response. The synthesized script exposes the contract's real
+  entrypoints and the real input/output types of its views, with non-functional
+  placeholder bodies, so that standard contract tooling can discover and
+  validate a native contract's interface. (MR :gl:`!22125`)
+
 Operation receipts
 ------------------
 
