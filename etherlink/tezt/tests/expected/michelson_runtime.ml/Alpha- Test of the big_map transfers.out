@@ -2,7 +2,7 @@ Test transferring big map from "sender_fresh" to "receiver_drop"
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 3501.299 units (will add 100 for safety)
+Estimated gas: 3501.359 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -29,7 +29,7 @@ This sequence of operations was run:
         New temp(1) of type (big_map string bytes)
         Set temp(1)["d"] to 0x
       Storage size: 79 bytes
-      Consumed gas: 1796.042
+      Consumed gas: 1796.102
       Internal operations:
         Internal Transaction:
           Amount: ꜩ0
@@ -50,7 +50,7 @@ Test transferring big map from "sender_fresh" to "receiver_store"
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 3503.172 units (will add 100 for safety)
+Estimated gas: 3503.232 units (will add 100 for safety)
 Estimated storage: 70 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -77,7 +77,7 @@ This sequence of operations was run:
         New temp(1) of type (big_map string bytes)
         Set temp(1)["d"] to 0x
       Storage size: 79 bytes
-      Consumed gas: 1797.042
+      Consumed gas: 1797.102
       Internal operations:
         Internal Transaction:
           Amount: ꜩ0
@@ -105,7 +105,7 @@ Test transferring big map from "sender_fresh" to "receiver_store_updated"
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 3519.536 units (will add 100 for safety)
+Estimated gas: 3519.596 units (will add 100 for safety)
 Estimated storage: 72 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -132,7 +132,7 @@ This sequence of operations was run:
         New temp(1) of type (big_map string bytes)
         Set temp(1)["d"] to 0x
       Storage size: 79 bytes
-      Consumed gas: 1807.122
+      Consumed gas: 1807.182
       Internal operations:
         Internal Transaction:
           Amount: ꜩ0
@@ -162,7 +162,7 @@ Test transferring big map from "sender_stored" to "receiver_drop"
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 3499.123 units (will add 100 for safety)
+Estimated gas: 3499.183 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -188,7 +188,7 @@ This sequence of operations was run:
       Updated big_maps:
         Copy map(4) to temp(1)
       Storage size: 159 bytes
-      Consumed gas: 1793.866
+      Consumed gas: 1793.926
       Internal operations:
         Internal Transaction:
           Amount: ꜩ0
@@ -209,7 +209,7 @@ Test transferring big map from "sender_stored" to "receiver_store"
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 3500.996 units (will add 100 for safety)
+Estimated gas: 3501.056 units (will add 100 for safety)
 Estimated storage: 70 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -220,7 +220,7 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000137
     Expected counter: 15
-    Gas limit: 3601
+    Gas limit: 3602
     Storage limit: 90 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000137
@@ -235,7 +235,7 @@ This sequence of operations was run:
       Updated big_maps:
         Copy map(6) to temp(1)
       Storage size: 159 bytes
-      Consumed gas: 1794.866
+      Consumed gas: 1794.926
       Internal operations:
         Internal Transaction:
           Amount: ꜩ0
@@ -263,7 +263,7 @@ Test transferring big map from "sender_stored" to "receiver_store_updated"
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 3517.360 units (will add 100 for safety)
+Estimated gas: 3517.420 units (will add 100 for safety)
 Estimated storage: 72 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -289,7 +289,7 @@ This sequence of operations was run:
       Updated big_maps:
         Copy map(9) to temp(1)
       Storage size: 159 bytes
-      Consumed gas: 1804.946
+      Consumed gas: 1805.006
       Internal operations:
         Internal Transaction:
           Amount: ꜩ0
@@ -319,7 +319,7 @@ Test transferring big map from "sender_stored_updated" to "receiver_drop"
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 3505.407 units (will add 100 for safety)
+Estimated gas: 3505.467 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -347,7 +347,7 @@ This sequence of operations was run:
         Unset temp(1)["b"]
         Set temp(1)["a"] to 0x0010
       Storage size: 276 bytes
-      Consumed gas: 1800.150
+      Consumed gas: 1800.210
       Internal operations:
         Internal Transaction:
           Amount: ꜩ0
@@ -368,7 +368,7 @@ Test transferring big map from "sender_stored_updated" to "receiver_store"
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 3507.280 units (will add 100 for safety)
+Estimated gas: 3507.340 units (will add 100 for safety)
 Estimated storage: 142 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -396,7 +396,7 @@ This sequence of operations was run:
         Unset temp(1)["b"]
         Set temp(1)["a"] to 0x0010
       Storage size: 276 bytes
-      Consumed gas: 1801.183
+      Consumed gas: 1801.243
       Internal operations:
         Internal Transaction:
           Amount: ꜩ0
@@ -424,7 +424,7 @@ Test transferring big map from "sender_stored_updated" to "receiver_store_update
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 3523.644 units (will add 100 for safety)
+Estimated gas: 3523.704 units (will add 100 for safety)
 Estimated storage: 144 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -452,7 +452,7 @@ This sequence of operations was run:
         Unset temp(1)["b"]
         Set temp(1)["a"] to 0x0010
       Storage size: 276 bytes
-      Consumed gas: 1811.263
+      Consumed gas: 1811.323
       Internal operations:
         Internal Transaction:
           Amount: ꜩ0
