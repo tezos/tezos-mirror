@@ -3246,9 +3246,183 @@ let test_no_redundant_dal_attestations protocol parameters _cryptobox node
   let* () = check_level (first_level + 1) in
   unit
 
+let test_rpc_acl protocol _parameters _cryptobox node client _key =
+  let profile = Dal_RPC.Attester Constant.bootstrap1.public_key_hash in
+  let endpoint ~host dal_node =
+    Endpoint.make ~scheme:"http" ~host ~port:(Dal_node.rpc_port dal_node) ()
+  in
+  (* In sandbox, the dal_node only resolves its protocol plugin upon arrival
+     of a new block, so we bake concurrently with [dal_plugin_resolved.v0]
+     (cf. [test_dal_node_startup]). [rpc_addr_is_public.v0] is set up
+     beforehand so we can later assert whether it fired. *)
+  let setup_node ~rpc_host =
+    let dal_node = Dal_node.create ~rpc_host ~node () in
+    let* () = Dal_node.init_config dal_node in
+    let public_event_promise =
+      Dal_node.wait_for dal_node "dal_rpc_addr_is_public.v0" (fun _ -> Some ())
+    in
+    let* () = Dal_node.run dal_node ~wait_ready:false in
+    let* () =
+      Lwt.join
+        [
+          Dal_node.wait_for dal_node "dal_plugin_resolved.v0" (fun _ -> Some ());
+          bake_for ~count:3 client;
+        ]
+    in
+    let* () = Dal_node.wait_for_ready dal_node in
+    return (dal_node, public_event_promise)
+  in
+  let raw_get path = RPC_core.make GET path Fun.id in
+  let assert_not_unauthorized ~__LOC__ resp =
+    if resp.RPC_core.code = 401 then
+      Test.fail ~__LOC__ "Expected ACL to allow request, got 401"
+  in
+  (* Public bind uses dal_secure ACL: GET /profiles and other allowlisted read
+     endpoints reach the handler, while mutations (PATCH /profiles, POST
+     /slots) are blocked. Resto returns 401 for ACL-denied requests (see
+     [resto/src/server.ml]). The Warning event [rpc_addr_is_public] also
+     fires so operators are notified. *)
+  Log.info "Testing ACL for public bind (0.0.0.0)" ;
+  let* dal_public, public_event_promise = setup_node ~rpc_host:"0.0.0.0" in
+  let* () =
+    Lwt.pick
+      [
+        public_event_promise;
+        (let* () = Lwt_unix.sleep 5. in
+         Test.fail "rpc_addr_is_public event did not fire on public bind");
+      ]
+  in
+  let ep_public = endpoint ~host:Constant.default_host dal_public in
+  (* GET /profiles is allowed. *)
+  let* resp = Dal.RPC.Remote.call_raw ep_public @@ Dal_RPC.get_profiles () in
+  RPC_core.check_string_response ~code:200 resp ;
+  (* PATCH /profiles is blocked. *)
+  let* resp =
+    Dal.RPC.Remote.call_raw ep_public @@ Dal_RPC.patch_profiles [profile]
+  in
+  RPC_core.check_string_response ~code:401 resp ;
+  (* POST /slots is blocked: the ACL middleware denies before the body is
+     parsed, so a dummy slot suffices. *)
+  let dummy_slot = Helpers.make_slot ~slot_size:1 "x" in
+  let* resp =
+    Dal.RPC.Remote.call_raw ep_public @@ Dal_RPC.post_slot dummy_slot
+  in
+  RPC_core.check_string_response ~code:401 resp ;
+  (* Other allowlist categories must reach the handler. The exact response
+     code varies (200 for [/health], [/version]; possibly 4xx for [/plugin]
+     with an unknown hash); the property under test is "not 401". *)
+  let* resp = Dal.RPC.Remote.call_raw ep_public @@ raw_get ["health"] in
+  assert_not_unauthorized ~__LOC__ resp ;
+  let* resp = Dal.RPC.Remote.call_raw ep_public @@ raw_get ["version"] in
+  assert_not_unauthorized ~__LOC__ resp ;
+  let* resp = Dal.RPC.Remote.call_raw ep_public @@ raw_get ["synchronized"] in
+  assert_not_unauthorized ~__LOC__ resp ;
+  let* resp =
+    Dal.RPC.Remote.call_raw ep_public
+    @@ raw_get
+         ["plugin"; Protocol.hash protocol; "commitments_history"; "hash"; "0"]
+  in
+  assert_not_unauthorized ~__LOC__ resp ;
+  let* () = Dal_node.terminate dal_public in
+  (* Loopback bind uses allow_all ACL: all endpoints are reachable, and
+     [rpc_addr_is_public] must not fire. Exercised on two addresses to
+     confirm the entire 127.0.0.0/8 block is treated as loopback
+     (Ipaddr.V6.scope returns Interface for any V4 address in 127/8 once
+     mapped to V6, not just 127.0.0.1). *)
+  let test_loopback host =
+    Log.info "Testing ACL for loopback bind (%s)" host ;
+    let* dal_local, local_event_promise = setup_node ~rpc_host:host in
+    let ep_local = endpoint ~host dal_local in
+    let* resp = Dal.RPC.Remote.call_raw ep_local @@ Dal_RPC.get_profiles () in
+    RPC_core.check_string_response ~code:200 resp ;
+    let* resp =
+      Dal.RPC.Remote.call_raw ep_local @@ Dal_RPC.patch_profiles [profile]
+    in
+    RPC_core.check_string_response ~code:200 resp ;
+    (* Brief grace period; if [rpc_addr_is_public] hasn't resolved by now it
+       won't (it would have been emitted before [wait_ready] returned). *)
+    let* () = Lwt_unix.sleep 1. in
+    (match Lwt.state local_event_promise with
+    | Lwt.Sleep -> Lwt.cancel local_event_promise
+    | _ ->
+        Test.fail
+          "rpc_addr_is_public event fired unexpectedly on loopback bind %s"
+          host) ;
+    Dal_node.terminate dal_local
+  in
+  let* () = test_loopback Constant.default_host in
+  let* () = test_loopback "127.0.0.2" in
+  unit
+
+let test_rpc_acl_override _protocol _parameters _cryptobox node client _key =
+  (* Verify that the [acl] field in [config.json] overrides the default
+     [dal_secure] policy. We inject a custom policy that allows everything on
+     the public bind, then assert PATCH /profiles — which would otherwise be
+     denied with 401 — succeeds. *)
+  let dal_node = Dal_node.create ~rpc_host:"0.0.0.0" ~node () in
+  let* () = Dal_node.init_config dal_node in
+  let config_path = Dal_node.Config_file.filename dal_node in
+  let port = Dal_node.rpc_port dal_node in
+  let acl_override =
+    JSON.parse
+      ~origin:"rpc_acl_override"
+      (Printf.sprintf {|[ { "address": "0.0.0.0:%d", "blacklist": [] } ]|} port)
+  in
+  let config = JSON.parse_file config_path in
+  let config = JSON.put ("acl", acl_override) config in
+  JSON.encode_to_file config_path config ;
+  let* () = Dal_node.run dal_node ~wait_ready:false in
+  let* () =
+    Lwt.join
+      [
+        Dal_node.wait_for dal_node "dal_plugin_resolved.v0" (fun _ -> Some ());
+        bake_for client;
+      ]
+  in
+  let* () = Dal_node.wait_for_ready dal_node in
+  let endpoint =
+    Endpoint.make
+      ~scheme:"http"
+      ~host:Constant.default_host
+      ~port:(Dal_node.rpc_port dal_node)
+      ()
+  in
+  let profile = Dal_RPC.Attester Constant.bootstrap1.public_key_hash in
+  let* resp =
+    Dal.RPC.Remote.call_raw endpoint @@ Dal_RPC.patch_profiles [profile]
+  in
+  RPC_core.check_string_response ~code:200 resp ;
+  Dal_node.terminate dal_node
+
+let test_default_rpc_addr_is_loopback ~__FILE__ () =
+  Test.register
+    ~__FILE__
+    ~title:"DAL node default rpc-addr is loopback"
+    ~tags:[Tag.tezos2; "dal"; "config"; "rpc"; "default"]
+    ~uses:[Constant.octez_dal_node]
+    ~uses_client:false
+    ~uses_admin_client:false
+    ~uses_node:false
+  @@ fun () ->
+  (* The default is applied at runtime, not persisted to [config.json] when
+     [--rpc-addr] is omitted. Verify it via the CLI help (whose doc string is
+     derived from [Configuration_file.default.rpc_addr]). *)
+  let process =
+    Process.spawn (Uses.path Constant.octez_dal_node) ["run"; "--help=plain"]
+  in
+  let* output = Process.check_and_read_stdout process in
+  Check.(
+    (output =~ rex "default address is 127\\.0\\.0\\.1")
+      ~error_msg:"Expected --rpc-addr help to advertise default 127.0.0.1") ;
+  Check.(
+    (output =~ rex "default port is 10732")
+      ~error_msg:"Expected --rpc-addr help to advertise default port 10732") ;
+  unit
+
 let register ~__FILE__ ~protocols =
   test_dal_node_startup ~__FILE__ protocols ;
   test_dal_node_invalid_config ~__FILE__ () ;
+  test_default_rpc_addr_is_loopback ~__FILE__ () ;
   scenario_with_layer1_and_dal_nodes
     ~__FILE__
     ~operator_profiles:[0]
@@ -3596,4 +3770,16 @@ let register ~__FILE__ ~protocols =
         ~protocol
       @@ fun parameters cryptobox node client _key ->
       test_ignore_l1_history_check protocol parameters cryptobox node client)
+    protocols ;
+  scenario_with_layer1_node
+    ~__FILE__
+    ~uses:(fun _ -> [Constant.octez_dal_node])
+    "DAL node RPC ACL: public bind blocks mutations, loopback allows all"
+    test_rpc_acl
+    protocols ;
+  scenario_with_layer1_node
+    ~__FILE__
+    ~uses:(fun _ -> [Constant.octez_dal_node])
+    "DAL node RPC ACL: config override replaces default policy"
+    test_rpc_acl_override
     protocols

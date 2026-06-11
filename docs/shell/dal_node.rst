@@ -208,8 +208,25 @@ RPC server
 The DAL node incorporates an RPC server which answers to RPC queries to update or retrieve information about the node’s state.
 For instance, one can post slots, ask the node to compute and store shards, to update profiles, or to connect to or disconnect from peers.
 
-The default listening port for RPCs is 10732, but can be changed using option ``--rpc-addr``.
-The RPC server is started by default, even if this option is not given.
+By default the RPC server binds to the loopback interface (``127.0.0.1:10732``), so only programs running on the same machine can reach it.
+The address and port can be changed with the ``--rpc-addr`` option; the RPC server itself is always started, whether or not the option is given.
+
+To expose the RPC interface to other hosts, pass an explicit non-loopback address such as ``--rpc-addr 0.0.0.0:10732`` (listen on every interface) or ``--rpc-addr <interface-IP>:10732`` (a specific interface).
+When the server binds to a non-loopback address, a warning is emitted at startup and a restrictive ACL is applied: read-only endpoints (``GET`` queries on profiles, slots, ``/version``, plugin endpoints under ``/plugin/**``, …) remain accessible, while mutating endpoints (``PATCH /profiles``, ``POST /slots``, …) return ``401 Unauthorized``.
+If you need remote access to mutating endpoints, either restrict access at the network layer (firewall, reverse proxy with authentication, SSH tunnel, …) or override the ACL via configuration (see below).
+
+The default ACL can be overridden through the ``acl`` field in the configuration file, with the same syntax as the L1 node's ``rpc.acl`` policy: a list of per-bind-address overrides, each providing either a ``whitelist`` or a ``blacklist`` of HTTP method/path matchers. Whichever entry matches the configured ``rpc-addr`` replaces the default policy for that bind. For example, an operator that needs ``POST /slots`` to be reachable from a remote host can add to ``config.json``:
+
+.. code-block:: json
+
+  {
+    "acl": [
+      { "address": "0.0.0.0:10732", "blacklist": [] }
+    ]
+  }
+
+A ``blacklist: []`` allows every endpoint (equivalent to the previous ``allow_all`` behavior). To tighten the default further, supply an explicit ``whitelist`` listing only the methods and paths to permit. When no ``acl`` entry matches the bind address, the default ``dal_secure`` policy described above applies.
+
 Look at  :ref:`openapi description<dal-node-openapi>` for the list of available RPC.
 
 
