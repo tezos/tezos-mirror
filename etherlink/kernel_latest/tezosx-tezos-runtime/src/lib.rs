@@ -50,8 +50,7 @@ use tezos_tezlink::{
 };
 use tezosx_interfaces::{
     AliasInfo, AliasResolution, Classification, CrossRuntimeContext, Origin, Registry,
-    RuntimeId, RuntimeInterface, TezosXRuntimeError, ALIAS_LOOKUP_MILLIGAS,
-    X_TEZOS_GAS_CONSUMED,
+    RuntimeInterface, TezosXRuntimeError, ALIAS_LOOKUP_MILLIGAS, X_TEZOS_GAS_CONSUMED,
 };
 use tezosx_journal::{DispatchSlotError, TezosXJournal};
 
@@ -178,10 +177,10 @@ fn finalize_response(
 
 /// Build a serialized two-step receipt for an incoming CRAC (EVM → Michelson).
 ///
-/// The RFC (CRAC Derived Block Contents) specifies the receipt structure:
+/// The receipt structure (CRAC Derived Block Contents):
 ///
 /// **Top-level**: handler (tz1) → source_alias (alias(E_0)), Applied
-///   - **Internal op #0** (if CRAC event): CRAC event with CRAC-ID
+///   - **Internal op #0**: CRAC begin event with CRAC-ID
 ///   - **Internal op #1**: sender_alias (alias(E_1)) → target, Applied(transfer result)
 ///   - **Internal ops 2..N**: further ops from Michelson execution
 ///
@@ -204,12 +203,12 @@ fn build_crac_receipt(
     target: TransferTarget,
     pre_transfer_internals: Vec<InternalOperationSum>,
     internal_receipts: Vec<InternalOperationSum>,
-    crac_id: Option<&str>,
+    crac_id: &str,
     base_nonce: u16,
 ) -> Result<AppliedOperation, TezosXRuntimeError> {
     // Combine, in execution order:
-    //   [CRAC event, ...pre_transfer_internals, alias(E_1)→target, ...further internal ops]
-    // Per RFC, the CRAC event is always the first internal operation (#0).
+    //   [CRAC begin event, ...pre_transfer_internals, alias(E_1)→target, ...further internal ops]
+    // The begin event is always the first internal operation (#0).
     // `pre_transfer_internals` carries the alias-forwarder origination
     // internal ops materialized during alias resolution — they must
     // appear BEFORE the synthetic transfer because the EVM precompile
@@ -222,11 +221,11 @@ fn build_crac_receipt(
     let mut all_internal = Vec::new();
     let mut next_nonce = base_nonce;
 
-    if let Some(id) = crac_id {
+    {
         use mir::{
             ast::annotations::NO_ANNS, ast::micheline::Micheline, ast::Entrypoint, lexer,
         };
-        // Synthetic kernel-emitted CRAC event. The event is
+        // Synthetic kernel-emitted CRAC begin event. The event is
         // *sponsored*: it is Micheline-encoded against a dedicated
         // kernel-owned gas counter (`Gas::default()` — the standard L1
         // per-operation cap, the idiom for non-user-billed kernel
@@ -234,7 +233,7 @@ fn build_crac_receipt(
         // encoded payload is tiny and bounded, so against this counter
         // the encode can never run out of gas: the event always lands
         // in the receipt. The internal-op `EventSuccess.consumed_milligas`
-        // is hardcoded to 0 (RFC); the top-level receipt's
+        // is hardcoded to 0; the top-level receipt's
         // `consumed_milligas` no longer includes this encode cost — the
         // kernel absorbs it instead of charging the user (L2-1464).
         let mut sponsored_event_gas = Gas::default();
@@ -246,7 +245,7 @@ fn build_crac_receipt(
                     "Failed to encode CRAC event type: {e}"
                 ))
             })?;
-        let payload = Micheline::from(id.to_string())
+        let payload = Micheline::from(crac_id.to_string())
             .encode(&mut sponsored_event_gas)
             .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
             .map_err(|e| {
@@ -339,7 +338,7 @@ fn build_crac_receipt(
     })
 }
 
-/// Build a failed CRAC receipt (RFC Example 4).
+/// Build a failed CRAC receipt.
 ///
 /// When `cross_runtime_transfer` fails, we still need a receipt in the
 /// Michelson block so indexers see the failed CRAC.  The top-level
@@ -357,10 +356,10 @@ fn build_failed_crac_receipt(
     error: TransferError,
     pre_transfer_internals: Vec<InternalOperationSum>,
     internal_receipts: Vec<InternalOperationSum>,
-    crac_id: Option<&str>,
+    crac_id: &str,
     base_nonce: u16,
 ) -> Result<AppliedOperation, TezosXRuntimeError> {
-    // Per RFC, the CRAC event is always first, even on failure.
+    // The CRAC begin event is always first, even on failure.
     // Since the downstream transfer failed, the event is backtracked
     // (matching Tezos protocol semantics where all applied internal ops
     // preceding a failure are backtracked).
@@ -369,19 +368,19 @@ fn build_failed_crac_receipt(
     // the CRAC body ran and their storage effects are persistent.
     let mut all_internal = Vec::new();
     let mut next_nonce = base_nonce;
-    if let Some(id) = crac_id {
+    {
         use mir::{
             ast::annotations::NO_ANNS, ast::micheline::Micheline, ast::Entrypoint, lexer,
         };
-        // Synthetic kernel-emitted CRAC event (backtracked variant for
-        // failed CRAC receipt). Like the success-path builder, the event
-        // is *sponsored*: encoded against a dedicated kernel-owned gas
-        // counter (`Gas::default()`) rather than the caller's remaining
-        // budget. This is the crux of L2-1464: a gas-tight failed CRAC
-        // must still record its failed receipt for indexers, so crafting
-        // the event must never depend on (and never exhaust) the caller's
-        // leftover gas. The internal-op `EventSuccess`'s `consumed_milligas`
-        // stays 0 inside the `BacktrackedResult` (RFC).
+        // Synthetic kernel-emitted CRAC begin event (backtracked variant
+        // for failed CRAC receipt). Like the success-path builder, the
+        // event is *sponsored*: encoded against a dedicated kernel-owned
+        // gas counter (`Gas::default()`) rather than the caller's
+        // remaining budget. This is the crux of L2-1464: a gas-tight
+        // failed CRAC must still record its failed receipt for indexers,
+        // so crafting the event must never depend on (and never exhaust)
+        // the caller's leftover gas. The internal-op `EventSuccess`'s
+        // `consumed_milligas` stays 0 inside the `BacktrackedResult`.
         let mut sponsored_event_gas = Gas::default();
         let ty = Micheline::App(lexer::Prim::string, &[], NO_ANNS)
             .encode(&mut sponsored_event_gas)
@@ -391,7 +390,7 @@ fn build_failed_crac_receipt(
                     "Failed to encode CRAC event type: {e}"
                 ))
             })?;
-        let payload = Micheline::from(id.to_string())
+        let payload = Micheline::from(crac_id.to_string())
             .encode(&mut sponsored_event_gas)
             .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
             .map_err(|e| {
@@ -422,7 +421,7 @@ fn build_failed_crac_receipt(
 
     all_internal.extend(pre_transfer_internals);
 
-    // Per RFC, include the failed transfer (alias(E_1) → target) so
+    // Include the failed transfer (alias(E_1) → target) so
     // indexers can see which contract call was attempted.
     all_internal.push(InternalOperationSum::Transfer(
         InternalContentWithMetadata {
@@ -638,33 +637,6 @@ where
     // SOURCE to be tz1/tz2/tz3; the null PKH fills that role for both
     // CRAC and non-CRAC requests.
     let is_crac = hdrs.crac_origin_contract.is_some();
-    // Every CRAC receipt carries the synthetic CRAC-ID event.  The
-    // merge stage (`merge_crac_internals` for top-level CRACs and
-    // `drain_reentrant_crac_ops` for re-entrant inner CRACs) dedupes
-    // events tagged `"crac"` with the null implicit sender so the
-    // final synthetic Michelson manager-op carries exactly one.
-    // Always-emitting keeps each receipt self-contained: when an EVM
-    // revert wipes pending receipts but failed ones survive (see
-    // `MichelsonJournal::revert_frame`), the surviving failed
-    // receipt brings its own CRAC-ID event with it.
-    //
-    // The synthetic event is only useful when the originating
-    // runtime is *not* Tezos: Tezos-originated CRACs already surface
-    // naturally on the Michelson side and don't need the
-    // cross-runtime correlation key.  Phrasing the predicate as
-    // "not Tezos" rather than "is Ethereum" keeps the semantics
-    // forward-compatible with hypothetical additional non-Tezos
-    // runtimes.
-    //
-    // `CracId::origin_runtime` is stored as a raw `u8`, but
-    // `u8::from(RuntimeId::Tezos)` resolves to the same canonical
-    // discriminant so the comparison stays typed-by-construction.
-    let crac_id_for_event =
-        if is_crac && journal.crac_id().origin_runtime != u8::from(RuntimeId::Tezos) {
-            Some(journal.crac_id().to_string())
-        } else {
-            None
-        };
     let source_pkh = PublicKeyHash::from_b58check(NULL_PKH).map_err(|e| {
         TezosXRuntimeError::ConversionError(format!("Failed to parse null address: {e}"))
     })?;
@@ -875,6 +847,7 @@ where
                 if let (Some(source_contract), CracError::Operation(te)) =
                     (hdrs.crac_origin_contract.as_ref(), error)
                 {
+                    let crac_id_str = journal.crac_id().to_string();
                     match build_failed_crac_receipt(
                         &source_pkh,
                         source_contract,
@@ -885,7 +858,7 @@ where
                         te,
                         alias_origination_internals,
                         internal_receipts,
-                        crac_id_for_event.as_deref(),
+                        &crac_id_str,
                         base_nonce,
                     ) {
                         Ok(receipt) => {
@@ -939,6 +912,7 @@ where
         // `build_crac_receipt` can insert them BETWEEN the CRAC event
         // and the synthetic transfer — the materializations happen
         // before the cross-runtime transfer they participate in.
+        let crac_id_str = journal.crac_id().to_string();
         let receipt = build_crac_receipt(
             &source_pkh,
             source_contract,
@@ -949,7 +923,7 @@ where
             result.target,
             alias_origination_internals,
             result.internal_receipts,
-            crac_id_for_event.as_deref(),
+            &crac_id_str,
             base_nonce,
         )?;
         journal.michelson.push_pending_crac_receipt(receipt);
@@ -2030,7 +2004,7 @@ mod tests {
             target,
             vec![],
             vec![],
-            Some(crac_id),
+            crac_id,
             0,
         )
         .expect("build_crac_receipt should succeed");
@@ -2151,7 +2125,7 @@ mod tests {
             target,
             vec![],
             vec![],
-            None, // no CRAC-ID in this variant test
+            "1-0",
             0,
         )
         .expect("build_crac_receipt should succeed");
@@ -2176,17 +2150,25 @@ mod tests {
         let OperationResultSum::Transfer(ref result) = op.receipt else {
             panic!("expected Transfer receipt");
         };
-        // Only the synthetic transfer (no CRAC event since crac_id=None).
+        // CRAC event at #0, synthetic transfer at #1.
         assert_eq!(
             result.internal_operation_results.len(),
-            1,
-            "one internal operation (transfer only, no CRAC event)"
+            2,
+            "two internal operations (CRAC event + transfer)"
+        );
+
+        assert!(
+            matches!(
+                result.internal_operation_results[0],
+                InternalOperationSum::Event(_)
+            ),
+            "internal op #0 must be the CRAC event"
         );
 
         let InternalOperationSum::Transfer(ref internal) =
-            result.internal_operation_results[0]
+            result.internal_operation_results[1]
         else {
-            panic!("expected internal Transfer");
+            panic!("expected internal Transfer at index 1");
         };
         // When E_0 == E_1, the internal sender equals the top-level destination.
         assert_eq!(
@@ -2247,7 +2229,7 @@ mod tests {
             error,
             vec![],
             vec![],
-            Some("1-0"),
+            "1-0",
             0,
         )
         .expect("build_failed_crac_receipt should succeed");
