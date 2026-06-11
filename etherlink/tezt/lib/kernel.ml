@@ -52,7 +52,7 @@ let supports_dal = function
    value for a network when that network's kernel is rebaked; treat this as
    the single source of truth when picking storage-version-gated paths in
    tezt. *)
-let storage_version = function Latest -> 60 | Previewnet -> 60 | Mainnet -> 46
+let storage_version = function Latest -> 61 | Previewnet -> 60 | Mainnet -> 46
 
 let of_tag tag =
   let contain_exp ~exp =

@@ -34,6 +34,20 @@ const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
 /// path lives next to the rest of the account state.
 pub(crate) const ORIGIN_PATH: RefPath = RefPath::assert_from(b"/origin");
 
+/// Path of the single shared Michelson implementation backing every Tezos X
+/// alias. It is resolved at execution and lookup time for any account
+/// classified as [`Origin::Alias`], so a single piece of code stands in for
+/// the script of every alias `KT1`.
+///
+/// It lives in a `__system__` subtree of the `tezosx/` account namespace.
+/// `__system__` is not a valid base58 account address, so the slot cannot
+/// collide with a per-account directory. Being rooted under
+/// `/tez/tez_accounts`, its content is folded into the Michelson state-hash
+/// commitment `h(/tez/tez_accounts)`: replicas that disagree on the
+/// implementation diverge on the Michelson block `state_root`.
+const ALIAS_IMPLEMENTATION_PATH: RefPath =
+    RefPath::assert_from(b"/tez/tez_accounts/tezosx/__system__/alias_implementation");
+
 pub fn narith_to_u256(
     narith: &Narith,
 ) -> Result<primitive_types::U256, TezosXRuntimeError> {
@@ -227,6 +241,49 @@ pub fn set_origin_for_implicit(
     set_origin_at(host, &prefix, origin)
 }
 
+/// Read the shared Michelson implementation backing every Tezos X alias.
+/// Returns `None` when the slot has not been seeded yet (see
+/// [`init_alias_implementation`]).
+pub fn read_alias_implementation(
+    host: &impl StorageV1,
+) -> Result<Option<Vec<u8>>, TezosXRuntimeError> {
+    match host.store_read_all(&ALIAS_IMPLEMENTATION_PATH) {
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(RuntimeError::PathNotFound) => Ok(None),
+        Err(err) => Err(TezosXRuntimeError::Runtime(err)),
+    }
+}
+
+/// Overwrite the shared alias implementation with `code`. A single write here
+/// changes the behaviour of every existing and future alias at once — the O(1)
+/// upgrade primitive.
+pub fn write_alias_implementation(
+    host: &mut impl StorageV1,
+    code: &[u8],
+) -> Result<(), TezosXRuntimeError> {
+    Ok(host.store_write_all(&ALIAS_IMPLEMENTATION_PATH, code)?)
+}
+
+/// Seed the shared alias implementation with the canonical forwarder code if
+/// the slot is empty, leaving an already-populated slot untouched.
+///
+/// Idempotent, so it is safe to call from both seeding points: the Michelson
+/// runtime activation (fresh networks) and the storage migration
+/// (already-deployed networks).
+pub fn init_alias_implementation(
+    host: &mut impl StorageV1,
+) -> Result<(), TezosXRuntimeError> {
+    if read_alias_implementation(host)?.is_none() {
+        let code = crate::alias_forwarder::forwarder_code().map_err(|e| {
+            TezosXRuntimeError::Custom(format!(
+                "decoding forwarder code from hex failed: {e}"
+            ))
+        })?;
+        write_alias_implementation(host, &code)?;
+    }
+    Ok(())
+}
+
 pub struct TezosImplicitAccount {
     pub(crate) pkh: PublicKeyHash,
     pub(crate) path: OwnedPath,
@@ -410,6 +467,52 @@ mod tests {
         });
         set_origin_at(&mut host, &path, &alias).unwrap();
         assert_eq!(get_origin_at(&host, &path).unwrap(), Some(alias));
+    }
+
+    #[test]
+    fn alias_implementation_path_is_under_the_accounts_root() {
+        // Nothing ties ALIAS_IMPLEMENTATION_PATH to TEZOS_ACCOUNTS_PATH at
+        // compile time; this guards that the slot stays inside the accounts
+        // namespace, so it remains covered by the `h(/tez/tez_accounts)`
+        // state-hash commitment if the accounts root ever moves.
+        use tezos_smart_rollup_host::path::Path;
+        assert!(super::ALIAS_IMPLEMENTATION_PATH
+            .as_bytes()
+            .starts_with(super::TEZOS_ACCOUNTS_PATH.as_bytes()));
+    }
+
+    #[test]
+    fn alias_implementation_seed_and_roundtrip() {
+        use crate::account::{
+            init_alias_implementation, read_alias_implementation,
+            write_alias_implementation,
+        };
+        use tezos_evm_runtime::runtime::MockKernelHost;
+
+        let mut host = MockKernelHost::default();
+
+        // Absent before seeding.
+        assert!(read_alias_implementation(&host).unwrap().is_none());
+
+        // Seeding installs the canonical forwarder code.
+        init_alias_implementation(&mut host).unwrap();
+        let forwarder = crate::alias_forwarder::forwarder_code().unwrap();
+        assert_eq!(
+            read_alias_implementation(&host).unwrap(),
+            Some(forwarder.clone())
+        );
+
+        // Seeding again is a no-op: an already-populated slot is untouched.
+        write_alias_implementation(&mut host, b"already here").unwrap();
+        init_alias_implementation(&mut host).unwrap();
+        assert_eq!(
+            read_alias_implementation(&host).unwrap(),
+            Some(b"already here".to_vec())
+        );
+
+        // An explicit write overwrites — the O(1) upgrade primitive.
+        write_alias_implementation(&mut host, &forwarder).unwrap();
+        assert_eq!(read_alias_implementation(&host).unwrap(), Some(forwarder));
     }
 
     #[test]

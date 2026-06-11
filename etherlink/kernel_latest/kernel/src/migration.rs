@@ -1205,6 +1205,34 @@ where
             // sufficient.
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V61 => {
+            // L2-1526: seed the shared Michelson alias implementation at
+            // /tez/tez_accounts/tezosx/__system__/alias_implementation for
+            // networks that already activated the Michelson runtime (the
+            // activation-time seeding only fires on fresh activations). The
+            // slot receives the forwarder code every alias already runs, so
+            // this is a semantic no-op; it just gives existing aliases a single
+            // shared implementation to resolve to. Idempotent.
+            //
+            // The path and code are frozen here as literals rather than read
+            // from the live constants: a migration can run long after it was
+            // written, so it must keep writing these exact bytes even if the
+            // live `ALIAS_IMPLEMENTATION_PATH` / `forwarder_code()` change later
+            // (migration discipline).
+            const ALIAS_IMPLEMENTATION_PATH: RefPath = RefPath::assert_from(
+                b"/tez/tez_accounts/tezosx/__system__/alias_implementation",
+            );
+            const FORWARDER_CODE_HEX_V61: &str = "02000000740500036c0501036805020200000065031703210743036e01000000244b5431386f444a4a4b584d4b68664531625375415047703932705963775644697173507705550368072f02000000120743036801000000076761746577617903270200000000031505700002034d053d036d034c031b0342";
+            if crate::storage::enable_tezos_runtime(host) {
+                if host.store_has(&ALIAS_IMPLEMENTATION_PATH)?.is_none() {
+                    let code = hex::decode(FORWARDER_CODE_HEX_V61)?;
+                    host.store_write_all(&ALIAS_IMPLEMENTATION_PATH, &code)?;
+                }
+                Ok(MigrationStatus::Done)
+            } else {
+                Ok(MigrationStatus::None)
+            }
+        }
     }
 }
 
@@ -1331,6 +1359,61 @@ mod tests {
         // must not have created one as a side effect of the no-op).
         let account = StorageAccount::from_address(&TEZOSX_CALLER_ADDRESS).unwrap();
         assert!(account.info_without_migration(&host).unwrap().is_none());
+    }
+
+    /// L2-1526: the V61 migration seeds the shared Michelson alias
+    /// implementation on networks where the Michelson runtime is enabled.
+    ///
+    /// The expected durable path is spelled out as a literal here on purpose:
+    /// a migration is a frozen historical record and must keep targeting these
+    /// exact bytes even if the live path constant is later moved or renamed
+    /// (etherlink/AGENTS.md migration discipline). If this assertion ever
+    /// drifts from the code, the migration — not the test — is wrong.
+    #[test]
+    fn v61_migration_seeds_alias_implementation_on_tezosx_networks() {
+        const ALIAS_IMPLEMENTATION_PATH: RefPath = RefPath::assert_from(
+            b"/tez/tez_accounts/tezosx/__system__/alias_implementation",
+        );
+
+        let mut host = MockKernelHost::default();
+        host.store_write_all(&crate::storage::ENABLE_TEZOS_RUNTIME, &[1u8])
+            .unwrap();
+
+        // Absent before the migration.
+        assert!(matches!(
+            host.store_read_all(&ALIAS_IMPLEMENTATION_PATH),
+            Err(RuntimeError::PathNotFound)
+        ));
+
+        let status = migrate_to(&mut host, StorageVersion::V61).unwrap();
+        assert!(matches!(status, MigrationStatus::Done));
+
+        // Seeded with exactly the forwarder bytes frozen in the V61 arm. We
+        // assert against the frozen literal (not the live `forwarder_code()`)
+        // so a future drift of the live constant cannot mask a divergence.
+        const FORWARDER_CODE_HEX_V61: &str = "02000000740500036c0501036805020200000065031703210743036e01000000244b5431386f444a4a4b584d4b68664531625375415047703932705963775644697173507705550368072f02000000120743036801000000076761746577617903270200000000031505700002034d053d036d034c031b0342";
+        let seeded = host.store_read_all(&ALIAS_IMPLEMENTATION_PATH).unwrap();
+        assert_eq!(seeded, hex::decode(FORWARDER_CODE_HEX_V61).unwrap());
+    }
+
+    /// L2-1526: the V61 migration is a no-op on non-TezosX networks — it must
+    /// not write the slot (the activation-time seeding covers those networks if
+    /// they ever enable the runtime).
+    #[test]
+    fn v61_migration_is_a_no_op_on_non_tezosx_networks() {
+        const ALIAS_IMPLEMENTATION_PATH: RefPath = RefPath::assert_from(
+            b"/tez/tez_accounts/tezosx/__system__/alias_implementation",
+        );
+
+        let mut host = MockKernelHost::default();
+        // Do NOT enable the Michelson runtime.
+
+        let status = migrate_to(&mut host, StorageVersion::V61).unwrap();
+        assert!(matches!(status, MigrationStatus::None));
+        assert!(matches!(
+            host.store_read_all(&ALIAS_IMPLEMENTATION_PATH),
+            Err(RuntimeError::PathNotFound)
+        ));
     }
 
     /// Sanity: the cleanup is safe even if the bug state was never
