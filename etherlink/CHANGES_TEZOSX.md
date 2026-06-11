@@ -216,6 +216,13 @@
 
 ### Internals
 
+- The Michelson burn pass no longer charges operations surfaced in
+  the manager-op receipt tree by the CRAC drain mechanism. Each
+  frame is now responsible for the storage fees of its own
+  allocations; operations from a CRAC sub-execution are skipped at
+  this burn pass — their cost is not billed against the parent's
+  `storage_limit`. A standalone Michelson manager-op that does not
+  cross a CRAC boundary observes no change. (!22095)
 - EVM caller absorbs the storage cost a CRAC callee delegates back
   through `X-Tezos-Storage-Cost`: `g2 = V / base_fee_per_gas` is
   deducted from the gas remaining at the return site, reverting
