@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- The account info record (`/info`) may now carry a fourth RLP field,
+  the origin classification (alias payload included). Legacy 3-field
+  records remain valid and are migrated lazily as accounts are touched;
+  no storage version bump. This removes the per-transaction and
+  per-committed-contract `/origin` reads introduced with the address
+  classification, restoring the transfer hot path to its previous
+  host-call count. (!22126)
+
 ## Version 6 (Farfadet)
 
 ### 6.2 (4d6762e)
