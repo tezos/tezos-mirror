@@ -68,7 +68,7 @@
   from the values inherited from L1 (a Tallinn-era snapshot) to values
   re-benchmarked directly on the MIR (Rust) interpreter. This changes the
   gas reported on receipts and `eth_estimateGas` for any Michelson script
-  using these instructions. (L2-1553, L2-1540 and others to come)
+  using these instructions. (L2-1553, L2-1540, L2-1544 and others to come)
 - Big-map usage now counts toward a contract's storage footprint, so
   receipts and storage burn cover big-maps the same way they do on
   L1. (!22040)
