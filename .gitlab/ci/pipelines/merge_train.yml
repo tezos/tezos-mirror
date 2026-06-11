@@ -693,46 +693,6 @@ images.ubuntu-systemd:
       - "24.04"
       - "26.04"
 
-images.debian-jsonnet:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: build
-  tags:
-  - gcp_very_high_cpu
-  rules:
-  - changes:
-    - images/base-images/Dockerfile.debian
-    - images/base-images/Dockerfile.debian-jsonnet
-    - images/scripts/install-gcloud.sh
-    - images/scripts/install_datadog_static.sh
-    - scripts/ci/build-base-images.sh
-    - scripts/kiss-fetch.sh
-    when: on_success
-  needs:
-  - images.debian
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian-jsonnet
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    DOCKER_VERSION: 28.5.1
-    DISTRIBUTION: debian-jsonnet
-    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
-    PLATFORM: linux/amd64
-  parallel:
-    matrix:
-    - RELEASE:
-      - trixie
-
 images.debian-rust-sdk-bindings:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: build
@@ -1606,6 +1566,47 @@ images.debian-homebrew:
   variables:
     DOCKER_VERSION: 28.5.1
     DISTRIBUTION: debian-homebrew
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    PLATFORM: linux/amd64
+  parallel:
+    matrix:
+    - RELEASE:
+      - trixie
+
+images.debian-jsonnet:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  rules:
+  - changes:
+    - images/base-images/Dockerfile.debian
+    - images/base-images/Dockerfile.debian-jsonnet
+    - images/scripts/install-gcloud.sh
+    - images/scripts/install_datadog_static.sh
+    - scripts/ci/build-base-images.sh
+    - scripts/kiss-fetch.sh
+    when: on_success
+  needs:
+  - images.debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian-jsonnet
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DOCKER_VERSION: 28.5.1
+    DISTRIBUTION: debian-jsonnet
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: linux/amd64
   parallel:

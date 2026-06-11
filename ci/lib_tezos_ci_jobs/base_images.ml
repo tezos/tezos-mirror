@@ -643,20 +643,20 @@ let make_job_ubuntu_systemd_base_images ?start_job ?(changeset = false) () =
 
 (* ── debian-jsonnet ──────────────────────────────────────────────────────── *)
 
-(* debian-jsonnet: based on [debian:trixie] *)
-let make_job_jsonnet_base_images ?start_job ?(changeset = false) () =
-  let dep_debian = make_job_debian_based_images () in
-  make_job_base_images
-    ?start_job
-    ~changeset
-    ~__POS__
+(* ── Cacio: debian-jsonnet ───────────────────────────────────────────────── *)
+
+let job_jsonnet_based_images =
+  base_image_job
     ~image_name:"debian-jsonnet"
     ~base_name:(Pipeline_dep "debian")
-    ~dependencies:(Dependent [Job dep_debian])
     ~matrix:[("RELEASE", ["trixie"])]
     ~compilation:Amd64_only
-    ~changes:(Changeset.make (Files.debian_jsonnet @ Files.debian_base))
     "images/base-images/Dockerfile.debian-jsonnet"
+    ~__POS__
+    ~description:"Build debian-jsonnet base images"
+    ~only_if_changed:Files.(debian_jsonnet @ debian_base)
+    ~needs_legacy:[(Cacio.Job, make_job_debian_based_images ())]
+    "images.debian-jsonnet"
 
 (* ── rust-sdk-bindings ───────────────────────────────────────────────────── *)
 
@@ -696,7 +696,6 @@ let jobs ?start_job ?(changeset = false) () =
     make_job_ubuntu_build_base_images_merge ~changeset ();
     make_job_debian_systemd_base_images ?start_job ~changeset ();
     make_job_ubuntu_systemd_base_images ?start_job ~changeset ();
-    make_job_jsonnet_base_images ?start_job ~changeset ();
     make_job_rust_sdk_bindings_base_images ?start_job ~changeset ();
   ]
   @
@@ -715,6 +714,7 @@ let () =
       (Cacio.Auto, job_ci_release_based_images);
       (Cacio.Auto, job_docker_ci_based_images);
       (Cacio.Auto, job_debian_homebrew_based_images);
+      (Cacio.Auto, job_jsonnet_based_images);
     ]
   in
   Cacio.register_merge_request_jobs jobs ;
