@@ -3808,7 +3808,7 @@ mod interpreter_tests {
         assert!(interpret_one(&Add(overloads::Add::MutezMutez), &mut ctx, &mut stack).is_ok());
         assert_eq!(
             ctx.gas().milligas().unwrap(),
-            Gas::default().milligas().unwrap() - 20
+            Gas::default().milligas().unwrap() - 45
         );
         assert_eq!(stack, stk![V::Mutez(2i64.pow(62) + 20)]);
         assert_eq!(
