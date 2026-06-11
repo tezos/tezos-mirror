@@ -27,7 +27,7 @@ use std::vec::Vec;
 use tezosx_journal::{LayeredStateError, OriginalSource, TezosXJournal};
 
 use crate::database::EtherlinkVMDB;
-use crate::error::{EvmRunError, OriginStorageError};
+use crate::error::{EvmDbError, EvmRunError};
 use crate::storage::world_state_handler::StorageAccount;
 use evm_types::{
     CustomPrecompileError, DatabaseCommitPrecompileStateChanges,
@@ -732,8 +732,13 @@ where
         let origin = match self.journal.evm.layered_state.pending_alias_origin(&source) {
             Some(origin) => Some(origin),
             None => StorageAccount::from_address(&source)
-                .map_err(OriginStorageError::from)
-                .and_then(|a| a.get_origin(self.database.host))
+                .map_err(EvmDbError::from)
+                .and_then(|a| {
+                    Ok(a.info_without_migration(self.database.host)?
+                        .map(|info| info.origin)
+                        .unwrap_or_default()
+                        .into())
+                })
                 .map_err(|e| e.into_with_remainder(remaining))?,
         };
         let alias_info = match resolve_routing(origin, target_runtime)
@@ -823,8 +828,13 @@ where
         let origin = match self.journal.evm.layered_state.pending_alias_origin(&source) {
             Some(origin) => Some(origin),
             None => StorageAccount::from_address(&source)
-                .map_err(OriginStorageError::from)
-                .and_then(|a| a.get_origin(self.database.host))
+                .map_err(EvmDbError::from)
+                .and_then(|a| {
+                    Ok(a.info_without_migration(self.database.host)?
+                        .map(|info| info.origin)
+                        .unwrap_or_default()
+                        .into())
+                })
                 .map_err(|e| e.into_with_remainder(remaining))?,
         };
         let native_bytes = match resolve_routing(origin, target_runtime)
@@ -907,7 +917,9 @@ pub fn commit_evm_journal_from_external<Host>(
 where
     Host: StorageV1,
 {
-    let db = EtherlinkVMDB::new(host, registry, block_constants)?;
+    // Cross-runtime callers are classified through their staged alias,
+    // never as Native: no caller to classify here.
+    let db = EtherlinkVMDB::new(host, registry, block_constants, None)?;
     let mut journal = Journal::new_with_inner(db, journal);
     let state = journal.finalize();
     DatabaseCommit::commit(journal.db_mut(), state);
@@ -927,19 +939,42 @@ mod tests {
         })
     }
 
+    // Write `origin` into the account record and read it back the way
+    // the routing code does.
+    fn write_origin(host: &mut MockKernelHost, source: &Address, origin: Origin) {
+        StorageAccount::from_address(source)
+            .unwrap()
+            .set_info_without_code(
+                host,
+                crate::storage::world_state_handler::AccountInfo {
+                    origin: origin.into(),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+    }
+
+    fn read_origin(host: &MockKernelHost, source: &Address) -> Option<Origin> {
+        StorageAccount::from_address(source)
+            .unwrap()
+            .info_without_migration(host)
+            .unwrap()
+            .map(|info| info.origin)
+            .unwrap_or_default()
+            .into()
+    }
+
     #[test]
     fn routing_returns_round_trip_for_matching_alias() {
         let mut host = MockKernelHost::default();
         let source = Address::from_slice(&[0xaa; 20]);
-        let mut account = StorageAccount::from_address(&source).unwrap();
-        account
-            .set_origin(&mut host, &alias_origin(RuntimeId::Tezos, b"tz1abcdef"))
-            .unwrap();
+        write_origin(
+            &mut host,
+            &source,
+            alias_origin(RuntimeId::Tezos, b"tz1abcdef"),
+        );
 
-        let origin = StorageAccount::from_address(&source)
-            .unwrap()
-            .get_origin(&host)
-            .unwrap();
+        let origin = read_origin(&host, &source);
         match resolve_routing(origin, RuntimeId::Tezos).unwrap() {
             RoutingDecision::RoundTrip(target) => assert_eq!(target, "tz1abcdef"),
             other => panic!(
@@ -953,10 +988,9 @@ mod tests {
     fn routing_returns_native_for_native_origin() {
         let mut host = MockKernelHost::default();
         let source = Address::from_slice(&[0xcc; 20]);
-        let mut account = StorageAccount::from_address(&source).unwrap();
-        account.set_origin(&mut host, &Origin::Native).unwrap();
+        write_origin(&mut host, &source, Origin::Native);
 
-        let origin = account.get_origin(&host).unwrap();
+        let origin = read_origin(&host, &source);
         assert!(matches!(
             resolve_routing(origin, RuntimeId::Tezos).unwrap(),
             RoutingDecision::Native,
@@ -968,10 +1002,7 @@ mod tests {
         let host = MockKernelHost::default();
         let source = Address::from_slice(&[0xdd; 20]);
 
-        let origin = StorageAccount::from_address(&source)
-            .unwrap()
-            .get_origin(&host)
-            .unwrap();
+        let origin = read_origin(&host, &source);
         assert!(matches!(
             resolve_routing(origin, RuntimeId::Tezos).unwrap(),
             RoutingDecision::Native,
@@ -984,12 +1015,13 @@ mod tests {
         // Unreachable in two runtime mode.
         let mut host = MockKernelHost::default();
         let source = Address::from_slice(&[0xbb; 20]);
-        let mut account = StorageAccount::from_address(&source).unwrap();
-        account
-            .set_origin(&mut host, &alias_origin(RuntimeId::Tezos, b"tz1abcdef"))
-            .unwrap();
+        write_origin(
+            &mut host,
+            &source,
+            alias_origin(RuntimeId::Tezos, b"tz1abcdef"),
+        );
 
-        let origin = account.get_origin(&host).unwrap();
+        let origin = read_origin(&host, &source);
         match resolve_routing(origin, RuntimeId::Ethereum).unwrap() {
             RoutingDecision::Transitive(info) => {
                 assert_eq!(info.runtime, RuntimeId::Tezos);

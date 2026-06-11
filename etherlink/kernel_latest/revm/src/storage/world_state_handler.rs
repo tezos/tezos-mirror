@@ -6,7 +6,7 @@
 
 use revm::{
     primitives::{Address, Bytes, B256, KECCAK_EMPTY, U256},
-    state::{AccountInfo, Bytecode},
+    state::{AccountInfo as RevmAccountInfo, Bytecode},
 };
 use rlp::{Decodable, Encodable, Rlp};
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader};
@@ -15,12 +15,12 @@ use tezos_smart_rollup_host::{
     runtime::RuntimeError,
     storage::StorageV1,
 };
-use tezosx_interfaces::Origin;
+use tezosx_interfaces::{AliasInfo, Origin};
 
 use evm_types::{FaDepositWithProxy, PrecompileStateError};
 
 use crate::{
-    error::{EvmDbError, OriginStorageError},
+    error::EvmDbError,
     helpers::storage::{
         read_b256_be_default, read_u256_be_default, read_u256_le_default,
         read_u64_le_default, write_u256_le,
@@ -75,13 +75,6 @@ const CODE_PATH: RefPath = RefPath::assert_from(b"/code");
 /// format for saving the accounts infos that overrides the previous one.
 const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
 
-/// Path that holds the classification record for an account. Stored
-/// at a sibling of the info path so the info RLP stays at 77 bytes and
-/// the read inside the basic call on Database keeps its fast path. The
-/// path is touched only by code that handles classification, which
-/// runs on cross-runtime translation and on alias materialization.
-const ORIGIN_PATH: RefPath = RefPath::assert_from(b"/origin");
-
 /// The contracts of "internal" accounts have their own storage area. The account
 /// location prefixed to this path gives the root path (prefix) to where such storage
 /// values are kept. Each index in durable storage gives one complete path to one
@@ -122,31 +115,165 @@ pub struct StorageAccount {
     path: OwnedPath,
 }
 
-// Used as a value for the durable storage, can't use REVM `AccountInfo`
-// because we need to implement `RlpEncodable` `RlpDecodable`
-#[derive(Copy, Clone, Default, Debug, PartialEq, Eq)]
-struct AccountInfoInternal {
-    pub balance: U256,
-    pub nonce: u64,
-    pub code_hash: B256,
+/// Origin classification of an account, carried as the fourth field of
+/// the info record so the hot paths (`basic` read, commit write) learn
+/// and persist it for free — including the alias payload, so the
+/// record is the single source of truth for the classification.
+///
+/// Legacy 3-field records (the current Etherlink mainnet format)
+/// decode as [`AccountOrigin::Unclassified`] and converge as accounts
+/// are touched; this is what makes the migration lazy.
+#[derive(Clone, Default, Debug, PartialEq, Eq)]
+pub enum AccountOrigin {
+    #[default]
+    Unclassified,
+    Native,
+    Alias(AliasInfo),
 }
 
-impl AccountInfoInternal {
-    // This value is used for optimizing reads in the durable storage,
-    // don't change it without changing StorageAccount::info.
-    const RLP_SIZE: usize = 77;
-}
+impl AccountOrigin {
+    const UNCLASSIFIED_TAG: u8 = 0;
+    const NATIVE_TAG: u8 = 1;
+    const ALIAS_TAG: u8 = 2;
 
-impl Encodable for AccountInfoInternal {
-    fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.begin_list(3);
-        s.append(&self.balance.to_le_bytes::<32>().as_slice());
-        s.append(&self.nonce.to_le_bytes().as_slice());
-        s.append(&self.code_hash.0.as_slice());
+    /// Byte representation used as the fourth field of the info
+    /// record: the tag, followed by the binary [`AliasInfo`] payload
+    /// for the `Alias` arm.
+    fn to_bytes(&self) -> Result<Vec<u8>, rlp::DecoderError> {
+        match self {
+            AccountOrigin::Unclassified => Ok(vec![Self::UNCLASSIFIED_TAG]),
+            AccountOrigin::Native => Ok(vec![Self::NATIVE_TAG]),
+            AccountOrigin::Alias(alias_info) => {
+                let mut bytes = vec![Self::ALIAS_TAG];
+                alias_info.bin_write(&mut bytes).map_err(|_| {
+                    rlp::DecoderError::Custom("Alias payload failed to encode")
+                })?;
+                Ok(bytes)
+            }
+        }
+    }
+
+    fn from_bytes(bytes: &[u8]) -> Result<Self, rlp::DecoderError> {
+        match bytes {
+            [Self::UNCLASSIFIED_TAG] => Ok(AccountOrigin::Unclassified),
+            [Self::NATIVE_TAG] => Ok(AccountOrigin::Native),
+            [Self::ALIAS_TAG, payload @ ..] => {
+                let (rest, alias_info) = AliasInfo::nom_read(payload).map_err(|_| {
+                    rlp::DecoderError::Custom("Alias payload failed to decode")
+                })?;
+                if !rest.is_empty() {
+                    return Err(rlp::DecoderError::Custom(
+                        "Trailing bytes after alias payload",
+                    ));
+                }
+                Ok(AccountOrigin::Alias(alias_info))
+            }
+            _ => Err(rlp::DecoderError::Custom("Invalid origin field")),
+        }
     }
 }
 
-impl Decodable for AccountInfoInternal {
+impl From<Origin> for AccountOrigin {
+    fn from(origin: Origin) -> Self {
+        match origin {
+            Origin::Native => AccountOrigin::Native,
+            Origin::Alias(alias_info) => AccountOrigin::Alias(alias_info),
+        }
+    }
+}
+
+impl From<AccountOrigin> for Option<Origin> {
+    fn from(origin: AccountOrigin) -> Self {
+        match origin {
+            AccountOrigin::Unclassified => None,
+            AccountOrigin::Native => Some(Origin::Native),
+            AccountOrigin::Alias(alias_info) => Some(Origin::Alias(alias_info)),
+        }
+    }
+}
+
+/// Etherlink's view of an account: revm's fields plus the
+/// [`AccountOrigin`] classification, which is part of the account
+/// itself and travels with it, in memory as in the durable record.
+/// Conversion to [`revm::state::AccountInfo`] happens only at the
+/// `Database` boundary, where revm takes over.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AccountInfo {
+    pub balance: U256,
+    pub nonce: u64,
+    pub code_hash: B256,
+    /// Origin classification, persisted as the fourth field of the
+    /// info record.
+    pub origin: AccountOrigin,
+    /// In-memory bytecode, never serialized in the record: the code
+    /// itself lives in the code storage, keyed by `code_hash`.
+    pub code: Option<Bytecode>,
+}
+
+impl Default for AccountInfo {
+    // Mirrors `revm::state::AccountInfo::default()`: an account
+    // without code carries the empty-code hash, not the zero hash.
+    fn default() -> Self {
+        AccountInfo {
+            balance: U256::ZERO,
+            nonce: 0,
+            code_hash: KECCAK_EMPTY,
+            origin: AccountOrigin::default(),
+            code: None,
+        }
+    }
+}
+
+impl AccountInfo {
+    // Upper bound used for optimizing reads in the durable storage.
+    // The fixed fields take 77 bytes and the origin field is bounded
+    // by the longest canonical native address; `set_info` enforces the
+    // bound at write time so a bounded read can never truncate.
+    //
+    // The record can only grow: the fixed fields (balance, nonce, code
+    // hash) are constant-size and the origin moves from `Unclassified`
+    // to `Native` or `Alias` exactly once, never shrinking. The writer
+    // ([`StorageAccount::write_info_record`]) relies on this; see its
+    // doc for the escape hatch if the invariant is ever broken.
+    pub(crate) const MAX_RLP_SIZE: usize = 256;
+
+    /// Attach an origin classification to a revm account info, e.g.
+    /// when the classification is decided at commit time.
+    pub fn with_origin(info: RevmAccountInfo, origin: AccountOrigin) -> Self {
+        AccountInfo {
+            balance: info.balance,
+            nonce: info.nonce,
+            code_hash: info.code_hash,
+            origin,
+            code: info.code,
+        }
+    }
+
+    fn rlp_bytes_checked(&self) -> Result<Vec<u8>, EvmDbError> {
+        let origin_bytes = self
+            .origin
+            .to_bytes()
+            .map_err(|_| RuntimeError::DecodingError)?;
+        let mut s = rlp::RlpStream::new();
+        s.begin_list(4);
+        s.append(&self.balance.to_le_bytes::<32>().as_slice());
+        s.append(&self.nonce.to_le_bytes().as_slice());
+        s.append(&self.code_hash.0.as_slice());
+        s.append(&origin_bytes.as_slice());
+        let bytes: Vec<u8> = s.out().to_vec();
+        // Records larger than the read bound must never reach the
+        // storage, or the bounded read in `info` would truncate them.
+        if bytes.len() > Self::MAX_RLP_SIZE {
+            return Err(EvmDbError::UnexpectedBytesLength {
+                expected: Self::MAX_RLP_SIZE,
+                actual: bytes.len(),
+            });
+        }
+        Ok(bytes)
+    }
+}
+
+impl Decodable for AccountInfo {
     fn decode(rlp: &Rlp) -> Result<Self, rlp::DecoderError> {
         if !rlp.is_list() {
             Err(rlp::DecoderError::RlpExpectedToBeList)
@@ -164,6 +291,21 @@ impl Decodable for AccountInfoInternal {
                 .next()
                 .ok_or(rlp::DecoderError::RlpExpectedToBeList)?
                 .as_val()?;
+            // Legacy 3-field records (Etherlink mainnet) carry no
+            // origin field and decode as `Unclassified`; this is what
+            // makes the migration lazy.
+            let origin = match it.next() {
+                None => AccountOrigin::Unclassified,
+                Some(field) => {
+                    let field: Vec<u8> = field.as_val()?;
+                    AccountOrigin::from_bytes(&field)?
+                }
+            };
+            if it.next().is_some() {
+                return Err(rlp::DecoderError::Custom(
+                    "Trailing fields after the origin",
+                ));
+            }
 
             Ok(Self {
                 balance: U256::from_le_bytes::<32>(
@@ -177,29 +319,21 @@ impl Decodable for AccountInfoInternal {
                         .map_err(|_| rlp::DecoderError::Custom("Invalid nonce length"))?,
                 ),
                 code_hash: B256::from_slice(&code_hash),
+                origin,
+                code: None,
             })
         }
     }
 }
 
-impl From<AccountInfoInternal> for AccountInfo {
-    fn from(info: AccountInfoInternal) -> Self {
-        AccountInfo {
+impl From<AccountInfo> for RevmAccountInfo {
+    fn from(info: AccountInfo) -> Self {
+        RevmAccountInfo {
             balance: info.balance,
             nonce: info.nonce,
             code_hash: info.code_hash,
             account_id: None,
-            code: None,
-        }
-    }
-}
-
-impl From<AccountInfo> for AccountInfoInternal {
-    fn from(info: AccountInfo) -> Self {
-        AccountInfoInternal {
-            balance: info.balance,
-            nonce: info.nonce,
-            code_hash: info.code_hash,
+            code: info.code,
         }
     }
 }
@@ -216,12 +350,9 @@ impl StorageAccount {
 
     pub fn info(&self, host: &mut impl StorageV1) -> Result<AccountInfo, EvmDbError> {
         let path = concat(&self.path, &INFO_PATH)?;
-        match host.store_read(&path, 0, AccountInfoInternal::RLP_SIZE) {
-            Ok(bytes) => {
-                let account_info = AccountInfoInternal::decode(&Rlp::new(&bytes))
-                    .map_err(|_| RuntimeError::DecodingError)?;
-                Ok(account_info.into())
-            }
+        match host.store_read(&path, 0, AccountInfo::MAX_RLP_SIZE) {
+            Ok(bytes) => Ok(AccountInfo::decode(&Rlp::new(&bytes))
+                .map_err(|_| RuntimeError::DecodingError)?),
             Err(RuntimeError::PathNotFound) => {
                 // If we don't have the informations inside of `INFO_PATH` it's either :
                 // - We don't have the account created yet
@@ -235,7 +366,7 @@ impl StorageAccount {
                 let code_hash_path = concat(&self.path, &CODE_HASH_PATH)?;
                 let code_path = concat(&self.path, &CODE_PATH)?;
 
-                let info = AccountInfoInternal {
+                let info = AccountInfo {
                     balance: read_u256_le_default(
                         host,
                         &balance_path,
@@ -243,9 +374,18 @@ impl StorageAccount {
                     )?,
                     nonce: read_u64_le_default(host, &nonce_path, NONCE_DEFAULT_VALUE)?,
                     code_hash: read_b256_be_default(host, &code_hash_path, KECCAK_EMPTY)?,
+                    // Split-field accounts predate classification.
+                    origin: AccountOrigin::Unclassified,
+                    code: None,
                 };
 
-                if info == AccountInfoInternal::default() {
+                // Historic check, kept bit-for-bit: it compares the
+                // code hash against the zero hash (the old derived
+                // default), not `KECCAK_EMPTY`.
+                if info.balance == BALANCE_DEFAULT_VALUE
+                    && info.nonce == NONCE_DEFAULT_VALUE
+                    && info.code_hash == B256::ZERO
+                {
                     // Account doesn't exist
                     return Ok(AccountInfo::default());
                 }
@@ -264,7 +404,7 @@ impl StorageAccount {
                     Err(RuntimeError::PathNotFound) => (),
                     Err(err) => return Err(EvmDbError::Runtime(err)),
                 };
-                host.store_write(&path, &info.rlp_bytes(), 0)?;
+                self.write_info_record(host, &info.rlp_bytes_checked()?)?;
 
                 // Delete legacy account entries
                 for path in &[balance_path, nonce_path, code_hash_path, code_path] {
@@ -274,7 +414,7 @@ impl StorageAccount {
                     };
                 }
 
-                Ok(info.into())
+                Ok(info)
             }
             Err(err) => Err(EvmDbError::Runtime(err)),
         }
@@ -285,23 +425,48 @@ impl StorageAccount {
         host: &impl StorageV1,
     ) -> Result<Option<AccountInfo>, EvmDbError> {
         let path = concat(&self.path, &INFO_PATH)?;
-        match host.store_read(&path, 0, AccountInfoInternal::RLP_SIZE) {
-            Ok(bytes) => {
-                let account_info = AccountInfoInternal::decode(&Rlp::new(&bytes))
-                    .map_err(|_| RuntimeError::DecodingError)?;
-                Ok(Some(account_info.into()))
-            }
+        match host.store_read(&path, 0, AccountInfo::MAX_RLP_SIZE) {
+            Ok(bytes) => Ok(Some(
+                AccountInfo::decode(&Rlp::new(&bytes))
+                    .map_err(|_| RuntimeError::DecodingError)?,
+            )),
             Err(RuntimeError::PathNotFound) => Ok(None),
             Err(err) => Err(EvmDbError::Runtime(err)),
         }
     }
 
+    /// Persist an already-encoded info record at this account's
+    /// `/info`.
+    ///
+    /// Uses `store_write` at offset 0 rather than `store_write_all`,
+    /// relying on the invariant documented on [`AccountInfo::MAX_RLP_SIZE`]
+    /// that the record only ever grows: a write at offset 0 then always
+    /// fully covers the previous content, so no stale trailing bytes can
+    /// remain.
+    ///
+    /// If that invariant is ever broken — a field becomes variable-size
+    /// and can shrink, or a classification can be downgraded — switch
+    /// this back to `store_write_all`; otherwise a shorter rewrite would
+    /// leave trailing bytes from the previous record and corrupt the
+    /// next decode.
+    fn write_info_record(
+        &self,
+        host: &mut impl StorageV1,
+        value: &[u8],
+    ) -> Result<(), EvmDbError> {
+        let path = concat(&self.path, &INFO_PATH)?;
+        host.store_write(&path, value, 0)?;
+        Ok(())
+    }
+
+    /// Write the account info record, origin included. Read-modify-write
+    /// sites preserve the classification by construction since the
+    /// origin travels inside the info they read.
     pub fn set_info(
         &mut self,
         host: &mut impl StorageV1,
         mut new_infos: AccountInfo,
     ) -> Result<(), EvmDbError> {
-        let path = concat(&self.path, &INFO_PATH)?;
         if let Some(code) = new_infos.code.take() {
             CodeStorage::add(
                 host,
@@ -309,22 +474,19 @@ impl StorageAccount {
                 Some(new_infos.code_hash),
             )?;
         }
-        let value = AccountInfoInternal::from(new_infos).rlp_bytes();
-
-        host.store_write(&path, &value, 0)?;
-        Ok(())
+        let value = new_infos.rlp_bytes_checked()?;
+        self.write_info_record(host, &value)
     }
 
+    /// Same as [`Self::set_info`] but ignores the in-memory bytecode
+    /// instead of persisting it to the code storage.
     pub fn set_info_without_code(
         &mut self,
         host: &mut impl StorageV1,
         new_infos: AccountInfo,
     ) -> Result<(), EvmDbError> {
-        let path = concat(&self.path, &INFO_PATH)?;
-        let value = AccountInfoInternal::from(new_infos).rlp_bytes();
-
-        host.store_write(&path, &value, 0)?;
-        Ok(())
+        let value = new_infos.rlp_bytes_checked()?;
+        self.write_info_record(host, &value)
     }
 
     pub fn delete_info(&mut self, host: &mut impl StorageV1) -> Result<(), EvmDbError> {
@@ -333,42 +495,6 @@ impl StorageAccount {
             Ok(()) | Err(RuntimeError::PathNotFound) => (),
             Err(err) => return Err(EvmDbError::Runtime(err)),
         };
-        Ok(())
-    }
-
-    /// Read the classification record for this account.
-    /// Returns None when the path is absent.
-    pub fn get_origin(
-        &self,
-        host: &impl StorageV1,
-    ) -> Result<Option<Origin>, OriginStorageError> {
-        let path = concat(&self.path, &ORIGIN_PATH)?;
-        match host.store_read_all(&path) {
-            Ok(bytes) => {
-                let (rest, origin) = Origin::nom_read(&bytes)
-                    .map_err(|e| OriginStorageError::Decode(e.to_string()))?;
-                if !rest.is_empty() {
-                    return Err(OriginStorageError::DecodeTrailing);
-                }
-                Ok(Some(origin))
-            }
-            Err(RuntimeError::PathNotFound) => Ok(None),
-            Err(err) => Err(OriginStorageError::Runtime(err)),
-        }
-    }
-
-    /// Write the classification record for this account.
-    pub fn set_origin(
-        &mut self,
-        host: &mut impl StorageV1,
-        origin: &Origin,
-    ) -> Result<(), OriginStorageError> {
-        let path = concat(&self.path, &ORIGIN_PATH)?;
-        let mut buf = Vec::new();
-        origin
-            .bin_write(&mut buf)
-            .map_err(|e| OriginStorageError::Encode(e.to_string()))?;
-        host.store_write(&path, &buf, 0)?;
         Ok(())
     }
 
@@ -538,7 +664,6 @@ mod test {
         primitives::{Bytes, FixedBytes, KECCAK_EMPTY},
         state::Bytecode,
     };
-    use rlp::Encodable;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::storage::StorageV1;
 
@@ -606,55 +731,205 @@ mod test {
     }
 
     #[test]
-    fn account_info_size_constant() {
-        use crate::storage::world_state_handler::AccountInfoInternal;
+    fn account_info_size_within_read_bound() {
+        use crate::storage::world_state_handler::{AccountInfo, AccountOrigin};
+        use tezosx_interfaces::{AliasInfo, RuntimeId};
 
-        let rlp_size = AccountInfoInternal::default().rlp_bytes().len();
-        assert_eq!(rlp_size, AccountInfoInternal::RLP_SIZE);
-        assert_eq!(rlp_size, 77);
+        // Default (Unclassified) record: fixed fields + 1-byte origin.
+        let rlp_size = AccountInfo::default().rlp_bytes_checked().unwrap().len();
+        assert_eq!(rlp_size, 78);
+
+        // The longest canonical native address today is a 0x-prefixed
+        // EVM hex address (42 bytes); leave generous slack below the
+        // bound, which `rlp_bytes_checked` enforces at write time.
+        let info = AccountInfo {
+            origin: AccountOrigin::Alias(AliasInfo {
+                runtime: RuntimeId::Ethereum,
+                native_address: b"0xffffffffffffffffffffffffffffffffffffffff".to_vec(),
+            }),
+            ..AccountInfo::default()
+        };
+        let alias_size = info.rlp_bytes_checked().unwrap().len();
+        assert!(alias_size <= AccountInfo::MAX_RLP_SIZE);
+
+        // A pathological native address larger than the bound is
+        // refused at write time instead of truncating later reads.
+        let info = AccountInfo {
+            origin: AccountOrigin::Alias(AliasInfo {
+                runtime: RuntimeId::Ethereum,
+                native_address: vec![0x61; AccountInfo::MAX_RLP_SIZE],
+            }),
+            ..AccountInfo::default()
+        };
+        assert!(info.rlp_bytes_checked().is_err());
     }
 
     #[test]
-    fn origin_storage_unrecorded_returns_none() {
-        use crate::storage::world_state_handler::StorageAccount;
-        use revm::primitives::Address;
+    fn account_info_origin_roundtrip() {
+        use crate::storage::world_state_handler::{AccountInfo, AccountOrigin};
+        use rlp::{Decodable, Rlp};
+        use tezosx_interfaces::{AliasInfo, RuntimeId};
 
-        let host = MockKernelHost::default();
-        let addr = Address::from_slice(&[0x42; 20]);
-        let account = StorageAccount::from_address(&addr).unwrap();
-        assert!(account.get_origin(&host).unwrap().is_none());
-        // A read of the info path must not affect the origin path.
-        let _ = account.info_without_migration(&host);
-        assert!(account.get_origin(&host).unwrap().is_none());
+        for origin in [
+            AccountOrigin::Unclassified,
+            AccountOrigin::Native,
+            AccountOrigin::Alias(AliasInfo {
+                runtime: RuntimeId::Tezos,
+                native_address: b"tz1abcdef".to_vec(),
+            }),
+        ] {
+            let info = AccountInfo {
+                balance: revm::primitives::U256::from(42),
+                nonce: 7,
+                code_hash: KECCAK_EMPTY,
+                origin,
+                code: None,
+            };
+            let bytes = info.rlp_bytes_checked().unwrap();
+            let decoded = AccountInfo::decode(&Rlp::new(&bytes)).unwrap();
+            assert_eq!(decoded, info);
+        }
+    }
+
+    // A record written before the tag existed (3-field RLP) decodes
+    // with `Unclassified`: this is the lazy-migration contract.
+    #[test]
+    fn account_info_legacy_record_decodes_as_unclassified() {
+        use crate::storage::world_state_handler::{AccountInfo, AccountOrigin};
+        use rlp::{Decodable, Rlp};
+
+        let info = AccountInfo {
+            balance: revm::primitives::U256::from(42),
+            nonce: 7,
+            code_hash: KECCAK_EMPTY,
+            origin: AccountOrigin::Unclassified,
+            code: None,
+        };
+        // Re-encode by hand in the legacy 3-field layout.
+        let mut stream = rlp::RlpStream::new();
+        stream.begin_list(3);
+        stream.append(&info.balance.to_le_bytes::<32>().as_slice());
+        stream.append(&info.nonce.to_le_bytes().as_slice());
+        stream.append(&info.code_hash.0.as_slice());
+        let legacy_bytes = stream.out();
+        assert_eq!(legacy_bytes.len(), 77);
+
+        let decoded = AccountInfo::decode(&Rlp::new(&legacy_bytes)).unwrap();
+        assert_eq!(decoded, info);
     }
 
     #[test]
-    fn origin_storage_native_roundtrip() {
-        use crate::storage::world_state_handler::StorageAccount;
+    fn account_info_rejects_invalid_tag_and_trailing_fields() {
+        use crate::storage::world_state_handler::AccountInfo;
+        use rlp::{Decodable, Rlp};
+
+        let append_legacy_fields = |stream: &mut rlp::RlpStream| {
+            stream.append(
+                &revm::primitives::U256::from(42)
+                    .to_le_bytes::<32>()
+                    .as_slice(),
+            );
+            stream.append(&7u64.to_le_bytes().as_slice());
+            stream.append(&KECCAK_EMPTY.0.as_slice());
+        };
+
+        // Tag out of range.
+        let mut stream = rlp::RlpStream::new();
+        stream.begin_list(4);
+        append_legacy_fields(&mut stream);
+        stream.append(&[3u8].as_slice());
+        assert!(AccountInfo::decode(&Rlp::new(&stream.out())).is_err());
+
+        // Fifth field.
+        let mut stream = rlp::RlpStream::new();
+        stream.begin_list(5);
+        append_legacy_fields(&mut stream);
+        stream.append(&[1u8].as_slice());
+        stream.append(&[1u8].as_slice());
+        assert!(AccountInfo::decode(&Rlp::new(&stream.out())).is_err());
+    }
+
+    // The origin survives a storage round-trip through the account
+    // record, including the alias payload. Each origin is written to a
+    // fresh account: the writer relies on the record-only-grows
+    // invariant (see [`StorageAccount::write_info_record`]), so a single
+    // account must never be rewritten with a *shorter* origin field
+    // (e.g. `Alias` -> `Unclassified`), which never happens in
+    // production either.
+    #[test]
+    fn origin_roundtrips_through_account_record() {
+        use crate::storage::world_state_handler::{
+            AccountInfo, AccountOrigin, StorageAccount,
+        };
         use revm::primitives::Address;
-        use tezosx_interfaces::Origin;
+        use tezosx_interfaces::{AliasInfo, RuntimeId};
+
+        let mut host = MockKernelHost::default();
+
+        for (i, origin) in [
+            AccountOrigin::Native,
+            AccountOrigin::Alias(AliasInfo {
+                runtime: RuntimeId::Tezos,
+                native_address: b"tz1abcdef".to_vec(),
+            }),
+            AccountOrigin::Unclassified,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let addr = Address::from_slice(&[i as u8 + 1; 20]);
+            let mut account = StorageAccount::from_address(&addr).unwrap();
+            assert!(account.info_without_migration(&host).unwrap().is_none());
+
+            account
+                .set_info_without_code(
+                    &mut host,
+                    AccountInfo {
+                        origin: origin.clone(),
+                        ..AccountInfo::default()
+                    },
+                )
+                .unwrap();
+            let read_back = account.info(&mut host).unwrap().origin;
+            assert_eq!(read_back, origin);
+        }
+    }
+
+    // In-place upgrades follow the production transitions, which only
+    // ever grow the origin field (`Unclassified` -> `Native` ->
+    // `Alias`); the record-only-grows invariant `write_info_record`
+    // relies on holds across them.
+    #[test]
+    fn origin_in_place_upgrade_roundtrips() {
+        use crate::storage::world_state_handler::{
+            AccountInfo, AccountOrigin, StorageAccount,
+        };
+        use revm::primitives::Address;
+        use tezosx_interfaces::{AliasInfo, RuntimeId};
 
         let mut host = MockKernelHost::default();
         let addr = Address::from_slice(&[0x42; 20]);
         let mut account = StorageAccount::from_address(&addr).unwrap();
-        account.set_origin(&mut host, &Origin::Native).unwrap();
-        assert_eq!(account.get_origin(&host).unwrap(), Some(Origin::Native));
-    }
 
-    #[test]
-    fn origin_storage_alias_roundtrip() {
-        use crate::storage::world_state_handler::StorageAccount;
-        use revm::primitives::Address;
-        use tezosx_interfaces::{AliasInfo, Origin, RuntimeId};
-
-        let mut host = MockKernelHost::default();
-        let addr = Address::from_slice(&[0x42; 20]);
-        let mut account = StorageAccount::from_address(&addr).unwrap();
-        let origin = Origin::Alias(AliasInfo {
-            runtime: RuntimeId::Tezos,
-            native_address: b"tz1abcdef".to_vec(),
-        });
-        account.set_origin(&mut host, &origin).unwrap();
-        assert_eq!(account.get_origin(&host).unwrap(), Some(origin));
+        for origin in [
+            AccountOrigin::Unclassified,
+            AccountOrigin::Native,
+            AccountOrigin::Alias(AliasInfo {
+                runtime: RuntimeId::Tezos,
+                native_address: b"tz1abcdef".to_vec(),
+            }),
+        ] {
+            account
+                .set_info_without_code(
+                    &mut host,
+                    AccountInfo {
+                        origin: origin.clone(),
+                        ..AccountInfo::default()
+                    },
+                )
+                .unwrap();
+            let read_back = account.info(&mut host).unwrap().origin;
+            assert_eq!(read_back, origin);
+        }
     }
 }

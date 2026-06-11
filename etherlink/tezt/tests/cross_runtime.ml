@@ -12337,41 +12337,56 @@ let test_crac_evm_deep_recurse_then_michelson_oog =
 
 let evm_alias_of_tezos_address = Test_helpers.evm_alias_of_tezos_address
 
-(** Reads the [/origin] classification record of EVM account
- *  [evm_address] from the sequencer's durable storage.  Returns the
- *  raw hex payload, or [None] if the account has no record. *)
-let read_evm_origin ~sequencer evm_address =
-  let*@ origin =
+(** Reads the [/info] account record of EVM account [evm_address] from
+ *  the sequencer's durable storage.  The origin classification — alias
+ *  payload included — is carried as the fourth field of this record.
+ *  Returns the raw hex of the whole record, or [None] if the account
+ *  has no record. *)
+let read_evm_account_record ~sequencer evm_address =
+  let*@ record =
     Rpc.state_value
       sequencer
-      (Durable_storage_path.origin Kernel.Latest evm_address)
+      (Durable_storage_path.account_info Kernel.Latest evm_address)
   in
-  return origin
+  return record
 
-(** Asserts that EVM account [evm_address] has no [/origin] record. *)
-let check_evm_origin_absent ~sequencer evm_address =
-  let* origin = read_evm_origin ~sequencer evm_address in
-  Check.(
-    (origin = None)
-      (option string)
-      ~error_msg:"Expected no /origin record but found %L") ;
+(** Asserts that EVM account [evm_address] carries no alias
+ *  classification for [native_address]: either the account record is
+ *  absent, or it does not embed the native address (the alias payload
+ *  is the only place the account record can mention it). *)
+let check_evm_origin_absent ~sequencer ~native_address evm_address =
+  let* record = read_evm_account_record ~sequencer evm_address in
+  (match record with
+  | None -> ()
+  | Some payload ->
+      let native_hex = Hex.(show (of_string native_address)) in
+      if String.lowercase_ascii payload =~ rex native_hex then
+        Test.fail
+          "Expected no alias classification for %s but its account record %s \
+           embeds native address %s (hex %s)"
+          evm_address
+          payload
+          native_address
+          native_hex) ;
   unit
 
-(** Asserts that EVM account [evm_address] has an [/origin] record whose
- *  payload embeds [native_address] (as the hex of its UTF-8 bytes). *)
+(** Asserts that the account record of EVM account [evm_address] embeds
+ *  an alias classification for [native_address] (as the hex of its
+ *  UTF-8 bytes). *)
 let check_evm_origin_records_alias ~sequencer ~native_address evm_address =
-  let* origin = read_evm_origin ~sequencer evm_address in
-  match origin with
+  let* record = read_evm_account_record ~sequencer evm_address in
+  match record with
   | None ->
       Test.fail
-        "Expected an /origin record for %s (alias of %s), found none"
+        "Expected an account record with an alias classification for %s (alias \
+         of %s), found none"
         evm_address
         native_address
   | Some payload ->
       let native_hex = Hex.(show (of_string native_address)) in
       if not (String.lowercase_ascii payload =~ rex native_hex) then
         Test.fail
-          "/origin record %s of %s does not embed native address %s (hex %s)"
+          "account record %s of %s does not embed native address %s (hex %s)"
           payload
           evm_address
           native_address
@@ -12833,9 +12848,14 @@ let test_crac_origin_repair_none_to_alias () =
      durable storage (fresh sandbox). *)
   Log.debug ~prefix "Originate tez_bridge → evm_relay (None branch initially)" ;
   let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_relay in
-  (* Baseline: E = evm_alias(source.pkh) has no /origin record yet. *)
-  Log.debug ~prefix "Baseline: /origin of evm_alias(tz1) is absent" ;
-  let* () = check_evm_origin_absent ~sequencer expected_origin in
+  (* Baseline: E = evm_alias(source.pkh) has no alias classification yet. *)
+  Log.debug ~prefix "Baseline: classification of evm_alias(tz1) is absent" ;
+  let* () =
+    check_evm_origin_absent
+      ~sequencer
+      ~native_address:original_tz1
+      expected_origin
+  in
   (* ── Step 1: first invocation — None branch. ───────────────────────────── *)
   Log.debug
     ~prefix
@@ -12980,9 +13000,14 @@ let test_crac_journal_revert_drops_origin () =
   (* E: the originator's EVM alias, whose /origin classification is staged
      during each TEZ→EVM CRAC of this test (the L1 signer is [source]). *)
   let tz1_evm_alias = evm_alias_of_tezos_address source.public_key_hash in
-  (* Baseline: no /origin record before any CRAC. *)
-  Log.debug ~prefix "Baseline: /origin of evm_alias(tz1) is absent" ;
-  let* () = check_evm_origin_absent ~sequencer tz1_evm_alias in
+  (* Baseline: no alias classification before any CRAC. *)
+  Log.debug ~prefix "Baseline: classification of evm_alias(tz1) is absent" ;
+  let* () =
+    check_evm_origin_absent
+      ~sequencer
+      ~native_address:source.public_key_hash
+      tz1_evm_alias
+  in
   (* Step 1: failing CRAC — reverter calls tez_bridge which CRACs to EVM.
      The EVM records msg.sender, but the outer TEZ FAILWITHs, rolling
      back the EVM journal.  The EVM tx never commits. *)
@@ -13002,11 +13027,16 @@ let test_crac_journal_revert_drops_origin () =
       evm_recorder
   in
   (* The staged classification was unwound with the journal: E still has
-     no /origin record after the backtracked CRAC. *)
+     no alias classification after the backtracked CRAC. *)
   Log.debug
     ~prefix
-    "Step 2: verify /origin of evm_alias(tz1) is still absent (unwound)" ;
-  let* () = check_evm_origin_absent ~sequencer tz1_evm_alias in
+    "Step 2: verify classification of evm_alias(tz1) is still absent (unwound)" ;
+  let* () =
+    check_evm_origin_absent
+      ~sequencer
+      ~native_address:source.public_key_hash
+      tz1_evm_alias
+  in
   (* Step 3: succeeding CRAC — tez_bridge_ok calls gateway %%call_evm.
      This time the CRAC succeeds and msg.sender is persisted. *)
   Log.debug ~prefix "Step 3: succeeding TEZ→EVM CRAC (tez_bridge_ok)" ;

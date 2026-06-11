@@ -43,47 +43,14 @@ pub enum EvmDbError {
     BalanceUnderflow { current: U256, amount: U256 },
     #[error("Commit ended in an inconsistent state")]
     CommitMismatch,
-    #[error("Origin storage: {0}")]
-    Origin(OriginStorageError),
 }
 
 impl DBErrorMarker for EvmDbError {}
 
-/// Failures from origin storage reads and writes.
-///
-/// The origin path is the only storage location reachable from an EVM
-/// precompile whose writes bypass the journal. State set there persists
-/// even when the surrounding precompile reverts. This dedicated type
-/// lets callers lift it into either EvmDbError or CustomPrecompileError
-/// depending on context.
-#[derive(Error, Debug, PartialEq, Eq, Clone)]
-pub enum OriginStorageError {
-    #[error("Runtime error: {0}")]
-    Runtime(#[from] RuntimeError),
-    #[error("Path error: {0}")]
-    Path(#[from] PathError),
-    #[error("decoding Origin failed: {0}")]
-    Decode(String),
-    #[error("remaining bytes after decoding Origin")]
-    DecodeTrailing,
-    #[error("encoding Origin failed: {0}")]
-    Encode(String),
-}
-
-impl From<OriginStorageError> for EvmDbError {
-    fn from(value: OriginStorageError) -> Self {
-        match value {
-            OriginStorageError::Runtime(e) => EvmDbError::Runtime(e),
-            OriginStorageError::Path(e) => EvmDbError::Path(e),
-            other => EvmDbError::Origin(other),
-        }
-    }
-}
-
-impl IntoWithRemainder for OriginStorageError {
+impl IntoWithRemainder for EvmDbError {
     fn into_with_remainder(self, gas: Gas) -> CustomPrecompileError {
         match self {
-            OriginStorageError::Runtime(e) => e.into_with_remainder(gas),
+            EvmDbError::Runtime(e) => e.into_with_remainder(gas),
             other => CustomPrecompileError::Revert(other.to_string(), gas),
         }
     }
@@ -142,12 +109,6 @@ pub enum EvmRunError {
 
 impl From<EvmDbError> for KernelStorageError {
     fn from(e: EvmDbError) -> Self {
-        KernelStorageError(e.to_string())
-    }
-}
-
-impl From<OriginStorageError> for KernelStorageError {
-    fn from(e: OriginStorageError) -> Self {
         KernelStorageError(e.to_string())
     }
 }

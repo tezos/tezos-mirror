@@ -65,10 +65,6 @@ val nonce : Kernel.t -> string -> path
 (** [code kernel addr] is the path to the [addr] account's code. *)
 val code : Kernel.t -> string -> path
 
-(** [origin kernel addr] is the path to the [addr] account's origin
-    classification record. *)
-val origin : Kernel.t -> string -> path
-
 (** [storage kernel addr ?key ()] is the path to the [addr] storage's code. [key]
     can be provided to get the path of a sub-element in the storage. *)
 val storage : Kernel.t -> string -> ?key:string -> unit -> path

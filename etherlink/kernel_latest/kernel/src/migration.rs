@@ -84,10 +84,9 @@ mod legacy {
     // which were present at the time.
     use super::*;
     use primitive_types::{H160, H256};
-    use revm::state::AccountInfo;
     use revm_etherlink::{
         helpers::legacy::{alloy_to_u256, u256_to_alloy},
-        storage::world_state_handler::StorageAccount,
+        storage::world_state_handler::{AccountInfo, StorageAccount},
     };
     use tezos_ethereum::block::EthBlock;
     use tezos_smart_rollup_host::path::Path;
@@ -1290,9 +1289,8 @@ where
 mod tests {
     use super::*;
     use revm::primitives::U256 as AlloyU256;
-    use revm::state::AccountInfo;
     use revm_etherlink::precompiles::constants::TEZOSX_CALLER_ADDRESS;
-    use revm_etherlink::storage::world_state_handler::StorageAccount;
+    use revm_etherlink::storage::world_state_handler::{AccountInfo, StorageAccount};
     use tezos_evm_runtime::runtime::MockKernelHost;
 
     /// L2-1296: the V55 migration must drop the persisted balance of
@@ -1319,8 +1317,7 @@ mod tests {
                     balance: AlloyU256::MAX,
                     nonce: 0,
                     code_hash: revm::primitives::B256::ZERO,
-                    account_id: None,
-                    code: None,
+                    ..AccountInfo::default()
                 },
             )
             .unwrap();
