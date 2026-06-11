@@ -761,6 +761,8 @@ let () =
   register_with_backend (module Memory_prove_backend) ;
   register_with_backend (module Disk_backend) ;
   register_with_backend (module Disk_prove_backend) ;
+  register_with_backend (module Memory_verify_backend) ;
+  register_with_backend (module Disk_verify_backend) ;
   register_unit_disk test_checkout_unknown_commit ;
   List.iter
     register_pbt_disk
@@ -790,10 +792,20 @@ let () =
     ~long_factor:10
     (module Disk_prove_backend)
     test_bisimulation ;
+  register_pbt
+    ~long:true
+    ~long_factor:50
+    (module Memory_verify_backend)
+    test_bisimulation ;
+  register_pbt
+    ~long:true
+    ~long_factor:10
+    (module Disk_verify_backend)
+    test_bisimulation ;
   register_pbt_disk ~long:true ~long_factor:5 test_cross_backend_bisimulation ;
   (* Proof API *)
   register_proof_tests (module Memory_proof_lifecycle) ;
   register_proof_tests (module Disk_proof_lifecycle) ;
-  (* Verify API *)
+  (* Verify API: the genuine replay-of-prior-state and divergence paths. *)
   register_verify_tests (module Memory_verify_lifecycle) ;
   register_verify_tests (module Disk_verify_lifecycle)

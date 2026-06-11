@@ -59,6 +59,27 @@ module Memory_prove_backend = struct
     start_proof r
 end
 
+(** Divergence free - as all operations are played from
+    an empty verify backend. *)
+module Memory_verify_backend : BACKEND = struct
+  let name = "memory_verify"
+
+  module Registry = Octez_riscv_nds_memory.Verify.Registry
+  module Database = Octez_riscv_nds_memory.Verify.Database
+
+  let create_registry_with_dbs n =
+    let empty = Octez_riscv_nds_memory.Normal.Registry.create () in
+    let prove = Octez_riscv_nds_memory.Prove.start_proof empty in
+    (* Read the (empty) registry layout in Prove mode so the proof records it;
+       otherwise the untouched proof is fully blinded and Verify diverges on
+       the very first [size]/[resize] (as registry length = 0 is missing). *)
+    let _ = Octez_riscv_nds_memory.Prove.Registry.size prove in
+    let proof = Octez_riscv_nds_memory.Prove.produce_proof prove in
+    let verify = Octez_riscv_nds_memory.Verify.start_verify proof in
+    grow_registry Octez_riscv_nds_memory.Verify.Registry.resize verify n ;
+    verify
+end
+
 (** Create a fresh disk repo in a Tezt-managed temporary directory. *)
 let get_disk_repo () =
   let path = Tezt.Temp.dir "nds_disk_test" in
@@ -84,6 +105,28 @@ module Disk_prove_backend = struct
   let create_registry_with_dbs n =
     let r = Disk_backend.create_registry_with_dbs n in
     start_proof r
+end
+
+(** Divergence free - as all operations are played from
+    an empty verify backend. *)
+module Disk_verify_backend : BACKEND = struct
+  let name = "disk_verify"
+
+  module Registry = Octez_riscv_nds_disk.Verify.Registry
+  module Database = Octez_riscv_nds_disk.Verify.Database
+
+  let create_registry_with_dbs n =
+    let repo = get_disk_repo () in
+    let empty = Octez_riscv_nds_disk.Normal.Registry.create repo in
+    let prove = Octez_riscv_nds_disk.Prove.start_proof empty in
+    (* Read the (empty) registry layout in Prove mode so the proof records it;
+       otherwise the untouched proof is fully blinded and Verify diverges on
+       the very first [size]/[resize] (as registry length = 0 is missing). *)
+    let _ = Octez_riscv_nds_disk.Prove.Registry.size prove in
+    let proof = Octez_riscv_nds_disk.Prove.produce_proof prove in
+    let verify = Octez_riscv_nds_disk.Verify.start_verify proof in
+    grow_registry Octez_riscv_nds_disk.Verify.Registry.resize verify n ;
+    verify
 end
 
 (** Backend abstraction for proof-API tests.  Unlike {!BACKEND}, which
