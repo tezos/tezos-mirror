@@ -337,8 +337,9 @@ fn store_read(
     let host = runtime_env.host();
     match bindings::store_read(&host.tree(), key, offset as usize, max_bytes as usize) {
         Ok(buffer) => {
-            memory_view.write(dst_ptr as u64, buffer.as_bytes())?;
-            Ok(max_bytes as i32)
+            let bytes = buffer.as_bytes();
+            memory_view.write(dst_ptr as u64, bytes)?;
+            Ok(bytes.len() as i32)
         }
         Err(err) => result_from_binding_error(err),
     }

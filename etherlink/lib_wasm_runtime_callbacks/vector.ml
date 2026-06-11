@@ -110,8 +110,11 @@ let load_bytes vector ~offset ~num_bytes =
     else return ()
   in
 
-  if len < offset + num_bytes then fail Error_code.store_invalid_access
+  (* Clamp over-reads to the available bytes instead of rejecting them,
+     matching the rollup PVM's [Durable.read_value_exn]. *)
+  if offset >= len then fail Error_code.store_invalid_access
   else
+    let num_bytes = min num_bytes (len - offset) in
     let buffer = Buffer.create num_bytes in
     let*! () = read_chunks begin_chunk buffer begin_offset num_bytes in
     return (Buffer.to_bytes buffer)

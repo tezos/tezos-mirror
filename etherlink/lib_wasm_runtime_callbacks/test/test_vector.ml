@@ -161,7 +161,40 @@ let test_vector_load_bytes () =
 
   unit
 
+let test_vector_load_bytes_clamps_overread () =
+  register ~title:"test vector load_bytes clamps over-read" @@ fun () ->
+  let* res = Vector.get empty_tree ~create_if_absent:true ["test"] in
+  let vector = expect_ok "create vector" res in
+
+  let* res = Vector.write_bytes vector 0 !!"abc" in
+  let vector = expect_ok "write a 3-byte value" res in
+
+  (* Asking for more bytes than the value holds returns the available bytes
+     rather than failing — matching the rollup PVM. *)
+  let* res = Vector.load_bytes vector ~offset:0 ~num_bytes:64 in
+  let res = expect_ok "over-read should be clamped, not rejected" res in
+  Check.(
+    (Bytes.unsafe_to_string res = "abc")
+      string
+      ~error_msg:"Over-read expected %R, got %L") ;
+
+  (* Over-reading from a valid mid-value offset is clamped too. *)
+  let* res = Vector.load_bytes vector ~offset:1 ~num_bytes:64 in
+  let res = expect_ok "mid-value over-read should be clamped" res in
+  Check.(
+    (Bytes.unsafe_to_string res = "bc")
+      string
+      ~error_msg:"Mid-value over-read expected %R, got %L") ;
+
+  (* A read whose offset is at or past the end of the value is still
+     invalid. *)
+  let* res = Vector.load_bytes vector ~offset:3 ~num_bytes:1 in
+  let _ = expect_error "reading at the end of the value should fail" res in
+
+  unit
+
 let () =
   test_vector_get () ;
   test_vector_write_bytes () ;
-  test_vector_load_bytes ()
+  test_vector_load_bytes () ;
+  test_vector_load_bytes_clamps_overread ()
