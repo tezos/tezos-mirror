@@ -1,5 +1,8 @@
 dev
 
+* Fixed a file descriptor leak in the client when following redirects: the
+  body of each intermediate redirect response is now drained so that its
+  connection is released.
 * Fixed a file descriptor leak in the client when calling streamed RPCs.
 
 v1.2
