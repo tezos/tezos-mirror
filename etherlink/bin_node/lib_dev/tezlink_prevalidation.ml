@@ -492,12 +492,26 @@ let validate_signature ~check_signature shell contents pk signature =
     else tzfail_p @@ Imported_protocol.Operation_repr.Invalid_signature
 
 (** [signature_cost pk op] unpacks [op] then returns the gas cost of the
-    signature check.*)
+    signature check. Mirrors the kernel's re-priced model (`check_signature`
+    in `contrib/mir/src/gas.rs`); the protocol's
+    [Operation_costs.check_signature_cost] carries the pre-benchmark values
+    and would make this floor reject operations the kernel accepts. *)
 let signature_cost pk {shell; protocol_data = Operation_data protocol_data} =
-  Imported_protocol.Operation_costs.check_signature_cost
-    (Imported_protocol.Michelson_v1_gas.Cost_of.Interpreter.algo_of_public_key
-       pk)
-    {shell; protocol_data}
+  let algo =
+    Imported_protocol.Michelson_v1_gas.Cost_of.Interpreter.algo_of_public_key pk
+  in
+  let size =
+    Imported_protocol.Alpha_context.Operation.unsigned_operation_length
+      {shell; protocol_data}
+  in
+  let milligas =
+    match algo with
+    | Ed25519 -> 48_395 + (size lsr 4) + (size lsr 5) + size
+    | Secp256k1 -> 183_265 + (size lsr 3) + size
+    | P256 -> 487_855 + (size lsr 3) + size
+    | Bls -> 1_570_000 + (size * 35)
+  in
+  Gas.atomic_step_cost (Imported_protocol.Saturation_repr.safe_int milligas)
 
 let compute_minimal_fees ~(op_raw_size : int) ~(op_gas_limit : Z.t)
     ~(da_fee_per_byte : Tezos_types.Tez.t)

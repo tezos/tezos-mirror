@@ -1387,15 +1387,16 @@ fn interpret_step<'a, 'b, 'c>(
                 }
             }
             overloads::Map::Option => {
-                ctx.gas().consume(interpret_cost::MAP_OPTION)?;
                 let option = pop_v!(V::Option);
                 match option {
                     Some(elem) => {
+                        ctx.gas().consume(interpret_cost::MAP_OPTION_SOME)?;
                         ctx.gas().consume(interpret_cost::PUSH)?;
                         stack.push(elem);
                         Ok(StepResult::OpenMapOption(mk_body(body)))
                     }
                     None => {
+                        ctx.gas().consume(interpret_cost::MAP_OPTION_NONE)?;
                         stack.push(V::new_option(None));
                         Ok(StepResult::Done)
                     }
@@ -1760,7 +1761,7 @@ fn interpret_one<'a>(
             overloads::Mul::NatNat => {
                 let x1 = pop!(V::Nat);
                 let x2 = pop!(V::Nat);
-                ctx.gas().consume(interpret_cost::mul_int(&x1, &x2)?)?;
+                ctx.gas().consume(interpret_cost::mul_nat(&x1, &x2)?)?;
                 let res = x1 * x2;
                 stack.push(V::Nat(res));
             }
@@ -2156,13 +2157,13 @@ fn interpret_one<'a>(
             overloads::And::NatNat => {
                 let o1 = pop!(V::Nat);
                 let o2 = top_mut!(V::Nat);
-                ctx.gas().consume(interpret_cost::and_num(&o1, o2)?)?;
+                ctx.gas().consume(interpret_cost::and_nat(&o1, o2)?)?;
                 *o2 &= o1;
             }
             overloads::And::IntNat => {
                 let o1 = pop!(V::Int);
                 let o2 = pop!(V::Nat);
-                ctx.gas().consume(interpret_cost::and_num(&o1, &o2)?)?;
+                ctx.gas().consume(interpret_cost::and_int_nat(&o1, &o2)?)?;
                 let res = BigUint::try_from(o1 & BigInt::from(o2))
                     // safe, `neg` & `pos` = `pos`
                     .unwrap();
@@ -2358,7 +2359,7 @@ fn interpret_one<'a>(
         },
         I::Nat => {
             pop_ref!(i, Bytes);
-            ctx.gas().consume(interpret_cost::int_bytes(i.len())?)?;
+            ctx.gas().consume(interpret_cost::nat_bytes(i.len())?)?;
             stack.push(V::Nat(BigUint::from_bytes_be(i)))
         }
         I::Bytes(overload) => match overload {
@@ -2634,7 +2635,11 @@ fn interpret_one<'a>(
                 let key_rc = pop_rc!();
                 pop_ref!(map, BigMap);
                 let len = map.len_for_gas();
-                // the protocol deliberately uses map costs for the overlay
+                // Charged with the map costs, as the protocol deliberately
+                // does: the Big_map models include storage carbonations that
+                // Tezos X charges separately at the kernel boundary, and the
+                // overlay compares real keys (hashing only happens
+                // kernel-side).
                 ctx.gas().consume(interpret_cost::map_mem(&key_rc, len)?)?;
                 let result = map.mem(&key_rc, *ctx.lazy_storage())?;
                 stack.push(V::Bool(result));
@@ -2853,14 +2858,14 @@ fn interpret_one<'a>(
             let result = match overload {
                 overloads::Slice::String => {
                     pop_ref!(str, String);
-                    ctx.gas().consume(interpret_cost::slice(str.len())?)?;
+                    ctx.gas().consume(interpret_cost::slice_string(str.len())?)?;
                     validate_bounds(offset, length, str.len())
                         .and_then(|range| str.get(range))
                         .map(|str| V::String(str.to_string()))
                 }
                 overloads::Slice::Bytes => {
                     pop_ref!(bytes, Bytes);
-                    ctx.gas().consume(interpret_cost::slice(bytes.len())?)?;
+                    ctx.gas().consume(interpret_cost::slice_bytes(bytes.len())?)?;
                     validate_bounds(offset, length, bytes.len())
                         .and_then(|range| bytes.get(range))
                         .map(|bytes| V::Bytes(bytes.to_owned()))
@@ -4730,7 +4735,7 @@ mod interpreter_tests {
             1,
             stk![V::new_option(Some(V::int(1)))],
             stk![V::new_option(Some(V::new_option(Some(V::int(1)))))],
-            interpret_cost::MAP_OPTION,
+            interpret_cost::MAP_OPTION_SOME,
         );
 
         test(

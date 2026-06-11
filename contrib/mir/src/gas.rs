@@ -337,12 +337,11 @@ impl BigIntByteSize for BigUint {
 pub mod interpret_cost {
     use checked::Checked;
     use num_bigint::{BigInt, BigUint};
-    use num_traits::Zero;
     use tezos_crypto_rs::public_key::PublicKey;
     use tezos_crypto_rs::CryptoError;
     use thiserror::Error;
 
-    use super::{AsGasCost, BigIntByteSize, CompareError, CostOverflow, Log2i, OutOfGas};
+    use super::{AsGasCost, BigIntByteSize, CompareError, CostOverflow, OutOfGas};
     use crate::ast::{Micheline, Or, Ticket, TypedValue};
 
     pub const DIP: u32 = 10;
@@ -350,12 +349,18 @@ pub mod interpret_cost {
     pub const DROP: u32 = 20;
     // Re-benchmarked on the MIR interpreter (`cost_N_IDup`).
     pub const DUP: u32 = 45;
-    pub const GT: u32 = 10;
-    pub const GE: u32 = 10;
-    pub const EQ: u32 = 10;
-    pub const NEQ: u32 = 10;
-    pub const LE: u32 = 10;
-    pub const LT: u32 = 10;
+    // correspond to cost_N_IGt / IGe / IEq / INeq / ILe / ILt in the Tezos
+    // protocol.
+    // TODO(L2-1554): these benchmarked constants (~1.1-1.2 us flat) look like
+    // measurement artefacts: each instruction pops an int and tests its sign.
+    // Same family as N_IDupN / N_ICons_list / N_IList_size; re-check the
+    // micro-benchmarks.
+    pub const GT: u32 = 1130;
+    pub const GE: u32 = 1145;
+    pub const EQ: u32 = 1115;
+    pub const NEQ: u32 = 1185;
+    pub const LE: u32 = 1210;
+    pub const LT: u32 = 1150;
     pub const IF: u32 = 10;
     pub const IF_NONE: u32 = 10;
     pub const IF_CONS: u32 = 855;
@@ -367,8 +372,10 @@ pub mod interpret_cost {
     // the entries directly (no such setup), so a flat cost matches MIR's work.
     pub const ITER: u32 = 20;
     pub const SWAP: u32 = 10;
-    pub const INT_NAT: u32 = 10;
-    pub const ISNAT: u32 = 10;
+    // corresponds to cost_N_IInt_nat in the Tezos protocol
+    pub const INT_NAT: u32 = 3630;
+    // corresponds to cost_N_IIs_nat in the Tezos protocol
+    pub const ISNAT: u32 = 2465;
     pub const INT_BLS_FR: u32 = 115;
     // Re-benchmarked on the MIR interpreter (`cost_N_IPush`).
     pub const PUSH: u32 = 60;
@@ -379,35 +386,64 @@ pub mod interpret_cost {
     pub const MUL_BLS_G1: u32 = 103000;
     pub const MUL_BLS_G2: u32 = 220000;
     pub const MUL_BLS_FR: u32 = 45;
-    pub const MUL_TEZ_NAT: u32 = 50;
-    pub const MUL_NAT_TEZ: u32 = MUL_TEZ_NAT; // should be the same always
-    pub const EDIV_TEZ_TEZ: u32 = 80;
-    pub const EDIV_TEZ_NAT: u32 = 70;
+    // corresponds to cost_N_IMul_teznat in the Tezos protocol
+    pub const MUL_TEZ_NAT: u32 = 60;
+    // corresponds to cost_N_IMul_nattez in the Tezos protocol
+    pub const MUL_NAT_TEZ: u32 = 65;
+    // corresponds to cost_N_IEdiv_tez in the Tezos protocol
+    pub const EDIV_TEZ_TEZ: u32 = 120;
+    // corresponds to cost_N_IEdiv_teznat in the Tezos protocol
+    pub const EDIV_TEZ_NAT: u32 = 125;
     pub const NEG_FR: u32 = 30;
     pub const NEG_G1: u32 = 50;
     pub const NEG_G2: u32 = 70;
     pub const SUB_MUTEZ: u32 = 55;
     // Re-benchmarked on the MIR interpreter (`cost_N_IUnit`).
     pub const UNIT: u32 = 55;
-    pub const AND_BOOL: u32 = 10;
-    pub const OR_BOOL: u32 = 10;
-    pub const XOR_BOOL: u32 = 15;
-    pub const NOT_BOOL: u32 = 10;
+    // corresponds to cost_N_IAnd in the Tezos protocol
+    pub const AND_BOOL: u32 = 45;
+    // corresponds to cost_N_IOr in the Tezos protocol
+    pub const OR_BOOL: u32 = 45;
+    // corresponds to cost_N_IXor in the Tezos protocol
+    pub const XOR_BOOL: u32 = 45;
+    // corresponds to cost_N_INot in the Tezos protocol
+    pub const NOT_BOOL: u32 = 40;
     pub const CAR: u32 = 15;
     pub const CDR: u32 = 20;
-    pub const PAIR: u32 = 10;
+    // corresponds to cost_N_ICons_pair in the Tezos protocol
+    pub const PAIR: u32 = 20;
     pub const UNPAIR: u32 = 60;
-    pub const SOME: u32 = 10;
-    pub const NONE: u32 = 10;
+    // corresponds to cost_N_ICons_some in the Tezos protocol
+    pub const SOME: u32 = 20;
+    // corresponds to cost_N_ICons_none in the Tezos protocol
+    pub const NONE: u32 = 65;
     pub const AMOUNT: u32 = 65;
     pub const NIL: u32 = 60;
-    pub const CONS: u32 = 15;
+    // corresponds to cost_N_ICons_list in the Tezos protocol
+    // TODO(L2-1548): the benchmarked constant (~840 ns flat) looks like a
+    // measurement artefact (same as N_IDupN, see TODO(L2-1553) on dupn);
+    // re-check the micro-benchmarks.
+    pub const CONS: u32 = 845;
     pub const EMPTY_SET: u32 = 60;
-    pub const SIZE_STRING: u32 = 15;
-    pub const SIZE_BYTES: u32 = 10;
-    pub const SIZE_LIST: u32 = 10;
-    pub const SIZE_SET: u32 = 10;
-    pub const SIZE_MAP: u32 = 10;
+    // correspond to cost_N_IString_size / cost_N_IBytes_size in the Tezos
+    // protocol.
+    // TODO(L2-1550): these benchmarked constants (~1.6 us flat) look like
+    // measurement artefacts: SIZE on a string or bytes is an O(1) len().
+    // Same family as N_IList_size; re-check the micro-benchmarks.
+    pub const SIZE_STRING: u32 = 1570;
+    pub const SIZE_BYTES: u32 = 1595;
+    // corresponds to cost_N_IList_size in the Tezos protocol
+    // TODO(L2-1547): the benchmarked constant (~920 ns) looks like a
+    // measurement artefact: SIZE on a list is Vec::len(), O(1). Same family
+    // as the ~840 ns constants (N_IDupN, N_ICons_list, N_IIf_cons); re-check
+    // the micro-benchmarks.
+    pub const SIZE_LIST: u32 = 920;
+    // corresponds to cost_N_ISet_size in the Tezos protocol
+    // TODO(L2-1547): ~110 ns for BTreeSet::len() also looks too high;
+    // re-check the micro-benchmarks.
+    pub const SIZE_SET: u32 = 110;
+    // corresponds to cost_N_IMap_size in the Tezos protocol
+    pub const SIZE_MAP: u32 = 45;
     pub const EMPTY_MAP: u32 = 60;
     pub const EMPTY_BIG_MAP: u32 = 60;
     pub const CHAIN_ID: u32 = 65;
@@ -417,27 +453,36 @@ pub mod interpret_cost {
     pub const LEFT: u32 = 20;
     pub const RIGHT: u32 = 20;
 
-    // See `cost_N_IOpt_map` in the Tezos protocol
-    pub const MAP_OPTION: u32 = 10;
-    // See `cost_N_IList_map` in the Tezos protocol
-    pub const MAP_LIST: u32 = 20;
-    // L1's `cost_N_IMap_map` is size-dependent because it folds the `map` into
-    // a list of key-value pairs first. MIR iterates the map's entries directly
-    // (no such setup), so a flat cost matches MIR's actual work.
-    pub const MAP_MAP: u32 = 20;
+    // corresponds to cost_N_IOpt_map_some in the Tezos protocol
+    pub const MAP_OPTION_SOME: u32 = 10;
+    // corresponds to cost_N_IOpt_map_none in the Tezos protocol
+    pub const MAP_OPTION_NONE: u32 = 35;
+    // corresponds to cost_N_IList_map in the Tezos protocol
+    pub const MAP_LIST: u32 = 70;
+    // corresponds to cost_N_IMap_map in the Tezos protocol. The MIR
+    // micro-benchmarks confirm the flat cost (fitted size coefficient is 0).
+    pub const MAP_MAP: u32 = 45;
 
     // Gas costs obtained from https://gitlab.com/tezos/tezos/-/blob/9875fbebe032a8c5ce62b3b3cb1588ca9855a37e/src/proto_017_PtNairob/lib_protocol/michelson_v1_gas_costs_generated.ml
     pub const TRANSFER_TOKENS: u32 = 120;
     pub const SET_DELEGATE: u32 = 75;
-    pub const LAMBDA: u32 = 10;
+    // Lambda creation cost (`cost_N_ILambda_lam` / `cost_N_ILambda_lamrec`).
+    // A single constant for both forms, the worst case of the two models
+    // (lam 80, lamrec 75), as the protocol charges.
+    pub const LAMBDA: u32 = 80;
     pub const EXEC: u32 = 10;
-    pub const HASH_KEY: u32 = 605;
-    // slight deviation from the protocol: in the protocol, APPLY costs differer
-    // depending on whether a lambda is recursive; here this distinction doesn't
-    // make a lot of sense.
-    pub const APPLY: u32 = 140;
-    pub const TICKET: u32 = 10;
-    pub const READ_TICKET: u32 = 10;
+    // corresponds to cost_N_IHash_key in the Tezos protocol
+    pub const HASH_KEY: u32 = 215;
+    // corresponds to cost_N_IApply in the Tezos protocol (the generated
+    // model merges the recursive and non-recursive cases)
+    pub const APPLY: u32 = 85;
+    // correspond to cost_N_ITicket / cost_N_IRead_ticket in the Tezos
+    // protocol.
+    // TODO(L2-1557): these benchmarked constants (~3.6/3.9 us flat) look
+    // very high for building/unfolding a ticket value; re-check the
+    // micro-benchmarks.
+    pub const TICKET: u32 = 3580;
+    pub const READ_TICKET: u32 = 3935;
     pub const BALANCE: u32 = 60;
     pub const CONTRACT: u32 = 115;
     pub const LEVEL: u32 = 85;
@@ -522,15 +567,23 @@ pub mod interpret_cost {
     pub const CREATE_CONTRACT: u32 = 60;
     pub const VIEW: u32 = 65; // corresponds to cost_N_IView_synthesized in the Tezos protocol
 
+    // corresponds to cost_N_IJoin_tickets in the Tezos protocol
     pub fn join_tickets(t1: &Ticket, t2: &Ticket) -> Result<u32, CompareError> {
-        compare(&t1.content, &t2.content)?;
-        Ok(add_num(&t1.amount, &t2.amount)?)
+        let w1 = Checked::from(std::cmp::max(
+            t1.amount.byte_size(),
+            t2.amount.byte_size(),
+        ));
+        let w2 = Checked::from(std::cmp::min(
+            comparable_size(&t1.content)?,
+            comparable_size(&t2.content)?,
+        ));
+        Ok(((w1 >> 3) + (w1 >> 5) + (w2 >> 3) + (w2 >> 7) + 245).as_gas_cost()?)
     }
 
+    // corresponds to cost_N_ISplit_ticket in the Tezos protocol
     pub fn split_ticket(amount1: &BigUint, amount2: &BigUint) -> Result<u32, CostOverflow> {
-        use std::mem::size_of_val;
-        let sz = Checked::from(std::cmp::max(size_of_val(amount1), size_of_val(amount2)));
-        (40 + (sz >> 1)).as_gas_cost()
+        let w = Checked::from(std::cmp::max(amount1.byte_size(), amount2.byte_size()));
+        ((w >> 2) + (w >> 7) + 475).as_gas_cost()
     }
 
     fn dropn(n: u16) -> Result<u32, CostOverflow> {
@@ -631,100 +684,119 @@ pub mod interpret_cost {
         (65 + (sz >> 3) + (sz >> 7)).as_gas_cost()
     }
 
-    /// Cost for `AND` on numbers and bytearrays
-    pub fn and_num(
+    // corresponds to cost_N_IAnd_int_nat in the Tezos protocol
+    pub fn and_int_nat(
         i1: &impl BigIntByteSize,
         i2: &impl BigIntByteSize,
     ) -> Result<u32, CostOverflow> {
-        let sz = Checked::from(Ord::min(i1.byte_size(), i2.byte_size()));
-        (35 + (sz >> 1)).as_gas_cost()
+        let w = Checked::from(Ord::min(i1.byte_size(), i2.byte_size()));
+        ((w >> 2) + (w >> 6) + 65).as_gas_cost()
     }
 
+    // corresponds to cost_N_IAnd_nat in the Tezos protocol
+    pub fn and_nat(
+        i1: &impl BigIntByteSize,
+        i2: &impl BigIntByteSize,
+    ) -> Result<u32, CostOverflow> {
+        let w = Checked::from(Ord::min(i1.byte_size(), i2.byte_size()));
+        ((w >> 3) + (w >> 5) + (w >> 7) + 65).as_gas_cost()
+    }
+
+    // corresponds to cost_N_IAnd_bytes in the Tezos protocol
     pub fn and_bytes(b1: &[u8], b2: &[u8]) -> Result<u32, CostOverflow> {
-        let sz = Checked::from(Ord::min(b1.len(), b2.len()));
-        (35 + (sz >> 1)).as_gas_cost()
+        let w = Checked::from(Ord::min(b1.len(), b2.len()));
+        (w + (w >> 2) + (w >> 3) + 70).as_gas_cost()
     }
 
+    // corresponds to cost_N_IOr_nat in the Tezos protocol
     pub fn or_num(i1: &impl BigIntByteSize, i2: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
-        let sz = Checked::from(Ord::min(i1.byte_size(), i2.byte_size()));
-        (35 + (sz >> 1)).as_gas_cost()
+        let w = Checked::from(Ord::max(i1.byte_size(), i2.byte_size()));
+        ((w >> 4) + (w >> 5) + (w >> 6) + (w >> 7) + (w >> 8) + (w >> 9) + 65).as_gas_cost()
     }
 
+    // corresponds to cost_N_IOr_bytes in the Tezos protocol
     pub fn or_bytes(b1: &[u8], b2: &[u8]) -> Result<u32, CostOverflow> {
-        // NB: Tezos takes maximum of the sizes, but in our implementation only
-        // touches bytes in two vectors intersection. So taking the same formula
-        // as in [and_bytes].
-        let sz = Checked::from(Ord::min(b1.len(), b2.len()));
-        (35 + (sz >> 1)).as_gas_cost()
+        let w = Checked::from(Ord::max(b1.len(), b2.len()));
+        (w + (w >> 2) + (w >> 4) + (w >> 5) + 65).as_gas_cost()
     }
 
+    // corresponds to cost_N_IXor_nat in the Tezos protocol
     pub fn xor_nat(i1: &BigUint, i2: &BigUint) -> Result<u32, CostOverflow> {
-        let sz = Checked::from(Ord::min(i1.byte_size(), i2.byte_size()));
-        (35 + (sz >> 1)).as_gas_cost()
+        let w = Checked::from(Ord::max(i1.byte_size(), i2.byte_size()));
+        ((w >> 4) + (w >> 5) + (w >> 6) + (w >> 7) + (w >> 8) + (w >> 9) + 70).as_gas_cost()
     }
 
+    // corresponds to cost_N_IXor_bytes in the Tezos protocol
     pub fn xor_bytes(b1: &[u8], b2: &[u8]) -> Result<u32, CostOverflow> {
-        let sz = Checked::from(Ord::min(b1.len(), b2.len()));
-        (40 + (sz >> 1)).as_gas_cost()
+        let w = Checked::from(Ord::max(b1.len(), b2.len()));
+        (w + (w >> 1) + (w >> 3) + 60).as_gas_cost()
     }
 
+    // corresponds to cost_N_INot_int in the Tezos protocol
     pub fn not_num<T: BigIntByteSize>(n: &T) -> Result<u32, CostOverflow> {
         let sz = Checked::from(n.byte_size());
-        (25 + (sz >> 1)).as_gas_cost()
+        ((sz >> 4) + (sz >> 6) + (sz >> 7) + (sz >> 8) + 90).as_gas_cost()
     }
 
+    // corresponds to cost_N_INot_bytes in the Tezos protocol
     pub fn not_bytes(b: &[u8]) -> Result<u32, CostOverflow> {
         let sz = Checked::from(b.len());
-        (30 + (sz >> 1)).as_gas_cost()
+        ((sz >> 4) + (sz >> 5) + (sz >> 7) + (sz >> 9) + 40).as_gas_cost()
     }
 
+    // corresponds to cost_N_ILsl_nat in the Tezos protocol
     pub fn lsl_nat(i1: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
-        let sz = i1.byte_size();
-        let w1 = sz >> 1;
-        Checked::from(w1 + 130).as_gas_cost()
+        let sz = Checked::from(i1.byte_size());
+        ((sz >> 3) + (sz >> 6) + (sz >> 8) + 85).as_gas_cost()
     }
 
+    // corresponds to cost_N_ILsl_bytes in the Tezos protocol
     pub fn lsl_bytes(i1: &[u8], i2: &usize) -> Result<u32, CostOverflow> {
-        let size_1 = i1.len();
-        let size_2 = *i2;
-        let w1 = if size_2 > 0 {
-            ((size_2 - 1) >> 4) + (size_1 >> 1)
-        } else {
-            size_1 >> 1
-        };
-        Checked::from(w1 + (size_1 >> 2) + 65).as_gas_cost()
+        let s1 = Checked::from(i1.len());
+        let w1 = Checked::from(i2.saturating_sub(1));
+        ((w1 >> 8) + (w1 >> 10) + (w1 >> 12) + (w1 >> 13)
+            + (s1 >> 4) + (s1 >> 5) + s1
+            + 120)
+        .as_gas_cost()
     }
 
+    // corresponds to cost_N_ILsr_nat in the Tezos protocol
     pub fn lsr_nat(i1: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
-        let sz = i1.byte_size();
-        Checked::from((sz >> 1) + 45).as_gas_cost()
+        let sz = Checked::from(i1.byte_size());
+        ((sz >> 3) + (sz >> 7) + 85).as_gas_cost()
     }
 
+    // corresponds to cost_N_ILsr_bytes in the Tezos protocol
     pub fn lsr_bytes(i1: &[u8], i2: &usize) -> Result<u32, CostOverflow> {
-        let size_1 = i1.len();
-        let size_2 = *i2;
-        let w1 = if size_1 >= (size_2 >> 3) {
-            Checked::from(size_1 - (size_2 >> 3))
-        } else {
-            Checked::from(0usize)
-        };
-        ((w1 >> 1) + (w1 >> 2) + 55).as_gas_cost()
+        let w1 = Checked::from(i1.len().saturating_sub(*i2 >> 3));
+        (w1 + (w1 >> 4) + 90).as_gas_cost()
     }
 
+    // corresponds to cost_N_IMul_int in the Tezos protocol
     pub fn mul_int(
         i1: &impl BigIntByteSize,
         i2: &impl BigIntByteSize,
     ) -> Result<u32, CostOverflow> {
         let a = Checked::from(i1.byte_size()) + Checked::from(i2.byte_size());
-        // log2 is ill-defined for zero, hence this check
-        let v0 = if a.is_zero() {
-            Checked::from(0)
-        } else {
-            a * (a.ok_or(CostOverflow)?.log2i()? as u64)
-        };
-        (55 + (v0 >> 1) + (v0 >> 2) + (v0 >> 4)).as_gas_cost()
+        // the protocol's log2 is 1 + numbits, i.e. ilog2 + 2
+        let log = (a + 1).ok_or(CostOverflow)?.ilog2() + 2;
+        let v0 = a * (log as u64);
+        ((v0 * 5) + 85).as_gas_cost()
     }
 
+    // corresponds to cost_N_IMul_nat in the Tezos protocol
+    pub fn mul_nat(
+        i1: &impl BigIntByteSize,
+        i2: &impl BigIntByteSize,
+    ) -> Result<u32, CostOverflow> {
+        let a = Checked::from(i1.byte_size()) + Checked::from(i2.byte_size());
+        // the protocol's log2 is 1 + numbits, i.e. ilog2 + 2
+        let log = (a + 1).ok_or(CostOverflow)?.ilog2() + 2;
+        let v0 = a * (log as u64);
+        ((v0 * 4) + (v0 >> 1) + (v0 >> 2) + (v0 >> 3) + 85).as_gas_cost()
+    }
+
+    // corresponds to cost_N_IEdiv_int in the Tezos protocol
     pub fn ediv_int(
         i1: &impl BigIntByteSize,
         i2: &impl BigIntByteSize,
@@ -736,10 +808,16 @@ pub mod interpret_cost {
         } else {
             Checked::from(0u64)
         };
-        ((w1 * 12) + (((w1 >> 10) + (w1 >> 13)) * size_2) + (size_1 >> 2) + size_1 + 150)
+        ((w1 * 3)
+            + (((w1 >> 6) + (w1 >> 8) + (w1 >> 10)) * size_2)
+            + (size_1 >> 2)
+            + (size_1 >> 3)
+            + (size_1 >> 7)
+            + 70)
             .as_gas_cost()
     }
 
+    // corresponds to cost_N_IEdiv_nat in the Tezos protocol
     pub fn ediv_nat(
         i1: &impl BigIntByteSize,
         i2: &impl BigIntByteSize,
@@ -751,16 +829,23 @@ pub mod interpret_cost {
         } else {
             Checked::from(0u64)
         };
-        ((w1 * 12) + (((w1 >> 10) + (w1 >> 13)) * size_2) + (size_1 >> 2) + size_1 + 150)
+        ((w1 * 3)
+            + (((w1 >> 6) + (w1 >> 8) + (w1 >> 10)) * size_2)
+            + (w1 >> 3)
+            + (size_1 >> 3)
+            + (size_1 >> 4)
+            + (size_1 >> 5)
+            + (size_1 >> 7)
+            + 70)
             .as_gas_cost()
     }
 
     pub fn compare(v1: &TypedValue, v2: &TypedValue) -> Result<u32, CompareError> {
         use TypedValue as V;
         let cmp_bytes = |s1: u64, s2: u64| -> Result<u32, CompareError> {
-            // Approximating 35 + 0.024413 x term
-            let v = Checked::from(std::cmp::min(s1, s2));
-            Ok((35 + (v >> 6) + (v >> 7)).as_gas_cost()?)
+            // corresponds to cost_N_ICompare in the Tezos protocol
+            let w = Checked::from(std::cmp::min(s1, s2).saturating_sub(1));
+            Ok(((w >> 5) + (w >> 6) + (w >> 8) + 85).as_gas_cost()?)
         };
         const ADDRESS_SIZE: u64 = 20 + 31; // hash size + max entrypoint size
         const CMP_CHAIN_ID: u32 = 30;
@@ -871,92 +956,133 @@ pub mod interpret_cost {
         (10 * Checked::from(list_size)).as_gas_cost()
     }
 
+    // corresponds to cost_N_IConcat_string in the Tezos protocol (the model's
+    // list-length coefficient is 0; the per-element precheck above stays as a
+    // MIR-specific protection)
     pub fn concat_string_list(total_len: Checked<usize>) -> Result<u32, CostOverflow> {
-        // Copied from the Tezos protocol
-        (total_len / 2 + 100).as_gas_cost()
+        ((total_len >> 4) + (total_len >> 6) + 55).as_gas_cost()
     }
 
+    // corresponds to cost_N_IConcat_bytes in the Tezos protocol
     pub fn concat_bytes_list(total_len: Checked<usize>) -> Result<u32, CostOverflow> {
-        // Copied from the Tezos protocol
-        (total_len / 2 + 100).as_gas_cost()
+        ((total_len >> 4) + (total_len >> 6) + 55).as_gas_cost()
     }
 
+    // corresponds to cost_N_IConcat_string_pair in the Tezos protocol
     pub fn concat_string_pair(len1: usize, len2: usize) -> Result<u32, CostOverflow> {
-        // Copied from the Tezos protocol
-        ((Checked::from(len1) + Checked::from(len2)) / 2 + 45).as_gas_cost()
+        let w = Checked::from(len1) + Checked::from(len2);
+        ((w >> 4) + (w >> 5) + (w >> 6) + (w >> 8) + 55).as_gas_cost()
     }
 
+    // corresponds to cost_N_IConcat_bytes_pair in the Tezos protocol
     pub fn concat_bytes_pair(len1: usize, len2: usize) -> Result<u32, CostOverflow> {
-        // Copied from the Tezos protocol
-        ((Checked::from(len1) + Checked::from(len2)) / 2 + 45).as_gas_cost()
+        let w = Checked::from(len1) + Checked::from(len2);
+        ((w >> 4) + (w >> 5) + (w >> 6) + (w >> 7) + (w >> 8) + 65).as_gas_cost()
     }
 
+    /// Comparable byte size of a key, the size axis of the benchmarked
+    /// collection lookup models. Mirrors the protocol's
+    /// `Gas_comparable_input_size.size_of_comparable_value`, walked
+    /// iteratively.
+    fn comparable_size(k: &TypedValue) -> Result<u64, CostOverflow> {
+        use TypedValue as V;
+        let mut total = Checked::from(0u64);
+        let mut stack: Vec<&TypedValue> = vec![k];
+        while let Some(v) = stack.pop() {
+            let sz: u64 = match v {
+                // integer leaves floor, as the protocol's
+                // Gas_comparable_input_size.integer (Z.numbits / 8)
+                V::Nat(n) => n.bits() / 8,
+                V::Int(n) => n.bits() / 8,
+                V::Timestamp(t) => t.bits() / 8,
+                V::Unit => 1,
+                V::Bool(_) => 1,
+                V::Mutez(_) => 8,
+                V::String(s) => s.len() as u64,
+                V::Bytes(b) => b.len() as u64,
+                V::Pair(l, r) => {
+                    stack.push(l.as_ref());
+                    stack.push(r.as_ref());
+                    1
+                }
+                V::Option(o) => {
+                    if let Some(x) = o {
+                        stack.push(x.as_ref());
+                    }
+                    1
+                }
+                V::Or(or) => {
+                    match or {
+                        Or::Left(x) | Or::Right(x) => stack.push(x.as_ref()),
+                    }
+                    1
+                }
+                // public key hash size (tag byte + 20-byte hash) plus the
+                // entrypoint length, as in the protocol's `address`
+                V::Address(a) => 21 + a.entrypoint.as_bytes().len() as u64,
+                V::ChainId(..) => 4,
+                V::Key(k) => match k {
+                    PublicKey::Ed25519(..) => 33,
+                    PublicKey::Secp256k1(..) | PublicKey::P256(..) => 34,
+                    PublicKey::Bls(..) => 49,
+                },
+                V::Signature(s) => match s {
+                    crate::ast::Signature::Bls(..) => 96,
+                    _ => 64,
+                },
+                V::KeyHash(_) => 21,
+                // non-comparable values cannot be collection keys
+                _ => 0,
+            };
+            total = total + sz;
+        }
+        total.ok_or(CostOverflow)
+    }
+
+    /// `comparable_size(key) * log2(size + 1)`, the variable of every
+    /// benchmarked collection lookup model.
+    fn lookup_var(k: &TypedValue, size: usize) -> Result<Checked<u64>, CompareError> {
+        let s1 = comparable_size(k)?;
+        // the protocol's log2 is 1 + numbits, i.e. ilog2 + 2
+        let log = (Checked::from(size as u64) + 1).ok_or(CostOverflow)?.ilog2() + 2;
+        Ok(Checked::from(s1) * (log as u64))
+    }
+
+    // corresponds to cost_N_IMap_mem in the Tezos protocol
     pub fn map_mem(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
-        map_get(k, map_size)
+        let w = lookup_var(k, map_size)?;
+        Ok(((w >> 4) + (w >> 5) + (w >> 8) + (w >> 9) + 40).as_gas_cost()?)
     }
 
+    // Single model for GET and MEM, as the protocol's map_get = map_mem
+    // alias; the dedicated cost_N_IMap_get fit is the same minus its
+    // w >> 9 term.
     pub fn map_get(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
-        // NB: this doesn't copy the tezos model exactly; tezos model uses
-        //
-        // 80 + sizeof(key)*log2(map.size)
-        //
-        // this seems dubious, from first principles and dimensional analysis,
-        // this seems more probable:
-        //
-        // 80 + cost_of_compare(key)*log2(map.size + 1)
-        //
-        // "+ 1" is from the observation that a lookup in a map of size 1 does
-        // exactly one comparison.
-        let map_size = Checked::from(map_size);
-        let compare_cost = compare(k, k)?;
-        let size_log = (map_size + 1).ok_or(CostOverflow)?.log2i()?;
-        let lookup_cost = Checked::from(compare_cost) * size_log;
-        Ok((80 + lookup_cost).as_gas_cost()?)
+        map_mem(k, map_size)
     }
 
+    // corresponds to cost_N_ISet_mem in the Tezos protocol
     pub fn set_mem(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
-        // NB: same considerations as for map_get
-        let compare_cost = compare(k, k)?;
-        let size_log = (Checked::from(map_size) + 1).ok_or(CostOverflow)?.log2i()?;
-        let lookup_cost = Checked::from(compare_cost) * size_log;
-        Ok((115 + lookup_cost).as_gas_cost()?)
+        let w = lookup_var(k, map_size)?;
+        Ok(((w >> 3) + (w >> 4) + (w >> 5) + (w >> 6) + 40).as_gas_cost()?)
     }
 
+    // corresponds to cost_N_IMap_update in the Tezos protocol
     pub fn map_update(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
-        // NB: same considerations as for map_get
-        let map_size = Checked::from(map_size);
-        let compare_cost = compare(k, k)?;
-        let size_log = (map_size + 1).ok_or(CostOverflow)?.log2i()?;
-        let lookup_cost = Checked::from(compare_cost) * size_log;
-        // NB: 2 factor copied from Tezos protocol, in principle it should
-        // reflect update vs get overhead.
-        Ok((80 + 2 * lookup_cost).as_gas_cost()?)
+        let w = lookup_var(k, map_size)?;
+        Ok(((w * 4) + (w >> 2) + 55).as_gas_cost()?)
     }
 
+    // corresponds to cost_N_ISet_update in the Tezos protocol
     pub fn set_update(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
-        // NB: same considerations as for map_update
-        let compare_cost = compare(k, k)?;
-        let size_log = (Checked::from(map_size) + 1).ok_or(CostOverflow)?.log2i()?;
-        let lookup_cost = Checked::from(compare_cost) * size_log;
-        // coefficient larger than in case of Map looks suspicious, something
-        // to benchmark later
-        Ok((130 + 2 * lookup_cost).as_gas_cost()?)
+        let w = lookup_var(k, map_size)?;
+        Ok(((w * 3) + (w >> 1) + (w >> 2) + 60).as_gas_cost()?)
     }
 
+    // corresponds to cost_N_IMap_get_and_update in the Tezos protocol
     pub fn map_get_and_update(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
-        // NB: same considerations as for map_get
-        let compare_cost = compare(k, k)?;
-        let size_log = (Checked::from(map_size) + 1).ok_or(CostOverflow)?.log2i()?;
-        let lookup_cost = Checked::from(compare_cost) * size_log;
-        // NB: 3 factor copied from Tezos protocol, in principle it should
-        // reflect update vs get overhead, but it seems like an overestimation,
-        // get_and_update should cost almost exactly the same as update, any
-        // observable difference would be in the constant term.
-        //
-        // However, note that this function is also reused for big_map version
-        // of GET_AND_UPDATE, wherein it's more justified. That is to say, take
-        // care when updating this.
-        Ok((80 + 3 * lookup_cost).as_gas_cost()?)
+        let w = lookup_var(k, map_size)?;
+        Ok(((w * 4) + (w >> 2) + (w >> 3) + 80).as_gas_cost()?)
     }
 
     /// Measures size of Michelson using several metrics.
@@ -996,7 +1122,10 @@ pub mod interpret_cost {
     }
 
     fn micheline_encoding_by_size(size: MichelineSize) -> Result<u32, CostOverflow> {
-        (size.nodes_num * 100 + size.zariths * 25 + size.str_byte * 10).as_gas_cost()
+        // The per-node cost corresponds to the benchmarked
+        // N_IPack_micheline_nodes parameter; the per-byte components are not
+        // in the re-benchmarked set.
+        (size.nodes_num * 125 + size.zariths * 25 + size.str_byte * 10).as_gas_cost()
     }
 
     /// Iterative tree fold over `Micheline` so the size accounting (and
@@ -1039,15 +1168,18 @@ pub mod interpret_cost {
         Crypto(#[from] CryptoError),
     }
 
+    // correspond to cost_N_ICheck_signature_{ed25519,secp256k1,p256} in the
+    // Tezos protocol. BLS is not part of the re-benchmarked set; its arm
+    // keeps the previous total (including the former 32 * len serialization
+    // surcharge, now folded in).
     pub fn check_signature(k: &PublicKey, msg: &[u8]) -> Result<u32, CryptoError> {
         let len = msg.len().min(u32::MAX as usize) as u32;
-        let serialization_cost = len << 5;
-        let checked_cost = match k {
-            PublicKey::Ed25519(..) => 65_800 + ((len >> 3) + len),
-            PublicKey::Secp256k1(..) => 51_600 + ((len >> 3) + len),
-            PublicKey::P256(..) => 341_000 + ((len >> 3) + len),
+        let cost = match k {
+            PublicKey::Ed25519(..) => 48_395 + ((len >> 4) + (len >> 5) + len),
+            PublicKey::Secp256k1(..) => 183_265 + ((len >> 3) + len),
+            PublicKey::P256(..) => 487_855 + ((len >> 3) + len),
             #[cfg(feature = "bls")]
-            PublicKey::Bls(..) => 1_570_000 + (len * 3),
+            PublicKey::Bls(..) => 1_570_000 + (len * 35),
             #[cfg(not(feature = "bls"))]
             PublicKey::Bls(..) => {
                 return Err(CryptoError::Unsupported(
@@ -1056,45 +1188,49 @@ pub mod interpret_cost {
             }
         };
 
-        Ok(serialization_cost + checked_cost)
+        Ok(cost)
     }
 
-    pub fn slice(length: usize) -> Result<u32, CostOverflow> {
-        // In the protocol, the gas costs for slicing strings and bytes are defined
-        // separately (see `cost_N_ISlice_bytes` and `cost_N_ISlice_string`).
-        //
-        // In practice, they both have the same cost.
-        ((Checked::from(length) >> 1) + 25).as_gas_cost()
+    // corresponds to cost_N_ISlice_string in the Tezos protocol
+    pub fn slice_string(length: usize) -> Result<u32, CostOverflow> {
+        let s = Checked::from(length);
+        ((s >> 4) + (s >> 5) + (s >> 6) + 75).as_gas_cost()
     }
 
+    // corresponds to cost_N_ISlice_bytes in the Tezos protocol
+    pub fn slice_bytes(length: usize) -> Result<u32, CostOverflow> {
+        let s = Checked::from(length);
+        ((s >> 4) + (s >> 5) + (s >> 6) + (s >> 9) + 80).as_gas_cost()
+    }
+
+    // corresponds to cost_N_IBlake2b in the Tezos protocol
     pub fn blake2b(msg: &[u8]) -> Result<u32, CostOverflow> {
-        /* fun size -> (430. + (1.125 * size)) */
         let size = Checked::from(msg.len());
-        (Checked::from(430) + ((size >> 3) + size)).as_gas_cost()
+        ((size >> 4) + (size >> 5) + size + 245).as_gas_cost()
     }
 
+    // corresponds to cost_N_IKeccak in the Tezos protocol
     pub fn keccak(msg: &[u8]) -> Result<u32, CostOverflow> {
-        /* fun size -> (1350. + (8.25 * size)) */
         let size = Checked::from(msg.len());
-        (Checked::from(1350) + ((size >> 2) + (size * 8))).as_gas_cost()
+        ((size >> 1) + (size >> 2) + (size >> 3) + (size >> 4) + (size * 2) + 550).as_gas_cost()
     }
 
+    // corresponds to cost_N_ISha256 in the Tezos protocol
     pub fn sha256(msg: &[u8]) -> Result<u32, CostOverflow> {
-        /* fun size -> (600. + (4.75 * size)) */
         let size = Checked::from(msg.len());
-        (Checked::from(600) + ((size >> 2) + ((size >> 1) + (size * 4)))).as_gas_cost()
+        ((size >> 1) + (size >> 2) + (size >> 4) + (size * 3) + 350).as_gas_cost()
     }
 
+    // corresponds to cost_N_ISha3 in the Tezos protocol
     pub fn sha3(msg: &[u8]) -> Result<u32, CostOverflow> {
-        /* fun size -> (1350. + (8.25 * size)) */
         let size = Checked::from(msg.len());
-        (Checked::from(1350) + ((size >> 2) + (size * 8))).as_gas_cost()
+        ((size >> 1) + (size >> 2) + (size >> 3) + (size >> 4) + (size * 2) + 545).as_gas_cost()
     }
 
+    // corresponds to cost_N_ISha512 in the Tezos protocol
     pub fn sha512(msg: &[u8]) -> Result<u32, CostOverflow> {
-        /* fun size -> (680. + (3. * size)) */
         let size = Checked::from(msg.len());
-        (Checked::from(680) + (size * 3)).as_gas_cost()
+        ((size >> 2) + (size >> 3) + (size * 2) + 455).as_gas_cost()
     }
 
     pub fn pairing_check(size: usize) -> Result<u32, CostOverflow> {
@@ -1110,10 +1246,10 @@ pub mod interpret_cost {
         (265 + ((size >> 4) + size)).as_gas_cost()
     }
 
+    // corresponds to cost_N_INeg in the Tezos protocol
     pub fn neg_int(int: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
-        // NB: taken from the protocol, this doesn't fit with MIR implementation.
         let size = Checked::from(int.byte_size());
-        (25 + (size >> 1)).as_gas_cost()
+        ((size >> 4) + (size >> 6) + (size >> 7) + (size >> 8) + 55).as_gas_cost()
     }
 
     pub fn abs(int: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
@@ -1121,29 +1257,35 @@ pub mod interpret_cost {
         (50 + (size >> 4) + (size >> 6) + (size >> 8) + (size >> 9)).as_gas_cost()
     }
 
+    // corresponds to cost_N_IInt_bytes in the Tezos protocol
     pub fn int_bytes(size: usize) -> Result<u32, CostOverflow> {
         let size = Checked::from(size);
-        (20 + ((size >> 1) + (size * 2))).as_gas_cost()
+        ((size >> 1) + (size >> 2) + (size >> 5) + (size >> 6) + 50).as_gas_cost()
     }
 
+    // corresponds to cost_N_INat_bytes in the Tezos protocol
     pub fn nat_bytes(size: usize) -> Result<u32, CostOverflow> {
         let size = Checked::from(size);
-        (45 + ((size >> 1) + (size * 2))).as_gas_cost()
+        ((size >> 1) + (size >> 6) + 55).as_gas_cost()
     }
 
+    // corresponds to cost_N_IBytes_int in the Tezos protocol
     pub fn bytes_int(int: &BigInt) -> Result<u32, CostOverflow> {
         let size = Checked::from(int.byte_size());
-        (90 + (size * 3)).as_gas_cost()
+        ((size >> 1) + (size >> 3) + (size >> 4) + size + 100).as_gas_cost()
     }
 
+    // corresponds to cost_N_IBytes_nat in the Tezos protocol
     pub fn bytes_nat(int: &BigUint) -> Result<u32, CostOverflow> {
         let size = Checked::from(int.byte_size());
-        (75 + (size * 3)).as_gas_cost()
+        ((size >> 2) + (size >> 3) + (size >> 4) + size + 90).as_gas_cost()
     }
 
-    pub fn unpack(bytes: &[u8]) -> Result<u32, CostOverflow> {
-        let size = Checked::from(bytes.len());
-        (260 + (size >> 1)).as_gas_cost()
+    // corresponds to cost_N_IUnpack in the Tezos protocol. The model is
+    // flat: the per-byte work is carried by the carbonated Micheline decode
+    // and typecheck that UNPACK also charges.
+    pub fn unpack(_bytes: &[u8]) -> Result<u32, CostOverflow> {
+        Ok(140)
     }
 
     pub fn pair_n(size: usize) -> Result<u32, CostOverflow> {
@@ -1181,25 +1323,26 @@ pub mod unparsing_cost {
     use crate::ast::annotations::Annotation;
     use checked::Checked;
 
-    /// Cost for allocating a Micheline node: 100mg.
-    pub const NODE: u32 = 100;
+    /// Cost for allocating a Micheline node: 125 mg (the benchmarked
+    /// N_IPack_micheline_nodes parameter).
+    pub const NODE: u32 = 125;
 
-    /// Cost for allocating a Micheline Int node: 100 mg + 25 mg/byte.
+    /// Cost for allocating a Micheline Int node: 125 mg + 25 mg/byte.
     pub fn int(i: &BigInt) -> Result<u32, CostOverflow> {
         let size = Checked::from(i.byte_size());
-        (100 + size * 25).as_gas_cost()
+        (125 + size * 25).as_gas_cost()
     }
 
-    /// Cost for allocating a Micheline String node: 100 mg + 10 mg/byte
+    /// Cost for allocating a Micheline String node: 125 mg + 10 mg/byte
     pub fn string(string: &str) -> Result<u32, CostOverflow> {
         let size = Checked::from(string.len());
-        (100 + size * 10).as_gas_cost()
+        (125 + size * 10).as_gas_cost()
     }
 
-    /// Cost for allocating a Micheline Bytes node: 100mg + 10 mg/byte
+    /// Cost for allocating a Micheline Bytes node: 125 mg + 10 mg/byte
     pub fn bytes(bytes: &[u8]) -> Result<u32, CostOverflow> {
         let size = Checked::from(bytes.len());
-        (100 + size * 10).as_gas_cost()
+        (125 + size * 10).as_gas_cost()
     }
 
     /// Cost for allocating a Micheline annotation: 10 mg/byte. No

@@ -1,7 +1,7 @@
 
 ./octez-client --log-requests --wait none transfer 1 from '[PUBLIC_KEY_HASH]' to '[PUBLIC_KEY_HASH]'
 Node is bootstrapped.
-Estimated gas: 2168.821 units (will add 0 for safety)
+Estimated gas: 2148.532 units (will add 0 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -14,7 +14,7 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000122
     Expected counter: 1
-    Gas limit: 2169
+    Gas limit: 2149
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000122
@@ -24,7 +24,7 @@ This sequence of operations was run:
       From: [PUBLIC_KEY_HASH]
       To: [PUBLIC_KEY_HASH]
       This transaction was successfully applied
-      Consumed gas: 2168.688
+      Consumed gas: 2148.528
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ1
         [PUBLIC_KEY_HASH] ... +ꜩ1
@@ -158,7 +158,7 @@ This sequence of operations was run:
                       { "kind": "contract",
                         "contract": "[PUBLIC_KEY_HASH]",
                         "change": "1000000", "origin": "block" } ],
-                  "consumed_milligas": "2168821" } } } ] }
+                  "consumed_milligas": "2148532" } } } ] }
 >>>>11: http://[HOST]:[PORT]/tezlink/chains/main/blocks/head~2/hash
 <<<<11: 200 OK
   "[BLOCK_HASH]"
@@ -170,14 +170,14 @@ This sequence of operations was run:
       "branch": "[BLOCK_HASH]",
       "contents":
         [ { "kind": "transaction", "source": "[PUBLIC_KEY_HASH]",
-            "fee": "122", "counter": "1", "gas_limit": "2169", "storage_limit": "0",
+            "fee": "122", "counter": "1", "gas_limit": "2149", "storage_limit": "0",
             "amount": "1000000", "destination": "[PUBLIC_KEY_HASH]" } ],
       "signature":
         "[SIGNATURE]" } ]
 <<<<13: 200 OK
   [ { "contents":
         [ { "kind": "transaction", "source": "[PUBLIC_KEY_HASH]",
-            "fee": "122", "counter": "1", "gas_limit": "2169", "storage_limit": "0",
+            "fee": "122", "counter": "1", "gas_limit": "2149", "storage_limit": "0",
             "amount": "1000000", "destination": "[PUBLIC_KEY_HASH]",
             "metadata":
               { "balance_updates":
@@ -194,7 +194,7 @@ This sequence of operations was run:
                         { "kind": "contract",
                           "contract": "[PUBLIC_KEY_HASH]",
                           "change": "1000000", "origin": "block" } ],
-                    "consumed_milligas": "2168688" } } } ],
+                    "consumed_milligas": "2148528" } } } ],
       "signature":
         "[SIGNATURE]" } ]
 >>>>14: http://[HOST]:[PORT]/tezlink/injection/operation?chain=main

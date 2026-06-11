@@ -2691,7 +2691,7 @@ mod tests {
                     },
                 ],
                 result: ContentResult::Applied(RevealSuccess {
-                    consumed_milligas: 168913_u64.into(),
+                    consumed_milligas: 148496_u64.into(),
                 }),
                 internal_operation_results: vec![],
             }),
@@ -2874,7 +2874,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 2168655_u64.into(),
+                        consumed_milligas: 2148527_u64.into(),
                         storage_size: 0_u64.into(),
                         paid_storage_size_diff: 0_u64.into(),
                         allocated_destination_contract: false,
@@ -2973,7 +2973,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 2168655_u64.into(),
+                        consumed_milligas: 2148527_u64.into(),
                         storage_size: 0_u64.into(),
                         paid_storage_size_diff: 0_u64.into(),
                         allocated_destination_contract: false,
@@ -3097,7 +3097,7 @@ mod tests {
                             balance_updates: vec![],
                             ticket_receipt: vec![],
                             originated_contracts: vec![],
-                            consumed_milligas: 1778724_u64.into(),
+                            consumed_milligas: 1759070_u64.into(),
                             storage_size: 69_u64.into(), // code (67) + unit (2)
                             paid_storage_size_diff: 0_u64.into(), // unit unchanged
                             allocated_destination_contract: false,
@@ -3141,7 +3141,7 @@ mod tests {
                                     ],
                                     ticket_receipt: vec![],
                                     originated_contracts: vec![],
-                                    consumed_milligas: 2_100_200_u64.into(),
+                                    consumed_milligas: 2_100_250_u64.into(),
                                     storage_size: 0_u64.into(),
                                     paid_storage_size_diff: 0_u64.into(),
                                     allocated_destination_contract: false,
@@ -3368,7 +3368,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 1774002_u64.into(),
+                        consumed_milligas: 1753261_u64.into(),
                         storage_size: 44_u64.into(), // code (33) + "Hello world" (11)
                         paid_storage_size_diff: 4_u64.into(), // "Hello world" (11) − "initial" (7)
                         allocated_destination_contract: false,
@@ -3567,7 +3567,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 1774002_u64.into(),
+                        consumed_milligas: 1753261_u64.into(),
                         storage_size: 44_u64.into(), // code (33) + "Hello world" (11)
                         paid_storage_size_diff: 4_u64.into(), // "Hello world" (11) − "initial" (7)
                         allocated_destination_contract: false,
@@ -3683,7 +3683,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 2_168_688_u64.into(),
+                        consumed_milligas: 2_148_528_u64.into(),
                         storage_size: 0_u64.into(),
                         paid_storage_size_diff: 0_u64.into(),
                         allocated_destination_contract: true,
@@ -3792,7 +3792,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 2_168_688_u64.into(),
+                        consumed_milligas: 2_148_528_u64.into(),
                         storage_size: 0_u64.into(),
                         paid_storage_size_diff: 0_u64.into(),
                         allocated_destination_contract: true,
@@ -4150,7 +4150,7 @@ mod tests {
                         },
                     ],
                     result: ContentResult::Applied(RevealSuccess {
-                        consumed_milligas: 172391_u64.into(),
+                        consumed_milligas: 148612_u64.into(),
                     }),
                     internal_operation_results: vec![],
                 }),
@@ -4623,7 +4623,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_kt1.clone(),
                     }],
-                    consumed_milligas: 2_973_406_u64.into(),
+                    consumed_milligas: 2_952_559_u64.into(),
                     storage_size: 38u64.into(),
                     paid_storage_size_diff: 38u64.into(),
                     lazy_storage_diff: None,
@@ -5242,7 +5242,7 @@ mod tests {
                         originated_contracts: vec![Originated {
                             contract: expected_kt1.clone(),
                         }],
-                        consumed_milligas: 2_973_406_u64.into(),
+                        consumed_milligas: 2_952_559_u64.into(),
                         storage_size: 38_u64.into(),
                         paid_storage_size_diff: 38_u64.into(),
                         lazy_storage_diff: None,
@@ -5437,7 +5437,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_address.clone(),
                     }],
-                    consumed_milligas: 2_902_004_u64.into(),
+                    consumed_milligas: 2_902_379_u64.into(),
                     storage_size: 30_u64.into(),
                     paid_storage_size_diff: 30_u64.into(),
                     lazy_storage_diff: None,
@@ -5643,7 +5643,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_address_3,
                     },],
-                    consumed_milligas: 2_902_016_u64.into(),
+                    consumed_milligas: 2_902_391_u64.into(),
                     storage_size: 33_u64.into(),
                     paid_storage_size_diff: 33_u64.into(),
                     lazy_storage_diff: None,
@@ -5701,7 +5701,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_address_2,
                     }],
-                    consumed_milligas: 2_902_104_u64.into(),
+                    consumed_milligas: 2_902_479_u64.into(),
                     storage_size: 30_u64.into(),
                     paid_storage_size_diff: 30_u64.into(),
                     lazy_storage_diff: None,
@@ -5854,7 +5854,7 @@ mod tests {
                         },
                     ],
                     result: ContentResult::BackTracked(backtrack_result(RevealSuccess {
-                        consumed_milligas: 177658_u64.into(),
+                        consumed_milligas: 148786_u64.into(),
                     })),
                     internal_operation_results: vec![],
                 }),
@@ -5918,7 +5918,7 @@ mod tests {
                             originated_contracts: vec![Originated {
                                 contract: expected_kt1_1.clone(),
                             }],
-                            consumed_milligas: 2_903_704_u64.into(),
+                            consumed_milligas: 2_903_754_u64.into(),
                             storage_size: 30.into(),
                             paid_storage_size_diff: 30.into(),
                             lazy_storage_diff: None,
@@ -5986,7 +5986,7 @@ mod tests {
                             originated_contracts: vec![Originated {
                                 contract: expected_kt1_2.clone(),
                             }],
-                            consumed_milligas: 2_903_704_u64.into(),
+                            consumed_milligas: 2_903_754_u64.into(),
                             storage_size: 30.into(),
                             paid_storage_size_diff: 30.into(),
                             lazy_storage_diff: None,

@@ -11182,8 +11182,8 @@ let test_crac_collect_result_revert_discards_bytes () =
 
     Per-internal-op the apply loop charges [Cost::manager_operation] =
     100_000 mgas; MIR then charges [VALUE_STEP] = 100 mgas for the
-    bytes typecheck, then 100mgas + 10 mgas/byte for conversion to
-    Micheline; then 100 mgas + 10mgas/byte for serialization; 1_400_192
+    bytes typecheck, then 125 mgas + 10 mgas/byte for conversion to
+    Micheline; then 125 mgas + 10 mgas/byte for serialization; 1_400_192
     mgas for IO work on the storage, finally the handler adds the
     size-dependent term [460 + 1.5 * size]. *)
 let test_crac_collect_result_size_sweep_matches_model () =
@@ -11207,7 +11207,7 @@ let test_crac_collect_result_size_sweep_matches_model () =
   let expected_mgas n =
     100_000 + 100 + 460
     + (3 * n / 2)
-    + 100 + (10 * n) + 100 + (10 * n) + 1_400_192
+    + 125 + (10 * n) + 125 + (10 * n) + 1_400_192
   in
   Log.debug ~prefix "Warmup each reader (alias + storage)" ;
   let* () =
