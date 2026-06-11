@@ -652,54 +652,6 @@ images.ubuntu-build.merge:
       - "24.04"
       - "26.04"
 
-images.ubuntu-systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: build
-  tags:
-  - gcp_very_high_cpu
-  rules:
-  - changes:
-    - images/base-images/Dockerfile.debian
-    - images/base-images/Dockerfile.debian-systemd
-    - images/scripts/install-gcloud.sh
-    - images/scripts/install_datadog_static.sh
-    - script-inputs/active_protocol_versions_without_number
-    - scripts/ci/build-base-images.sh
-    - scripts/ci/octez-packages-version.sh
-    - scripts/ci/systemd-entrypoint.service
-    - scripts/ci/systemd-entrypoint.sh
-    - scripts/kiss-fetch.sh
-    - scripts/packaging/tests/tests-common.inc.sh
-    when: on_success
-  needs:
-  - trigger
-  - images.ubuntu
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian-systemd
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    DOCKER_VERSION: 28.5.1
-    DISTRIBUTION: ubuntu-systemd
-    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/ubuntu:${RELEASE}-${CI_COMMIT_REF_SLUG}
-    PLATFORM: linux/amd64
-  parallel:
-    matrix:
-    - RELEASE:
-      - "22.04"
-      - "24.04"
-      - "26.04"
-
 select_tezts:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: build
@@ -1650,6 +1602,55 @@ images.debian-systemd:
     - RELEASE:
       - bookworm
       - trixie
+
+images.ubuntu-systemd:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  rules:
+  - changes:
+    - images/base-images/Dockerfile.debian
+    - images/base-images/Dockerfile.debian-systemd
+    - images/scripts/install-gcloud.sh
+    - images/scripts/install_datadog_static.sh
+    - script-inputs/active_protocol_versions_without_number
+    - scripts/ci/build-base-images.sh
+    - scripts/ci/octez-packages-version.sh
+    - scripts/ci/systemd-entrypoint.service
+    - scripts/ci/systemd-entrypoint.sh
+    - scripts/kiss-fetch.sh
+    - scripts/packaging/tests/tests-common.inc.sh
+    when: on_success
+  needs:
+  - trigger
+  - images.ubuntu
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian-systemd
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DOCKER_VERSION: 28.5.1
+    DISTRIBUTION: ubuntu-systemd
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/ubuntu:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    PLATFORM: linux/amd64
+  parallel:
+    matrix:
+    - RELEASE:
+      - "22.04"
+      - "24.04"
+      - "26.04"
 
 images.debian-jsonnet:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621

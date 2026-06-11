@@ -628,19 +628,20 @@ let job_debian_systemd_based_images =
     ~needs_legacy:[(Cacio.Job, make_job_debian_based_images ())]
     "images.debian-systemd"
 
-let make_job_ubuntu_systemd_based_images ?start_job ?(changeset = false) () =
-  let dep_ubuntu = make_job_ubuntu_based_images () in
-  make_job_base_images
-    ?start_job
-    ~changeset
-    ~__POS__
+(* ── Cacio: ubuntu-systemd ───────────────────────────────────────────────── *)
+
+let job_ubuntu_systemd_based_images =
+  base_image_job
     ~image_name:"ubuntu-systemd"
     ~base_name:(Pipeline_dep "ubuntu")
-    ~dependencies:(Dependent [Job dep_ubuntu])
     ~matrix:Distribution.(release_matrix Ubuntu)
     ~compilation:Amd64_only
-    ~changes:(Changeset.make (Files.debian_systemd @ Files.debian_base))
     "images/base-images/Dockerfile.debian-systemd"
+    ~__POS__
+    ~description:"Build ubuntu-systemd base images"
+    ~only_if_changed:Files.(debian_systemd @ debian_base)
+    ~needs_legacy:[(Cacio.Job, make_job_ubuntu_based_images ())]
+    "images.ubuntu-systemd"
 
 (* ── debian-jsonnet ──────────────────────────────────────────────────────── *)
 
@@ -695,7 +696,6 @@ let jobs ?start_job ?(changeset = false) () =
     make_job_debian_build_base_images_merge ~changeset ();
     make_job_ubuntu_build_base_images ?start_job ~changeset ();
     make_job_ubuntu_build_base_images_merge ~changeset ();
-    make_job_ubuntu_systemd_based_images ?start_job ~changeset ();
   ]
   @
   if enable_rpm_images then
@@ -716,6 +716,7 @@ let () =
       (Cacio.Auto, job_jsonnet_based_images);
       (Cacio.Auto, job_rust_sdk_bindings_based_images);
       (Cacio.Auto, job_debian_systemd_based_images);
+      (Cacio.Auto, job_ubuntu_systemd_based_images);
     ]
   in
   Cacio.register_merge_request_jobs jobs ;
