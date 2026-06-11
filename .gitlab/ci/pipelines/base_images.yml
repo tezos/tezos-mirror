@@ -107,34 +107,6 @@ images.ubuntu:
       - "24.04"
       - "26.04"
 
-images.debian-rust.merge:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: build
-  tags:
-  - gcp
-  rules:
-  - when: on_success
-  needs:
-  - images.debian-rust
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - scripts/ci/docker-merge-base-images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    DOCKER_VERSION: 28.5.1
-    RELEASE: trixie
-    IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/debian-rust
-
 images.ci-release:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: build
@@ -234,6 +206,33 @@ images.debian-rust:
       TAGS:
       - gcp_very_high_cpu
       - gcp_arm64
+
+images.debian-rust.merge:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: build
+  tags:
+  - gcp
+  needs:
+  - images.debian-rust
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - scripts/ci/docker-merge-base-images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DOCKER_VERSION: 28.5.1
+    RELEASE: trixie
+    IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/debian-rust
 
 images.debian-homebrew:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621

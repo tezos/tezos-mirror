@@ -448,68 +448,6 @@ let job_docker_ci_based_images =
 
 (* ── Rust family ────────────────────────────────────────────────────────── *)
 
-(* debian-rust: based on [debian:trixie]. *)
-let make_job_rust_based_images ?start_job ?(changeset = false) () =
-  (* dep is called with defaults just to get the job name for the dependency reference;
-     CIAO only uses the name *)
-  let dep_debian = make_job_debian_based_images () in
-  make_job_base_images
-    ?start_job
-    ~changeset
-    ~__POS__
-    ~image_name:"debian-rust"
-    ~base_name:(Pipeline_dep "debian")
-    ~matrix:[("RELEASE", ["trixie"])]
-    ~dependencies:(Dependent [Job dep_debian])
-    ~compilation:Native
-    ~changes:
-      (Changeset.make
-         (Files.debian_rust_build
-        (* Adding the changeset of debian job as we want to test the
-           build of [debian-rust] if [debian] is rebuild. *)
-        @ Files.debian_base
-         (* If we run [debian-rust] merge job, we need [debian-rust] build job *)
-         @ Files.merge_script))
-    "images/base-images/Dockerfile.rust"
-
-(* dedicated merge job exist because QEMU compilation takes too much
-   time. Build job reached timeout. *)
-let make_job_rust_based_images_merge ?(changeset = false) () =
-  (* dep is called with defaults just to get the job name for the dependency reference *)
-  let dep_rust = make_job_rust_based_images () in
-  job_docker_authenticated
-    ~__POS__
-    ~name:"images.debian-rust.merge"
-    ~stage:Stages.build
-    ~dependencies:(Dependent [Job dep_rust])
-    ~rules:
-      (if changeset then
-         [
-           job_rule
-             ~changes:
-               (Changeset.encode
-                  (Changeset.make
-                     (Files.merge_script
-                    (* Adding changesets of [debian] and
-                      [debian-rust] build jobs as if we rebuild one
-                      of these images, we want to test the
-                      [debian-rust] merge job *)
-                    @ Files.debian_rust_build
-                     @ Files.debian_base)))
-             ~when_:On_success
-             ();
-         ]
-       (* To force the run of the job. Similar to
-          [make_job_base_images] and cf. comment above.
-          Migration to Cacio will clean this hack. *)
-         else [job_rule ~when_:On_success ()])
-    ~variables:
-      [
-        ("RELEASE", "trixie");
-        ("IMAGE_NAME", "${GCP_REGISTRY}/tezos/tezos/debian-rust");
-      ]
-    ["scripts/ci/docker-merge-base-images.sh"]
-
 (* ── Cacio: debian-rust ──────────────────────────────────────────────────── *)
 
 let job_rust_based_images =
@@ -524,6 +462,22 @@ let job_rust_based_images =
     ~only_if_changed:Files.(debian_rust_build @ debian_base)
     ~needs_legacy:[(Cacio.Job, make_job_debian_based_images ())]
     "images.debian-rust"
+
+(* ── Cacio: debian-rust.merge ────────────────────────────────────────────── *)
+
+let job_rust_based_images_merge =
+  docker_job
+    ~extra_variables:
+      [
+        ("RELEASE", "trixie");
+        ("IMAGE_NAME", "${GCP_REGISTRY}/tezos/tezos/debian-rust");
+      ]
+    ~script:["scripts/ci/docker-merge-base-images.sh"]
+    ~__POS__
+    ~description:"Merge debian-rust base image manifests"
+    ~only_if_changed:Files.(merge_script @ debian_rust_build @ debian_base)
+    ~needs:[(Cacio.Job, job_rust_based_images)]
+    "images.debian-rust.merge"
 
 (* ── debian-homebrew ────────────────────────────────────────────────────── *)
 
@@ -683,7 +637,6 @@ let jobs ?start_job ?(changeset = false) () =
   [
     make_job_debian_based_images ?start_job ~changeset ();
     make_job_ubuntu_based_images ?start_job ~changeset ();
-    make_job_rust_based_images_merge ~changeset ();
   ]
   @
   if enable_rpm_images then
@@ -710,6 +663,7 @@ let () =
       (Cacio.Auto, job_ubuntu_build_based_images);
       (Cacio.Auto, job_ubuntu_build_based_images_merge);
       (Cacio.Auto, job_rust_based_images);
+      (Cacio.Auto, job_rust_based_images_merge);
     ]
   in
   Cacio.register_merge_request_jobs jobs ;
