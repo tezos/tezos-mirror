@@ -512,22 +512,22 @@ let make_job_rust_based_images_merge ?(changeset = false) () =
 
 (* ── debian-homebrew ────────────────────────────────────────────────────── *)
 
-(* debian-homebrew: based on [debian:trixie] *)
-let make_job_debian_homebrew_base_images ?start_job ?(changeset = false) () =
-  let dep_debian = make_job_debian_based_images () in
-  make_job_base_images
-    ?start_job
-    ~changeset
-    ~__POS__
+(* ── Cacio: debian-homebrew ──────────────────────────────────────────────── *)
+
+(* debian_base is included to trigger a rebuild when debian files change,
+   since ~needs_legacy does not participate in Cacio changeset propagation. *)
+let job_debian_homebrew_based_images =
+  base_image_job
     ~image_name:"debian-homebrew"
     ~base_name:(Pipeline_dep "debian")
-    ~dependencies:(Dependent [Job dep_debian])
     ~matrix:[("RELEASE", ["trixie"])]
     ~compilation:Amd64_only
-      (* Adding the changeset of [debian] job as we want to test the
-       build of [debian-homebrew] if [debian] is rebuild. *)
-    ~changes:(Changeset.make (Files.debian_homebrew @ Files.debian_base))
     "images/base-images/Dockerfile.debian-homebrew"
+    ~__POS__
+    ~description:"Build debian-homebrew base images"
+    ~only_if_changed:Files.(debian_homebrew @ debian_base)
+    ~needs_legacy:[(Cacio.Job, make_job_debian_based_images ())]
+    "images.debian-homebrew"
 
 (* ── debian-build and ubuntu-build families ─────────────────────────────── *)
 
@@ -690,7 +690,6 @@ let jobs ?start_job ?(changeset = false) () =
     make_job_ubuntu_based_images ?start_job ~changeset ();
     make_job_rust_based_images ?start_job ~changeset ();
     make_job_rust_based_images_merge ~changeset ();
-    make_job_debian_homebrew_base_images ?start_job ~changeset ();
     make_job_debian_build_base_images ?start_job ~changeset ();
     make_job_debian_build_base_images_merge ~changeset ();
     make_job_ubuntu_build_base_images ?start_job ~changeset ();
@@ -715,6 +714,7 @@ let () =
     [
       (Cacio.Auto, job_ci_release_based_images);
       (Cacio.Auto, job_docker_ci_based_images);
+      (Cacio.Auto, job_debian_homebrew_based_images);
     ]
   in
   Cacio.register_merge_request_jobs jobs ;
