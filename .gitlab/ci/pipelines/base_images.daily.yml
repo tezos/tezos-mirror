@@ -160,39 +160,6 @@ images.debian-rust.merge:
     RELEASE: trixie
     IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/debian-rust
 
-images.debian-build.merge:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: build
-  tags:
-  - gcp
-  rules:
-  - when: on_success
-  needs:
-  - images.debian-build
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - scripts/ci/docker-merge-base-images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    DOCKER_VERSION: 28.5.1
-    IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/debian-build
-  parallel:
-    matrix:
-    - RELEASE:
-      - bookworm
-      - trixie
-
 images.ubuntu-build:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: build
@@ -398,6 +365,37 @@ images.debian-build:
       TAGS:
       - gcp_very_high_cpu
       - gcp_arm64
+
+images.debian-build.merge:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: build
+  tags:
+  - gcp
+  needs:
+  - images.debian-build
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - scripts/ci/docker-merge-base-images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DOCKER_VERSION: 28.5.1
+    IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/debian-build
+  parallel:
+    matrix:
+    - RELEASE:
+      - bookworm
+      - trixie
 
 images.debian-systemd:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
