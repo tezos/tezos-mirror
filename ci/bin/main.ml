@@ -520,7 +520,7 @@ let () =
   register
     "schedule_security_scans"
     schedule_security_scans
-    ~jobs:Security_scans.jobs
+    ~jobs:(job_datadog_pipeline_trace :: Cacio.get_jobs Schedule_security_scans)
     ~description:
       "Scheduled pipeline for various security scans. Currently scanning for \
        vulnerabilities in Docker images" ;

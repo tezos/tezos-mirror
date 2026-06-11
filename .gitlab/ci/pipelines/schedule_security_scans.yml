@@ -63,6 +63,7 @@ container_scanning_tezos-tezos-latest:
   needs: []
   dependencies: []
   timeout: 60 minutes
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -90,6 +91,7 @@ container_scanning_tezos-tezos-octez-evm-node-latest:
   needs: []
   dependencies: []
   timeout: 60 minutes
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -117,6 +119,7 @@ container_scanning_tezos-tezos-master:
   needs: []
   dependencies: []
   timeout: 60 minutes
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -144,6 +147,7 @@ container_scanning_tezos-debian-bookworm-master-100afa6d:
   needs: []
   dependencies: []
   timeout: 60 minutes
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -171,6 +175,7 @@ container_scanning_tezos-debian-trixie-master-100afa6d:
   needs: []
   dependencies: []
   timeout: 60 minutes
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -198,6 +203,7 @@ container_scanning_tezos-ubuntu-22.04-master-100afa6d:
   needs: []
   dependencies: []
   timeout: 60 minutes
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -225,6 +231,7 @@ container_scanning_tezos-ubuntu-24.04-master-100afa6d:
   needs: []
   dependencies: []
   timeout: 60 minutes
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -252,6 +259,7 @@ container_scanning_tezos-ubuntu-26.04-master-100afa6d:
   needs: []
   dependencies: []
   timeout: 60 minutes
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -297,14 +305,15 @@ container_scanning_merge_reports:
   - container_scanning_tezos-ubuntu-24.04-master-100afa6d
   - container_scanning_tezos-ubuntu-26.04-master-100afa6d
   timeout: 60 minutes
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - 'jq --slurp ''{ version: .[0].version, scan: .[0].scan, vulnerabilities: map((.vulnerabilities
-    // [])[]), remediations: map((.remediations // [])[])}'' gl-container-scanning-report-*>
-    gl-container-scanning-report.json'
+    // [])[]), remediations: map((.remediations // [])[])}'' gl-container-scanning-report-*
+    > gl-container-scanning-report.json'
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -313,6 +322,31 @@ container_scanning_merge_reports:
     - gl-container-scanning-report.json
     reports:
       container_scanning: gl-container-scanning-report.json
+
+container_scanning_slack_notification_tezos-tezos-latest:
+  image: ${ci_image_name}/monitoring:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  needs:
+  - oc.docker:ci:amd64
+  - container_scanning_tezos-tezos-latest
+  dependencies:
+  - oc.docker:ci:amd64
+  - container_scanning_tezos-tezos-latest
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/ci/container_scanning_slack_notification.sh tezos/tezos:latest
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    REPORT: gl-container-scanning-report-tezos-tezos-latest.json
 
 container_scanning_slack_notification_tezos-tezos-octez-evm-node-latest:
   image: ${ci_image_name}/monitoring:${ci_image_tag}
@@ -326,6 +360,7 @@ container_scanning_slack_notification_tezos-tezos-octez-evm-node-latest:
   - oc.docker:ci:amd64
   - container_scanning_tezos-tezos-octez-evm-node-latest
   timeout: 60 minutes
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -350,6 +385,7 @@ container_scanning_slack_notification_tezos-tezos-master:
   - oc.docker:ci:amd64
   - container_scanning_tezos-tezos-master
   timeout: 60 minutes
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -361,27 +397,3 @@ container_scanning_slack_notification_tezos-tezos-master:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     REPORT: gl-container-scanning-report-tezos-tezos-master.json
-
-container_scanning_slack_notification_tezos-tezos-latest:
-  image: ${ci_image_name}/monitoring:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp
-  needs:
-  - oc.docker:ci:amd64
-  - container_scanning_tezos-tezos-latest
-  dependencies:
-  - oc.docker:ci:amd64
-  - container_scanning_tezos-tezos-latest
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - . ./scripts/ci/container_scanning_slack_notification.sh tezos/tezos:latest
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    REPORT: gl-container-scanning-report-tezos-tezos-latest.json

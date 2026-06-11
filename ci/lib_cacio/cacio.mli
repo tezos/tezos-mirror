@@ -465,6 +465,8 @@ type global_pipeline =
   (* Debian packaging pipelines *)
   | Debian_partial
   | Debian_daily
+  (* Security scan pipelines *)
+  | Schedule_security_scans
 
 (** Add jobs to a given global pipeline. *)
 val register_jobs : global_pipeline -> (trigger * job) list -> unit
