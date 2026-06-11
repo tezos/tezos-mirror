@@ -519,16 +519,16 @@ images.ci-release:
   stage: build
   tags:
   - gcp_very_high_cpu
-  rules:
-  - when: on_success
+  needs: []
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
+  - ./scripts/ci/docker_initialize.sh
   - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian-release
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:

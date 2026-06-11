@@ -8,6 +8,7 @@
 open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
+module CI = Cacio.Shared
 
 (* Helper function to standardise the path of a base image built in the same
    pipeline. Used to build more complex base images and avoid code duplications *)
@@ -188,6 +189,56 @@ end
    See https://gitlab.com/tezos/tezos/-/work_items/8205 *)
 let enable_rpm_images = false
 
+(* ── Cacio helpers ───────────────────────────────────────────────────────── *)
+
+(* Partial application of [CI.job] that fixes the docker-auth settings:
+   alpine_docker_ci image, dind service, DOCKER_VERSION variable, and
+   docker_initialize.sh prepended to the script (Cacio has no before_script).
+   All other [CI.job] arguments are left for the caller. *)
+let docker_job ?(extra_variables = []) ~script =
+  CI.job
+    ~stage:Cacio.Build
+    ~image:Images.Base_images.alpine_docker_ci
+    ~services:[{name = Images.Base_images.dind_service}]
+    ~variables:
+      (("DOCKER_VERSION", Images.Base_images.docker_version) :: extra_variables)
+    ~script:("./scripts/ci/docker_initialize.sh" :: script)
+
+(* Partial application of [docker_job] that fixes the image-build variables
+   (DISTRIBUTION, IMAGE_PATH, PLATFORM) and the compilation strategy
+   (tag and matrix). All other arguments are left for the caller. *)
+let base_image_job ~image_name ?(base_name = Upstream image_name) ~matrix
+    ~compilation ?(extra_variables = []) dockerfile =
+  let platform, extra_tags =
+    match compilation with
+    | Amd64_only -> ("linux/amd64", [])
+    | Arm64_only -> ("", [("TAGS", [Runner.Tag.show Gcp_arm64])])
+    | Emulated -> ("linux/amd64,linux/arm64", [])
+    | Native ->
+        ( "",
+          [
+            ( "TAGS",
+              [Runner.Tag.show Gcp_very_high_cpu; Runner.Tag.show Gcp_arm64] );
+          ] )
+  in
+  let emulated = extra_tags = [] in
+  docker_job
+    ~extra_variables:
+      ([
+         ("DISTRIBUTION", image_name);
+         ( "IMAGE_PATH",
+           match base_name with
+           | Upstream name -> Format.asprintf "%s:$RELEASE" name
+           | Pipeline_dep name -> base_dep_img_name name );
+         ("PLATFORM", platform);
+       ]
+      @ extra_variables)
+    ~script:[Printf.sprintf "scripts/ci/build-base-images.sh %s" dockerfile]
+    ~tag:(if emulated then Gcp_very_high_cpu else Dynamic)
+    ~parallel:(Matrix [matrix @ extra_tags])
+
+(* ── CIAO helpers (used until all jobs are migrated) ─────────────────────── *)
+
 (* This function can build docker images both in an emulated environment using
    qemu or natively. The advantage of choosing emulated vs native depends on
    the build time associated with the image. Small images are more efficiently
@@ -344,17 +395,19 @@ let make_job_rockylinux_based_images ?start_job ?(changeset = false) () =
 
 (* ── Standalone jobs (no job dependencies within this file) ─────────────── *)
 
-let make_job_ci_release_based_images ?start_job ?(changeset = false) () =
-  make_job_base_images
-    ?start_job
-    ~changeset
-    ~__POS__
+(* ── Cacio: ci-release ───────────────────────────────────────────────────── *)
+
+let job_ci_release_based_images =
+  base_image_job
     ~image_name:"ci-release"
     ~base_name:(Upstream "debian")
     ~matrix:[("RELEASE", ["trixie"])]
     ~compilation:Amd64_only
-    ~changes:(Changeset.make Files.(ci_releases @ debian_base))
     "images/base-images/Dockerfile.debian-release"
+    ~__POS__
+    ~description:"Build ci-release base images"
+    ~only_if_changed:Files.(ci_releases @ debian_base)
+    "images.ci-release"
 
 (* This base image differs from the others in its build process: it is
    bootstrapped directly from the upstream Docker Hub [docker:<version>]
@@ -659,7 +712,6 @@ let jobs ?start_job ?(changeset = false) () =
     make_job_ubuntu_systemd_base_images ?start_job ~changeset ();
     make_job_jsonnet_base_images ?start_job ~changeset ();
     make_job_rust_sdk_bindings_base_images ?start_job ~changeset ();
-    make_job_ci_release_based_images ?start_job ~changeset ();
   ]
   @
   if enable_rpm_images then
@@ -669,8 +721,17 @@ let jobs ?start_job ?(changeset = false) () =
     ]
   else []
 
+(* ── Cacio pipeline registrations ───────────────────────────────────────── *)
+
+let () =
+  let jobs = [(Cacio.Auto, job_ci_release_based_images)] in
+  Cacio.register_merge_request_jobs jobs ;
+  Cacio.register_jobs Cacio.Base_images_daily jobs
+
 let child_pipeline =
   Pipeline.register_child
     "base_images"
     ~description:"Build CI base images"
-    ~jobs:(job_datadog_pipeline_trace :: jobs ())
+    ~jobs:
+      (job_datadog_pipeline_trace
+      :: (jobs () @ Cacio.get_jobs Cacio.Base_images_daily))
