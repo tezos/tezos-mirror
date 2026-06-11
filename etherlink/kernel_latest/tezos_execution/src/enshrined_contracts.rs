@@ -526,14 +526,14 @@ pub fn synthetic_crac_marker_tag(iop: &InternalOperationSum) -> Option<&str> {
 }
 
 /// Drain re-entrant CRAC receipts that accumulated since the per-list
-/// watermarks.
+/// watermarks and splice their internal ops into the caller's flat list.
 ///
 /// After each internal operation that may have triggered a cross-runtime
 /// call (e.g. a gateway call that re-entered Michelson), this function
 /// drains the CRAC receipts that were pushed since the watermarks —
-/// across all three lists (pending, failed, backtracked) — and splices
-/// their internal operation results into the parent op's flat list,
-/// preserving DFS execution order (RFC Example 8).
+/// across all three lists (pending, failed, backtracked) — and returns
+/// all their internal operation results in execution order, preserving
+/// DFS order for nested frames.
 ///
 /// Draining all three lists matters because a re-entrant inner CRAC
 /// can land in any of them depending on its outcome and the EVM frame
@@ -542,18 +542,19 @@ pub fn synthetic_crac_marker_tag(iop: &InternalOperationSum) -> Option<&str> {
 ///   - Failed inner caught by an upstream EVM frame: pushed to
 ///     `failed_crac_receipts`, must still nest under its outer parent
 ///     in the receipt rather than reach the top-level merge with a
-///     smaller seq than the outer (would invert DFS order — L2-1300).
+///     smaller seq than the outer (would invert DFS order).
 ///   - Applied inner whose enclosing EVM frame later reverted but was
 ///     caught above: migrated to `backtracked_crac_receipts` by
-///     `revert_frame` (L2-1304); same nesting requirement.
+///     `revert_frame`; same nesting requirement.
 ///
 /// Receipts are sorted by their shared sequence number before splicing
 /// so cross-list interleavings of inner CRACs at the same depth come
 /// out in execution order.
 ///
-/// Synthetic CRAC-ID events are dropped from each spliced receipt
-/// (only the outermost CRAC carries one per RFC principle 6); user-
-/// issued `EMIT` ops are preserved.
+/// Frame markers (begin/end events) are preserved: each inner frame
+/// is self-bracketed so indexers can identify nested frames without
+/// any special treatment at the drain site.  User-issued `EMIT` ops
+/// were always preserved and continue to be.
 pub(crate) fn drain_reentrant_crac_ops(
     journal: &mut TezosXJournal,
     pending_watermark: usize,
@@ -588,12 +589,7 @@ pub(crate) fn drain_reentrant_crac_ops(
             receipt.op_and_receipt;
         for op in batch.operations {
             if let OperationResultSum::Transfer(result) = op.receipt {
-                ops.extend(
-                    result
-                        .internal_operation_results
-                        .into_iter()
-                        .filter(|iop| synthetic_crac_marker_tag(iop).is_none()),
-                );
+                ops.extend(result.internal_operation_results);
             }
         }
     }
