@@ -18,6 +18,7 @@ use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 use tezos_smart_rollup_host::runtime::ValueType;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 
 const CONFIG_PATH: RefPath = RefPath::assert_from(b"/base/__tmp/reveal_config");
 
@@ -68,7 +69,7 @@ pub fn reveal_storage<Host>(
     sequencer: Option<PublicKey>,
     admin: Option<ContractKt1Hash>,
 ) where
-    Host: StorageV1 + IsEvmNode,
+    Host: StorageV1 + IsEvmNode + KeySpaceLoader,
 {
     log!(Info, "Starting the reveal dump");
 

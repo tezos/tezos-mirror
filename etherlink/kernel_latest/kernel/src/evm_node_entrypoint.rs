@@ -148,7 +148,8 @@ pub extern "C" fn assemble_block() {
 #[allow(dead_code)]
 pub fn assemble_block_fn<Host>(host: &mut Host)
 where
-    Host: tezos_smart_rollup_host::runtime::Runtime,
+    Host: tezos_smart_rollup_host::runtime::Runtime
+        + tezos_smart_rollup_host::storage::CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
     let assemble_block_input = match sub_block::read_assemble_block_input(&mut host) {

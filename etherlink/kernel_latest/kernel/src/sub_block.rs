@@ -44,6 +44,7 @@ use tezos_smart_rollup::{host::RuntimeError, outbox::OutboxQueue, types::Timesta
 use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezos_tezlink::block::OperationsWithReceipts;
 use tezos_tracing::trace_kernel;
 
@@ -326,7 +327,7 @@ pub fn assemble_block<Host>(
     input_data: AssembleBlockInput,
 ) -> Result<(), anyhow::Error>
 where
-    Host: StorageV1 + WasmHost + IsEvmNode,
+    Host: StorageV1 + WasmHost + IsEvmNode + KeySpaceLoader,
 {
     let __attrs = [
         (

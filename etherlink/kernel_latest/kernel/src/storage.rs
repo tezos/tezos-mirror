@@ -29,9 +29,10 @@ use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::ValueType;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceLoader, Name};
 use tezos_storage::{
-    read_b58_kt1, read_optional_nom_value, read_u256_le, read_u64_le, store_bin,
-    store_read_slice, write_u256_le, write_u64_le,
+    keyspace, read_b58_kt1, read_optional_nom_value, read_u256_le, read_u64_le,
+    store_bin, store_read_slice, write_u256_le, write_u64_le,
 };
 
 use crate::error::{Error, StorageError};
@@ -114,7 +115,30 @@ impl StorageVersion {
 
 pub const STORAGE_VERSION: StorageVersion = StorageVersion::V62;
 
-pub const PRIVATE_FLAG_PATH: RefPath = RefPath::assert_from(b"/base/remove_whitelist");
+/// Name of the `/base` keyspace, holding kernel configuration and
+/// node-interaction values that do not belong to any world state.
+pub const BASE_KEYSPACE_NAME: Name = Name::from_static("/base");
+
+/// Load the `/base` keyspace.
+///
+/// Scoping contract (single-owner rule): within any phase (configuration
+/// fetch, stage one, block production), exactly one live `/base` handle may
+/// exist. Load it once at the top of the phase, thread it down as
+/// `&impl KeySpace` (or `&mut impl KeySpace` for writers) and let it drop at
+/// the end of the phase — helpers must receive the handle, never re-load.
+/// Isolated leaf accessors running outside any such phase may load
+/// transiently instead. A failure therefore signals a programming error
+/// (another `/base` handle is still alive, or a keyspace overlapping `/base`
+/// was loaded earlier in the run), never a normal runtime condition.
+pub fn load_base_keyspace<L: KeySpaceLoader>(
+    loader: &mut L,
+) -> Result<L::KeySpace, StorageError> {
+    loader
+        .load_or_create(BASE_KEYSPACE_NAME)
+        .map_err(StorageError::KeySpaceLoad)
+}
+
+pub const PRIVATE_FLAG_KEY: Key = Key::from_static(b"/remove_whitelist");
 
 pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/base/storage_version");
 pub const LEGACY_STORAGE_VERSION_PATH: RefPath =
@@ -122,16 +146,19 @@ pub const LEGACY_STORAGE_VERSION_PATH: RefPath =
 
 const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/base/kernel_version");
 
+// `/base/admin` keeps an absolute form next to the relative key: the
+// reveal-storage bootstrap writes it through the raw host while readers go
+// through the `/base` keyspace.
 pub const ADMIN: RefPath = RefPath::assert_from(b"/base/admin");
+const ADMIN_KEY: Key = Key::from_static(b"/admin");
 pub const SEQUENCER_GOVERNANCE: RefPath =
     RefPath::assert_from(b"/evm/world_state/sequencer_governance");
-pub const KERNEL_GOVERNANCE: RefPath = RefPath::assert_from(b"/base/kernel_governance");
-pub const KERNEL_SECURITY_GOVERNANCE: RefPath =
-    RefPath::assert_from(b"/base/kernel_security_governance");
-pub const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/base/delayed_bridge");
+const KERNEL_GOVERNANCE_KEY: Key = Key::from_static(b"/kernel_governance");
+const KERNEL_SECURITY_GOVERNANCE_KEY: Key =
+    Key::from_static(b"/kernel_security_governance");
+const DELAYED_BRIDGE_KEY: Key = Key::from_static(b"/delayed_bridge");
 
-pub const MAXIMUM_ALLOWED_TICKS: RefPath =
-    RefPath::assert_from(b"/base/maximum_allowed_ticks");
+const MAXIMUM_ALLOWED_TICKS_KEY: Key = Key::from_static(b"/maximum_allowed_ticks");
 
 pub const STAGE_ONE_WITNESS_PATH: RefPath =
     RefPath::assert_from(b"/base/stage_one_witness");
@@ -279,11 +306,14 @@ pub const DAL_PUBLISHERS_WHITELIST: RefPath =
 const TRACER_INPUT: RefPath = RefPath::assert_from(b"/base/trace/input");
 
 // If this path contains a value, the fa bridge is enabled in the kernel.
+// The absolute form remains for its writers (migration, tests); the reader
+// goes through the `/base` keyspace.
 pub const ENABLE_FA_BRIDGE: RefPath =
     RefPath::assert_from(b"/base/feature_flags/enable_fa_bridge");
+const ENABLE_FA_BRIDGE_KEY: Key = Key::from_static(b"/feature_flags/enable_fa_bridge");
 
-const MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS: RefPath =
-    RefPath::assert_from(b"/base/max_blueprint_lookahead_in_seconds");
+const MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS_KEY: Key =
+    Key::from_static(b"/max_blueprint_lookahead_in_seconds");
 
 pub fn store_simulation_result<T>(
     host: &mut impl StorageV1,
@@ -781,26 +811,24 @@ pub fn read_last_info_per_level_timestamp(
     read_timestamp_path(host, &EVM_INFO_PER_LEVEL_TIMESTAMP.into())
 }
 
-pub fn read_admin(host: &mut impl StorageV1) -> Option<ContractKt1Hash> {
-    read_b58_kt1(host, &ADMIN)
+pub fn read_admin(base: &impl KeySpace) -> Option<ContractKt1Hash> {
+    keyspace::read_b58_kt1(base, &ADMIN_KEY)
 }
 
 pub fn read_sequencer_governance(host: &mut impl StorageV1) -> Option<ContractKt1Hash> {
     read_b58_kt1(host, &SEQUENCER_GOVERNANCE)
 }
 
-pub fn read_kernel_governance(host: &mut impl StorageV1) -> Option<ContractKt1Hash> {
-    read_b58_kt1(host, &KERNEL_GOVERNANCE)
+pub fn read_kernel_governance(base: &impl KeySpace) -> Option<ContractKt1Hash> {
+    keyspace::read_b58_kt1(base, &KERNEL_GOVERNANCE_KEY)
 }
 
-pub fn read_kernel_security_governance(
-    host: &mut impl StorageV1,
-) -> Option<ContractKt1Hash> {
-    read_b58_kt1(host, &KERNEL_SECURITY_GOVERNANCE)
+pub fn read_kernel_security_governance(base: &impl KeySpace) -> Option<ContractKt1Hash> {
+    keyspace::read_b58_kt1(base, &KERNEL_SECURITY_GOVERNANCE_KEY)
 }
 
-pub fn read_maximum_allowed_ticks(host: &mut impl StorageV1) -> Option<u64> {
-    read_u64_le(host, &MAXIMUM_ALLOWED_TICKS).ok()
+pub fn read_maximum_allowed_ticks(base: &impl KeySpace) -> Option<u64> {
+    keyspace::read_u64_le(base, &MAXIMUM_ALLOWED_TICKS_KEY).ok()
 }
 
 pub fn enter_stage_one<Host>(host: &mut Host) -> Result<(), Error>
@@ -1182,33 +1210,82 @@ where
     }
 }
 
-pub fn is_enable_fa_bridge(host: &impl StorageV1) -> anyhow::Result<bool> {
-    if let Some(ValueType::Value) = host.store_has(&ENABLE_FA_BRIDGE)? {
-        Ok(true)
-    } else {
-        Ok(false)
-    }
+pub fn is_enable_fa_bridge(base: &impl KeySpace) -> bool {
+    base.contains(&ENABLE_FA_BRIDGE_KEY)
 }
 
-pub fn max_blueprint_lookahead_in_seconds(host: &impl StorageV1) -> anyhow::Result<i64> {
-    let bytes = host.store_read(&MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS, 0, 8)?;
-    let bytes: [u8; 8] = bytes.as_slice().try_into()?;
-    Ok(i64::from_le_bytes(bytes))
+pub fn max_blueprint_lookahead_in_seconds(base: &impl KeySpace) -> anyhow::Result<i64> {
+    Ok(keyspace::read_i64_le(
+        base,
+        &MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS_KEY,
+    )?)
 }
 
 /// Smart Contract of the delayed bridge
 ///
 /// This smart contract is used to submit transactions to the rollup
 /// when in sequencer mode
-pub fn read_delayed_transaction_bridge(host: &impl StorageV1) -> Option<ContractKt1Hash> {
-    read_b58_kt1(host, &DELAYED_BRIDGE)
+pub fn read_delayed_transaction_bridge(base: &impl KeySpace) -> Option<ContractKt1Hash> {
+    keyspace::read_b58_kt1(base, &DELAYED_BRIDGE_KEY)
 }
 
 #[cfg(test)]
 mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_host::storage::StorageV1;
     use tezosx_journal::{CracId, TezosXJournal};
+
+    // Byte-compat check for the values migrated to the `/base` keyspace:
+    // each value written through the raw host at its historical absolute
+    // path must be read back through the keyspace reader, proving the
+    // resolved durable paths never moved.
+    #[test]
+    fn base_keyspace_readers_resolve_to_absolute_paths() {
+        let mut host = MockKernelHost::default();
+        let kt1 = tezos_crypto_rs::hash::ContractKt1Hash::from_base58_check(
+            "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",
+        )
+        .unwrap();
+        let kt1_bytes = kt1.to_base58_check().into_bytes();
+
+        for path in [
+            b"/base/admin".as_slice(),
+            b"/base/kernel_governance",
+            b"/base/kernel_security_governance",
+            b"/base/delayed_bridge",
+        ] {
+            host.store_write_all(&RefPath::assert_from(path), &kt1_bytes)
+                .unwrap();
+        }
+        host.store_write_all(
+            &RefPath::assert_from(b"/base/maximum_allowed_ticks"),
+            &42u64.to_le_bytes(),
+        )
+        .unwrap();
+        host.store_write_all(
+            &RefPath::assert_from(b"/base/max_blueprint_lookahead_in_seconds"),
+            &300i64.to_le_bytes(),
+        )
+        .unwrap();
+        host.store_write_all(&super::ENABLE_FA_BRIDGE, &[1u8])
+            .unwrap();
+
+        let base = super::load_base_keyspace(&mut host).unwrap();
+        assert_eq!(super::read_admin(&base), Some(kt1.clone()));
+        assert_eq!(super::read_kernel_governance(&base), Some(kt1.clone()));
+        assert_eq!(
+            super::read_kernel_security_governance(&base),
+            Some(kt1.clone())
+        );
+        assert_eq!(super::read_delayed_transaction_bridge(&base), Some(kt1));
+        assert_eq!(super::read_maximum_allowed_ticks(&base), Some(42));
+        assert_eq!(
+            super::max_blueprint_lookahead_in_seconds(&base).unwrap(),
+            300
+        );
+        assert!(super::is_enable_fa_bridge(&base));
+    }
 
     #[test]
     fn update_burned_fees() {
