@@ -660,20 +660,20 @@ let job_jsonnet_based_images =
 
 (* ── rust-sdk-bindings ───────────────────────────────────────────────────── *)
 
-(* rust-sdk-bindings: based on [debian:trixie] *)
-let make_job_rust_sdk_bindings_base_images ?start_job ?(changeset = false) () =
-  let dep_debian = make_job_debian_based_images () in
-  make_job_base_images
-    ?start_job
-    ~changeset
-    ~__POS__
+(* ── Cacio: rust-sdk-bindings ────────────────────────────────────────────── *)
+
+let job_rust_sdk_bindings_based_images =
+  base_image_job
     ~image_name:"debian-rust-sdk-bindings"
     ~base_name:(Pipeline_dep "debian")
-    ~dependencies:(Dependent [Job dep_debian])
     ~matrix:[("RELEASE", ["trixie"])]
     ~compilation:Amd64_only
-    ~changes:(Changeset.make (Files.rust_sdk_bindings @ Files.debian_base))
     "images/base-images/Dockerfile.rust-sdk-bindings"
+    ~__POS__
+    ~description:"Build debian-rust-sdk-bindings base images"
+    ~only_if_changed:Files.(rust_sdk_bindings @ debian_base)
+    ~needs_legacy:[(Cacio.Job, make_job_debian_based_images ())]
+    "images.debian-rust-sdk-bindings"
 
 (* ── Assembly ────────────────────────────────────────────────────────────── *)
 
@@ -696,7 +696,6 @@ let jobs ?start_job ?(changeset = false) () =
     make_job_ubuntu_build_base_images_merge ~changeset ();
     make_job_debian_systemd_base_images ?start_job ~changeset ();
     make_job_ubuntu_systemd_base_images ?start_job ~changeset ();
-    make_job_rust_sdk_bindings_base_images ?start_job ~changeset ();
   ]
   @
   if enable_rpm_images then
@@ -715,6 +714,7 @@ let () =
       (Cacio.Auto, job_docker_ci_based_images);
       (Cacio.Auto, job_debian_homebrew_based_images);
       (Cacio.Auto, job_jsonnet_based_images);
+      (Cacio.Auto, job_rust_sdk_bindings_based_images);
     ]
   in
   Cacio.register_merge_request_jobs jobs ;
