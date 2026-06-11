@@ -62,6 +62,7 @@ It contains the following libraries:
 - {{!module-Tezos_scoru_wasm}Tezos_scoru_wasm}
 - {{!module-Tezos_smart_rollup_wasm_dual_state}Tezos_smart_rollup_wasm_dual_state}
 - {{!module-Tezos_smart_rollup_wasm_in_memory}Tezos_smart_rollup_wasm_in_memory}
+- {{!module-Tezos_smart_rollup_wasm_in_memory_dual}Tezos_smart_rollup_wasm_in_memory_dual}
 - {{!module-Tezos_stdlib}Tezos_stdlib}: Yet-another local-extension of the OCaml standard library
 - {{!module-Tezos_stdlib_unix}Tezos_stdlib_unix}: Yet-another local-extension of the OCaml standard library (unix-specific fragment)
 - {{!module-Tezos_test_helpers}Tezos_test_helpers}

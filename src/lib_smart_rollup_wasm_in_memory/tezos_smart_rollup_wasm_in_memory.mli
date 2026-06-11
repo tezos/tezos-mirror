@@ -32,7 +32,14 @@ module State_in_memory :
     implementation builds the config via
     {!Tezos_scoru_wasm.Wasm_pvm_config.of_signals}. Non-protocol
     consumers (node, benchmarks, tests) pass
-    {!Tezos_scoru_wasm.Wasm_pvm_config.empty}. *)
+    {!Tezos_scoru_wasm.Wasm_pvm_config.empty}.
+
+    The returned machine starts every state in the [Durable_only]
+    storage variant.  Kernels that request NDS activation via the
+    canonical sentinel will hit the [failwith] guard in the factory
+    captured here (this instantiation closes over [make_empty_nds =
+    None]) — for the dual-state instantiation, see
+    {!Tezos_smart_rollup_wasm_in_memory_dual.wasm_pvm_machine_dual}. *)
 val wasm_pvm_machine :
   config:Tezos_scoru_wasm.Wasm_pvm_config.t ->
   (module Tezos_scoru_wasm.Wasm_pvm_sig.S

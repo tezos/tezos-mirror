@@ -1,0 +1,17 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_smart_rollup_wasm_in_memory_dual)
+ (public_name octez-libs.smart-rollup-wasm-in-memory-dual)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-libs.scoru-wasm
+  octez-libs.smart-rollup-wasm-in-memory
+  octez-libs.smart-rollup-wasm-dual-state
+  octez-libs.riscv-nds-common
+  octez-libs.riscv-nds-memory)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives))
