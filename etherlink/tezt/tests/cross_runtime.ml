@@ -203,6 +203,52 @@ module TezContract = struct
         return (contract_hex, kt1_address)
     | _ -> assert false
 
+  (** [originate_inline_contract_via_tezlink] originates a Michelson contract
+   *  from an inline Michelson script string (e.g.
+   *  ["parameter unit; storage unit; code { ... }"]). The script is
+   *  converted to JSON with [Client.convert_script_to_json] directly — no
+   *  file-system fixture is required.  All other arguments are the same as
+   *  {!originate_contract_via_tezlink}. *)
+  let originate_inline_contract_via_tezlink ~client ~client_tezlink ~sequencer
+      ~source ~counter ~inline_script ~init_storage_data ?(init_balance = 0)
+      _protocol =
+    let* code = Client.convert_script_to_json ~script:inline_script client in
+    let* init_storage =
+      Client.convert_data_to_json ~data:init_storage_data client
+    in
+    let* origination_op =
+      Operation.Manager.(
+        operation
+          [
+            make
+              ~fee:1000
+              ~counter
+              ~gas_limit:10000
+              ~storage_limit:60000
+              ~source
+              (origination ~code ~init_storage ~init_balance ());
+          ])
+        client
+    in
+    let* op_json =
+      inject_op_and_produce_block ~client_tezlink ~sequencer origination_op
+    in
+    let new_contracts =
+      JSON.(
+        op_json |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
+        |-> "originated_contracts" |> as_list |> List.map as_string)
+    in
+    Check.(
+      (List.length new_contracts = 1)
+        int
+        ~error_msg:"Expected %R new contract but got %L") ;
+    match new_contracts with
+    | [kt1_address] ->
+        let contract_hex = encode_contract_address kt1_address in
+        Log.info "Originated inline contract: %s" kt1_address ;
+        return (contract_hex, kt1_address)
+    | _ -> assert false
+
   (** [call_contract_via_tezlink] calls a Michelson contract by direct
    *  tezlink injection. Converts the argument from Michelson notation to
    *  JSON, forges, injects and seals the call operation. *)
@@ -1003,6 +1049,43 @@ module TezGasBurner = struct
       ~counter
       ~script_name
       ~init_storage_data
+      ?init_balance
+      protocol
+end
+
+(** Michelson contract that [FAILWITH]s with a [payload_length]-byte string
+ *  payload on [%run].  Used to verify that the kernel meters
+ *  attacker-controlled FAILWITH error bodies so a tight gas budget produces a
+ *  compact [OutOfGas] error in the CRAC receipt instead of the full payload.
+ *
+ *  Parameterised by payload length: the gas a *small*-payload CRAC consumes
+ *  (alias creation + dispatch + [PUSH]/[FAILWITH] execution, all
+ *  payload-independent) is the budget that reaches the per-byte charge step
+ *  but cannot pay a *large* payload's charge — see
+ *  [test_crac_failwith_receipt_is_gas_bounded].
+ *
+ *  The script is synthesised inline to avoid adding a new [.tz] fixture
+ *  (which would require regenerating the Michelson-script regression
+ *  snapshots). *)
+module TezFailwithString = struct
+  open TezContract
+
+  let inline_script ~payload_length =
+    let payload = String.make payload_length 'x' in
+    Printf.sprintf
+      {|parameter (unit %%run); storage unit; code { DROP; PUSH string "%s"; FAILWITH }|}
+      payload
+
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~payload_length () =
+    originate_inline_contract_via_tezlink
+      ~client
+      ~client_tezlink
+      ~sequencer
+      ~source
+      ~counter
+      ~inline_script:(inline_script ~payload_length)
+      ~init_storage_data:"Unit"
       ?init_balance
       protocol
 end
@@ -1859,6 +1942,11 @@ module CracRunnerWrapper = struct
       val originate : ?init_balance:int -> unit -> tez_runner Lwt.t
     end
 
+    module TezFailwithString : sig
+      val originate :
+        ?init_balance:int -> payload_length:int -> unit -> tez_runner Lwt.t
+    end
+
     (** Deploy EVM runner + TEZ bridge + TEZ runner in one call. *)
     val setup_crac_pipeline : unit -> (evm_runner * tez_runner) Lwt.t
 
@@ -2623,6 +2711,23 @@ module CracRunnerWrapper = struct
               ~counter:(tez_counter ())
               ~protocol
               ?init_balance
+              ()
+          in
+          return (`Tez_runner (runner_hex, runner))
+      end
+
+      module TezFailwithString = struct
+        let originate ?init_balance ~payload_length () =
+          let* runner_hex, runner =
+            TezFailwithString.originate
+              ~client
+              ~client_tezlink
+              ~sequencer
+              ~source
+              ~counter:(tez_counter ())
+              ~protocol
+              ?init_balance
+              ~payload_length
               ()
           in
           return (`Tez_runner (runner_hex, runner))
@@ -10204,6 +10309,152 @@ let test_crac_http_call_catch_oog () =
   in
   unit
 
+(** Gas-bounded FAILWITH error body in a failed CRAC receipt.
+ *
+ *    EVM[caller] --runCatchWithGasLimit(N)--> TEZ[failwith(payload)]
+ *    failwith(payload): PUSH string "<payload>"; FAILWITH
+ *
+ *  Property under test: when the cross-runtime gas budget is too small to pay
+ *  [charge_persisted_error]'s per-byte charge on the FAILWITH payload, the
+ *  kernel records a compact [OutOfGas] error in the failed CRAC receipt
+ *  instead of the full attacker-controlled payload.
+ *
+ *  The tight budget is *derived*, not tuned. Alias creation, dispatch, and
+ *  [PUSH]/[FAILWITH] execution cost the same regardless of payload size
+ *  ([PUSH string] is flat-cost, [FAILWITH] is free); only the per-byte charge
+ *  scales with the payload. So the gas a *successful small-payload* CRAC
+ *  consumes is exactly enough to reach the charge step but not enough to pay a
+ *  *large* payload's charge. Forwarding that measured budget to the
+ *  large-payload CRAC therefore forces an out-of-gas during the charge — with
+ *  no hardcoded gas constant that would rot when gas costs are re-priced. *)
+let test_crac_failwith_receipt_is_gas_bounded () =
+  register_crac_runner_test
+    ~title:"CRAC: FAILWITH error body in receipt is gas-bounded"
+    ~tags:["crac_receipt"; "failwith"; "gas"; "regression"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-FAILWITH-BOUNDED" in
+  let small_payload = 1 in
+  let large_payload = 3000 in
+  (* Generous ceiling: comfortably above one CRAC's cost including the large
+     per-byte charge. Not a tuned value — only the tight budget below is
+     load-bearing, and it is measured rather than hardcoded. *)
+  let generous_gas = 2_000_000 in
+  Log.debug ~prefix "Originate small- and large-payload FAILWITH contracts" ;
+  let* small_target =
+    TezFailwithString.originate ~payload_length:small_payload ()
+  in
+  let* large_target =
+    TezFailwithString.originate ~payload_length:large_payload ()
+  in
+  let (`Tez_runner (_, small_kt1)) = small_target in
+  let (`Tez_runner (_, large_kt1)) = large_target in
+  Log.debug ~prefix "Deploy one EVM caller per target" ;
+  let* small_caller = EvmCracHttpCall.deploy_and_init small_target in
+  let* large_caller = EvmCracHttpCall.deploy_and_init large_target in
+  (* EVM-initiated CRAC: the top-level Michelson op's destination is
+     alias(E_0) = alias(sender), the same for both callers. *)
+  let*@ sender_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress sender.address sequencer
+  in
+  (* Read the failed internal transfer to [target] from the most recent
+     Michelson block and return its error_message. Each CRAC produces its own
+     (latest) block, so this reads the run that just executed. *)
+  let failed_error_message ~target () =
+    let* ops = fetch_recent_michelson_manager_ops sequencer in
+    let top = JSON.(ops |=> 0 |-> "contents" |=> 0) in
+    let internals =
+      check_crac_top_level
+        ~prefix
+        ~expected_destination:sender_alias
+        ~expected_status:"failed"
+        top
+    in
+    match
+      List.find_opt
+        (fun iop ->
+          JSON.(iop |-> "kind" |> as_string) = "transaction"
+          && JSON.(iop |-> "destination" |> as_string) = target
+          && JSON.(iop |-> "result" |-> "status" |> as_string) = "failed")
+        internals
+    with
+    | Some iop ->
+        return
+          JSON.(
+            iop |-> "result" |-> "errors" |=> 0 |-> "error_message" |> as_string)
+    | None ->
+        Test.fail
+          "%s: no failed internal transaction to %s in the latest receipt"
+          prefix
+          target
+  in
+  (* 1. Measure the gas a successful small-payload CRAC consumes. Its per-byte
+     charge is negligible, so this budget reflects alias + dispatch +
+     execution (all payload-independent). *)
+  Log.debug ~prefix "Small-payload CRAC (generous gas): measure consumed gas" ;
+  let* gas_used_small =
+    EvmCracHttpCall.call_run_catch_with_gas_limit
+      ~gas_limit:generous_gas
+      small_caller
+  in
+  let* small_msg = failed_error_message ~target:small_kt1 () in
+  Log.info
+    "%s: small-payload error_message = %d bytes; gas_used = %Ld"
+    prefix
+    (String.length small_msg)
+    gas_used_small ;
+  (* The small payload must be persisted in full (a ~128-byte interpret error,
+     vs. the ~27-byte "Transfer(OutOfGas(OutOfGas))"): this confirms the small
+     CRAC's charge succeeded, so gas_used_small is a complete measurement. *)
+  Check.(
+    (String.length small_msg > 100)
+      int
+      ~error_msg:
+        "small-payload run error_message is only %L bytes (≤ 100): the small \
+         CRAC out-of-gassed instead of persisting its payload, so the gas \
+         measurement would be unreliable") ;
+  (* 2. Baseline: with ample gas the large payload leaks in full. *)
+  Log.debug ~prefix "Large-payload CRAC (generous gas): full payload leaks" ;
+  let* _ =
+    EvmCracHttpCall.call_run_catch_with_gas_limit
+      ~gas_limit:generous_gas
+      large_caller
+  in
+  let* large_msg = failed_error_message ~target:large_kt1 () in
+  Log.info
+    "%s: large-payload error_message = %d bytes (full payload leaks)"
+    prefix
+    (String.length large_msg) ;
+  Check.(
+    (String.length large_msg > 1000)
+      int
+      ~error_msg:
+        "large-payload run error_message is only %L bytes (≤ 1000): expected \
+         the full FAILWITH payload to leak with ample gas") ;
+  (* 3. Tight: forward the small run's budget to the large CRAC. It covers
+     alias + dispatch + execution but not the large per-byte charge, so the
+     kernel swaps the body for a compact OutOfGas. *)
+  Log.debug ~prefix "Large-payload CRAC (small run's budget): charge OOGs" ;
+  let* _ =
+    EvmCracHttpCall.call_run_catch_with_gas_limit
+      ~gas_limit:(Int64.to_int gas_used_small)
+      large_caller
+  in
+  let* tight_msg = failed_error_message ~target:large_kt1 () in
+  Log.info
+    "%s: tight-run error_message = %S (length %d)"
+    prefix
+    tight_msg
+    (String.length tight_msg) ;
+  Check.(
+    (String.length tight_msg < 100)
+      int
+      ~error_msg:
+        "tight-run error_message is %L bytes (≥ 100): the full FAILWITH \
+         payload leaked into the receipt; expected a gas-bounded OutOfGas \
+         message (< 100 bytes)") ;
+  unit
+
 (** Generic call() precompile: EVM calls EVM via HTTP (same-runtime CRAC).
  *
  *    EVM[evm_caller] --call(http://ethereum/...)--> EVM[evm_target]
@@ -14456,6 +14707,7 @@ let () =
   test_crac_http_call_success () ;
   test_crac_http_call_catch_revert () ;
   test_crac_http_call_catch_oog () ;
+  test_crac_failwith_receipt_is_gas_bounded () ;
   test_crac_http_call_evm_to_evm () ;
   test_crac_http_call_evm_to_evm_preserves_msg_sender () ;
   test_crac_http_call_tez_to_tez () ;
