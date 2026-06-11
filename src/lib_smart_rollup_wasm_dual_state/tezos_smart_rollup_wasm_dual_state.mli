@@ -143,6 +143,10 @@ module Make
       (** Stamp the NDS-hash marker into the Irmin state, for tests that
           set up an [Active] state's marker directly. *)
       val write_nds_hash : Irmin.state -> bytes -> Irmin.state Lwt.t
+
+      (** Read the NDS-hash marker from the Irmin state, or [None] when
+          the [/pvm/nds_hash] path is unset (a pre-activation state). *)
+      val read_nds_hash : Irmin.state -> bytes option Lwt.t
     end
   end
 

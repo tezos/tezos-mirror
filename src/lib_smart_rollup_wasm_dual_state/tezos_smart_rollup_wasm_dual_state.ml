@@ -257,6 +257,8 @@ struct
         Dual {irmin_proof; nds_proof}
 
       let write_nds_hash = write_nds_hash_marker
+
+      let read_nds_hash = read_nds_hash_marker
     end
 
     (** Produce the proof for a post-activation step ([Active]

@@ -3277,7 +3277,7 @@ let octez_smart_rollup_wasm_dual_state =
    ([octez_riscv_nds_memory]) is linked only by binaries that exercise
    NDS activation — not transitively by [octez_protocol_environment]
    (and hence every node binary, including octez-evm-node). *)
-let _octez_smart_rollup_wasm_in_memory_dual =
+let octez_smart_rollup_wasm_in_memory_dual =
   octez_lib
     "smart-rollup-wasm-in-memory-dual"
     ~internal_name:"tezos_smart_rollup_wasm_in_memory_dual"
@@ -3290,6 +3290,26 @@ let _octez_smart_rollup_wasm_in_memory_dual =
         octez_smart_rollup_wasm_dual_state;
         octez_riscv_nds_common;
         octez_riscv_nds_memory;
+      ]
+
+let _octez_smart_rollup_wasm_in_memory_tests =
+  tezt
+    ["test_dual_state"]
+    ~path:"src/lib_smart_rollup_wasm_in_memory/test"
+    ~opam:"octez-libs"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_test_helpers |> open_;
+        octez_test_helpers |> open_;
+        octez_scoru_wasm;
+        octez_smart_rollup_wasm_in_memory;
+        octez_smart_rollup_wasm_dual_state;
+        octez_smart_rollup_wasm_in_memory_dual;
+        octez_riscv_nds_memory;
+        octez_webassembly_interpreter;
+        qcheck_alcotest;
+        alcotezt;
       ]
 
 let octez_scoru_wasm_fast =

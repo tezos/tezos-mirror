@@ -78,6 +78,7 @@
   src_lib_stdlib_test_tezt_lib
   src_lib_srs_extraction_test_tezt_lib
   src_lib_sqlite_zstd_test_tezt_lib
+  src_lib_smart_rollup_wasm_in_memory_test_tezt_lib
   src_lib_smart_rollup_node_test__tezt_lib
   src_lib_signer_backends_unix_test_tezt_lib
   src_lib_signer_backends_test_tezt_lib

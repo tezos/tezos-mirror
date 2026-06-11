@@ -90,6 +90,7 @@ depends: [
   "octez-rust-tezos-context" { = version }
   "opentelemetry-lwt"
   "octez-rustzcash-deps" { with-test & = version }
+  "octez-rust-deps" { with-test & = version }
   "bigstring" {with-test}
   "tezt-bam" { with-test & >= "0.3" }
 ]
