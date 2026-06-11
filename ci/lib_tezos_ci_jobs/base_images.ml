@@ -237,7 +237,7 @@ let base_image_job ~image_name ?(base_name = Upstream image_name) ~matrix
     ~tag:(if emulated then Gcp_very_high_cpu else Dynamic)
     ~parallel:(Matrix [matrix @ extra_tags])
 
-(* ── CIAO helpers (used until all jobs are migrated) ─────────────────────── *)
+(* ── CIAO helpers (used until RPM images are migrated) ──────────────────── *)
 
 (* This function can build docker images both in an emulated environment using
    qemu or natively. The advantage of choosing emulated vs native depends on
@@ -267,26 +267,12 @@ let base_image_job ~image_name ?(base_name = Upstream image_name) ~matrix
    If [compilation] is set to [Native] we build for both architectures using
    a native runner. In this case we also must add a merge manifest job.
 
-   [start_job] adds a dependency to [trigger] in [before_merging] pipelines.
    [changeset] should be [true] for [before_merging]/[merge_train] only. *)
-let make_job_base_images ?start_job ?(changeset = false) ~__POS__ ?(matrix = [])
+let make_job_base_images ?(changeset = false) ~__POS__ ?(matrix = [])
     ~image_name ?(base_name = Upstream image_name)
     ?(changes = Changeset.make []) ?(compilation = Emulated) ?(variables = [])
     ?dependencies dockerfile =
   let script = Printf.sprintf "scripts/ci/build-base-images.sh %s" dockerfile in
-  (* if provided, add [start_job] to the dependencies. *)
-  let dependencies =
-    match start_job with
-    | None -> dependencies
-    | Some job -> (
-        match dependencies with
-        | None -> Some (Dependent [Job job])
-        | Some (Dependent lst) -> Some (Dependent (Job job :: lst))
-        | Some (Staged _) ->
-            failwith
-              "Only job dependencies in base_image jobs. Stage dependencies \
-               are not allowed.")
-  in
   (* cf. [scripts/ci/build-base-images.sh] for more details on the coupling between $PLATFORM and $TAGS *)
   let platform, tags =
     match compilation with
@@ -338,10 +324,9 @@ let make_job_base_images ?start_job ?(changeset = false) ~__POS__ ?(matrix = [])
    - if [changes] is not provided, we use the base changeset of the
    distribution. This applies to base images that are not a
    dependency of other images.  *)
-let make_job_base_image_distribution ?start_job ?(changeset = false) ?base_name
-    ?changes distro =
+let make_job_base_image_distribution ?(changeset = false) ?base_name ?changes
+    distro =
   make_job_base_images
-    ?start_job
     ~changeset
     ~__POS__
     ~matrix:(Distribution.release_matrix distro)
@@ -384,12 +369,11 @@ let job_ubuntu_based_images =
     ~only_if_changed:Files.debian_base
     "images.ubuntu"
 
-let make_job_fedora_based_images ?start_job ?(changeset = false) () =
-  make_job_base_image_distribution ?start_job ~changeset Distribution.Fedora
+let make_job_fedora_based_images ?(changeset = false) () =
+  make_job_base_image_distribution ~changeset Distribution.Fedora
 
-let make_job_rockylinux_based_images ?start_job ?(changeset = false) () =
+let make_job_rockylinux_based_images ?(changeset = false) () =
   make_job_base_image_distribution
-    ?start_job
     ~changeset
     ~base_name:(Upstream "rockylinux/rockylinux")
     Distribution.Rockylinux
@@ -631,20 +615,13 @@ let job_rust_sdk_bindings_based_images =
 
 (* ── Assembly ────────────────────────────────────────────────────────────── *)
 
-(* [start_job] adds a dependency to [trigger] in [before_merging] pipelines.
-   [changeset] should be set to [true] for [before_merging]/[merge_train]
-   parent pipelines only. Changesets should be ignored for other pipelines:
-   - branch pipelines such as [base_images.daily] because they are then
-     ignored by GitLab;
-   - in the manually triggered base images child pipeline as we may want to
-     trigger all base images jobs. *)
-let jobs ?start_job ?(changeset = false) () =
-  []
-  @
+(* Returns the remaining CIAO jobs (RPM images, pending migration).
+   [changeset] should be set to [true] for [before_merging]/[merge_train] only. *)
+let jobs ?(changeset = false) () =
   if enable_rpm_images then
     [
-      make_job_fedora_based_images ?start_job ~changeset ();
-      make_job_rockylinux_based_images ?start_job ~changeset ();
+      make_job_fedora_based_images ~changeset ();
+      make_job_rockylinux_based_images ~changeset ();
     ]
   else []
 
