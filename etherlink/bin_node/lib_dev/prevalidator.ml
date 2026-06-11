@@ -299,7 +299,12 @@ let validate_nonce ~next_nonce:(Qty next_nonce)
     (transaction : Transaction_object.t) =
   let open Lwt_result_syntax in
   let (Qty nonce) = Transaction_object.nonce transaction in
-  if nonce >= next_nonce then return (Ok ()) else return (Error "Nonce too low")
+  if Z.lt nonce next_nonce then return (Error "Nonce too low")
+  else if Z.gt Z.(nonce - next_nonce) (Z.of_int Nonce_bitset.max_offset) then
+    (* fail early when the nonce is too far in the future to be stored
+       in the tx_queue Nonce_bitset *)
+    return (Error "Nonce too high")
+  else return (Ok ())
 
 let validate_gas_limit session (transaction : Transaction_object.t) :
     (unit, string) result tzresult Lwt.t =
@@ -349,6 +354,15 @@ let validate_authorizations txn =
   let open Lwt_result_syntax in
   let authorization_list = Transaction_object.authorization_list txn in
   if not (Transaction_object.is_eip7702 txn) then return (Ok ())
+  else if Option.is_none (Transaction_object.to_ txn) then
+    (* EIP-7702 type-4 transactions cannot create contracts: a destination
+       address is mandatory. A type-4 transaction with [to = null] is rejected
+       by the kernel as a block-level error (revm fails to derive the
+       transaction type, "missing target for EIP-7702"), which invalidates the
+       whole blueprint instead of being recorded as a failed transaction.
+       Reject it at admission so it never enters the tx pool or a produced
+       blueprint. *)
+    return (Error "EIP-7702 transaction must have a destination address.")
   else if List.is_empty authorization_list then
     return (Error "Authorization list cannot be empty per EIP-7702.")
   else

@@ -12,30 +12,48 @@
 
 ### Command-line interface changes
 
-- The `run sandbox` and `run tezlink sandbox` commands accept
-  `--michelson-hard-gas-limit-per-block` to raise the Michelson per-block
-  gas cap (default 3M). Sandbox-only; intended for capacity benchmarking.
-  (!21968)
-- Add a `compress store` command that compresses the legacy uncompressed rows of
-  the SQLite store with zstd and reclaims disk space via `VACUUM INTO`. The
-  migration is incremental and resumable: it persists its progress and resumes
-  where it left off if interrupted, and is a no-op once the store is fully
-  compressed. The node must not be running, and
-  `experimental_features.sqlite_compression` must be set in the configuration
-  file. (!21776)
-
 ### Execution changes
-
-- The WASM runtime's `store_read` host function now clamps a read that
-  asks for more bytes than the value holds to the bytes actually present,
-  instead of failing it with `Store_invalid_access`. This matches the
-  rollup PVM (`Durable.read_value_exn`) and the host-function contract
-  ("read up to `num_bytes`"); the two implementations previously diverged
-  on over-reads, which could make the node and the rollup disagree. (!22141)
 
 ### Storage changes
 
 ### Documentation changes
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-
+
+## Version 0.61 (2026-06-11)
+
+This releases notably provides full support for Etherlink 6.4. Node operators
+are strongly encouraged to upgrade. Previous versions of the node suffer from
+several functional regressions in key RPCs for blocks post the activation
+number of Etherlink 6.4 (block 45,018,602 on Etherlink Mainnet).
+
+This release will not apply any migration to the node’s store (version 24),
+meaning it is possible to downgrade to previous version).
+
+### RPCs changes
+
+- `eth_sendRawTransaction` now correctly rejects EIP-7702 (type-4) transactions
+  that have no destination address (`to = null`). (!22153)
+
+### Command-line interface changes
+
+- The `run sandbox` command accepts `--michelson-hard-gas-limit-per-block` to
+  raise the Michelson per-block gas cap (default 3M). (!21968)
+- Add support for downloading Etherlink 6.4 (`farfadet-r4`) kernel by name
+  using `download kernel farfadet-r4`. (!22153)
+
+### Execution changes
+
+- The WASM runtime's `store_read` host function now clamps a read that asks for
+  more bytes than the value holds to the bytes actually present, instead of
+  failing it with `Store_invalid_access`. This matches the rollup PVM
+  implementation ("read up to `num_bytes`"). (!22141)
+- Add support for executing Etherlink 6.4 (`farfadet-r4`) natively. (!22153)
 
 ### Experimental features changes
 
@@ -52,6 +70,13 @@ you start using them, you probably want to use `octez-evm-node check config
   command. Set it to `true` for the defaults, or to an object with explicit
   `compression_level` and `batch_size` to tune it. On a full mainnet database
   this yields an ~82% size reduction. (!21775, !21776, !22043)
+- Add a `compress store` command that compresses the legacy uncompressed rows of
+  the SQLite store with zstd and reclaims disk space via `VACUUM INTO`. The
+  migration is incremental and resumable: it persists its progress and resumes
+  where it left off if interrupted, and is a no-op once the store is fully
+  compressed. The node must not be running, and
+  `experimental_features.sqlite_compression` must be set in the configuration
+  file. (!21776)
 
 ## Version 0.60 (2026-06-01)
 
@@ -309,6 +334,9 @@ meaning it is not possible downgrade to a previous version.
 
 - Fix `shell` (and children subcommands) failing with "No store found"
   when the EVM node is running on the same data directory. (!21067)
+- Bound the accepted future-nonce gap when admitting transactions to the
+  `tx_queue`, preventing a single valid transaction with a far-future nonce
+  from forcing a multi-gigabyte allocation in the tx_queue worker (node DoS).
 
 ### Execution changes
 

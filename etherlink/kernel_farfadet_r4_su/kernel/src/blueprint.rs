@@ -1,0 +1,102 @@
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+//
+// SPDX-License-Identifier: MIT
+
+use rlp::{Decodable, DecoderError, Encodable};
+use tezos_ethereum::rlp_helpers::{
+    self, append_timestamp, decode_field, decode_timestamp,
+};
+
+use tezos_smart_rollup_encoding::timestamp::Timestamp;
+
+/// The blueprint of a block is a list of transactions.
+#[derive(PartialEq, Debug, Clone)]
+pub struct Blueprint<Txs> {
+    pub transactions: Txs,
+    pub timestamp: Timestamp,
+}
+
+impl<Txs: Encodable> Encodable for Blueprint<Txs> {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.begin_list(2);
+        stream.append(&self.transactions);
+        append_timestamp(stream, self.timestamp);
+    }
+}
+
+impl<Txs: Decodable> Decodable for Blueprint<Txs> {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
+        if !decoder.is_list() {
+            return Err(DecoderError::RlpExpectedToBeList);
+        }
+        if decoder.item_count()? != 2 {
+            return Err(DecoderError::RlpIncorrectListLen);
+        }
+
+        let mut it = decoder.iter();
+        let transactions = decode_field(&rlp_helpers::next(&mut it)?, "transactions")?;
+        let timestamp = decode_timestamp(&rlp_helpers::next(&mut it)?)?;
+
+        Ok(Blueprint {
+            transactions,
+            timestamp,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use crate::transaction::{
+        Transaction, TransactionContent::Ethereum, Transactions::EthTxs,
+    };
+    use primitive_types::{H160, U256};
+    use rlp::Rlp;
+    use tezos_ethereum::{
+        transaction::TRANSACTION_HASH_SIZE, tx_common::EthereumTransactionCommon,
+    };
+
+    fn address_from_str(s: &str) -> Option<H160> {
+        let data = &hex::decode(s).unwrap();
+        Some(H160::from_slice(data))
+    }
+    fn tx_(i: u64) -> EthereumTransactionCommon {
+        EthereumTransactionCommon::new(
+            tezos_ethereum::transaction::TransactionType::Legacy,
+            Some(U256::one()),
+            i,
+            U256::from(40000000u64),
+            U256::from(40000000u64),
+            21000u64,
+            address_from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea"),
+            U256::from(500000000u64),
+            vec![],
+            vec![],
+            None,
+            None,
+        )
+    }
+
+    fn dummy_transaction(i: u8) -> Transaction {
+        Transaction {
+            tx_hash: [i; TRANSACTION_HASH_SIZE],
+            content: Ethereum(tx_(i.into())),
+        }
+    }
+
+    #[test]
+    fn test_encode_blueprint() {
+        let proposal = Blueprint {
+            transactions: EthTxs(vec![dummy_transaction(0), dummy_transaction(1)]),
+            timestamp: Timestamp::from(0i64),
+        };
+        let encoded = proposal.rlp_bytes();
+        let decoder = Rlp::new(&encoded);
+        let decoded = Blueprint::decode(&decoder).expect("Should be decodable");
+        assert_eq!(decoded, proposal);
+    }
+}
