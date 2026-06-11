@@ -16,6 +16,29 @@
 
 open Rpc.Syntax
 
+(** Base-fee floor for the CRAC test setups.  The delayed-inbox transport
+    bypassed the fee market entirely; direct tezlink injection enforces
+    minimal fees (base_fee_per_gas * michelson_to_evm_gas_multiplier *
+    gas_limit), which the historical [~fee:1000] of the forged
+    operations does not cover beyond 100k gas.  The operations must
+    stay byte-for-byte identical, so instead lower the base-fee floor
+    to 1 wei — non-zero so BASEFEE-observable assertions stay
+    meaningful. *)
+let crac_minimum_base_fee_per_gas = Wei.of_string "1"
+
+(** Foreign endpoint of the tezlink RPC served by [evm_node]. *)
+let tezlink_foreign_endpoint_from_evm_node evm_node =
+  let evm_node_endpoint = Evm_node.rpc_endpoint_record evm_node in
+  {evm_node_endpoint with Endpoint.path = "/tezlink"}
+
+(** Client whose endpoint is the tezlink RPC served by [evm_node], for
+    direct injection of Michelson operations. *)
+let tezlink_client_from_evm_node evm_node =
+  let endpoint =
+    Client.Foreign_endpoint (tezlink_foreign_endpoint_from_evm_node evm_node)
+  in
+  Client.init ~endpoint ()
+
 module EvmContract = struct
   let tezosx_evm_chain_id = 1337
 
@@ -37,11 +60,21 @@ module EvmContract = struct
     let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
     let*@ _block_number = Rpc.produce_block sequencer in
     let*@ receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
+    let* receipt =
+      match receipt with
+      | Some receipt -> return receipt
+      | None ->
+          (* The receipt may not be indexed yet right after
+             [produce_block]; retry before failing. *)
+          Test_helpers.wait_for_transaction_receipt
+            ~evm_node:sequencer
+            ~transaction_hash:tx_hash
+            ()
+    in
     match receipt with
-    | Some {contractAddress = Some addr; status = true; _} -> return addr
-    | Some {status = false; _} ->
-        Test.fail "Contract deployment transaction failed"
-    | _ -> Test.fail "No receipt or no contract address for deployment tx"
+    | {contractAddress = Some addr; status = true; _} -> return addr
+    | {status = false; _} -> Test.fail "Contract deployment transaction failed"
+    | _ -> Test.fail "No contract address for deployment tx"
 
   (** [deploy_solidity_contract ~sequencer ~sender ~nonce ~contract ()]
    *  compiles and deploys a Solidity contract. *)
@@ -94,52 +127,48 @@ module TezContract = struct
    *  Michelson contract. *)
   let tezosx_michelson_contracts_index = "/tez/tez_accounts/contracts/index"
 
-  (** [decode_contract_address hex] decodes a hex-encoded
-   *  [Contract_repr.t] into a b58check KT1 address string. *)
-  let decode_contract_address hex =
+  (** [encode_contract_address kt1] encodes a b58check KT1 address string
+   *  into the hex-encoded [Contract_repr.t] under which the contract is
+   *  indexed in the durable storage. *)
+  let encode_contract_address kt1 =
     let module C = Tezos_protocol_alpha.Protocol.Contract_repr in
-    Hex.to_bytes (`Hex hex)
-    |> Data_encoding.Binary.of_bytes_exn C.encoding
-    |> C.to_b58check
+    match C.of_b58check kt1 with
+    | Error _ -> Test.fail "encode_contract_address: invalid address %s" kt1
+    | Ok contract ->
+        Data_encoding.Binary.to_bytes_exn C.encoding contract
+        |> Hex.of_bytes |> Hex.show
 
-  (** [send_op_to_delayed_inbox_and_wait] sends a Tezos operation via the
-   *  delayed inbox and waits until it is included and the delayed inbox is
-   *  empty. *)
-  let send_op_to_delayed_inbox_and_wait ~sc_rollup_address ~sc_rollup_node
-      ~client ~l1_contracts ~sequencer operation =
-    let* _hash =
-      Delayed_inbox.send_tezos_operation_to_delayed_inbox
-        ~sc_rollup_address
-        ~sc_rollup_node
-        ~client
-        ~l1_contracts
-        ~tezosx_format:true
-        operation
+  (** [inject_op_and_produce_block ~client_tezlink ~sequencer op] injects a
+   *  pre-signed operation as-is via the tezlink RPC, seals it with
+   *  [produce_block], and returns the operation (with receipt metadata) as
+   *  found in the produced block.  Fails if the operation was not
+   *  included. *)
+  let inject_op_and_produce_block ~client_tezlink ~sequencer operation =
+    let* (`OpHash op_hash) =
+      Operation.inject ~dont_wait:true operation client_tezlink
     in
-    let* () =
-      Delayed_inbox.wait_for_delayed_inbox_add_tx_and_injected
-        ~sequencer
-        ~sc_rollup_node
-        ~client
+    let*@ _count = Rpc.produce_block sequencer in
+    let* all_passes =
+      RPC_core.call
+        (tezlink_foreign_endpoint_from_evm_node sequencer)
+        (RPC.get_chain_block_operations ())
     in
-    let* () =
-      Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-    in
-    Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node)
+    match
+      List.find_opt
+        (fun op -> JSON.(op |-> "hash" |> as_string) = op_hash)
+        JSON.(all_passes |=> 3 |> as_list)
+    with
+    | None ->
+        Test.fail "Operation %s was not included in the produced block" op_hash
+    | Some op -> return op
 
-  (** [originate_contract_via_delayed_inbox] originates a Michelson
-   *  contract via the delayed inbox. Loads the script from
+  (** [originate_contract_via_tezlink] originates a Michelson contract by
+   *  direct tezlink injection. Loads the script from
    *  [michelson_test_scripts], converts code and initial storage to JSON,
-   *  forges and sends the origination operation, then returns the hex key and
-   *  KT1 address of the new contract. *)
-  let originate_contract_via_delayed_inbox ~sc_rollup_address ~sc_rollup_node
-      ~client ~l1_contracts ~sequencer ~source ~counter ~script_name
-      ~init_storage_data ?(init_balance = 0) protocol =
-    let* contracts_before =
-      Delayed_inbox.subkeys
-        tezosx_michelson_contracts_index
-        (Sc_rollup_node sc_rollup_node)
-    in
+   *  forges, injects and seals the origination operation, then returns the
+   *  hex key and KT1 address of the new contract. *)
+  let originate_contract_via_tezlink ~client ~client_tezlink ~sequencer ~source
+      ~counter ~script_name ~init_storage_data ?(init_balance = 0) protocol =
     let script_path = Michelson_script.(find script_name protocol |> path) in
     let* code = Client.convert_script_to_json ~script:script_path client in
     let* init_storage =
@@ -159,38 +188,31 @@ module TezContract = struct
           ])
         client
     in
-    let* () =
-      send_op_to_delayed_inbox_and_wait
-        ~sc_rollup_address
-        ~sc_rollup_node
-        ~client
-        ~l1_contracts
-        ~sequencer
-        origination_op
-    in
-    let* contracts_after =
-      Delayed_inbox.subkeys
-        tezosx_michelson_contracts_index
-        (Sc_rollup_node sc_rollup_node)
+    let* op_json =
+      inject_op_and_produce_block ~client_tezlink ~sequencer origination_op
     in
     let new_contracts =
-      List.filter (fun c -> not (List.mem c contracts_before)) contracts_after
+      JSON.(
+        op_json |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
+        |-> "originated_contracts" |> as_list |> List.map as_string)
     in
     Check.(
       (List.length new_contracts = 1)
         int
         ~error_msg:"Expected %R new contract but got %L") ;
-    let contract_hex = List.hd new_contracts in
-    let kt1_address = decode_contract_address contract_hex in
-    Log.info "Originated contract: %s" kt1_address ;
-    return (contract_hex, kt1_address)
+    match new_contracts with
+    | [kt1_address] ->
+        let contract_hex = encode_contract_address kt1_address in
+        Log.info "Originated contract: %s" kt1_address ;
+        return (contract_hex, kt1_address)
+    | _ -> assert false
 
-  (** [call_contract_via_delayed_inbox] calls a Michelson contract
-   *  via the delayed inbox. Converts the argument from Michelson notation to
-   *  JSON, forges and sends the call operation. *)
-  let call_contract_via_delayed_inbox ~sc_rollup_address ~sc_rollup_node ~client
-      ~l1_contracts ~sequencer ~source ~counter ~dest ~arg_data
-      ?(entrypoint = "default") ?(amount = 0) ?(gas_limit = 100_000) () =
+  (** [call_contract_via_tezlink] calls a Michelson contract by direct
+   *  tezlink injection. Converts the argument from Michelson notation to
+   *  JSON, forges, injects and seals the call operation. *)
+  let call_contract_via_tezlink ~client ~client_tezlink ~sequencer ~source
+      ~counter ~dest ~arg_data ?(entrypoint = "default") ?(amount = 0)
+      ?(gas_limit = 100_000) () =
     let* arg = Client.convert_data_to_json ~data:arg_data client in
     let* call_op =
       Operation.Manager.(
@@ -206,13 +228,10 @@ module TezContract = struct
           ])
         client
     in
-    send_op_to_delayed_inbox_and_wait
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~sequencer
-      call_op
+    let* (_ : JSON.t) =
+      inject_op_and_produce_block ~client_tezlink ~sequencer call_op
+    in
+    unit
 
   (** [get_consumed_milligas ~block sequencer] queries the tezlink RPC
    *  for [block]'s first manager operation and returns the top-level
@@ -275,59 +294,13 @@ module TezContract = struct
         in
         return consumed
 
-  (** [read_michelson_contract_storage sc_rollup_node contract_hex] reads the
-   *  storage of an originated Michelson contract from the durable storage,
-   *  given its hex-encoded [Contract_repr.t] key. *)
-  let read_michelson_contract_storage sc_rollup_node contract_hex =
-    let path =
-      sf "%s/%s/data/storage" tezosx_michelson_contracts_index contract_hex
-    in
-    Sc_rollup_node.RPC.call sc_rollup_node
-    @@ Sc_rollup_rpc.get_global_block_durable_state_value
-         ~pvm_kind:"wasm_2_0_0"
-         ~operation:Sc_rollup_rpc.Value
-         ~key:path
-         ()
-
-  (** [decode_michelson_contract_address hex] decodes a hex-encoded
-   *  [Contract_repr.t] into a b58check KT1 address string. *)
-  let decode_michelson_contract_address hex =
-    let module C = Tezos_protocol_alpha.Protocol.Contract_repr in
-    Hex.to_bytes (`Hex hex)
-    |> Data_encoding.Binary.of_bytes_exn C.encoding
-    |> C.to_b58check
-
-  (** [decode_micheline_storage hex_str] decodes a hex string from the durable
-   *  storage into a Micheline [JSON.u] value. Returns [None] if decoding
-   *  fails. *)
-  let decode_micheline_storage hex_str =
-    let module S = Tezos_protocol_alpha.Protocol.Script_repr in
-    Data_encoding.Binary.of_bytes_opt
-      S.expr_encoding
-      (Hex.to_bytes (`Hex hex_str))
-    |> Option.map (fun e ->
-           Data_encoding.Json.(
-             construct S.expr_encoding e
-             |> to_string
-             |> JSON.parse ~origin:"decode_micheline_storage"))
-
-  (** Reads and decodes the storage of the Michelson contract identified
-   *  by [contract_hex].  Fails if the storage is missing or cannot be
-   *  decoded. *)
-  let get_storage ~sc_rollup_node contract_hex =
-    let* storage_raw =
-      read_michelson_contract_storage sc_rollup_node contract_hex
-    in
-    match storage_raw with
-    | None ->
-        let kt1 = decode_michelson_contract_address contract_hex in
-        Test.fail "Storage not found for contract %s" kt1
-    | Some hex_str -> (
-        match decode_micheline_storage hex_str with
-        | None ->
-            let kt1 = decode_michelson_contract_address contract_hex in
-            Test.fail "Storage failed to be decoded for contract %s" kt1
-        | Some storage -> return storage)
+  (** Reads the decoded Micheline storage of the Michelson contract
+   *  identified by [contract_address] (a b58check KT1 address) from the
+   *  tezlink RPC of [sequencer]. *)
+  let get_storage ~sequencer contract_address =
+    RPC_core.call
+      (tezlink_foreign_endpoint_from_evm_node sequencer)
+      (RPC.get_chain_block_context_contract_storage ~id:contract_address ())
 end
 
 (** Contracts *)
@@ -769,14 +742,12 @@ end
 module TezRunner = struct
   open TezContract
 
-  (** Calls [%run] with [Unit] via the delayed inbox. *)
-  let call_run ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ?amount ?gas_limit runner =
-    call_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+  (** Calls [%run] with [Unit] by direct tezlink injection. *)
+  let call_run ~client ~client_tezlink ~sequencer ~source ~counter ?amount
+      ?gas_limit runner =
+    call_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -797,16 +768,13 @@ module TezCrossRuntimeRunnerEvm = struct
 
   (** Originates the contract.  [evm_contract_target_address] is the
    *  EVM address that will be called on [%run]. *)
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance
-      ~evm_contract_target_address () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~evm_contract_target_address () =
     let script_name = ["mini_scenarios"; "cross_runtime_run_evm"] in
     let init_storage_data = sf {|Pair 0 "%s"|} evm_contract_target_address in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -816,9 +784,9 @@ module TezCrossRuntimeRunnerEvm = struct
       protocol
 
   (** Asserts that the contract's [counter] equals [expected_counter]. *)
-  let check_storage ~sc_rollup_node ~expected_counter
-      (cross_runtime_run_tez_hex, _cross_runtime_run_tez_address) =
-    let* storage = get_storage ~sc_rollup_node cross_runtime_run_tez_hex in
+  let check_storage ~sequencer ~expected_counter
+      (_cross_runtime_run_tez_hex, cross_runtime_run_tez_address) =
+    let* storage = get_storage ~sequencer cross_runtime_run_tez_address in
     (* Pair(nat %count, string %destination) *)
     let counter = JSON.(storage |-> "args" |=> 0 |-> "int" |> as_int) in
     Check.(
@@ -850,16 +818,13 @@ module TezCrossRuntimeHttpCallEvm = struct
   open TezContract
   include TezRunner
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance
-      ~evm_contract_target_address () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~evm_contract_target_address () =
     let script_name = ["mini_scenarios"; "cross_runtime_http_call_evm"] in
     let init_storage_data = sf {|Pair 0 "%s"|} evm_contract_target_address in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -868,9 +833,9 @@ module TezCrossRuntimeHttpCallEvm = struct
       ?init_balance
       protocol
 
-  let check_storage ~sc_rollup_node ~expected_counter
-      (contract_hex, _contract_address) =
-    let* storage = get_storage ~sc_rollup_node contract_hex in
+  let check_storage ~sequencer ~expected_counter
+      (_contract_hex, contract_address) =
+    let* storage = get_storage ~sequencer contract_address in
     (* Pair(nat %count, string %destination) *)
     let counter = JSON.(storage |-> "args" |=> 0 |-> "int" |> as_int) in
     Check.(
@@ -889,20 +854,17 @@ module TezCrossRuntimeHttpCallTezCallback = struct
   open TezContract
   include TezRunner
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance
-      ~tez_contract_target_address () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~tez_contract_target_address () =
     let script_name =
       ["mini_scenarios"; "cross_runtime_http_call_tez_callback"]
     in
     let init_storage_data =
       sf {|Pair 0 (Pair "%s" None)|} tez_contract_target_address
     in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -911,9 +873,9 @@ module TezCrossRuntimeHttpCallTezCallback = struct
       ?init_balance
       protocol
 
-  let check_counter ~sc_rollup_node ~expected_counter
-      (contract_hex, _contract_address) =
-    let* storage = get_storage ~sc_rollup_node contract_hex in
+  let check_counter ~sequencer ~expected_counter
+      (_contract_hex, contract_address) =
+    let* storage = get_storage ~sequencer contract_address in
     (* Pair(nat %count, Pair(string %destination, option bytes)) *)
     let counter = JSON.(storage |-> "args" |=> 0 |-> "int" |> as_int) in
     Check.(
@@ -923,9 +885,9 @@ module TezCrossRuntimeHttpCallTezCallback = struct
           "Expected TezCrossRuntimeHttpCallTezCallback `count` %R but got %L") ;
     unit
 
-  let check_result ~sc_rollup_node ~expected_bytes
-      (contract_hex, _contract_address) =
-    let* storage = get_storage ~sc_rollup_node contract_hex in
+  let check_result ~sequencer ~expected_bytes (_contract_hex, contract_address)
+      =
+    let* storage = get_storage ~sequencer contract_address in
     (* Storage: Pair(count, Pair(destination, option bytes)) *)
     let result_node = JSON.(storage |-> "args" |=> 1 |-> "args" |=> 1) in
     (match expected_bytes with
@@ -958,16 +920,13 @@ module TezCrossRuntimeHttpCallTez = struct
   open TezContract
   include TezRunner
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance
-      ~tez_contract_target_address () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~tez_contract_target_address () =
     let script_name = ["mini_scenarios"; "cross_runtime_http_call_tez"] in
     let init_storage_data = sf {|Pair 0 "%s"|} tez_contract_target_address in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -976,9 +935,9 @@ module TezCrossRuntimeHttpCallTez = struct
       ?init_balance
       protocol
 
-  let check_storage ~sc_rollup_node ~expected_counter
-      (contract_hex, _contract_address) =
-    let* storage = get_storage ~sc_rollup_node contract_hex in
+  let check_storage ~sequencer ~expected_counter
+      (_contract_hex, contract_address) =
+    let* storage = get_storage ~sequencer contract_address in
     (* Pair(nat %count, string %destination) *)
     let counter = JSON.(storage |-> "args" |=> 0 |-> "int" |> as_int) in
     Check.(
@@ -998,15 +957,13 @@ module TezMultiRunCaller = struct
   (** Originates the contract.  [callees] is the list of contracts
    *  that will be called on [%run].  [revert] controls whether the
    *  contract reverts after all calls. *)
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance ~revert ~callees () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~revert ~callees () =
     let script_name = ["mini_scenarios"; "multi_run_caller"] in
     let init_storage_data = multi_run_caller_init_storage ~revert ~callees in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1016,9 +973,9 @@ module TezMultiRunCaller = struct
       protocol
 
   (** Asserts that the contract's [counter] equals [expected_counter]. *)
-  let check_storage ~sc_rollup_node ~expected_counter
-      (multi_run_caller_hex, _multi_run_caller_address) =
-    let* storage = get_storage ~sc_rollup_node multi_run_caller_hex in
+  let check_storage ~sequencer ~expected_counter
+      (_multi_run_caller_hex, multi_run_caller_address) =
+    let* storage = get_storage ~sequencer multi_run_caller_address in
     (* Pair(int %counter, Pair(bool %willRevert, list address %callees)) *)
     let counter = JSON.(storage |-> "args" |=> 0 |-> "int" |> as_int) in
     Check.(
@@ -1033,15 +990,13 @@ end
 module TezGasBurner = struct
   open TezContract
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance () =
     let script_name = ["mini_scenarios"; "gas_burner"] in
     let init_storage_data = "Unit" in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1189,9 +1144,9 @@ module TezCallbackRunnerEvm = struct
 
   (** Originates the contract.  [evm_contract_target_address] is the
    *  EVM address that will be called on [%run]. *)
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance ~failing
-      ~evm_contract_target_address ~method_sig ~abi_params () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~failing ~evm_contract_target_address ~method_sig
+      ~abi_params () =
     let script_name =
       if failing then ["mini_scenarios"; "failing_callback_run_evm"]
       else ["mini_scenarios"; "callback_run_evm"]
@@ -1203,11 +1158,9 @@ module TezCallbackRunnerEvm = struct
         method_sig
         abi_params
     in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1217,8 +1170,8 @@ module TezCallbackRunnerEvm = struct
       protocol
 
   (** Asserts that the contract's [counter] equals [expected_counter]. *)
-  let check_counter ~sc_rollup_node ~expected_counter (hex, _addr) =
-    let* storage = get_storage ~sc_rollup_node hex in
+  let check_counter ~sequencer ~expected_counter (_hex, addr) =
+    let* storage = get_storage ~sequencer addr in
     (* Pair(nat %count, Pair(string %dest, ...)) *)
     let counter = JSON.(storage |-> "args" |=> 0 |-> "int" |> as_int) in
     Check.(
@@ -1231,8 +1184,8 @@ module TezCallbackRunnerEvm = struct
    *  [None] means the result should be [None] (callback did not fire
    *  or was reverted).  [Some hex] means the result should be
    *  [Some <hex>]. *)
-  let check_result ~sc_rollup_node ~expected_bytes (hex, _addr) =
-    let* storage = get_storage ~sc_rollup_node hex in
+  let check_result ~sequencer ~expected_bytes (_hex, addr) =
+    let* storage = get_storage ~sequencer addr in
     (* Storage: Pair(count, Pair(dest, Pair(sig, Pair(params, result)))) *)
     let result_node =
       JSON.(
@@ -1270,15 +1223,13 @@ end
 module TezMichelsonGasBurner = struct
   open TezContract
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance () =
     let script_name = ["mini_scenarios"; "gas_burner_with_internal_op"] in
     let init_storage_data = "Unit" in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1297,9 +1248,8 @@ module Gateway = struct
   open TezContract
 
   (** Calls the gateway's [%call_evm] with [None] callback. *)
-  let call_evm ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~evm_target ~method_sig ~abi_params
-      ?(amount = 0) () =
+  let call_evm ~client ~client_tezlink ~sequencer ~source ~counter ~evm_target
+      ~method_sig ~abi_params ?(amount = 0) () =
     let arg_data =
       sf
         {|Pair "%s" (Pair "%s" (Pair 0x%s None))|}
@@ -1307,11 +1257,9 @@ module Gateway = struct
         method_sig
         abi_params
     in
-    call_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    call_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1333,15 +1281,13 @@ module TezCollectResult = struct
   (** Originates [gateway_collect_result.tz] with storage
    *  [Pair gateway_address 0x<payload_hex>].  [payload_hex] is the
    *  bytes payload deposited via [%collect_result] (no [0x] prefix). *)
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance ~payload_hex () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~payload_hex () =
     let script_name = ["mini_scenarios"; "gateway_collect_result"] in
     let init_storage_data = sf {|Pair "%s" 0x%s|} gateway_address payload_hex in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1365,17 +1311,15 @@ module TezCollectResultWithAmount = struct
    *  otherwise the TRANSFER_TOKENS would fail with [BalanceTooLow] before
    *  the kernel's amount check has a chance to fire, masking the
    *  rejection we are testing. *)
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance ~payload_hex () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~payload_hex () =
     let script_name =
       ["mini_scenarios"; "gateway_collect_result_with_amount"]
     in
     let init_storage_data = sf {|Pair "%s" 0x%s|} gateway_address payload_hex in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1389,13 +1333,11 @@ end
 module TezAlwaysFailsUnit = struct
   open TezContract
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance () =
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance () =
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1418,13 +1360,11 @@ end
 module TezEmitFailer = struct
   open TezContract
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance () =
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance () =
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1442,18 +1382,15 @@ end
 module TezCollectResultThenFail = struct
   open TezContract
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance ~failing_kt1
-      ~payload_hex () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~failing_kt1 ~payload_hex () =
     let script_name = ["mini_scenarios"; "gateway_collect_result_then_fail"] in
     let init_storage_data =
       sf {|Pair "%s" (Pair "%s" 0x%s)|} gateway_address failing_kt1 payload_hex
     in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1470,13 +1407,11 @@ end
 module TezAlwaysSucceedsUnit = struct
   open TezContract
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance () =
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance () =
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1495,13 +1430,11 @@ end
 module TezEmitter = struct
   open TezContract
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance () =
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance () =
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1518,15 +1451,13 @@ end
 module TezCollectResultTwice = struct
   open TezContract
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance ~payload_hex () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~payload_hex () =
     let script_name = ["mini_scenarios"; "gateway_collect_result_twice"] in
     let init_storage_data = sf {|Pair "%s" 0x%s|} gateway_address payload_hex in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1545,9 +1476,8 @@ end
 module TezCollectResultThenCallEvm = struct
   open TezContract
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance ~evm_target_address
-      ~payload_hex () =
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~evm_target_address ~payload_hex () =
     let script_name =
       ["mini_scenarios"; "gateway_collect_result_then_call_evm"]
     in
@@ -1558,11 +1488,9 @@ module TezCollectResultThenCallEvm = struct
         evm_target_address
         payload_hex
     in
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1579,13 +1507,11 @@ end
 module TezGenerate4MibResult = struct
   open TezContract
 
-  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ~protocol ?init_balance () =
-    originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance () =
+    originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter
@@ -1611,9 +1537,13 @@ module CracRunnerWrapper = struct
   module type S = sig
     val sequencer : Evm_node.t
 
-    val sc_rollup_node : Sc_rollup_node.t
-
+    (** Offline (mockup) client used for Michelson conversions and
+        operation forging. *)
     val client : Client.t
+
+    (** Client pointing at the sequencer's tezlink RPC, used for direct
+        injection and tezlink queries. *)
+    val client_tezlink : Client.t
 
     val sender : Eth_account.t
 
@@ -1880,22 +1810,11 @@ module CracRunnerWrapper = struct
     end
   end
 
-  (** Builds a {!S} module from the given test setup.  [nonce] and
+  (** Builds a {!S} module from the given test components.  [nonce] and
    *  [counter] are the initial EVM nonce and Tezos operation counter;
    *  both are auto-incremented on each use. *)
-  let build ?(nonce = 0) ?(counter = 0)
-      ~sequencer_setup:
-        ({
-           sc_rollup_address;
-           sc_rollup_node;
-           client;
-           l1_contracts;
-           sequencer;
-           evm_version;
-           _;
-         } :
-          Tezt_etherlink.Setup.sequencer_setup) ~sender ~source protocol :
-      (module S) =
+  let build ?(nonce = 0) ?(counter = 0) ~sequencer ~client ~client_tezlink
+      ~evm_version ~sender ~source protocol : (module S) =
     let ref_nonce = ref nonce in
     let ref_counter = ref counter in
 
@@ -1912,17 +1831,13 @@ module CracRunnerWrapper = struct
     let module Helper = struct
       let sequencer = sequencer
 
-      let sc_rollup_node = sc_rollup_node
-
       let client = client
+
+      let client_tezlink = client_tezlink
 
       let sender = sender
 
       let source = source
-
-      let sc_rollup_address = sc_rollup_address
-
-      let l1_contracts = l1_contracts
 
       let evm_nonce = evm_nonce
 
@@ -1941,9 +1856,6 @@ module CracRunnerWrapper = struct
               ?access_list
               ?gas
               runner
-          in
-          let* () =
-            Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
           in
           return gas_used
       end
@@ -2008,9 +1920,6 @@ module CracRunnerWrapper = struct
               ~value
               runner
           in
-          let* () =
-            Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-          in
           return gas_used
 
         let call_run_catch_with_gas_limit ?expected_status ?(value = Wei.zero)
@@ -2024,9 +1933,6 @@ module CracRunnerWrapper = struct
               ~value
               ~gas_limit
               runner
-          in
-          let* () =
-            Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
           in
           return gas_used
 
@@ -2070,9 +1976,6 @@ module CracRunnerWrapper = struct
               ~nonce:(evm_nonce ())
               ~value
               runner
-          in
-          let* () =
-            Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
           in
           return gas_used
 
@@ -2118,9 +2021,6 @@ module CracRunnerWrapper = struct
               ~value
               runner
           in
-          let* () =
-            Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-          in
           return gas_used
 
         let check_result ~expected_hex (`Evm_runner runner) =
@@ -2158,9 +2058,6 @@ module CracRunnerWrapper = struct
               ~value
               runner
           in
-          let* () =
-            Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-          in
           return gas_used
 
         let call_run_catch ?expected_status ?gas ?(value = Wei.zero)
@@ -2174,9 +2071,6 @@ module CracRunnerWrapper = struct
               ~nonce:(evm_nonce ())
               ~value
               runner
-          in
-          let* () =
-            Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
           in
           return gas_used
 
@@ -2240,10 +2134,8 @@ module CracRunnerWrapper = struct
       module TezRunner = struct
         let call_run ?amount ?gas_limit (`Tez_runner (_, runner)) =
           TezRunner.call_run
-            ~sc_rollup_address
-            ~sc_rollup_node
             ~client
-            ~l1_contracts
+            ~client_tezlink
             ~sequencer
             ~source
             ~counter:(tez_counter ())
@@ -2262,10 +2154,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance (`Evm_runner address) =
           let* contract_hex, address =
             TezCrossRuntimeRunnerEvm.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2279,7 +2169,7 @@ module CracRunnerWrapper = struct
         let check_storage ~expected_counter
             (`Tez_runner (runner_hex, runner_address)) =
           TezCrossRuntimeRunnerEvm.check_storage
-            ~sc_rollup_node
+            ~sequencer
             ~expected_counter
             (runner_hex, runner_address)
       end
@@ -2288,10 +2178,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance (`Evm_runner address) =
           let* contract_hex, address =
             TezCrossRuntimeHttpCallEvm.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2305,7 +2193,7 @@ module CracRunnerWrapper = struct
         let check_storage ~expected_counter
             (`Tez_runner (runner_hex, runner_address)) =
           TezCrossRuntimeHttpCallEvm.check_storage
-            ~sc_rollup_node
+            ~sequencer
             ~expected_counter
             (runner_hex, runner_address)
       end
@@ -2314,10 +2202,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance (`Tez_runner (_, address)) =
           let* contract_hex, address =
             TezCrossRuntimeHttpCallTez.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2331,7 +2217,7 @@ module CracRunnerWrapper = struct
         let check_storage ~expected_counter
             (`Tez_runner (runner_hex, runner_address)) =
           TezCrossRuntimeHttpCallTez.check_storage
-            ~sc_rollup_node
+            ~sequencer
             ~expected_counter
             (runner_hex, runner_address)
       end
@@ -2340,10 +2226,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance (`Tez_runner (_, address)) =
           let* contract_hex, address =
             TezCrossRuntimeHttpCallTezCallback.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2357,14 +2241,14 @@ module CracRunnerWrapper = struct
         let check_counter ~expected_counter
             (`Tez_runner (runner_hex, runner_address)) =
           TezCrossRuntimeHttpCallTezCallback.check_counter
-            ~sc_rollup_node
+            ~sequencer
             ~expected_counter
             (runner_hex, runner_address)
 
         let check_result ~expected_bytes
             (`Tez_runner (runner_hex, runner_address)) =
           TezCrossRuntimeHttpCallTezCallback.check_result
-            ~sc_rollup_node
+            ~sequencer
             ~expected_bytes
             (runner_hex, runner_address)
       end
@@ -2376,10 +2260,8 @@ module CracRunnerWrapper = struct
           in
           let* runner_hex, runner =
             TezMultiRunCaller.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2394,7 +2276,7 @@ module CracRunnerWrapper = struct
         let check_storage ~expected_counter
             (`Tez_runner (runner_hex, runner_address)) =
           TezMultiRunCaller.check_storage
-            ~sc_rollup_node
+            ~sequencer
             ~expected_counter
             (runner_hex, runner_address)
       end
@@ -2403,10 +2285,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance ~payload_hex () =
           let* runner_hex, runner =
             TezCollectResult.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2422,10 +2302,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance ~payload_hex () =
           let* runner_hex, runner =
             TezCollectResultWithAmount.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2441,10 +2319,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance () =
           let* runner_hex, runner =
             TezAlwaysFailsUnit.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2460,10 +2336,8 @@ module CracRunnerWrapper = struct
             ~payload_hex () =
           let* runner_hex, runner =
             TezCollectResultThenFail.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2480,10 +2354,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance () =
           let* runner_hex, runner =
             TezAlwaysSucceedsUnit.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2498,10 +2370,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance () =
           let* runner_hex, runner =
             TezEmitter.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2516,10 +2386,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance () =
           let* runner_hex, runner =
             TezEmitFailer.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2534,10 +2402,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance ~payload_hex () =
           let* runner_hex, runner =
             TezCollectResultTwice.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2554,10 +2420,8 @@ module CracRunnerWrapper = struct
             ~payload_hex () =
           let* runner_hex, runner =
             TezCollectResultThenCallEvm.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2574,10 +2438,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance () =
           let* runner_hex, runner =
             TezGenerate4MibResult.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2592,10 +2454,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance () =
           let* runner_hex, runner =
             TezGasBurner.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2615,16 +2475,6 @@ module CracRunnerWrapper = struct
         return (evm_runner, tez_runner)
 
       let inject_crac_no_block (`Tez_runner (_, dest)) =
-        let tezlink_endpoint =
-          Client.(
-            Foreign_endpoint
-              Endpoint.
-                {
-                  (Evm_node.rpc_endpoint_record sequencer) with
-                  path = "/tezlink";
-                })
-        in
-        let* client_tezlink = Client.init ~endpoint:tezlink_endpoint () in
         let* arg = Client.convert_data_to_json ~data:"Unit" client in
         let* crac_op =
           Operation.Manager.(
@@ -2713,10 +2563,8 @@ module CracRunnerWrapper = struct
             (`Evm_runner address) =
           let* contract_hex, address =
             TezCallbackRunnerEvm.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2732,14 +2580,14 @@ module CracRunnerWrapper = struct
         let check_counter ~expected_counter
             (`Tez_runner (runner_hex, runner_address)) =
           TezCallbackRunnerEvm.check_counter
-            ~sc_rollup_node
+            ~sequencer
             ~expected_counter
             (runner_hex, runner_address)
 
         let check_result ~expected_bytes
             (`Tez_runner (runner_hex, runner_address)) =
           TezCallbackRunnerEvm.check_result
-            ~sc_rollup_node
+            ~sequencer
             ~expected_bytes
             (runner_hex, runner_address)
       end
@@ -2748,10 +2596,8 @@ module CracRunnerWrapper = struct
         let call_evm ~evm_target:(`Evm_runner address) ~method_sig ~abi_params
             ?amount () =
           Gateway.call_evm
-            ~sc_rollup_address
-            ~sc_rollup_node
             ~client
-            ~l1_contracts
+            ~client_tezlink
             ~sequencer
             ~source
             ~counter:(tez_counter ())
@@ -2766,10 +2612,8 @@ module CracRunnerWrapper = struct
         let originate ?init_balance () =
           let* runner_hex, runner =
             TezMichelsonGasBurner.originate
-              ~sc_rollup_address
-              ~sc_rollup_node
               ~client
-              ~l1_contracts
+              ~client_tezlink
               ~sequencer
               ~source
               ~counter:(tez_counter ())
@@ -2783,8 +2627,8 @@ module CracRunnerWrapper = struct
     (module Helper)
 end
 
-(** Registers a fullstack CRAC runner test.  Sets up the sequencer,
- *  builds a {!CracRunnerWrapper.S} and passes it to [body]. *)
+(** Registers a sequencer-only CRAC runner test on the sandbox.  Builds
+ *  a {!CracRunnerWrapper.S} and passes it to [body]. *)
 let register_crac_runner_test ~title ?(tags = []) body =
   let with_runtimes = Tezosx_runtime.[Tezos] in
   let tags =
@@ -2792,21 +2636,34 @@ let register_crac_runner_test ~title ?(tags = []) body =
     @ List.map Tezosx_runtime.tag with_runtimes
     @ ["crac"; "runner"] @ tags
   in
-  Setup.register_test
+  Test_helpers.register_sandbox
     ~__FILE__
-    ~rpc_server:Evm_node.Resto
-    ~title
-    ~time_between_blocks:Nothing
-    ~tags
+    ~uses_client:true
     ~kernel:Latest
+    ~title
+    ~tags
     ~with_runtimes
-    ~enable_dal:false
+    ~minimum_base_fee_per_gas:crac_minimum_base_fee_per_gas
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
-  @@ fun sequencer_setup protocol ->
+  @@ fun sequencer ->
   let sender = Eth_account.bootstrap_accounts.(0) in
   let source = Constant.bootstrap5 in
+  (* Conversions and forging need a protocol-aware client but no chain:
+     use a mockup client.  Injection goes through the tezlink RPC. *)
+  let* client =
+    Client.init_mockup ~protocol:Michelson_contracts.tezlink_protocol ()
+  in
+  let* client_tezlink = tezlink_client_from_evm_node sequencer in
   let (module Wrapper) =
-    CracRunnerWrapper.build ~counter:1 ~sequencer_setup ~sender ~source protocol
+    CracRunnerWrapper.build
+      ~counter:1
+      ~sequencer
+      ~client
+      ~client_tezlink
+      ~evm_version:(Kernel.select_evm_version Kernel.Latest)
+      ~sender
+      ~source
+      Michelson_contracts.tezlink_protocol
   in
   body (module Wrapper : CracRunnerWrapper.S)
 
@@ -2816,7 +2673,7 @@ let register_crac_runner_test ~title ?(tags = []) body =
  *     |-> EVM[evm_bridge] ~CRAC~> TEZ[tez_runner]
  *
  *)
-let test_crac_evm_to_tez =
+let test_crac_evm_to_tez () =
   register_crac_runner_test ~title:"CRAC: EVM runner calls TEZ runner"
   @@ fun (module Wrapper) ->
   let open Wrapper in
@@ -2846,7 +2703,7 @@ let test_crac_evm_to_tez =
  *     |-> EVM[evm_bridge_2] ~CRAC~> TEZ[tez_runner_2]
  *
  *)
-let test_crac_evm_multiple_independent_crossings =
+let test_crac_evm_multiple_independent_crossings () =
   register_crac_runner_test ~title:"CRAC: multiple independent crossings"
   @@ fun (module Wrapper) ->
   let open Wrapper in
@@ -2886,7 +2743,7 @@ let test_crac_evm_multiple_independent_crossings =
  *     |-> EVM[evm_inner]
  *
  *)
-let test_crac_evm_double_crossing =
+let test_crac_evm_double_crossing () =
   register_crac_runner_test
     ~title:"CRAC: double crossing EVM via TEZ back to EVM"
   @@ fun (module Wrapper) ->
@@ -2926,7 +2783,7 @@ let test_crac_evm_double_crossing =
  *     |-> EVM[evm_bridge_direct] ~CRAC~> TEZ[tez_leaf]
  *
  *)
-let test_crac_evm_shared_leaf_via_direct_and_chain =
+let test_crac_evm_shared_leaf_via_direct_and_chain () =
   register_crac_runner_test
     ~title:"CRAC: EVM shared TEZ leaf via direct bridge and 3-CRAC chain"
   @@ fun (module Wrapper) ->
@@ -2977,7 +2834,7 @@ let test_crac_evm_shared_leaf_via_direct_and_chain =
  *    EVM[evm_a] ~CRAC~> TEZ[tez_b] ~CRAC~> EVM[evm_c] ~CRAC~> TEZ[tez_d] ~CRAC~> EVM[evm_e] ~CRAC~> TEZ[tez_leaf]
  *
  *)
-let test_crac_evm_5_crossing_chain =
+let test_crac_evm_5_crossing_chain () =
   register_crac_runner_test ~title:"CRAC: EVM 5-crossing chain"
   @@ fun (module Wrapper) ->
   let open Wrapper in
@@ -3006,7 +2863,7 @@ let test_crac_evm_5_crossing_chain =
  *      |-> TEZ[tez_bridge] ~CRAC~> EVM[evm_runner]
  *
  *)
-let test_crac_tez_to_evm =
+let test_crac_tez_to_evm () =
   register_crac_runner_test ~title:"CRAC: TEZ runner calls EVM runner"
   @@ fun (module Wrapper) ->
   let open Wrapper in
@@ -3034,7 +2891,7 @@ let test_crac_tez_to_evm =
  *     |-> TEZ[tez_bridge_2] ~CRAC~> EVM[evm_runner_2]
  *
  *)
-let test_crac_tez_multiple_independent_crossings =
+let test_crac_tez_multiple_independent_crossings () =
   register_crac_runner_test
     ~title:"CRAC: TEZ multiple independent crossings to EVM"
   @@ fun (module Wrapper) ->
@@ -3072,7 +2929,7 @@ let test_crac_tez_multiple_independent_crossings =
  *     |-> TEZ[tez_inner]
  *
  *)
-let test_crac_tez_double_crossing =
+let test_crac_tez_double_crossing () =
   register_crac_runner_test ~title:"CRAC: TEZ-to-EVM-to-TEZ double crossing"
   @@ fun (module Wrapper) ->
   let open Wrapper in
@@ -3109,7 +2966,7 @@ let test_crac_tez_double_crossing =
  *     |-> TEZ[tez_bridge_direct] ~CRAC~> EVM[evm_leaf]
  *
  *)
-let test_crac_tez_shared_leaf_via_direct_and_chain =
+let test_crac_tez_shared_leaf_via_direct_and_chain () =
   register_crac_runner_test
     ~title:"CRAC: TEZ shared EVM leaf via direct bridge and 3-CRAC chain"
   @@ fun (module Wrapper) ->
@@ -3155,7 +3012,7 @@ let test_crac_tez_shared_leaf_via_direct_and_chain =
  *    TEZ[tez_a] ~CRAC~> EVM[evm_b] ~CRAC~> TEZ[tez_c] ~CRAC~> EVM[evm_d] ~CRAC~> TEZ[tez_e] ~CRAC~> EVM[evm_leaf]
  *
  *)
-let test_crac_tez_5_crossing_chain =
+let test_crac_tez_5_crossing_chain () =
   register_crac_runner_test ~title:"CRAC: TEZ 5-crossing chain"
   @@ fun (module Wrapper) ->
   let open Wrapper in
@@ -3192,7 +3049,7 @@ let test_crac_tez_5_crossing_chain =
  *  then with one pre-warming [evm_inner]'s counter storage slot.
  *  The second call should use strictly less gas.
  *)
-let test_crac_access_list_preserved =
+let test_crac_access_list_preserved () =
   register_crac_runner_test
     ~title:"CRAC: access list preserved across EVM->TEZ->EVM"
     ~tags:["access_list"]
@@ -3245,7 +3102,7 @@ let test_crac_access_list_preserved =
  *                                 |-> REVERT
  *
  *)
-let test_crac_evm_to_tez_reverts =
+let test_crac_evm_to_tez_reverts () =
   register_crac_runner_test ~title:"CRAC: EVM to TEZ reverts" ~tags:["revert"]
   @@ fun (module Wrapper) ->
   let open Wrapper in
@@ -3270,24 +3127,22 @@ let test_crac_evm_to_tez_reverts =
 
 (** A first-interaction EVM to TEZ call materializes the forwarder KT1
  *  of the EVM sender and source in durable storage. *)
-let test_crac_evm_to_tez_materializes_alias =
+let test_crac_evm_to_tez_materializes_alias () =
   register_crac_runner_test
     ~title:"CRAC: EVM to TEZ materializes alias forwarders"
     ~tags:["alias"]
   @@ fun (module Wrapper) ->
   let open Wrapper in
   let contracts () =
-    Delayed_inbox.subkeys
-      TezContract.tezosx_michelson_contracts_index
-      (Delayed_inbox.Sc_rollup_node sc_rollup_node)
+    let*@! contracts =
+      Rpc.state_subkeys sequencer TezContract.tezosx_michelson_contracts_index
+    in
+    return contracts
   in
   let* tez_runner = TezMultiRunCaller.originate () in
   let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_runner in
   let* evm_main =
     EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge, false)] ()
-  in
-  let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
   in
   let* before = contracts () in
   let* _ = EvmRunner.call_run evm_main in
@@ -3303,24 +3158,22 @@ let test_crac_evm_to_tez_materializes_alias =
 
 (** Regression: a reverted first-interaction EVM to TEZ call must leave
  *  no new forwarder KT1 on durable storage. *)
-let test_crac_evm_to_tez_revert_drops_alias =
+let test_crac_evm_to_tez_revert_drops_alias () =
   register_crac_runner_test
     ~title:"CRAC: EVM to TEZ revert drops alias forwarders"
     ~tags:["revert"; "alias"]
   @@ fun (module Wrapper) ->
   let open Wrapper in
   let contracts () =
-    Delayed_inbox.subkeys
-      TezContract.tezosx_michelson_contracts_index
-      (Delayed_inbox.Sc_rollup_node sc_rollup_node)
+    let*@! contracts =
+      Rpc.state_subkeys sequencer TezContract.tezosx_michelson_contracts_index
+    in
+    return contracts
   in
   let* tez_reverter = TezMultiRunCaller.originate ~revert:true () in
   let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_reverter in
   let* evm_main =
     EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge, false)] ()
-  in
-  let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
   in
   let* before = contracts () in
   let* _ = EvmRunner.call_run ~expected_status:false evm_main in
@@ -3342,7 +3195,7 @@ let test_crac_evm_to_tez_revert_drops_alias =
  *                                 |-> REVERT
  *
  *)
-let test_crac_tez_to_evm_reverts =
+let test_crac_tez_to_evm_reverts () =
   register_crac_runner_test ~title:"CRAC: TEZ to EVM reverts" ~tags:["revert"]
   @@ fun (module Wrapper) ->
   let open Wrapper in
@@ -3373,7 +3226,7 @@ let test_crac_tez_to_evm_reverts =
  *  After the Michelson transaction, we fetch the latest EVM block and
  *  assert it contains at least one transaction (the CRAC envelope).
  *)
-let test_crac_tez_to_evm_fake_tx_in_block =
+let test_crac_tez_to_evm_fake_tx_in_block () =
   register_crac_runner_test
     ~title:"CRAC: TEZ->EVM produces fake EVM transaction in block"
     ~tags:["crac_tx"]
@@ -3414,7 +3267,7 @@ let test_crac_tez_to_evm_fake_tx_in_block =
  *  only (without the block number), causing a UNIQUE constraint violation in
  *  the EVM node's transactions table on the second insertion.
  *)
-let test_crac_tez_to_evm_fake_tx_unique_hash_across_blocks =
+let test_crac_tez_to_evm_fake_tx_unique_hash_across_blocks () =
   register_crac_runner_test
     ~title:"CRAC: TEZ->EVM fake transactions have unique hashes across blocks"
     ~tags:["crac_tx"; "regression"]
@@ -3455,7 +3308,7 @@ let test_crac_tez_to_evm_fake_tx_unique_hash_across_blocks =
  *    - [eth_getLogs] filtered by the contract address returns those
  *      events, restoring parity with a regular EVM-EOA call.
  *)
-let test_crac_tez_to_evm_inner_logs_in_receipt =
+let test_crac_tez_to_evm_inner_logs_in_receipt () =
   register_crac_runner_test
     ~title:"CRAC: TEZ->EVM inner LOG opcodes surface on synthetic tx receipt"
     ~tags:["crac_tx"; "regression"; "logs"]
@@ -3649,7 +3502,7 @@ let test_crac_tez_to_evm_inner_logs_in_receipt =
  *  [apply.rs]; the unit test mocks the journal directly and does not reach
  *  those paths.
  *)
-let test_crac_tez_to_evm_block_observables_visible =
+let test_crac_tez_to_evm_block_observables_visible () =
   register_crac_runner_test
     ~title:"CRAC: TEZ->EVM block-observable opcodes see the live block"
     ~tags:
@@ -3701,9 +3554,6 @@ let test_crac_tez_to_evm_block_observables_visible =
       ()
   in
   let read_slot pos = Rpc.get_storage_at ~address:probe_addr ~pos sequencer in
-  let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-  in
   Log.debug ~prefix "Send native EVM tx to probe (observables -> slots 0-3)" ;
   let* raw_tx =
     Cast.craft_tx
@@ -3718,9 +3568,6 @@ let test_crac_tez_to_evm_block_observables_visible =
   in
   let*@ _tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
   let*@ _block_number = Rpc.produce_block sequencer in
-  let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-  in
   Log.debug ~prefix "Read native observables from slots 0-3 and block header" ;
   let*@ native_basefee_hex = read_slot "0x0" in
   let*@ native_gaslimit_hex = read_slot "0x1" in
@@ -3831,7 +3678,7 @@ let test_crac_tez_to_evm_block_observables_visible =
  *  and calls debug_traceTransaction with both callTracer and structLogger.
  *  Verifies that the kernel produces a valid trace during Blueprint replay.
  *)
-let test_crac_debug_trace_transaction =
+let test_crac_debug_trace_transaction () =
   register_crac_runner_test
     ~title:"CRAC: debug_traceTransaction on TEZ->EVM fake tx"
     ~tags:["crac_tx"; "trace"; "crac_trace"]
@@ -3911,7 +3758,7 @@ let test_crac_debug_trace_transaction =
  *  block via the Tezlink RPC, then calls debug_traceBlockByNumber and
  *  verifies that traces are returned for both transactions.
  *)
-let test_crac_debug_trace_block =
+let test_crac_debug_trace_block () =
   register_crac_runner_test
     ~title:"CRAC: debug_traceBlockByNumber on mixed block"
     ~tags:["crac_tx"; "trace"; "crac_trace"; "block"]
@@ -3978,7 +3825,7 @@ let test_crac_debug_trace_block =
  *  contains a CRAC fake tx.  Ensures that CRAC presence does not break
  *  tracing of regular transactions in the same block.
  *)
-let test_crac_debug_trace_normal_tx_in_crac_block =
+let test_crac_debug_trace_normal_tx_in_crac_block () =
   register_crac_runner_test
     ~title:"CRAC: debug_traceTransaction on normal tx in CRAC block"
     ~tags:["crac_tx"; "trace"; "crac_trace"; "regression"]
@@ -4054,7 +3901,7 @@ let check_http_trace_shape trace =
     field, so a single tx exposes the full call tree. This exercises the
     nested-trace path of the kernel journal as well as the RLP round-trip
     for `inner_traces`. *)
-let test_http_trace_nested_crac =
+let test_http_trace_nested_crac () =
   register_crac_runner_test
     ~title:"CRAC: http_traceTransaction on nested EVM->TEZ->EVM->TEZ"
     ~tags:["http_trace"; "crac_trace"; "nested"]
@@ -4112,7 +3959,7 @@ let test_http_trace_nested_crac =
     independent CRACs — the kernel journal records them as sibling
     top-level traces and [maybe_store_http_traces_for_tx] must preserve
     order through RLP. *)
-let test_http_trace_multiple_independent_cracs =
+let test_http_trace_multiple_independent_cracs () =
   register_crac_runner_test
     ~title:"CRAC: http_traceTransaction with multiple independent CRACs"
     ~tags:["http_trace"; "crac_trace"; "multi"]
@@ -4172,7 +4019,7 @@ let test_http_trace_multiple_independent_cracs =
     [traces] list on the plain transfer. Exercises the "multiple
     transactions with mixed CRAC content in the same block" axis that
     single-tx tests don't cover. *)
-let test_http_trace_mixed_block =
+let test_http_trace_mixed_block () =
   register_crac_runner_test
     ~title:"CRAC: http_traceBlockByNumber on mixed CRAC + non-CRAC block"
     ~tags:["http_trace"; "crac_trace"; "block"; "mixed"]
@@ -4282,7 +4129,7 @@ let read_crac_depth_header trace =
     a further nested EVM -> TEZ reads [3]. Validates that both the
     EVM precompile gateway and the Michelson [dispatch_crac_call]
     producer agree on the [inbound + 1] semantics end-to-end. *)
-let test_http_trace_crac_depth_propagation =
+let test_http_trace_crac_depth_propagation () =
   register_crac_runner_test
     ~title:"CRAC: X-Tezos-CRAC-Depth increments across nested hops"
     ~tags:["http_trace"; "crac_trace"; "crac_depth"]
@@ -4353,7 +4200,7 @@ let test_http_trace_crac_depth_propagation =
  *  When tez_runner reverts, both the TEZ state and evm_inner's EVM storage
  *  must be rolled back to zero.
  *)
-let test_crac_tez_revert_rolls_back_inner_evm_storage =
+let test_crac_tez_revert_rolls_back_inner_evm_storage () =
   register_crac_runner_test
     ~title:"CRAC: TEZ revert rolls back inner EVM storage"
     ~tags:["revert"]
@@ -4386,7 +4233,7 @@ let test_crac_tez_revert_rolls_back_inner_evm_storage =
  *     |-> REVERT
  *
  *)
-let test_crac_tez_revert_propagates_to_evm =
+let test_crac_tez_revert_propagates_to_evm () =
   register_crac_runner_test
     ~title:"CRAC: TEZ revert propagates to EVM"
     ~tags:["revert"]
@@ -4422,7 +4269,7 @@ let test_crac_tez_revert_propagates_to_evm =
  *  triggers REVM's logs[checkpoint.log_i..] slice operation which
  *  panics if the prior CRAC drained or reset journal state.
  *)
-let test_crac_evm_journal_state_preserved =
+let test_crac_evm_journal_state_preserved () =
   register_crac_runner_test
     ~title:"CRAC: EVM journal state preserved"
     ~tags:["revert"]
@@ -4465,7 +4312,7 @@ let test_crac_evm_journal_state_preserved =
  *     |-> (Catch) EVM[evm_bridge] ~CRAC~> TEZ[tez_reverter]
  *                                         |-> REVERT
  *)
-let test_crac_catch_tez_revert =
+let test_crac_catch_tez_revert () =
   register_crac_runner_test ~title:"CRAC: catch TEZ revert" ~tags:["revert"]
   @@ fun (module Wrapper) ->
   let open Wrapper in
@@ -4498,7 +4345,7 @@ let test_crac_catch_tez_revert =
  *     |-> REVERT
  *
  *)
-let test_crac_evm_revert_propagates_to_tez =
+let test_crac_evm_revert_propagates_to_tez () =
   register_crac_runner_test
     ~title:"CRAC: EVM revert propagates to TEZ"
     ~tags:["revert"]
@@ -4534,7 +4381,7 @@ let test_crac_evm_revert_propagates_to_tez =
  *                                   |-> REVERT
  *
  *)
-let test_crac_second_crac_tez_revert =
+let test_crac_second_crac_tez_revert () =
   register_crac_runner_test
     ~title:"CRAC: second CRAC target TEZ reverts"
     ~tags:["revert"]
@@ -4575,7 +4422,7 @@ let test_crac_second_crac_tez_revert =
  *     |-> REVERT
  *
  *)
-let test_crac_evm_revert_rolls_back_two_cracs =
+let test_crac_evm_revert_rolls_back_two_cracs () =
   register_crac_runner_test
     ~title:"CRAC: EVM revert rolls back two CRACs"
     ~tags:["revert"]
@@ -4617,7 +4464,7 @@ let test_crac_evm_revert_rolls_back_two_cracs =
  *                                   |-> REVERT
  *
  *)
-let test_crac_deep_branch_with_second_tez_revert =
+let test_crac_deep_branch_with_second_tez_revert () =
   register_crac_runner_test
     ~title:"CRAC: deep first branch with TEZ revert in second"
     ~tags:["revert"]
@@ -4666,7 +4513,7 @@ let test_crac_deep_branch_with_second_tez_revert =
  *                                 |-> REVERT
  *
  *)
-let test_crac_nested_revert_cascade_without_catch =
+let test_crac_nested_revert_cascade_without_catch () =
   register_crac_runner_test
     ~title:"CRAC: nested revert cascade without catch"
     ~tags:["revert"]
@@ -4709,7 +4556,7 @@ let test_crac_nested_revert_cascade_without_catch =
  *                                                                     |-> REVERT
  *
  *)
-let test_crac_double_nested_evm_revert =
+let test_crac_double_nested_evm_revert () =
   register_crac_runner_test
     ~title:"CRAC: double-nested CRAC with intermediate EVM revert"
     ~tags:["revert"]
@@ -4764,7 +4611,7 @@ let test_crac_double_nested_evm_revert =
  *                                                                               |-> REVERT
  *
  *)
-let test_crac_deep_nesting_6_levels =
+let test_crac_deep_nesting_6_levels () =
   register_crac_runner_test
     ~title:"CRAC: deep nesting across 6 CRAC levels"
     ~tags:["revert"]
@@ -4796,7 +4643,7 @@ let test_crac_deep_nesting_6_levels =
  *     |-> REVERT
  *
  *)
-let test_crac_evm_revert_after_nested_cracs =
+let test_crac_evm_revert_after_nested_cracs () =
   register_crac_runner_test
     ~title:"CRAC: EVM revert after nested CRACs"
     ~tags:["revert"]
@@ -4833,7 +4680,7 @@ let test_crac_evm_revert_after_nested_cracs =
  *                                 |-> REVERT
  *
  *)
-let test_crac_evm_target_reverts =
+let test_crac_evm_target_reverts () =
   register_crac_runner_test
     ~title:"CRAC: EVM CRAC target reverts"
     ~tags:["revert"]
@@ -4864,7 +4711,7 @@ let test_crac_evm_target_reverts =
  *                                   |-> REVERT
  *
  *)
-let test_crac_second_crac_evm_revert =
+let test_crac_second_crac_evm_revert () =
   register_crac_runner_test
     ~title:"CRAC: second CRAC target EVM reverts"
     ~tags:["revert"]
@@ -4903,7 +4750,7 @@ let test_crac_second_crac_evm_revert =
  *     |-> REVERT
  *
  *)
-let test_crac_tez_revert_rolls_back_two_cracs =
+let test_crac_tez_revert_rolls_back_two_cracs () =
   register_crac_runner_test
     ~title:"CRAC: TEZ revert rolls back two CRACs"
     ~tags:["revert"]
@@ -4945,7 +4792,7 @@ let test_crac_tez_revert_rolls_back_two_cracs =
  *                                   |-> REVERT
  *
  *)
-let test_crac_deep_branch_with_second_evm_revert =
+let test_crac_deep_branch_with_second_evm_revert () =
   register_crac_runner_test
     ~title:"CRAC: deep first branch with EVM revert in second"
     ~tags:["revert"]
@@ -4994,7 +4841,7 @@ let test_crac_deep_branch_with_second_evm_revert =
  *                                 |-> REVERT
  *
  *)
-let test_crac_tez_nested_revert_cascade_without_catch =
+let test_crac_tez_nested_revert_cascade_without_catch () =
   register_crac_runner_test
     ~title:"CRAC: TEZ nested revert cascade without catch"
     ~tags:["revert"]
@@ -5038,7 +4885,7 @@ let test_crac_tez_nested_revert_cascade_without_catch =
  *                                                                     |-> REVERT
  *
  *)
-let test_crac_double_nested_tez_revert =
+let test_crac_double_nested_tez_revert () =
   register_crac_runner_test
     ~title:"CRAC: double-nested CRAC with intermediate TEZ revert"
     ~tags:["revert"]
@@ -5084,7 +4931,7 @@ let test_crac_double_nested_tez_revert =
  *                                                                               |-> REVERT
  *
  *)
-let test_crac_tez_deep_nesting_6_levels =
+let test_crac_tez_deep_nesting_6_levels () =
   register_crac_runner_test
     ~title:"CRAC: TEZ deep nesting across 6 CRAC levels"
     ~tags:["revert"]
@@ -5116,7 +4963,7 @@ let test_crac_tez_deep_nesting_6_levels =
  *     |-> REVERT
  *
  *)
-let test_crac_tez_revert_after_nested_cracs =
+let test_crac_tez_revert_after_nested_cracs () =
   register_crac_runner_test
     ~title:"CRAC: TEZ revert after nested CRACs"
     ~tags:["revert"]
@@ -5156,7 +5003,7 @@ let test_crac_tez_revert_after_nested_cracs =
  *     |-> EVM[evm_bridge] ~CRAC~> TEZ[tez_leaf]
  *
  *)
-let test_crac_catch_evm_revert_between_cracs =
+let test_crac_catch_evm_revert_between_cracs () =
   register_crac_runner_test
     ~title:"CRAC: catch EVM revert between CRACs"
     ~tags:["revert"]
@@ -5206,7 +5053,7 @@ let test_crac_catch_evm_revert_between_cracs =
  *     |-> EVM[evm_bridge] ~CRAC~> TEZ[tez_leaf]
  *
  *)
-let test_crac_catch_tez_revert_between_cracs =
+let test_crac_catch_tez_revert_between_cracs () =
   register_crac_runner_test
     ~title:"CRAC: catch cross-runtime TEZ revert between CRACs"
     ~tags:["revert"]
@@ -5259,7 +5106,7 @@ let test_crac_catch_tez_revert_between_cracs =
  *     |-> EVM[evm_leaf]
  *
  *)
-let test_crac_catch_tez_revert_with_nested_crac =
+let test_crac_catch_tez_revert_with_nested_crac () =
   register_crac_runner_test
     ~title:"CRAC: catch TEZ revert with nested CRAC"
     ~tags:["revert"]
@@ -5316,7 +5163,7 @@ let test_crac_catch_tez_revert_with_nested_crac =
  *     |-> EVM[evm_leaf]
  *
  *)
-let test_crac_catch_deep_evm_revert_through_double_crac =
+let test_crac_catch_deep_evm_revert_through_double_crac () =
   register_crac_runner_test
     ~title:"CRAC: catch deep EVM revert through double CRAC"
     ~tags:["revert"]
@@ -5380,7 +5227,7 @@ let test_crac_catch_deep_evm_revert_through_double_crac =
  *     |-> TEZ[tez_leaf]
  *
  *)
-let test_crac_tez_catch_evm_revert_between_cracs =
+let test_crac_tez_catch_evm_revert_between_cracs () =
   register_crac_runner_test
     ~title:"CRAC: TEZ-initiated catch EVM revert between CRACs"
     ~tags:["revert"]
@@ -5442,7 +5289,7 @@ let test_crac_tez_catch_evm_revert_between_cracs =
  *     |-> TEZ[tez_bridge_leaf] ~CRAC~> EVM[evm_leaf]
  *
  *)
-let test_crac_tez_catch_tez_revert_between_cracs =
+let test_crac_tez_catch_tez_revert_between_cracs () =
   register_crac_runner_test
     ~title:"CRAC: TEZ-initiated catch TEZ revert between CRACs"
     ~tags:["revert"]
@@ -5509,7 +5356,7 @@ let test_crac_tez_catch_tez_revert_between_cracs =
  *     |-> TEZ[tez_bridge_leaf] ~CRAC~> EVM[evm_leaf]
  *
  *)
-let test_crac_tez_catch_deep_revert_through_double_crac =
+let test_crac_tez_catch_deep_revert_through_double_crac () =
   register_crac_runner_test
     ~title:"CRAC: TEZ-initiated catch deep revert through double CRAC"
     ~tags:["revert"]
@@ -5580,7 +5427,7 @@ let test_crac_tez_catch_deep_revert_through_double_crac =
  *                 |-> REVERT
  *
  *)
-let test_crac_catch_revert_after_multiple_cracs =
+let test_crac_catch_revert_after_multiple_cracs () =
   register_crac_runner_test
     ~title:"CRAC: catch revert after multiple sequential CRACs"
     ~tags:["revert"]
@@ -5641,7 +5488,7 @@ let test_crac_catch_revert_after_multiple_cracs =
  *                                         |-> REVERT
  *
  *)
-let test_crac_catch_tez_revert_after_multiple_return_cracs =
+let test_crac_catch_tez_revert_after_multiple_return_cracs () =
   register_crac_runner_test
     ~title:"CRAC: catch TEZ revert after multiple return CRACs"
     ~tags:["revert"]
@@ -5703,7 +5550,7 @@ let test_crac_catch_tez_revert_after_multiple_return_cracs =
  *                                                                                               |-> REVERT
  *
  *)
-let test_crac_catch_4_crossing_chain_revert =
+let test_crac_catch_4_crossing_chain_revert () =
   register_crac_runner_test
     ~title:"CRAC: catch 4-crossing chain revert"
     ~tags:["revert"]
@@ -5743,7 +5590,7 @@ let test_crac_catch_4_crossing_chain_revert =
  *                                                                                                                 |-> REVERT
  *
  *)
-let test_crac_tez_catch_4_crossing_chain_revert =
+let test_crac_tez_catch_4_crossing_chain_revert () =
   register_crac_runner_test
     ~title:"CRAC: TEZ-initiated catch 4-crossing chain revert"
     ~tags:["revert"]
@@ -5786,7 +5633,7 @@ let test_crac_tez_catch_4_crossing_chain_revert =
  *                                                                                                                   |-> REVERT
  *
  *)
-let test_crac_catch_5_crossing_chain_revert =
+let test_crac_catch_5_crossing_chain_revert () =
   register_crac_runner_test
     ~title:"CRAC: catch 5-crossing chain revert"
     ~tags:["revert"]
@@ -5828,7 +5675,7 @@ let test_crac_catch_5_crossing_chain_revert =
  *                                                                                                                                     |-> REVERT
  *
  *)
-let test_crac_tez_catch_5_crossing_chain_revert =
+let test_crac_tez_catch_5_crossing_chain_revert () =
   register_crac_runner_test
     ~title:"CRAC: TEZ-initiated catch 5-crossing chain revert"
     ~tags:["revert"]
@@ -5875,7 +5722,7 @@ let test_crac_tez_catch_5_crossing_chain_revert =
  *                                                 |-> REVERT
  *
  *)
-let test_crac_chained_tez_calls_behind_crac =
+let test_crac_chained_tez_calls_behind_crac () =
   register_crac_runner_test
     ~title:"CRAC: chained TEZ calls behind CRAC"
     ~tags:["revert"]
@@ -5922,7 +5769,7 @@ let test_crac_chained_tez_calls_behind_crac =
  *     |-> EVM[evm_bridge_4] ~CRAC~> TEZ[tez_leaf]
  *
  *)
-let test_crac_nested_catches_with_multiple_reverts =
+let test_crac_nested_catches_with_multiple_reverts () =
   register_crac_runner_test
     ~title:"CRAC: nested catches with multiple reverts"
     ~tags:["revert"]
@@ -5983,7 +5830,7 @@ let test_crac_nested_catches_with_multiple_reverts =
   let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_leaf in
   unit
 
-let test_crac_gas_model_alias_caching =
+let test_crac_gas_model_alias_caching () =
   register_crac_runner_test
     ~title:"CRAC: gas model charges less on alias cache hit"
     ~tags:["gas"]
@@ -6051,8 +5898,8 @@ let michelson_head_level sequencer =
   return JSON.(head |-> "level" |> as_int)
 
 (** Fetch manager operations from the most recent non-empty Tezlink block.
-    bake_until_sync may advance the head past the block containing the
-    CRAC receipt, so we scan backwards from [head]. *)
+    Blocks produced after the CRAC may advance the head past the block
+    containing the CRAC receipt, so we scan backwards from [head]. *)
 let fetch_recent_michelson_manager_ops sequencer =
   let* head = michelson_head_level sequencer in
   let rec find_ops level =
@@ -6288,7 +6135,7 @@ let check_crac_internal_transaction ~prefix ~expected_nonce ~expected_source
  *
  *     EVM[evm_runner] |-> EVM[evm_bridge] ~CRAC~> TEZ[tez_runner]
  *)
-let test_crac_evm_to_tez_receipt =
+let test_crac_evm_to_tez_receipt () =
   register_crac_runner_test
     ~title:"CRAC: EVM->TEZ receipt matches RFC structure"
     ~tags:["crac_receipt"]
@@ -6411,7 +6258,7 @@ let test_crac_evm_to_tez_receipt =
     [hello_l2_1301] and payload string ["hello-l2-1301"].
 
     L2-1301. *)
-let test_crac_user_emit_in_reentrant_inner_crac =
+let test_crac_user_emit_in_reentrant_inner_crac () =
   register_crac_runner_test
     ~title:
       "CRAC: user EMIT from re-entrant inner CRAC surfaces on synthetic receipt"
@@ -6572,7 +6419,7 @@ let test_crac_user_emit_in_reentrant_inner_crac =
       - the failed transfer to EmitFailer (CRAC #2's body) appears
         AFTER the alias→C1 transfer (CRAC #1's body begins) — the
         L2-1300 DFS-order assertion. *)
-let test_crac_synthetic_event_survives_failed_inner_with_emit =
+let test_crac_synthetic_event_survives_failed_inner_with_emit () =
   register_crac_runner_test
     ~title:
       "CRAC: synthetic crac event survives merge with failed inner that \
@@ -6802,7 +6649,7 @@ let test_crac_synthetic_event_survives_failed_inner_with_emit =
     the EVM revert) and at least one transaction targets C_fail.
 
     L2-1302. *)
-let test_crac_synthetic_event_present_when_applied_crac_reverted_out =
+let test_crac_synthetic_event_present_when_applied_crac_reverted_out () =
   register_crac_runner_test
     ~title:
       "CRAC: synthetic crac event survives when applied CRAC is reverted out \
@@ -6989,7 +6836,7 @@ let test_crac_synthetic_event_present_when_applied_crac_reverted_out =
         scenario completeness).
 
     L2-1304. *)
-let test_crac_applied_body_preserved_as_backtracked_on_evm_revert =
+let test_crac_applied_body_preserved_as_backtracked_on_evm_revert () =
   register_crac_runner_test
     ~title:
       "CRAC: applied CRAC's body survives as backtracked when EVM tx reverts"
@@ -7165,7 +7012,7 @@ let test_crac_applied_body_preserved_as_backtracked_on_evm_revert =
  *     |-> EVM[bridge_1] ~CRAC~> TEZ[tez_1]
  *     |-> EVM[bridge_2] ~CRAC~> TEZ[tez_2]
  *)
-let test_crac_receipt_two_independent =
+let test_crac_receipt_two_independent () =
   register_crac_runner_test
     ~title:"CRAC: two EVM->TEZ from same tx produce one Michelson op"
     ~tags:["crac_receipt"]
@@ -7297,7 +7144,7 @@ let test_crac_receipt_two_independent =
  *   EVM tx 0: EVM[runner_1] → EVM[bridge_1] ~CRAC~> TEZ[tez_1]  (CRAC-ID "1-0")
  *   EVM tx 1: EVM[runner_2] → EVM[bridge_2] ~CRAC~> TEZ[tez_2]  (CRAC-ID "1-1")
  *)
-let test_crac_receipt_separate_tx_two_cracs =
+let test_crac_receipt_separate_tx_two_cracs () =
   register_crac_runner_test
     ~title:
       "CRAC: two separate EVM txs produce two Michelson ops with different \
@@ -7363,9 +7210,6 @@ let test_crac_receipt_separate_tx_two_cracs =
   in
   let*@ _tx_hash_2 = Rpc.send_raw_transaction ~raw_tx:raw_tx_2 sequencer in
   let*@ _block_number = Rpc.produce_block sequencer in
-  let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-  in
   (* Verify both Tez contracts were called *)
   let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_1 in
   let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_2 in
@@ -7472,7 +7316,7 @@ let test_crac_receipt_separate_tx_two_cracs =
  *    EVM[evm_main]
  *     |-> EVM[evm_bridge] ~CRAC~> TEZ[tez_bridge] ~CRAC~> EVM[evm_inner]
  *)
-let test_crac_receipt_evm_tez_evm =
+let test_crac_receipt_evm_tez_evm () =
   register_crac_runner_test
     ~title:"CRAC: EVM->TEZ->EVM double crossing receipts"
     ~tags:["crac_receipt"]
@@ -7606,7 +7450,7 @@ let test_crac_receipt_evm_tez_evm =
  *   - EVM block: fake CRAC transaction whose hash matches CRAC-ID "0-0"
  *   - Tezlink block: manager operation from the second EVM→TEZ leg
  *)
-let test_crac_receipt_tez_evm_tez =
+let test_crac_receipt_tez_evm_tez () =
   register_crac_runner_test
     ~title:"CRAC: TEZ->EVM->TEZ double crossing receipts"
     ~tags:["crac_receipt"]
@@ -7770,7 +7614,7 @@ let test_crac_receipt_tez_evm_tez =
  *  This is the shape no other receipt test exercises (all others reach the
  *  gateway through an intermediate Michelson contract, i.e. as an internal
  *  op).  L2-1450. *)
-let test_crac_receipt_tez_gateway_direct_evm_tez =
+let test_crac_receipt_tez_gateway_direct_evm_tez () =
   register_crac_runner_test
     ~title:"CRAC: TEZ direct gateway %call_evm -> EVM -> TEZ receipts"
     ~tags:["crac_receipt"]
@@ -7869,7 +7713,7 @@ let test_crac_receipt_tez_gateway_direct_evm_tez =
  *
  *  The failed nested leg is folded into the gateway op's internals with
  *  failed / backtracked statuses, and the top-level op fails.  L2-1450. *)
-let test_crac_receipt_tez_gateway_direct_evm_tez_revert =
+let test_crac_receipt_tez_gateway_direct_evm_tez_revert () =
   register_crac_runner_test
     ~title:"CRAC: TEZ direct gateway %call_evm -> EVM -> TEZ revert receipts"
     ~tags:["crac_receipt"; "revert"]
@@ -7966,7 +7810,7 @@ let test_crac_receipt_tez_gateway_direct_evm_tez_revert =
  *   - EVM block: 1 transaction (original tx; re-entrant TEZ→EVM leg
  *     is internal per RFC principle 6)
  *)
-let test_crac_receipt_evm_tez_evm_tez =
+let test_crac_receipt_evm_tez_evm_tez () =
   register_crac_runner_test
     ~title:"CRAC: EVM->TEZ->EVM->TEZ triple crossing receipts"
     ~tags:["crac_receipt"]
@@ -8126,7 +7970,7 @@ let test_crac_receipt_evm_tez_evm_tez =
  *    EVM[evm_main]
  *     |-> EVM[evm_bridge] ~CRAC~> TEZ[tez_reverter] → REVERT
  *)
-let test_crac_receipt_evm_to_tez_revert =
+let test_crac_receipt_evm_to_tez_revert () =
   register_crac_runner_test
     ~title:"CRAC: EVM->TEZ revert produces failed receipt"
     ~tags:["crac_receipt"; "revert"]
@@ -8231,7 +8075,7 @@ let test_crac_receipt_evm_to_tez_revert =
  *     |-> (Catch) EVM[bridge_1] ~CRAC~> TEZ[tez_reverter_1] -> REVERT
  *     |-> (Catch) EVM[bridge_2] ~CRAC~> TEZ[tez_reverter_2] -> REVERT
  *)
-let test_crac_receipt_two_failed_independent =
+let test_crac_receipt_two_failed_independent () =
   register_crac_runner_test
     ~title:"CRAC: two EVM->TEZ failures from same tx produce one Michelson op"
     ~tags:["crac_receipt"; "revert"]
@@ -8409,7 +8253,7 @@ let test_crac_receipt_two_failed_independent =
  *    success.  Applied/failed statuses alternate in pairs of two,
  *    matching the per-CRAC outcome.
  *)
-let test_crac_receipt_interleaved_failed_pending =
+let test_crac_receipt_interleaved_failed_pending () =
   register_crac_runner_test
     ~title:
       "CRAC: SFSFSFSF interleaved CRACs merge in execution order with applied \
@@ -8576,7 +8420,7 @@ let test_crac_receipt_interleaved_failed_pending =
  *   [dummy ETH transfer]  (tx_index 0)
  *   EVM[evm_runner] |-> EVM[evm_bridge] ~CRAC~> TEZ[tez_runner]  (tx_index 1)
  *)
-let test_crac_receipt_evm_not_first_tx =
+let test_crac_receipt_evm_not_first_tx () =
   register_crac_runner_test
     ~title:"CRAC: EVM->TEZ CRAC-ID reflects tx_index > 0"
     ~tags:["crac_receipt"; "crac_id"]
@@ -8685,7 +8529,7 @@ let test_crac_receipt_evm_not_first_tx =
  *   TEZ[dummy transfer]   (Michelson tx_index 0)
  *   TEZ[tez_runner] |-> TEZ[tez_bridge] ~CRAC~> EVM[evm_runner]  (Michelson tx_index 1)
  *)
-let test_crac_receipt_tez_not_first_tx =
+let test_crac_receipt_tez_not_first_tx () =
   register_crac_runner_test
     ~title:"CRAC: TEZ->EVM CRAC-ID reflects tx_index > 0"
     ~tags:["crac_receipt"; "crac_id"]
@@ -8757,7 +8601,7 @@ let test_crac_receipt_tez_not_first_tx =
  *   TEZ[tez_runner] |-> TEZ[tez_bridge] ~CRAC~> EVM[evm_inner]
  *       (Michelson tx_index 0 → CRAC-ID "0-0")
  *)
-let test_crac_receipt_evm_then_tez_same_block =
+let test_crac_receipt_evm_then_tez_same_block () =
   register_crac_runner_test
     ~title:
       "CRAC: EVM tx before TEZ->EVM in same block — CRAC-ID uses \
@@ -8836,7 +8680,7 @@ let test_crac_receipt_evm_then_tez_same_block =
  *  (Michelson is the originating runtime).
  *  EVM block: fake CRAC transaction from Handler_E with CRAC event log "0-0".
  *)
-let test_crac_receipt_tez_to_evm =
+let test_crac_receipt_tez_to_evm () =
   register_crac_runner_test
     ~title:"CRAC: TEZ->EVM receipt matches RFC structure"
     ~tags:["crac_receipt"]
@@ -8947,7 +8791,7 @@ let test_crac_receipt_tez_to_evm =
  *  re-entrant alias(E_1) → tez_inner_bridge and tez_inner_bridge → GW_M.
  *  EVM block: 1 fake CRAC tx with CRAC-ID "0-0".
  *)
-let test_crac_receipt_tez_evm_tez_evm =
+let test_crac_receipt_tez_evm_tez_evm () =
   register_crac_runner_test
     ~title:"CRAC: TEZ->EVM->TEZ->EVM triple crossing receipts"
     ~tags:["crac_receipt"]
@@ -9121,7 +8965,7 @@ let test_crac_receipt_tez_evm_tez_evm =
  *  EVM block: 1 transaction (all re-entrant EVM legs are internal
  *  per RFC principle 6).
  *)
-let test_crac_receipt_evm_5_crossing_chain =
+let test_crac_receipt_evm_5_crossing_chain () =
   register_crac_runner_test
     ~title:"CRAC: EVM 5-crossing chain receipt"
     ~tags:["crac_receipt"]
@@ -9339,7 +9183,7 @@ let test_crac_receipt_evm_5_crossing_chain =
  *  original TEZ transaction.
  *  EVM block: 1 fake CRAC tx with CRAC-ID "0-0".
  *)
-let test_crac_receipt_tez_mixed_calls_with_crac =
+let test_crac_receipt_tez_mixed_calls_with_crac () =
   register_crac_runner_test
     ~title:"CRAC: TEZ mixed calls with interleaved CRAC receipt"
     ~tags:["crac_receipt"]
@@ -9546,7 +9390,7 @@ let test_crac_receipt_tez_mixed_calls_with_crac =
  *    EVM[evm_caller] --call()--> TEZ[tez_runner]
  *
  *)
-let test_crac_http_call_success =
+let test_crac_http_call_success () =
   register_crac_runner_test
     ~title:"CRAC: generic call() EVM to TEZ success"
     ~tags:["http_call"]
@@ -9571,7 +9415,7 @@ let test_crac_http_call_success =
  *    runCatch() catches the revert, execution continues.
  *
  *)
-let test_crac_http_call_catch_revert =
+let test_crac_http_call_catch_revert () =
   register_crac_runner_test
     ~title:"CRAC: generic call() 4xx is catchable"
     ~tags:["http_call"; "revert"]
@@ -9603,7 +9447,7 @@ let test_crac_http_call_catch_revert =
  *    continues with its remaining gas.
  *
  *)
-let test_crac_http_call_catch_oog =
+let test_crac_http_call_catch_oog () =
   register_crac_runner_test
     ~title:"CRAC: generic call() subcall OOG is catchable"
     ~tags:["http_call"; "oog"]
@@ -9636,7 +9480,7 @@ let test_crac_http_call_catch_oog =
  *  delivers, its [count] reaches 1.  If the gateway path is broken for
  *  same-runtime targets, the CRAC fails and [catches] is incremented.
  *  This test asserts the CRAC succeeds end-to-end. *)
-let test_crac_http_call_evm_to_evm =
+let test_crac_http_call_evm_to_evm () =
   register_crac_runner_test
     ~title:"CRAC: generic call() EVM to EVM (same-runtime)"
     ~tags:["http_call"; "same_runtime"]
@@ -9670,7 +9514,7 @@ let test_crac_http_call_evm_to_evm =
  *  IdentityRecorder, calls it via the gateway from [CracHttpCallEvm],
  *  and asserts that the recorder observed the calling contract's real
  *  address rather than the laundered alias. *)
-let test_crac_http_call_evm_to_evm_preserves_msg_sender =
+let test_crac_http_call_evm_to_evm_preserves_msg_sender () =
   register_crac_runner_test
     ~title:"CRAC: same-runtime EVM→EVM round-trip preserves msg.sender"
     ~tags:["http_call"; "same_runtime"; "msg_sender"]
@@ -9723,7 +9567,7 @@ let test_crac_http_call_evm_to_evm_preserves_msg_sender =
  *  Michelson runtime.  The target is a plain [multi_run_caller] with no
  *  callees; if the CRAC delivers, its [count] reaches 1.  The caller's
  *  [count] reaches 2 (pre + post). *)
-let test_crac_http_call_tez_to_tez =
+let test_crac_http_call_tez_to_tez () =
   register_crac_runner_test
     ~title:"CRAC: generic call() TEZ to TEZ (same-runtime)"
     ~tags:["http_call"; "same_runtime"]
@@ -9748,7 +9592,7 @@ let test_crac_http_call_tez_to_tez =
  *    EVM[evm_caller] --call(http://ethereum/...)--> EVM[evm_reverter]
  *                                                   |-> revert()
  *  EVM caller wraps the gateway call in try/catch: catches=1, count=2. *)
-let test_crac_http_call_evm_to_evm_revert =
+let test_crac_http_call_evm_to_evm_revert () =
   register_crac_runner_test
     ~title:"CRAC: generic call() EVM to EVM (same-runtime) revert is catchable"
     ~tags:["http_call"; "same_runtime"; "revert"]
@@ -9779,7 +9623,7 @@ let test_crac_http_call_evm_to_evm_revert =
  *  the outer operation group, which reverts wholesale.  All three of
  *  tez_caller's internal operations (pre, gateway, post) are rolled
  *  back, so [count] stays at 0. *)
-let test_crac_http_call_tez_to_tez_revert =
+let test_crac_http_call_tez_to_tez_revert () =
   register_crac_runner_test
     ~title:"CRAC: generic call() TEZ to TEZ (same-runtime) revert propagates"
     ~tags:["http_call"; "same_runtime"; "revert"]
@@ -9809,7 +9653,7 @@ let test_crac_http_call_tez_to_tez_revert =
  *  response body.  The precompile ABI-encodes them as [bytes] and
  *  returns them to the caller.  Caller decodes [bytes] and stores it
  *  in [result]. *)
-let test_crac_http_call_evm_to_evm_return_value =
+let test_crac_http_call_evm_to_evm_return_value () =
   register_crac_runner_test
     ~title:
       "CRAC: generic call() EVM to EVM (same-runtime) returns target output"
@@ -9846,7 +9690,7 @@ let test_crac_http_call_evm_to_evm_return_value =
  *
  *  After the gateway returns, the deposited bytes are forwarded to
  *  [tez_caller %on_result] which stores them in [%result]. *)
-let test_crac_http_call_tez_to_tez_collect_result =
+let test_crac_http_call_tez_to_tez_collect_result () =
   register_crac_runner_test
     ~title:
       "CRAC: generic call() TEZ to TEZ (same-runtime) callback receives \
@@ -9976,9 +9820,8 @@ let test_l1_vs_tezosx_nested_failwith_receipt =
   let client = sequencer_setup.client in
   let node = sequencer_setup.node in
   let source = Constant.bootstrap5 in
-  let {Setup.sc_rollup_address; sc_rollup_node; l1_contracts; sequencer; _} =
-    sequencer_setup
-  in
+  let {Setup.sequencer; _} = sequencer_setup in
+  let* client_tezlink = tezlink_client_from_evm_node sequencer in
   let tez_counter = ref 1 in
   let next_tez_counter () =
     let c = !tez_counter in
@@ -10004,10 +9847,8 @@ let test_l1_vs_tezosx_nested_failwith_receipt =
       ~originate:(fun ~revert ~callees () ->
         let* _hex, kt1 =
           TezMultiRunCaller.originate
-            ~sc_rollup_address
-            ~sc_rollup_node
             ~client
-            ~l1_contracts
+            ~client_tezlink
             ~sequencer
             ~source
             ~counter:(next_tez_counter ())
@@ -10019,10 +9860,8 @@ let test_l1_vs_tezosx_nested_failwith_receipt =
         return kt1)
       ~call_run:(fun addr ->
         TezRunner.call_run
-          ~sc_rollup_address
-          ~sc_rollup_node
           ~client
-          ~l1_contracts
+          ~client_tezlink
           ~sequencer
           ~source
           ~counter:(next_tez_counter ())
@@ -10064,7 +9903,7 @@ let abi_encoded_uint256_99 =
  *    Gateway.call_evm ~> EVM[store_and_return]
  *
  *)
-let test_crac_callback_fire_and_forget =
+let test_crac_callback_fire_and_forget () =
   register_crac_runner_test
     ~title:"CRAC: callback fire-and-forget (None)"
     ~tags:["callback"]
@@ -10091,7 +9930,7 @@ let test_crac_callback_fire_and_forget =
  *        Gateway --> TEZ[callback_runner %on_result]
  *
  *)
-let test_crac_callback_receives_result_bytes =
+let test_crac_callback_receives_result_bytes () =
   register_crac_runner_test
     ~title:"CRAC: callback receives EVM result bytes"
     ~tags:["callback"]
@@ -10124,7 +9963,7 @@ let test_crac_callback_receives_result_bytes =
  *        Gateway --> TEZ[failing_callback_runner %on_result] --> FAILWITH
  *
  *)
-let test_crac_callback_failure_reverts_all =
+let test_crac_callback_failure_reverts_all () =
   register_crac_runner_test
     ~title:"CRAC: failing callback reverts entire operation group"
     ~tags:["callback"; "revert"]
@@ -10169,7 +10008,7 @@ let test_crac_callback_failure_reverts_all =
  *        Gateway --> TEZ[callback_runner %on_result]
  *
  *)
-let test_crac_callback_behind_crac =
+let test_crac_callback_behind_crac () =
   register_crac_runner_test
     ~title:"CRAC: callback behind a CRAC crossing"
     ~tags:["callback"]
@@ -10211,7 +10050,7 @@ let test_crac_callback_behind_crac =
  *     |-> REVERT
  *
  *)
-let test_crac_callback_tez_revert_rolls_back_callback =
+let test_crac_callback_tez_revert_rolls_back_callback () =
   register_crac_runner_test
     ~title:"CRAC: TEZ revert rolls back callback result"
     ~tags:["callback"; "revert"]
@@ -10264,7 +10103,7 @@ let test_crac_callback_tez_revert_rolls_back_callback =
  *                                              |-> %on_result --> FAILWITH
  *
  *)
-let test_crac_callback_evm_catches_failing_callback_behind_crac =
+let test_crac_callback_evm_catches_failing_callback_behind_crac () =
   register_crac_runner_test
     ~title:"CRAC: EVM catches failing callback behind CRAC"
     ~tags:["callback"; "revert"]
@@ -10327,7 +10166,7 @@ let test_crac_callback_evm_catches_failing_callback_behind_crac =
  *                                             |-> %on_result stores bytes
  *
  *)
-let test_crac_callback_mixed_with_normal_runners =
+let test_crac_callback_mixed_with_normal_runners () =
   register_crac_runner_test
     ~title:"CRAC: callback runner alongside normal CRAC runner"
     ~tags:["callback"]
@@ -10401,7 +10240,7 @@ let test_crac_callback_mixed_with_normal_runners =
  *  Instead the ~32M milligas flow through the header to the EVM
  *  receipt, pushing G_burner well above the threshold.
  *)
-let test_crac_gas_header_michelson_burner =
+let test_crac_gas_header_michelson_burner () =
   register_crac_runner_test
     ~title:"CRAC: X-Tezos-Gas-Consumed reports Michelson gas"
     ~tags:["gas"]
@@ -10498,7 +10337,7 @@ let test_crac_gas_header_michelson_burner =
  *  significant EVM gas.  The total gasUsed must exceed a baseline
  *  that only makes sense if the inner callee gas is accounted for.
  *)
-let test_crac_gas_model_callee_gas_in_evm_receipt =
+let test_crac_gas_model_callee_gas_in_evm_receipt () =
   register_crac_runner_test
     ~title:"CRAC: EVM receipt includes callee gas for %%call_evm"
     ~tags:["gas"]
@@ -10591,7 +10430,7 @@ let test_crac_gas_model_callee_gas_in_evm_receipt =
  *  (~13M milligas), not just the alias resolution cost (~520K).
  *  Threshold: 2M milligas.
  *)
-let test_crac_gas_model_callee_gas_in_receipt =
+let test_crac_gas_model_callee_gas_in_receipt () =
   register_crac_runner_test
     ~title:"CRAC: Michelson receipt includes callee gas for %%call_evm"
     ~tags:["gas"]
@@ -10719,7 +10558,7 @@ let test_crac_gas_model_callee_gas_in_receipt =
  *  upper bound — the whole point is to catch double-counting.
  *
  *)
-let test_crac_gas_accounting_investigation =
+let test_crac_gas_accounting_investigation () =
   register_crac_runner_test
     ~title:"CRAC: gas accounting investigation (A/B/C/D scenarios)"
     ~tags:["gas"; "investigation"]
@@ -10938,7 +10777,7 @@ let test_crac_gas_accounting_investigation =
  *  If the error path reports accurate gas, the outer gasUsed must
  *  include the GasBurner gas (> G_direct).  If buggy (~0), it cannot.
  *)
-let test_crac_gas_error_path_reporting =
+let test_crac_gas_error_path_reporting () =
   register_crac_runner_test
     ~title:"CRAC: error path reports accurate gas in X-Tezos-Gas-Consumed"
     ~tags:["gas"; "error"]
@@ -11072,7 +10911,7 @@ let test_crac_gas_error_path_reporting =
  *  to the EVM receipt.  If the header reported ~0 on OOG, G_oog
  *  would be close to G_baseline.
  *)
-let test_crac_gas_oog_path_reporting =
+let test_crac_gas_oog_path_reporting () =
   register_crac_runner_test
     ~title:"CRAC: OOG error path reports consumed gas in X-Tezos-Gas-Consumed"
     ~tags:["gas"; "oog"]
@@ -11143,7 +10982,7 @@ let test_crac_gas_oog_path_reporting =
 (** End-to-end happy-path check: the Michelson contract deposits bytes
     via [%collect_result]; the server surfaces them as the HTTP response
     body; the EVM caller recovers them via the [call] precompile. *)
-let test_crac_collect_result_surfaces_in_response_body =
+let test_crac_collect_result_surfaces_in_response_body () =
   register_crac_runner_test
     ~title:"CRAC: %collect_result bytes surface in HTTP response body"
     ~tags:["collect_result"; "http_call"]
@@ -11168,7 +11007,7 @@ let test_crac_collect_result_surfaces_in_response_body =
     leaking, and the EVM precompile call must revert.  The outer tx
     catches the revert via [runCatch()] so we can inspect post-revert
     state and confirm [result] stays empty. *)
-let test_crac_collect_result_rejects_nonzero_amount =
+let test_crac_collect_result_rejects_nonzero_amount () =
   register_crac_runner_test
     ~title:"CRAC: %collect_result rejects non-zero amount"
     ~tags:["collect_result"; "http_call"; "amount"]
@@ -11193,17 +11032,8 @@ let test_crac_collect_result_rejects_nonzero_amount =
   Log.debug ~prefix "Verify no bytes leaked into the result slot" ;
   let* () = EvmCollectResult.check_result ~expected_hex:"" evm_reader in
   Log.debug ~prefix "Verify the gateway accumulated no tez" ;
-  let tezlink_endpoint =
-    Client.(
-      Foreign_endpoint
-        Endpoint.
-          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
-  in
   let* gateway_balance =
-    Client.get_balance_for
-      ~endpoint:tezlink_endpoint
-      ~account:gateway_address
-      client
+    Client.get_balance_for ~account:gateway_address client_tezlink
   in
   Check.(
     (Tez.to_mutez gateway_balance = 0)
@@ -11216,7 +11046,7 @@ let test_crac_collect_result_rejects_nonzero_amount =
     op.  The server must return 4xx with no bytes leaking, so the EVM
     precompile call reverts and [result] stays empty even after the
     outer tx completes via [runCatch()]. *)
-let test_crac_collect_result_revert_discards_bytes =
+let test_crac_collect_result_revert_discards_bytes () =
   register_crac_runner_test
     ~title:"CRAC: revert discards %collect_result bytes"
     ~tags:["collect_result"; "http_call"; "revert"]
@@ -11255,7 +11085,7 @@ let test_crac_collect_result_revert_discards_bytes =
     Micheline; then 100 mgas + 10mgas/byte for serialization; 1_400_192
     mgas for IO work on the storage, finally the handler adds the
     size-dependent term [460 + 1.5 * size]. *)
-let test_crac_collect_result_size_sweep_matches_model =
+let test_crac_collect_result_size_sweep_matches_model () =
   register_crac_runner_test
     ~title:"CRAC: %collect_result size sweep matches model"
     ~tags:["collect_result"; "gas"]
@@ -11318,7 +11148,7 @@ let test_crac_collect_result_size_sweep_matches_model =
     Use [runCatch()] + [check_caught ~expected:false] to disambiguate:
     a silent precompile failure would also leave [result] empty, so
     asserting [caught = false] proves the call actually succeeded. *)
-let test_crac_collect_result_fire_and_forget_empty_body =
+let test_crac_collect_result_fire_and_forget_empty_body () =
   register_crac_runner_test
     ~title:"CRAC: no %collect_result call returns empty bytes to EVM caller"
     ~tags:["collect_result"; "http_call"; "fire_and_forget"]
@@ -11342,7 +11172,7 @@ let test_crac_collect_result_fire_and_forget_empty_body =
 (** Once-per-frame invariant: a second [%collect_result] call in the
     same frame reverts the entire Michelson operation group.  The EVM
     caller must see a revert and [result] must stay empty. *)
-let test_crac_collect_result_once_per_frame =
+let test_crac_collect_result_once_per_frame () =
   register_crac_runner_test
     ~title:"CRAC: second %collect_result in same frame reverts Michelson"
     ~tags:["collect_result"; "http_call"; "revert"]
@@ -11372,7 +11202,7 @@ let test_crac_collect_result_once_per_frame =
     deposits [inner_bytes] into a separate frame.  After unwinding:
       - the outer EVM caller receives [outer_bytes], not [inner_bytes]
       - the inner EVM contract holds [inner_bytes] in its [result()] *)
-let test_crac_collect_result_nested_independent_slots =
+let test_crac_collect_result_nested_independent_slots () =
   register_crac_runner_test
     ~title:"CRAC: nested frames have independent %collect_result slots"
     ~tags:["collect_result"; "http_call"; "nested"]
@@ -11426,7 +11256,7 @@ let test_crac_collect_result_nested_independent_slots =
     graceful [revert] returns unused gas (so [gasUsed] would be
     small), whereas an OOG burns the entire forwarded sub-call
     budget (~63/64 of the limit) before [catch] runs. *)
-let test_crac_collect_result_large_payload_oog =
+let test_crac_collect_result_large_payload_oog () =
   register_crac_runner_test
     ~title:"CRAC: 4 MiB %collect_result payload causes EVM OOG"
     ~tags:["collect_result"; "http_call"; "oog"]
@@ -11477,7 +11307,7 @@ let test_crac_collect_result_large_payload_oog =
     pre-flight balance check requires nothing); this test exercises a TEZ →
     EVM CRAC (which forces alias generation through the EVM runtime) and
     asserts [eth_getBalance] returns 0 for [TEZOSX_CALLER_ADDRESS]. *)
-let test_crac_tezosx_caller_balance_stays_zero =
+let test_crac_tezosx_caller_balance_stays_zero () =
   register_crac_runner_test
     ~title:"CRAC: TEZOSX_CALLER_ADDRESS balance stays zero (L2-1296)"
     ~tags:["caller_balance"; "l2_1296"]
@@ -11529,7 +11359,7 @@ let test_crac_tezosx_caller_balance_stays_zero =
     per-tx cap — since any such regression would once again break the
     high-end probes of the binary search and surface as an
     [eth_estimateGas] failure. *)
-let test_crac_evm_to_tez_high_gas =
+let test_crac_evm_to_tez_high_gas () =
   register_crac_runner_test
     ~title:"CRAC: eth_estimateGas works on EVM->TEZ bridge call (L2-1295)"
     ~tags:["gas"; "estimate_gas"; "l2_1295"]
@@ -11676,16 +11506,14 @@ let crac_orig_child_kt1s_for_callees ~prefix ~op_list ~callee_kt1s =
     (String.concat "; " children) ;
   children
 
-(* Register a test exposing the raw [sequencer_setup] (we need direct
-   access to [sc_rollup_address] / [sc_rollup_node] / [client] /
-   [l1_contracts] to originate Michelson contracts via the delayed
-   inbox, which the CRAC runner wrapper hides).
+(* Register a fullstack test exposing the raw setup components.  Only
+   used by tests that genuinely need the rollup node (e.g. the PVM
+   replay in [test_crac_evm_deep_recurse_then_michelson_oog]); every
+   other CRAC test runs on the sequencer-only sandbox.
 
    Tag-neutral base. The [tags] argument is appended verbatim to the
    default [tezosx; <runtime>; crac] tags so callers control the
-   per-test classification (e.g., origination-only, stack_overflow,
-   oog). [crac_orig_register] below builds on top with the
-   origination-specific tags. *)
+   per-test classification (e.g., stack_overflow, oog). *)
 let crac_register ~title ~tags body =
   let with_runtimes = Tezosx_runtime.[Tezos] in
   let tags =
@@ -11702,17 +11530,10 @@ let crac_register ~title ~tags body =
     ~enable_dal:false
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
   @@ fun sequencer_setup protocol ->
-  let {
-    Setup.sc_rollup_address;
-    sc_rollup_node;
-    l1_contracts;
-    sequencer;
-    client;
-    evm_version;
-    _;
-  } =
+  let {Setup.sc_rollup_node; sequencer; client; evm_version; _} =
     sequencer_setup
   in
+  let* client_tezlink = tezlink_client_from_evm_node sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let source = Constant.bootstrap5 in
   let ref_nonce = ref 0 in
@@ -11728,11 +11549,10 @@ let crac_register ~title ~tags body =
     c
   in
   body
-    ~sc_rollup_address
     ~sc_rollup_node
-    ~l1_contracts
     ~sequencer
     ~client
+    ~client_tezlink
     ~evm_version
     ~sender
     ~source
@@ -11740,20 +11560,65 @@ let crac_register ~title ~tags body =
     ~tez_counter
     protocol
 
-(* Origination-flavoured wrapper used by tests tracking the L2-1366
-   origination-collision ticket. *)
+(* Origination-flavoured sandbox register used by tests tracking the
+   L2-1366 origination-collision ticket.  Exposes the raw components
+   (we need direct access to [client] / [client_tezlink] to originate
+   Michelson contracts via direct tezlink injection, which the CRAC
+   runner wrapper hides). *)
 let crac_orig_register ~title ~tags body =
-  crac_register ~title ~tags:(["origination"; "l2_1366"] @ tags) body
+  let with_runtimes = Tezosx_runtime.[Tezos] in
+  let tags =
+    ["tezosx"]
+    @ List.map Tezosx_runtime.tag with_runtimes
+    @ ["crac"; "origination"; "l2_1366"]
+    @ tags
+  in
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~uses_client:true
+    ~kernel:Latest
+    ~title
+    ~tags
+    ~with_runtimes
+    ~minimum_base_fee_per_gas:crac_minimum_base_fee_per_gas
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@ fun sequencer ->
+  let* client =
+    Client.init_mockup ~protocol:Michelson_contracts.tezlink_protocol ()
+  in
+  let* client_tezlink = tezlink_client_from_evm_node sequencer in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let source = Constant.bootstrap5 in
+  let ref_nonce = ref 0 in
+  let evm_nonce () =
+    let n = !ref_nonce in
+    incr ref_nonce ;
+    n
+  in
+  let ref_counter = ref 1 in
+  let tez_counter () =
+    let c = !ref_counter in
+    incr ref_counter ;
+    c
+  in
+  body
+    ~sequencer
+    ~client
+    ~client_tezlink
+    ~evm_version:(Kernel.select_evm_version Kernel.Latest)
+    ~sender
+    ~source
+    ~evm_nonce
+    ~tez_counter
+    Michelson_contracts.tezlink_protocol
 
 (* Originate the Michelson callee fixture: a parameterless %run that
    performs exactly one CREATE_CONTRACT. *)
-let crac_orig_originate_create_on_run ~sc_rollup_address ~sc_rollup_node ~client
-    ~l1_contracts ~sequencer ~source ~counter protocol =
-  TezContract.originate_contract_via_delayed_inbox
-    ~sc_rollup_address
-    ~sc_rollup_node
+let crac_orig_originate_create_on_run ~client ~client_tezlink ~sequencer ~source
+    ~counter protocol =
+  TezContract.originate_contract_via_tezlink
     ~client
-    ~l1_contracts
+    ~client_tezlink
     ~sequencer
     ~source
     ~counter
@@ -11799,18 +11664,16 @@ let crac_orig_send_run_no_block ~sequencer ~sender ~nonce ~address =
 (* PRIMARY: two distinct top-level EVM txs in ONE block, each NACing
    into a Michelson callee that performs CREATE_CONTRACT.  With the
    fix, the two children must derive DISTINCT KT1s. *)
-let test_crac_orig_two_txs_one_block =
+let test_crac_orig_two_txs_one_block () =
   crac_orig_register
     ~title:
       "CRAC: two inbound-CRAC CREATE_CONTRACT in two txs / one block produce \
        distinct KT1s"
     ~tags:["collision"]
   @@
-  fun ~sc_rollup_address
-      ~sc_rollup_node
-      ~l1_contracts
-      ~sequencer
+  fun ~sequencer
       ~client
+      ~client_tezlink
       ~evm_version
       ~sender
       ~source
@@ -11822,10 +11685,8 @@ let test_crac_orig_two_txs_one_block =
   Log.debug ~prefix "Originate Michelson CREATE_CONTRACT callee #1" ;
   let* _, kt1_callee_1 =
     crac_orig_originate_create_on_run
-      ~sc_rollup_address
-      ~sc_rollup_node
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter:(tez_counter ())
@@ -11834,10 +11695,8 @@ let test_crac_orig_two_txs_one_block =
   Log.debug ~prefix "Originate Michelson CREATE_CONTRACT callee #2" ;
   let* _, kt1_callee_2 =
     crac_orig_originate_create_on_run
-      ~sc_rollup_address
-      ~sc_rollup_node
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter:(tez_counter ())
@@ -11887,9 +11746,6 @@ let test_crac_orig_two_txs_one_block =
   in
   Log.debug ~prefix "Produce ONE block containing both txs" ;
   let*@ _block_number = Rpc.produce_block sequencer in
-  let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-  in
   let* () =
     EvmCrossRuntimeRunnerTez.check_storage
       ~sequencer
@@ -11948,18 +11804,16 @@ let test_crac_orig_two_txs_one_block =
    distinct KT1s.  Pre-fix, they collided on the same constant address
    regardless of block; post-fix the block_number is mixed into the
    seed so cross-block isolation also holds. *)
-let test_crac_orig_two_txs_two_blocks =
+let test_crac_orig_two_txs_two_blocks () =
   crac_orig_register
     ~title:
       "CRAC: two inbound-CRAC CREATE_CONTRACT in two txs / two blocks produce \
        distinct KT1s"
     ~tags:["cross_block"]
   @@
-  fun ~sc_rollup_address
-      ~sc_rollup_node
-      ~l1_contracts
-      ~sequencer
+  fun ~sequencer
       ~client
+      ~client_tezlink
       ~evm_version
       ~sender
       ~source
@@ -11970,10 +11824,8 @@ let test_crac_orig_two_txs_two_blocks =
   let prefix = "CRAC-ORIG-BLK" in
   let* _, kt1_callee_1 =
     crac_orig_originate_create_on_run
-      ~sc_rollup_address
-      ~sc_rollup_node
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter:(tez_counter ())
@@ -11981,18 +11833,16 @@ let test_crac_orig_two_txs_two_blocks =
   in
   let* _, kt1_callee_2 =
     crac_orig_originate_create_on_run
-      ~sc_rollup_address
-      ~sc_rollup_node
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter:(tez_counter ())
       protocol
   in
-  (* The two callees were originated via the native delayed-inbox path
-     (real per-op hash); their addresses must already be distinct — this
-     guards the fixture itself. *)
+  (* The two callees were originated via the native tezlink-injection
+     path (real per-op hash); their addresses must already be distinct —
+     this guards the fixture itself. *)
   Check.(
     (kt1_callee_1 <> kt1_callee_2)
       string
@@ -12028,9 +11878,6 @@ let test_crac_orig_two_txs_two_blocks =
       ~address:bridge_1
   in
   let*@ _b1 = Rpc.produce_block sequencer in
-  let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-  in
   let* ops1 = fetch_recent_michelson_manager_ops sequencer in
   let child_1 =
     crac_orig_child_kt1_for_callee
@@ -12047,9 +11894,6 @@ let test_crac_orig_two_txs_two_blocks =
       ~address:bridge_2
   in
   let*@ _b2 = Rpc.produce_block sequencer in
-  let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-  in
   let* ops2 = fetch_recent_michelson_manager_ops sequencer in
   let child_2 =
     crac_orig_child_kt1_for_callee
@@ -12093,18 +11937,16 @@ let test_crac_orig_two_txs_two_blocks =
    wired to call two bridges; one EVM call produces one synthetic
    Michelson manager op carrying both CREATE_CONTRACTs, and we
    assert the two children are distinct KT1s. *)
-let test_crac_orig_two_cracs_one_tx =
+let test_crac_orig_two_cracs_one_tx () =
   crac_orig_register
     ~title:
       "CRAC: two inbound-CRAC CREATE_CONTRACT in a single EVM tx produce \
        distinct KT1s"
     ~tags:["intra_tx"]
   @@
-  fun ~sc_rollup_address
-      ~sc_rollup_node
-      ~l1_contracts
-      ~sequencer
+  fun ~sequencer
       ~client
+      ~client_tezlink
       ~evm_version
       ~sender
       ~source
@@ -12116,10 +11958,8 @@ let test_crac_orig_two_cracs_one_tx =
   Log.debug ~prefix "Originate Michelson CREATE_CONTRACT callee #1" ;
   let* _, kt1_callee_1 =
     crac_orig_originate_create_on_run
-      ~sc_rollup_address
-      ~sc_rollup_node
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter:(tez_counter ())
@@ -12128,10 +11968,8 @@ let test_crac_orig_two_cracs_one_tx =
   Log.debug ~prefix "Originate Michelson CREATE_CONTRACT callee #2" ;
   let* _, kt1_callee_2 =
     crac_orig_originate_create_on_run
-      ~sc_rollup_address
-      ~sc_rollup_node
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter:(tez_counter ())
@@ -12187,9 +12025,6 @@ let test_crac_orig_two_cracs_one_tx =
       ~address:main_addr
   in
   let*@ _block_number = Rpc.produce_block sequencer in
-  let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-  in
   let* ops = fetch_recent_michelson_manager_ops sequencer in
   let op_list = JSON.(ops |> as_list) in
   Log.info
@@ -12266,11 +12101,10 @@ let test_crac_evm_deep_recurse_then_michelson_oog =
       "CRAC: deep EVM recursion then Michelson diverging lambda returns OOG"
     ~tags:["stack_overflow"; "oog"]
   @@
-  fun ~sc_rollup_address
-      ~sc_rollup_node
-      ~l1_contracts
+  fun ~sc_rollup_node
       ~sequencer
       ~client
+      ~client_tezlink
       ~evm_version
       ~sender
       ~source
@@ -12281,11 +12115,9 @@ let test_crac_evm_deep_recurse_then_michelson_oog =
   let prefix = "CRAC" in
   Log.debug ~prefix "Originate diverging_lambda Michelson contract" ;
   let* _lambda_hex, lambda_kt1 =
-    TezContract.originate_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
+    TezContract.originate_contract_via_tezlink
       ~client
-      ~l1_contracts
+      ~client_tezlink
       ~sequencer
       ~source
       ~counter:(tez_counter ())
@@ -12401,125 +12233,125 @@ let test_crac_evm_deep_recurse_then_michelson_oog =
   unit
 
 let () =
-  test_crac_evm_to_tez [Alpha] ;
-  test_crac_evm_multiple_independent_crossings [Alpha] ;
-  test_crac_evm_double_crossing [Alpha] ;
-  test_crac_evm_shared_leaf_via_direct_and_chain [Alpha] ;
-  test_crac_evm_5_crossing_chain [Alpha] ;
-  test_crac_tez_to_evm [Alpha] ;
-  test_crac_tez_multiple_independent_crossings [Alpha] ;
-  test_crac_tez_double_crossing [Alpha] ;
-  test_crac_tez_shared_leaf_via_direct_and_chain [Alpha] ;
-  test_crac_tez_5_crossing_chain [Alpha] ;
-  test_crac_access_list_preserved [Alpha] ;
-  test_crac_evm_to_tez_reverts [Alpha] ;
-  test_crac_evm_to_tez_materializes_alias [Alpha] ;
-  test_crac_evm_to_tez_revert_drops_alias [Alpha] ;
-  test_crac_tez_to_evm_reverts [Alpha] ;
-  test_crac_tez_to_evm_fake_tx_in_block [Alpha] ;
-  test_crac_tez_to_evm_fake_tx_unique_hash_across_blocks [Alpha] ;
-  test_crac_tez_to_evm_inner_logs_in_receipt [Alpha] ;
-  test_crac_tez_to_evm_block_observables_visible [Alpha] ;
-  test_crac_tez_revert_rolls_back_inner_evm_storage [Alpha] ;
-  test_crac_tez_revert_propagates_to_evm [Alpha] ;
-  test_crac_evm_journal_state_preserved [Alpha] ;
-  test_crac_catch_tez_revert [Alpha] ;
-  test_crac_evm_revert_propagates_to_tez [Alpha] ;
-  test_crac_second_crac_tez_revert [Alpha] ;
-  test_crac_evm_revert_rolls_back_two_cracs [Alpha] ;
-  test_crac_deep_branch_with_second_tez_revert [Alpha] ;
-  test_crac_nested_revert_cascade_without_catch [Alpha] ;
-  test_crac_double_nested_evm_revert [Alpha] ;
-  test_crac_deep_nesting_6_levels [Alpha] ;
-  test_crac_evm_revert_after_nested_cracs [Alpha] ;
-  test_crac_evm_target_reverts [Alpha] ;
-  test_crac_second_crac_evm_revert [Alpha] ;
-  test_crac_tez_revert_rolls_back_two_cracs [Alpha] ;
-  test_crac_deep_branch_with_second_evm_revert [Alpha] ;
-  test_crac_tez_nested_revert_cascade_without_catch [Alpha] ;
-  test_crac_double_nested_tez_revert [Alpha] ;
-  test_crac_tez_deep_nesting_6_levels [Alpha] ;
-  test_crac_tez_revert_after_nested_cracs [Alpha] ;
-  test_crac_catch_evm_revert_between_cracs [Alpha] ;
-  test_crac_catch_tez_revert_between_cracs [Alpha] ;
-  test_crac_catch_tez_revert_with_nested_crac [Alpha] ;
-  test_crac_catch_deep_evm_revert_through_double_crac [Alpha] ;
-  test_crac_tez_catch_evm_revert_between_cracs [Alpha] ;
-  test_crac_tez_catch_tez_revert_between_cracs [Alpha] ;
-  test_crac_tez_catch_deep_revert_through_double_crac [Alpha] ;
-  test_crac_catch_revert_after_multiple_cracs [Alpha] ;
-  test_crac_catch_tez_revert_after_multiple_return_cracs [Alpha] ;
-  test_crac_catch_4_crossing_chain_revert [Alpha] ;
-  test_crac_tez_catch_4_crossing_chain_revert [Alpha] ;
-  test_crac_catch_5_crossing_chain_revert [Alpha] ;
-  test_crac_tez_catch_5_crossing_chain_revert [Alpha] ;
-  test_crac_chained_tez_calls_behind_crac [Alpha] ;
-  test_crac_nested_catches_with_multiple_reverts [Alpha] ;
-  test_crac_gas_model_alias_caching [Alpha] ;
-  test_crac_evm_to_tez_receipt [Alpha] ;
-  test_crac_user_emit_in_reentrant_inner_crac [Alpha] ;
-  test_crac_synthetic_event_survives_failed_inner_with_emit [Alpha] ;
-  test_crac_synthetic_event_present_when_applied_crac_reverted_out [Alpha] ;
-  test_crac_applied_body_preserved_as_backtracked_on_evm_revert [Alpha] ;
-  test_crac_receipt_two_independent [Alpha] ;
-  test_crac_receipt_separate_tx_two_cracs [Alpha] ;
-  test_crac_receipt_evm_tez_evm [Alpha] ;
-  test_crac_receipt_tez_evm_tez [Alpha] ;
-  test_crac_receipt_tez_gateway_direct_evm_tez [Alpha] ;
-  test_crac_receipt_tez_gateway_direct_evm_tez_revert [Alpha] ;
-  test_crac_receipt_evm_tez_evm_tez [Alpha] ;
-  test_crac_receipt_evm_to_tez_revert [Alpha] ;
-  test_crac_receipt_two_failed_independent [Alpha] ;
-  test_crac_receipt_interleaved_failed_pending [Alpha] ;
-  test_crac_receipt_evm_not_first_tx [Alpha] ;
-  test_crac_receipt_tez_not_first_tx [Alpha] ;
-  test_crac_receipt_evm_then_tez_same_block [Alpha] ;
-  test_crac_receipt_tez_to_evm [Alpha] ;
-  test_crac_receipt_tez_evm_tez_evm [Alpha] ;
-  test_crac_receipt_evm_5_crossing_chain [Alpha] ;
-  test_crac_receipt_tez_mixed_calls_with_crac [Alpha] ;
-  test_crac_http_call_success [Alpha] ;
-  test_crac_http_call_catch_revert [Alpha] ;
-  test_crac_http_call_catch_oog [Alpha] ;
-  test_crac_http_call_evm_to_evm [Alpha] ;
-  test_crac_http_call_evm_to_evm_preserves_msg_sender [Alpha] ;
-  test_crac_http_call_tez_to_tez [Alpha] ;
-  test_crac_http_call_evm_to_evm_revert [Alpha] ;
-  test_crac_http_call_tez_to_tez_revert [Alpha] ;
-  test_crac_http_call_evm_to_evm_return_value [Alpha] ;
-  test_crac_http_call_tez_to_tez_collect_result [Alpha] ;
-  test_crac_debug_trace_transaction [Alpha] ;
-  test_crac_debug_trace_block [Alpha] ;
-  test_crac_debug_trace_normal_tx_in_crac_block [Alpha] ;
-  test_http_trace_nested_crac [Alpha] ;
-  test_http_trace_multiple_independent_cracs [Alpha] ;
-  test_http_trace_mixed_block [Alpha] ;
-  test_http_trace_crac_depth_propagation [Alpha] ;
+  test_crac_evm_to_tez () ;
+  test_crac_evm_multiple_independent_crossings () ;
+  test_crac_evm_double_crossing () ;
+  test_crac_evm_shared_leaf_via_direct_and_chain () ;
+  test_crac_evm_5_crossing_chain () ;
+  test_crac_tez_to_evm () ;
+  test_crac_tez_multiple_independent_crossings () ;
+  test_crac_tez_double_crossing () ;
+  test_crac_tez_shared_leaf_via_direct_and_chain () ;
+  test_crac_tez_5_crossing_chain () ;
+  test_crac_access_list_preserved () ;
+  test_crac_evm_to_tez_reverts () ;
+  test_crac_evm_to_tez_materializes_alias () ;
+  test_crac_evm_to_tez_revert_drops_alias () ;
+  test_crac_tez_to_evm_reverts () ;
+  test_crac_tez_to_evm_fake_tx_in_block () ;
+  test_crac_tez_to_evm_fake_tx_unique_hash_across_blocks () ;
+  test_crac_tez_to_evm_inner_logs_in_receipt () ;
+  test_crac_tez_to_evm_block_observables_visible () ;
+  test_crac_tez_revert_rolls_back_inner_evm_storage () ;
+  test_crac_tez_revert_propagates_to_evm () ;
+  test_crac_evm_journal_state_preserved () ;
+  test_crac_catch_tez_revert () ;
+  test_crac_evm_revert_propagates_to_tez () ;
+  test_crac_second_crac_tez_revert () ;
+  test_crac_evm_revert_rolls_back_two_cracs () ;
+  test_crac_deep_branch_with_second_tez_revert () ;
+  test_crac_nested_revert_cascade_without_catch () ;
+  test_crac_double_nested_evm_revert () ;
+  test_crac_deep_nesting_6_levels () ;
+  test_crac_evm_revert_after_nested_cracs () ;
+  test_crac_evm_target_reverts () ;
+  test_crac_second_crac_evm_revert () ;
+  test_crac_tez_revert_rolls_back_two_cracs () ;
+  test_crac_deep_branch_with_second_evm_revert () ;
+  test_crac_tez_nested_revert_cascade_without_catch () ;
+  test_crac_double_nested_tez_revert () ;
+  test_crac_tez_deep_nesting_6_levels () ;
+  test_crac_tez_revert_after_nested_cracs () ;
+  test_crac_catch_evm_revert_between_cracs () ;
+  test_crac_catch_tez_revert_between_cracs () ;
+  test_crac_catch_tez_revert_with_nested_crac () ;
+  test_crac_catch_deep_evm_revert_through_double_crac () ;
+  test_crac_tez_catch_evm_revert_between_cracs () ;
+  test_crac_tez_catch_tez_revert_between_cracs () ;
+  test_crac_tez_catch_deep_revert_through_double_crac () ;
+  test_crac_catch_revert_after_multiple_cracs () ;
+  test_crac_catch_tez_revert_after_multiple_return_cracs () ;
+  test_crac_catch_4_crossing_chain_revert () ;
+  test_crac_tez_catch_4_crossing_chain_revert () ;
+  test_crac_catch_5_crossing_chain_revert () ;
+  test_crac_tez_catch_5_crossing_chain_revert () ;
+  test_crac_chained_tez_calls_behind_crac () ;
+  test_crac_nested_catches_with_multiple_reverts () ;
+  test_crac_gas_model_alias_caching () ;
+  test_crac_evm_to_tez_receipt () ;
+  test_crac_user_emit_in_reentrant_inner_crac () ;
+  test_crac_synthetic_event_survives_failed_inner_with_emit () ;
+  test_crac_synthetic_event_present_when_applied_crac_reverted_out () ;
+  test_crac_applied_body_preserved_as_backtracked_on_evm_revert () ;
+  test_crac_receipt_two_independent () ;
+  test_crac_receipt_separate_tx_two_cracs () ;
+  test_crac_receipt_evm_tez_evm () ;
+  test_crac_receipt_tez_evm_tez () ;
+  test_crac_receipt_tez_gateway_direct_evm_tez () ;
+  test_crac_receipt_tez_gateway_direct_evm_tez_revert () ;
+  test_crac_receipt_evm_tez_evm_tez () ;
+  test_crac_receipt_evm_to_tez_revert () ;
+  test_crac_receipt_two_failed_independent () ;
+  test_crac_receipt_interleaved_failed_pending () ;
+  test_crac_receipt_evm_not_first_tx () ;
+  test_crac_receipt_tez_not_first_tx () ;
+  test_crac_receipt_evm_then_tez_same_block () ;
+  test_crac_receipt_tez_to_evm () ;
+  test_crac_receipt_tez_evm_tez_evm () ;
+  test_crac_receipt_evm_5_crossing_chain () ;
+  test_crac_receipt_tez_mixed_calls_with_crac () ;
+  test_crac_http_call_success () ;
+  test_crac_http_call_catch_revert () ;
+  test_crac_http_call_catch_oog () ;
+  test_crac_http_call_evm_to_evm () ;
+  test_crac_http_call_evm_to_evm_preserves_msg_sender () ;
+  test_crac_http_call_tez_to_tez () ;
+  test_crac_http_call_evm_to_evm_revert () ;
+  test_crac_http_call_tez_to_tez_revert () ;
+  test_crac_http_call_evm_to_evm_return_value () ;
+  test_crac_http_call_tez_to_tez_collect_result () ;
+  test_crac_debug_trace_transaction () ;
+  test_crac_debug_trace_block () ;
+  test_crac_debug_trace_normal_tx_in_crac_block () ;
+  test_http_trace_nested_crac () ;
+  test_http_trace_multiple_independent_cracs () ;
+  test_http_trace_mixed_block () ;
+  test_http_trace_crac_depth_propagation () ;
   test_l1_vs_tezosx_nested_failwith_receipt [Alpha] ;
-  test_crac_callback_fire_and_forget [Alpha] ;
-  test_crac_callback_receives_result_bytes [Alpha] ;
-  test_crac_callback_failure_reverts_all [Alpha] ;
-  test_crac_callback_behind_crac [Alpha] ;
-  test_crac_callback_tez_revert_rolls_back_callback [Alpha] ;
-  test_crac_callback_evm_catches_failing_callback_behind_crac [Alpha] ;
-  test_crac_callback_mixed_with_normal_runners [Alpha] ;
-  test_crac_gas_header_michelson_burner [Alpha] ;
-  test_crac_gas_model_callee_gas_in_evm_receipt [Alpha] ;
-  test_crac_gas_model_callee_gas_in_receipt [Alpha] ;
-  test_crac_gas_accounting_investigation [Alpha] ;
-  test_crac_gas_error_path_reporting [Alpha] ;
-  test_crac_gas_oog_path_reporting [Alpha] ;
-  test_crac_collect_result_surfaces_in_response_body [Alpha] ;
-  test_crac_collect_result_rejects_nonzero_amount [Alpha] ;
-  test_crac_collect_result_revert_discards_bytes [Alpha] ;
-  test_crac_collect_result_size_sweep_matches_model [Alpha] ;
-  test_crac_collect_result_fire_and_forget_empty_body [Alpha] ;
-  test_crac_collect_result_once_per_frame [Alpha] ;
-  test_crac_collect_result_nested_independent_slots [Alpha] ;
-  test_crac_collect_result_large_payload_oog [Alpha] ;
-  test_crac_tezosx_caller_balance_stays_zero [Alpha] ;
-  test_crac_evm_to_tez_high_gas [Alpha] ;
-  test_crac_orig_two_txs_one_block [Alpha] ;
-  test_crac_orig_two_txs_two_blocks [Alpha] ;
-  test_crac_orig_two_cracs_one_tx [Alpha] ;
+  test_crac_callback_fire_and_forget () ;
+  test_crac_callback_receives_result_bytes () ;
+  test_crac_callback_failure_reverts_all () ;
+  test_crac_callback_behind_crac () ;
+  test_crac_callback_tez_revert_rolls_back_callback () ;
+  test_crac_callback_evm_catches_failing_callback_behind_crac () ;
+  test_crac_callback_mixed_with_normal_runners () ;
+  test_crac_gas_header_michelson_burner () ;
+  test_crac_gas_model_callee_gas_in_evm_receipt () ;
+  test_crac_gas_model_callee_gas_in_receipt () ;
+  test_crac_gas_accounting_investigation () ;
+  test_crac_gas_error_path_reporting () ;
+  test_crac_gas_oog_path_reporting () ;
+  test_crac_collect_result_surfaces_in_response_body () ;
+  test_crac_collect_result_rejects_nonzero_amount () ;
+  test_crac_collect_result_revert_discards_bytes () ;
+  test_crac_collect_result_size_sweep_matches_model () ;
+  test_crac_collect_result_fire_and_forget_empty_body () ;
+  test_crac_collect_result_once_per_frame () ;
+  test_crac_collect_result_nested_independent_slots () ;
+  test_crac_collect_result_large_payload_oog () ;
+  test_crac_tezosx_caller_balance_stays_zero () ;
+  test_crac_evm_to_tez_high_gas () ;
+  test_crac_orig_two_txs_one_block () ;
+  test_crac_orig_two_txs_two_blocks () ;
+  test_crac_orig_two_cracs_one_tx () ;
   test_crac_evm_deep_recurse_then_michelson_oog [Alpha]
