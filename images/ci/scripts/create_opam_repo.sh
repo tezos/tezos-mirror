@@ -3,8 +3,10 @@
 set -eu
 
 # use opam proxy, if available
+# Respect an OPAMFETCH inherited from the environment (set by the Dockerfile),
+# falling back to the legacy /tmp location when run standalone.
 # shellcheck disable=SC2034
-OPAMFETCH="/tmp/kiss-fetch.sh"
+OPAMFETCH="${OPAMFETCH:-/tmp/kiss-fetch.sh}"
 # shellcheck disable=SC2034
 KISSCACHE="http://kisscache.kisscache.svc.cluster.local"
 
@@ -27,6 +29,14 @@ git fetch --depth 1 origin "$opam_repository_tag"
 git checkout "$opam_repository_tag"
 # No need to store the whole Git history in the Docker images.
 rm -rf .git .github .gitignore .gitattributes
+# Use the content-addressed opam cache as an archive mirror. A bare git clone
+# of opam-repository carries no archive-mirrors, so opam fetches sources from
+# their upstream URLs only. GitHub regenerates its on-the-fly archive tarballs
+# (archive/refs/tags/*.tar.gz), so those bytes drift from the md5/sha512 pinned
+# in opam-repository and [opam admin add-hashes] then fails verification (e.g.
+# "Could not get hash for ambient-context.0.1.0"). The opam cache stores
+# archives by hash, so it always returns the original, matching bytes.
+echo 'archive-mirrors: "https://opam.ocaml.org/cache"' >> repo
 cd ..
 
 echo "Add package: octez-deps"
