@@ -510,6 +510,21 @@ let make_job_rust_based_images_merge ?(changeset = false) () =
       ]
     ["scripts/ci/docker-merge-base-images.sh"]
 
+(* ── Cacio: debian-rust ──────────────────────────────────────────────────── *)
+
+let job_rust_based_images =
+  base_image_job
+    ~image_name:"debian-rust"
+    ~base_name:(Pipeline_dep "debian")
+    ~matrix:[("RELEASE", ["trixie"])]
+    ~compilation:Native
+    "images/base-images/Dockerfile.rust"
+    ~__POS__
+    ~description:"Build debian-rust base images"
+    ~only_if_changed:Files.(debian_rust_build @ debian_base)
+    ~needs_legacy:[(Cacio.Job, make_job_debian_based_images ())]
+    "images.debian-rust"
+
 (* ── debian-homebrew ────────────────────────────────────────────────────── *)
 
 (* ── Cacio: debian-homebrew ──────────────────────────────────────────────── *)
@@ -668,7 +683,6 @@ let jobs ?start_job ?(changeset = false) () =
   [
     make_job_debian_based_images ?start_job ~changeset ();
     make_job_ubuntu_based_images ?start_job ~changeset ();
-    make_job_rust_based_images ?start_job ~changeset ();
     make_job_rust_based_images_merge ~changeset ();
   ]
   @
@@ -695,6 +709,7 @@ let () =
       (Cacio.Auto, job_debian_build_based_images_merge);
       (Cacio.Auto, job_ubuntu_build_based_images);
       (Cacio.Auto, job_ubuntu_build_based_images_merge);
+      (Cacio.Auto, job_rust_based_images);
     ]
   in
   Cacio.register_merge_request_jobs jobs ;
