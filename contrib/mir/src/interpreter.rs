@@ -399,15 +399,6 @@ enum CodeRef<'a, 'b> {
     Owned(Rc<[Instruction<'a>]>),
 }
 
-impl<'a, 'b> CodeRef<'a, 'b> {
-    fn len(&self) -> usize {
-        match self {
-            CodeRef::Borrowed(s) => s.len(),
-            CodeRef::Owned(rc) => rc.len(),
-        }
-    }
-}
-
 /// Worklist frame for the iterative interpreter driver. Each variant
 /// either kicks the next instruction in a block or finalizes the side
 /// effects of a previously opened control flow shape.
@@ -811,6 +802,42 @@ fn push_stack<'a>(
     Ok(())
 }
 
+/// Run consecutive `StepResult::Done` instructions of `instrs` in place,
+/// advancing `*idx` until either the block is exhausted (charging
+/// `INTERPRET_RET`) or a non-`Done` step breaks the run.
+///
+/// Returns `Some(step)` for the breaking step — the caller re-pushes the
+/// parent `NextInstr` at the advanced `idx` and dispatches `step` through
+/// `handle_step` — or `None` when the block ran out.
+///
+/// `mk_body` materializes nested control-flow bodies into a [`CodeRef`]:
+/// `CodeRef::Borrowed` for arena-borrowed blocks (zero-copy) or a cloning
+/// closure for owned `Rc` blocks. Each call site passes a distinct closure
+/// type, so the compiler monomorphises one copy of this function per
+/// `CodeRef` arm — the borrowed hot path keeps its sub-bodies zero-copy
+/// with no runtime dispatch.
+fn run_done_until<'a, 'b, 'c>(
+    instrs: &'c [Instruction<'a>],
+    idx: &mut usize,
+    stack: &mut IStack<'a>,
+    ctx: &mut impl CtxTrait<'a>,
+    arena: &'a Arena<Micheline<'a>>,
+    mk_body: impl Copy + Fn(&'c [Instruction<'a>]) -> CodeRef<'a, 'b>,
+) -> Result<Option<StepResult<'a, 'b>>, InterpretError<'a>> {
+    loop {
+        if *idx >= instrs.len() {
+            ctx.gas().consume(interpret_cost::INTERPRET_RET)?;
+            return Ok(None);
+        }
+        let step = interpret_step(&instrs[*idx], ctx, arena, stack, mk_body)?;
+        *idx += 1;
+        match step {
+            StepResult::Done => continue,
+            other => return Ok(Some(other)),
+        }
+    }
+}
+
 fn run_interp_driver<'a, 'b>(
     ctx: &mut impl CtxTrait<'a>,
     arena: &'a Arena<Micheline<'a>>,
@@ -819,48 +846,48 @@ fn run_interp_driver<'a, 'b>(
 ) -> Result<(), InterpretError<'a>> {
     while let Some(frame) = frames.pop() {
         match frame {
-            InterpFrame::NextInstr { block, idx } => {
-                if idx >= block.len() {
-                    ctx.gas().consume(interpret_cost::INTERPRET_RET)?;
-                    continue;
-                }
-                // A nested control-flow body inherits its parent's kind: a
-                // body borrowed from the AST stays borrowed (zero-copy); a
-                // body in an owned `Rc` (a runtime lambda/view body) must be
-                // cloned, because a borrow into the `Rc` cannot outlive this
-                // frame once it is re-pushed below. Only the per-instruction
-                // borrow lifetime and the body-materialization closure differ
-                // between the two arms; the gas charge above and `handle_step`
-                // below are shared. The parent NextInstr is re-pushed before
-                // any nested frames so it lands below them.
-                let step = match block {
+            InterpFrame::NextInstr { block, mut idx } => {
+                // Fast path: stay in this frame while consecutive
+                // instructions return `StepResult::Done` (the common
+                // case — `PUSH`, `DROP`, `DUP`, `INT`, `NAT`, `ADD`,
+                // arithmetic, comparisons, etc.). Only push/pop a new
+                // worklist frame when control flow actually opens a
+                // sub-block (`Open*` arms). The active sub-stack is
+                // hoisted once per block — it only changes when
+                // `OpenExec` / `OpenView` runs, and those `break` out
+                // of the inner loop before `handle_step` mutates
+                // `stacks`.
+                //
+                // L2-1579: pre-fix, the driver popped + re-pushed the
+                // parent `NextInstr` every instruction and called
+                // `handle_step` to dispatch `StepResult::Done` into a
+                // no-op match arm. For arithmetic-heavy blocks (the
+                // int/nat benchmark profile) the per-instruction
+                // worklist + sub-stack lookup + `StepResult` round
+                // trip dominated the actual instruction work, which
+                // is what !21984 regressed. The inner-loop form
+                // (`run_done_until`) pays worklist + `handle_step`
+                // cost only once per control-flow event.
+                //
+                // The `CodeRef::{Borrowed, Owned}` split survives: a
+                // borrowed block keeps sub-bodies arena-borrowed
+                // (zero-copy), an owned block clones via
+                // `body_to_owned`. Each arm hands `run_done_until` a
+                // distinct `mk_body` closure, so it is monomorphised
+                // per arm — same codegen as two hand-inlined loops.
+                let stack = active_stack_mut(stacks)?;
+                let pending = match &block {
                     CodeRef::Borrowed(s) => {
-                        let step = interpret_step(
-                            &s[idx],
-                            ctx,
-                            arena,
-                            active_stack_mut(stacks)?,
-                            CodeRef::Borrowed,
-                        )?;
-                        frames.push(InterpFrame::NextInstr {
-                            block: CodeRef::Borrowed(s),
-                            idx: idx + 1,
-                        });
-                        step
+                        run_done_until(s, &mut idx, stack, ctx, arena, CodeRef::Borrowed)?
                     }
-                    CodeRef::Owned(rc) => {
-                        let step =
-                            interpret_step(&rc[idx], ctx, arena, active_stack_mut(stacks)?, |b| {
-                                CodeRef::Owned(body_to_owned(b))
-                            })?;
-                        frames.push(InterpFrame::NextInstr {
-                            block: CodeRef::Owned(rc),
-                            idx: idx + 1,
-                        });
-                        step
-                    }
+                    CodeRef::Owned(rc) => run_done_until(rc, &mut idx, stack, ctx, arena, |b| {
+                        CodeRef::Owned(body_to_owned(b))
+                    })?,
                 };
-                handle_step(step, ctx, stacks, frames)?;
+                if let Some(step) = pending {
+                    frames.push(InterpFrame::NextInstr { block, idx });
+                    handle_step(step, ctx, stacks, frames)?;
+                }
             }
             InterpFrame::AfterDip {
                 protected,
