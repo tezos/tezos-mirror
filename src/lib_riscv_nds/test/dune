@@ -9,7 +9,7 @@
   bls12-381.archive
   octez-libs.base
   octez-libs.riscv-nds-common
-  octez-riscv-nds.memory
+  octez-libs.riscv-nds-memory
   octez-riscv-nds.disk
   octez-libs.test-helpers
   octez-libs.qcheck-tezt

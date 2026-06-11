@@ -3,7 +3,7 @@
 
 (library
  (name octez_riscv_nds_memory)
- (public_name octez-riscv-nds.memory)
+ (public_name octez-libs.riscv-nds-memory)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
