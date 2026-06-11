@@ -358,7 +358,7 @@ pub mod interpret_cost {
     pub const LT: u32 = 10;
     pub const IF: u32 = 10;
     pub const IF_NONE: u32 = 10;
-    pub const IF_CONS: u32 = 10;
+    pub const IF_CONS: u32 = 855;
     pub const IF_LEFT: u32 = 10;
     pub const LOOP: u32 = 10;
     // Iteration cost (`cost_N_IList_iter` / `cost_N_ISet_iter` /
@@ -452,7 +452,7 @@ pub mod interpret_cost {
     pub const TOTAL_VOTING_POWER: u32 = 450;
     pub const EMIT: u32 = 30;
 
-    pub const INTERPRET_RET: u32 = 15; // corresponds to KNil in the Tezos protocol
+    pub const INTERPRET_RET: u32 = 130; // corresponds to cost_N_IHalt in the Tezos protocol: charged at the end of every code block, like L1's terminal IHalt
 
     /// Per-frame charge deducted at every worklist-growth push onto
     /// `frames: Vec<InterpFrame>`. Layered *on top of* L1's existing
@@ -518,7 +518,7 @@ pub mod interpret_cost {
     pub const STACK_PUSH: u32 = 500;
     pub const LOOP_ENTER: u32 = 10; // corresponds to KLoop_in in the Tezos protocol
     pub const LOOP_LEFT_ENTER: u32 = 10; // corresponds to KLoop_in_left in the Tezos protocol
-    pub const LOOP_EXIT: u32 = 10;
+    pub const LOOP_EXIT: u32 = 15;
     pub const CREATE_CONTRACT: u32 = 60;
     pub const VIEW: u32 = 1460; // corresponds to cost_N_IView_synthesized in the Tezos protocol
 
