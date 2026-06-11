@@ -6339,7 +6339,7 @@ let check_crac_brackets ~prefix internals =
           Log.info "%s:   end marker (depth -> %d)" prefix new_depth ;
           Check.(
             (new_depth >= 0)
-              bool
+              int
               ~error_msg:
                 (sf
                    "%s: CRAC marker imbalance: crac_end without matching crac \
@@ -13661,6 +13661,635 @@ let test_crac_journal_revert_drops_origin () =
   in
   unit
 
+(* CRAC bracketing scenario 1 — multiple top-level frames with a nested inner
+ * frame in one EVM transaction.
+ *
+ * An EVM transaction drives two bridge contracts sequentially.  Bridge 1
+ * reaches tez_1 (MultiRunCaller with callees=[tez_inner_bridge, tez_plain]).
+ * tez_inner_bridge (CrossRuntimeRunnerEvm) calls back into EVM which
+ * re-enters tez_inner_of_inner — forming a nested inner frame spliced at
+ * the gateway call site.  tez_plain is called AFTER the inner frame returns,
+ * providing the "trailing op after crac_end" property.  Bridge 2 reaches
+ * tez_2 as a disjoint sibling frame.
+ *
+ * Internal-op layout (top-level = sender_alias, 24 ops):
+ *   #0:  EVENT crac        (begin frame 1, CRAC-ID "1-0")
+ *   #1:  origination alias(bridge_1)
+ *   #2:  origination alias(sender)
+ *   #3:  alias(bridge_1) -> tez_1 (%run)
+ *   #4:  tez_1 -> tez_1 (%_incrementWitness)   [before tez_inner_bridge]
+ *   #5:  tez_1 -> tez_inner_bridge (%run)
+ *   #6:  tez_inner_bridge -> tez_inner_bridge (%_incrementWitness) [pre]
+ *   #7:  tez_inner_bridge -> GW_M (%call_evm)
+ *   #8:  EVENT crac        (begin inner, CRAC-ID "1-0")
+ *   #9:  origination alias(evm_inner)
+ *   #10: alias(evm_inner) -> tez_inner_of_inner (%run)
+ *   #11: tez_inner_of_inner -> tez_inner_of_inner (%_incrementWitness)
+ *   #12: EVENT crac_end    (end inner)
+ *   #13: tez_inner_bridge -> tez_inner_bridge (%_incrementWitness) [post]
+ *   #14: tez_1 -> tez_1 (%_incrementWitness)   [before tez_plain]
+ *   #15: tez_1 -> tez_plain (%run)              [trailing op after inner frame]
+ *   #16: tez_plain -> tez_plain (%_incrementWitness)
+ *   #17: tez_1 -> tez_1 (%_incrementWitness)   [final]
+ *   #18: EVENT crac_end    (end frame 1)
+ *   #19: EVENT crac        (begin frame 2, CRAC-ID "1-0")
+ *   #20: origination alias(bridge_2)
+ *   #21: alias(bridge_2) -> tez_2 (%run)
+ *   #22: tez_2 -> tez_2 (%_incrementWitness)
+ *   #23: EVENT crac_end    (end frame 2)
+ *
+ * Asserts: exact op count (24), six markers at their exact indices with
+ * correct tags and shared CRAC-ID, the inner pair (indices 8, 12) strictly
+ * inside frame 1's pair (indices 0, 18), frame 2's pair (indices 19, 23)
+ * disjoint and after frame 1's, and check_crac_brackets. *)
+let test_crac_receipt_frames_nested_and_sibling () =
+  register_crac_runner_test
+    ~title:"CRAC: nested inner frame and sibling frame from one EVM tx"
+    ~tags:["crac_receipt"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "RCPT-NEST-SIB" in
+  let* tez_inner_of_inner = TezMultiRunCaller.originate () in
+  let (`Tez_runner (_, tez_inner_of_inner_kt1)) = tez_inner_of_inner in
+  let* evm_inner =
+    EvmCrossRuntimeRunnerTez.deploy_and_init tez_inner_of_inner
+  in
+  let (`Evm_runner evm_inner_addr) = evm_inner in
+  let* tez_inner_bridge = TezCrossRuntimeRunnerEvm.originate evm_inner in
+  let (`Tez_runner (_, tez_inner_bridge_kt1)) = tez_inner_bridge in
+  let* tez_plain = TezMultiRunCaller.originate () in
+  let (`Tez_runner (_, tez_plain_kt1)) = tez_plain in
+  let* tez_1 =
+    TezMultiRunCaller.originate ~callees:[tez_inner_bridge; tez_plain] ()
+  in
+  let (`Tez_runner (_, tez_1_kt1)) = tez_1 in
+  let* bridge_1 = EvmCrossRuntimeRunnerTez.deploy_and_init tez_1 in
+  let (`Evm_runner bridge_1_addr) = bridge_1 in
+  let* tez_2 = TezMultiRunCaller.originate () in
+  let (`Tez_runner (_, tez_2_kt1)) = tez_2 in
+  let* bridge_2 = EvmCrossRuntimeRunnerTez.deploy_and_init tez_2 in
+  let (`Evm_runner bridge_2_addr) = bridge_2 in
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init
+      ~callees:[(bridge_1, false); (bridge_2, false)]
+      ()
+  in
+  let*@ sender_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress sender.address sequencer
+  in
+  let*@ bridge_1_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress bridge_1_addr sequencer
+  in
+  let*@ bridge_2_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress bridge_2_addr sequencer
+  in
+  let*@ evm_inner_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress evm_inner_addr sequencer
+  in
+  let* _ = EvmRunner.call_run evm_main in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_2 in
+  let* () =
+    TezMultiRunCaller.check_storage ~expected_counter:1 tez_inner_of_inner
+  in
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  let op_list = JSON.(ops |> as_list) in
+  Log.info "%s: %d manager operation(s)" prefix (List.length op_list) ;
+  Check.(
+    (List.length op_list = 1)
+      int
+      ~error_msg:"Expected 1 manager operation, got %L") ;
+  let top = JSON.(ops |=> 0 |-> "contents" |=> 0) in
+  let internals =
+    check_crac_top_level
+      ~prefix
+      ~expected_destination:sender_alias
+      ~expected_status:"applied"
+      top
+  in
+  Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
+  List.iteri
+    (fun i iop ->
+      Log.info
+        "%s:   [%d] kind=%s tag=%s dst=%s"
+        prefix
+        i
+        JSON.(iop |-> "kind" |> as_string)
+        JSON.(iop |-> "tag" |> as_opt |> Option.fold ~none:"-" ~some:as_string)
+        JSON.(
+          iop |-> "destination" |> as_opt
+          |> Option.fold ~none:"-" ~some:as_string))
+    internals ;
+  Check.(
+    (List.length internals = 24)
+      int
+      ~error_msg:"Expected 24 internal operations, got %L") ;
+  (* ── Frame 1 (indices 0-18) ──────────────────────────────────── *)
+  check_crac_event
+    ~prefix:(prefix ^ "#0")
+    ~expected_crac_id:"1-0"
+    ~expected_status:"applied"
+    (List.nth internals 0) ;
+  check_crac_internal_alias_origination
+    ~prefix:(prefix ^ "#1")
+    ~expected_nonce:1
+    ~expected_alias_kt1:bridge_1_alias
+    ~expected_status:"applied"
+    (List.nth internals 1) ;
+  check_crac_internal_alias_origination
+    ~prefix:(prefix ^ "#2")
+    ~expected_nonce:2
+    ~expected_alias_kt1:sender_alias
+    ~expected_status:"applied"
+    (List.nth internals 2) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#3")
+    ~expected_nonce:3
+    ~expected_source:bridge_1_alias
+    ~expected_destination:tez_1_kt1
+    ~expected_entrypoint:"run"
+    ~expected_status:"applied"
+    (List.nth internals 3) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#4")
+    ~expected_nonce:4
+    ~expected_source:tez_1_kt1
+    ~expected_destination:tez_1_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 4) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#5")
+    ~expected_nonce:5
+    ~expected_source:tez_1_kt1
+    ~expected_destination:tez_inner_bridge_kt1
+    ~expected_entrypoint:"run"
+    ~expected_status:"applied"
+    (List.nth internals 5) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#6")
+    ~expected_nonce:6
+    ~expected_source:tez_inner_bridge_kt1
+    ~expected_destination:tez_inner_bridge_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 6) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#7")
+    ~expected_nonce:7
+    ~expected_source:tez_inner_bridge_kt1
+    ~expected_destination:gateway_address
+    ~expected_entrypoint:"call_evm"
+    ~expected_status:"applied"
+    (List.nth internals 7) ;
+  (* ── Inner frame (indices 8-12, nested inside frame 1) ──────── *)
+  check_crac_event
+    ~prefix:(prefix ^ "#8")
+    ~expected_crac_id:"1-0"
+    ~expected_status:"applied"
+    (List.nth internals 8) ;
+  check_crac_internal_alias_origination
+    ~prefix:(prefix ^ "#9")
+    ~expected_nonce:9
+    ~expected_alias_kt1:evm_inner_alias
+    ~expected_status:"applied"
+    (List.nth internals 9) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#10")
+    ~expected_nonce:10
+    ~expected_source:evm_inner_alias
+    ~expected_destination:tez_inner_of_inner_kt1
+    ~expected_entrypoint:"run"
+    ~expected_status:"applied"
+    (List.nth internals 10) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#11")
+    ~expected_nonce:11
+    ~expected_source:tez_inner_of_inner_kt1
+    ~expected_destination:tez_inner_of_inner_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 11) ;
+  check_crac_end_event
+    ~prefix:(prefix ^ "#12")
+    ~expected_crac_id:"1-0"
+    ~expected_status:"applied"
+    (List.nth internals 12) ;
+  (* ── Continuation of frame 1 body after the inner frame ──────── *)
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#13")
+    ~expected_nonce:13
+    ~expected_source:tez_inner_bridge_kt1
+    ~expected_destination:tez_inner_bridge_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 13) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#14")
+    ~expected_nonce:14
+    ~expected_source:tez_1_kt1
+    ~expected_destination:tez_1_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 14) ;
+  (* Trailing op after the inner frame's crac_end at #12 *)
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#15")
+    ~expected_nonce:15
+    ~expected_source:tez_1_kt1
+    ~expected_destination:tez_plain_kt1
+    ~expected_entrypoint:"run"
+    ~expected_status:"applied"
+    (List.nth internals 15) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#16")
+    ~expected_nonce:16
+    ~expected_source:tez_plain_kt1
+    ~expected_destination:tez_plain_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 16) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#17")
+    ~expected_nonce:17
+    ~expected_source:tez_1_kt1
+    ~expected_destination:tez_1_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 17) ;
+  check_crac_end_event
+    ~prefix:(prefix ^ "#18")
+    ~expected_crac_id:"1-0"
+    ~expected_status:"applied"
+    (List.nth internals 18) ;
+  (* ── Frame 2 (indices 19-23, disjoint sibling of frame 1) ──── *)
+  check_crac_event
+    ~prefix:(prefix ^ "#19")
+    ~expected_crac_id:"1-0"
+    ~expected_status:"applied"
+    (List.nth internals 19) ;
+  (* alias(sender) was materialized in frame 1 and is cached; only
+     alias(bridge_2) is fresh for frame 2. *)
+  check_crac_internal_alias_origination
+    ~prefix:(prefix ^ "#20")
+    ~expected_nonce:20
+    ~expected_alias_kt1:bridge_2_alias
+    ~expected_status:"applied"
+    (List.nth internals 20) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#21")
+    ~expected_nonce:21
+    ~expected_source:bridge_2_alias
+    ~expected_destination:tez_2_kt1
+    ~expected_entrypoint:"run"
+    ~expected_status:"applied"
+    (List.nth internals 21) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#22")
+    ~expected_nonce:22
+    ~expected_source:tez_2_kt1
+    ~expected_destination:tez_2_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 22) ;
+  check_crac_end_event
+    ~prefix:(prefix ^ "#23")
+    ~expected_crac_id:"1-0"
+    ~expected_status:"applied"
+    (List.nth internals 23) ;
+  (* Inner pair (8, 12) is strictly inside frame 1 pair (0, 18); frame 2
+     pair (19, 23) is disjoint and after frame 1 pair — enforced by the
+     per-index marker checks above and the balance walk below. *)
+  check_crac_brackets ~prefix internals ;
+  (* ── EVM side ──────────────────────────────────────────────── *)
+  (* 1 original EVM tx; both gateway calls are internal to it *)
+  let* _block =
+    check_evm_block_tx_count ~prefix ~expected_tx_count:1 sequencer
+  in
+  unit
+
+(* CRAC bracketing scenario 2 — Tezos-originated re-entry forest with a
+ * trailing op after the re-entrant frame.
+ *
+ * A Michelson manager operation calls tez_main (MultiRunCaller with
+ * callees=[tez_outer_bridge, tez_plain]).  tez_outer_bridge
+ * (CrossRuntimeRunnerEvm) initiates a TEZ→EVM CRAC; EVM re-enters
+ * tez_inner (the re-entrant EVM→TEZ frame).  After the frame returns,
+ * tez_main calls tez_plain — the plain transfer that sits unambiguously
+ * after the frame's crac_end.
+ *
+ * Because the root op is Tezos-originated it carries NO outer begin/end
+ * markers; its internals form a balanced forest (one bracketed frame).
+ * The CRAC-ID has Tezos origin ("0-0").
+ *
+ * Internal-op layout (14 ops):
+ *   #0:  tez_main -> tez_main (%_incrementWitness)  [before tez_outer_bridge]
+ *   #1:  tez_main -> tez_outer_bridge (%run)
+ *   #2:  tez_outer_bridge -> tez_outer_bridge (%_incrementWitness) [pre]
+ *   #3:  tez_outer_bridge -> GW_M (%call_evm)
+ *   #4:  EVENT crac    (begin, CRAC-ID "0-0")
+ *   #5:  origination alias(evm_bridge)
+ *   #6:  alias(evm_bridge) -> tez_inner (%run)
+ *   #7:  tez_inner -> tez_inner (%_incrementWitness)
+ *   #8:  EVENT crac_end
+ *   #9:  tez_outer_bridge -> tez_outer_bridge (%_incrementWitness) [post]
+ *   #10: tez_main -> tez_main (%_incrementWitness)  [before tez_plain]
+ *   #11: tez_main -> tez_plain (%run)               [trailing op after crac_end]
+ *   #12: tez_plain -> tez_plain (%_incrementWitness)
+ *   #13: tez_main -> tez_main (%_incrementWitness)  [final]
+ *
+ * Asserts: exact op count (14), CRAC-ID "0-0" (Tezos origin), the crac_end
+ * at index 8 precedes the trailing transfer at index 11 (after-the-frame
+ * property), and check_crac_brackets (forest: root un-bracketed). *)
+let test_crac_receipt_tez_origin_reentry_trailing_op () =
+  register_crac_runner_test
+    ~title:"CRAC: Tezos-originated re-entry forest with trailing op after frame"
+    ~tags:["crac_receipt"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "RCPT-TEZORIG-TRAIL" in
+  let* tez_inner = TezMultiRunCaller.originate () in
+  let (`Tez_runner (_, tez_inner_kt1)) = tez_inner in
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_inner in
+  let (`Evm_runner evm_bridge_addr) = evm_bridge in
+  let* tez_outer_bridge = TezCrossRuntimeRunnerEvm.originate evm_bridge in
+  let (`Tez_runner (_, tez_outer_bridge_kt1)) = tez_outer_bridge in
+  let* tez_plain = TezMultiRunCaller.originate () in
+  let (`Tez_runner (_, tez_plain_kt1)) = tez_plain in
+  let* tez_main =
+    TezMultiRunCaller.originate ~callees:[tez_outer_bridge; tez_plain] ()
+  in
+  let (`Tez_runner (_, tez_main_kt1)) = tez_main in
+  let*@ evm_bridge_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress evm_bridge_addr sequencer
+  in
+  let* () = TezRunner.call_run tez_main in
+  (* 2 callees → 2 pre-callee increments + 1 final = 3 *)
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:3 tez_main in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_inner in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_plain in
+  (* ── EVM side: one fake CRAC tx with CRAC-ID "0-0" ───────────── *)
+  let* block =
+    check_evm_block_tx_count ~prefix ~expected_tx_count:1 sequencer
+  in
+  check_fake_crac_tx_hash ~prefix ~expected_crac_id:"0-0" block ;
+  (* ── Michelson side: root op un-bracketed, one frame inside ─── *)
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  let op_list = JSON.(ops |> as_list) in
+  Log.info "%s: %d manager operation(s)" prefix (List.length op_list) ;
+  Check.(
+    (List.length op_list = 1) int ~error_msg:"Expected 1 Michelson op, got %L") ;
+  let top = JSON.(ops |=> 0 |-> "contents" |=> 0) in
+  let metadata = JSON.(top |-> "metadata") in
+  let top_status =
+    JSON.(metadata |-> "operation_result" |-> "status" |> as_string)
+  in
+  Check.(
+    (top_status = "applied")
+      string
+      ~error_msg:"Expected top-level status %R, got %L") ;
+  let internals = JSON.(metadata |-> "internal_operation_results" |> as_list) in
+  Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
+  List.iteri
+    (fun i iop ->
+      Log.info
+        "%s:   [%d] kind=%s tag=%s"
+        prefix
+        i
+        JSON.(iop |-> "kind" |> as_string)
+        JSON.(iop |-> "tag" |> as_opt |> Option.fold ~none:"-" ~some:as_string))
+    internals ;
+  Check.(
+    (List.length internals = 14)
+      int
+      ~error_msg:"Expected 14 internal operations, got %L") ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#0")
+    ~expected_nonce:0
+    ~expected_source:tez_main_kt1
+    ~expected_destination:tez_main_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 0) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#1")
+    ~expected_nonce:1
+    ~expected_source:tez_main_kt1
+    ~expected_destination:tez_outer_bridge_kt1
+    ~expected_entrypoint:"run"
+    ~expected_status:"applied"
+    (List.nth internals 1) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#2")
+    ~expected_nonce:2
+    ~expected_source:tez_outer_bridge_kt1
+    ~expected_destination:tez_outer_bridge_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 2) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#3")
+    ~expected_nonce:3
+    ~expected_source:tez_outer_bridge_kt1
+    ~expected_destination:gateway_address
+    ~expected_entrypoint:"call_evm"
+    ~expected_status:"applied"
+    (List.nth internals 3) ;
+  (* ── Re-entrant CRAC frame begin/end (indices 4, 8) ─────────── *)
+  check_crac_event
+    ~prefix:(prefix ^ "#4")
+    ~expected_crac_id:"0-0"
+    ~expected_status:"applied"
+    (List.nth internals 4) ;
+  check_crac_internal_alias_origination
+    ~prefix:(prefix ^ "#5")
+    ~expected_nonce:5
+    ~expected_alias_kt1:evm_bridge_alias
+    ~expected_status:"applied"
+    (List.nth internals 5) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#6")
+    ~expected_nonce:6
+    ~expected_source:evm_bridge_alias
+    ~expected_destination:tez_inner_kt1
+    ~expected_entrypoint:"run"
+    ~expected_status:"applied"
+    (List.nth internals 6) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#7")
+    ~expected_nonce:7
+    ~expected_source:tez_inner_kt1
+    ~expected_destination:tez_inner_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 7) ;
+  check_crac_end_event
+    ~prefix:(prefix ^ "#8")
+    ~expected_crac_id:"0-0"
+    ~expected_status:"applied"
+    (List.nth internals 8) ;
+  (* ── Post-frame continuation (after crac_end at #8) ─────────── *)
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#9")
+    ~expected_nonce:9
+    ~expected_source:tez_outer_bridge_kt1
+    ~expected_destination:tez_outer_bridge_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 9) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#10")
+    ~expected_nonce:10
+    ~expected_source:tez_main_kt1
+    ~expected_destination:tez_main_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 10) ;
+  (* Trailing plain transfer: sits AFTER crac_end at #8. *)
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#11")
+    ~expected_nonce:11
+    ~expected_source:tez_main_kt1
+    ~expected_destination:tez_plain_kt1
+    ~expected_entrypoint:"run"
+    ~expected_status:"applied"
+    (List.nth internals 11) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#12")
+    ~expected_nonce:12
+    ~expected_source:tez_plain_kt1
+    ~expected_destination:tez_plain_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 12) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#13")
+    ~expected_nonce:13
+    ~expected_source:tez_main_kt1
+    ~expected_destination:tez_main_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 13) ;
+  (* The crac_end (#8) precedes the trailing transfer (#11): the forest
+     bracket check below confirms the re-entrant frame is balanced. *)
+  (* Forest bracket check: root is un-bracketed; the one re-entrant frame
+     must form a balanced pair. *)
+  check_crac_brackets ~prefix internals ;
+  unit
+
+(* CRAC bracketing scenario 3 — failed-frame marker outcome.
+ *
+ * A single EVM→TEZ CRAC whose Michelson callee FAILWITHs.  Both the
+ * begin (crac) and end (crac_end) markers are present on the receipt;
+ * their statuses are "backtracked" (consistent with the failed parent
+ * frame).  check_crac_brackets passes without filtering by status.
+ *
+ * Call tree:
+ *   EVM[evm_main]
+ *     -> EVM[bridge] ~CRAC~> TEZ[tez_reverter]  (FAILWITH)
+ *   EVM catches the revert so the EVM tx succeeds.
+ *
+ * Asserts: both begin and end markers are present, both have status
+ * "backtracked", and check_crac_brackets passes. *)
+let test_crac_receipt_failed_frame_markers () =
+  register_crac_runner_test
+    ~title:"CRAC: failed frame carries both markers with consistent status"
+    ~tags:["crac_receipt"; "revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "RCPT-FAIL-MARK" in
+  let* tez_reverter = TezMultiRunCaller.originate ~revert:true () in
+  let (`Tez_runner (_, tez_reverter_kt1)) = tez_reverter in
+  let* bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_reverter in
+  let (`Evm_runner bridge_addr) = bridge in
+  (* doCatch=true: EVM absorbs the CRAC failure so the tx succeeds. *)
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(bridge, true)] ()
+  in
+  let*@ bridge_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress bridge_addr sequencer
+  in
+  let*@ sender_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress sender.address sequencer
+  in
+  (* EVM tx succeeds; Michelson callee FAILWITHed but EVM caught it. *)
+  let* _ = EvmRunner.call_run evm_main in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_reverter in
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  let op_list = JSON.(ops |> as_list) in
+  Check.(
+    (List.length op_list = 1) int ~error_msg:"Expected 1 Michelson op, got %L") ;
+  let top = JSON.(ops |=> 0 |-> "contents" |=> 0) in
+  let internals =
+    check_crac_top_level
+      ~prefix
+      ~expected_destination:sender_alias
+      ~expected_status:"failed"
+      top
+  in
+  Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
+  List.iteri
+    (fun i iop ->
+      Log.info
+        "%s:   [%d] kind=%s tag=%s status=%s"
+        prefix
+        i
+        JSON.(iop |-> "kind" |> as_string)
+        JSON.(iop |-> "tag" |> as_opt |> Option.fold ~none:"-" ~some:as_string)
+        JSON.(
+          iop |-> "result" |-> "status" |> as_opt
+          |> Option.fold ~none:"-" ~some:as_string))
+    internals ;
+  (* 6 internal ops: begin + alias(bridge) + alias(sender) + bridge->reverter
+     (failed) + reverter->reverter %_revert (failed) + end. *)
+  Check.(
+    (List.length internals = 6)
+      int
+      ~error_msg:"Expected 6 internal operations, got %L") ;
+  (* Both markers are present regardless of the frame outcome. *)
+  check_crac_event
+    ~prefix:(prefix ^ "#0")
+    ~expected_crac_id:"1-0"
+    ~expected_status:"backtracked"
+    (List.nth internals 0) ;
+  check_crac_internal_alias_origination
+    ~prefix:(prefix ^ "#1")
+    ~expected_nonce:1
+    ~expected_alias_kt1:bridge_alias
+    ~expected_status:"applied"
+    (List.nth internals 1) ;
+  check_crac_internal_alias_origination
+    ~prefix:(prefix ^ "#2")
+    ~expected_nonce:2
+    ~expected_alias_kt1:sender_alias
+    ~expected_status:"applied"
+    (List.nth internals 2) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#3")
+    ~expected_nonce:3
+    ~expected_source:bridge_alias
+    ~expected_destination:tez_reverter_kt1
+    ~expected_entrypoint:"run"
+    ~expected_status:"failed"
+    (List.nth internals 3) ;
+  check_crac_internal_transaction
+    ~prefix:(prefix ^ "#4")
+    ~expected_nonce:4
+    ~expected_source:tez_reverter_kt1
+    ~expected_destination:tez_reverter_kt1
+    ~expected_entrypoint:"_revert"
+    ~expected_status:"failed"
+    (List.nth internals 4) ;
+  (* End marker is present with status "backtracked" to match the begin
+     marker and the failed frame. *)
+  check_crac_end_event
+    ~prefix:(prefix ^ "#5")
+    ~expected_crac_id:"1-0"
+    ~expected_status:"backtracked"
+    (List.nth internals 5) ;
+  (* Bracket walk succeeds without status filtering. *)
+  check_crac_brackets ~prefix internals ;
+  unit
+
 let () =
   test_crac_evm_to_tez () ;
   test_crac_evm_multiple_independent_crossings () ;
@@ -13741,6 +14370,9 @@ let () =
   test_crac_receipt_tez_evm_tez_evm () ;
   test_crac_receipt_evm_5_crossing_chain () ;
   test_crac_receipt_tez_mixed_calls_with_crac () ;
+  test_crac_receipt_frames_nested_and_sibling () ;
+  test_crac_receipt_tez_origin_reentry_trailing_op () ;
+  test_crac_receipt_failed_frame_markers () ;
   test_crac_http_call_success () ;
   test_crac_http_call_catch_revert () ;
   test_crac_http_call_catch_oog () ;
