@@ -38,6 +38,7 @@ use tezos_smart_rollup::storage::path::RefPath;
 use tezos_smart_rollup_host::path::{concat, OwnedPath};
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 
 #[derive(Eq, PartialEq)]
 pub enum MigrationStatus {
@@ -342,7 +343,7 @@ fn migrate_to<Host>(
     version: StorageVersion,
 ) -> anyhow::Result<MigrationStatus>
 where
-    Host: StorageV1 + IsEvmNode,
+    Host: StorageV1 + IsEvmNode + KeySpaceLoader,
 {
     log!(Info, "Migrating to {:?}", version);
     match version {
@@ -1235,7 +1236,7 @@ where
 //
 fn migration<Host>(host: &mut Host) -> anyhow::Result<MigrationStatus>
 where
-    Host: StorageV1 + IsEvmNode,
+    Host: StorageV1 + IsEvmNode + KeySpaceLoader,
 {
     match read_storage_version(host)?.next() {
         Some(next_version) => {
@@ -1258,7 +1259,7 @@ where
 
 pub fn storage_migration<Host>(host: &mut Host) -> Result<MigrationStatus, Error>
 where
-    Host: StorageV1 + IsEvmNode,
+    Host: StorageV1 + IsEvmNode + KeySpaceLoader,
 {
     let migration_result = migration(host);
     migration_result.map_err(|_| Error::UpgradeError(UpgradeProcessError::Fallback))

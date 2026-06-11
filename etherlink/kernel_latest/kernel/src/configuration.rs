@@ -191,13 +191,12 @@ where
     }
 }
 
-fn fetch_dal_configuration<Host>(host: &mut Host) -> Option<DalConfiguration>
-where
-    Host: StorageV1 + IsEvmNode,
-{
-    let enable_dal = enable_dal(host).unwrap_or(false);
-    if enable_dal {
-        let slot_indices: Vec<u8> = dal_slots(host).unwrap_or(None)?;
+fn fetch_dal_configuration(
+    base: &impl KeySpace,
+    is_evm_node: bool,
+) -> Option<DalConfiguration> {
+    if enable_dal(base, is_evm_node) {
+        let slot_indices: Vec<u8> = dal_slots(base)?;
         Some(DalConfiguration { slot_indices })
     } else {
         None
@@ -295,8 +294,8 @@ where
         read_maximum_allowed_ticks(&base).unwrap_or(MAX_ALLOWED_TICKS);
     let sequencer = sequencer(host).unwrap_or_default();
     let enable_fa_bridge = is_enable_fa_bridge(&base);
-    let dal: Option<DalConfiguration> = fetch_dal_configuration(host);
     let evm_node_flag = host.is_evm_node();
+    let dal: Option<DalConfiguration> = fetch_dal_configuration(&base, evm_node_flag);
     match sequencer {
         Some(sequencer) => {
             let delayed_bridge = read_delayed_transaction_bridge(&base)

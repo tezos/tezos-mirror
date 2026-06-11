@@ -19,7 +19,6 @@ use tezos_crypto_rs::hash::ChainId;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_data_encoding::nom::NomReader;
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_indexable_storage::IndexableStorage;
 use tezos_smart_rollup::host::RuntimeError;
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
@@ -282,25 +281,28 @@ use revm_etherlink::storage::world_state_handler::SEQUENCER_KEY_PATH;
 
 pub const KEEP_EVENTS: RefPath = RefPath::assert_from(b"/base/keep_rollup_events");
 
-// Path to the DAL feature flag. If there is nothing at this path, DAL
-// is not used.
-pub const ENABLE_DAL: RefPath = RefPath::assert_from(b"/base/feature_flags/enable_dal");
+// Key to the DAL feature flag, inside the `/base` keyspace. If there is
+// nothing at this key, DAL is not used. Both reader (`enable_dal`) and writer
+// (`tweak_dal_activation`, migration only) go through the keyspace; the key
+// resolves to the durable path `/base/feature_flags/enable_dal`.
+const ENABLE_DAL_KEY: Key = Key::from_static(b"/feature_flags/enable_dal");
 
-// Path to the flag that disables legacy DAL slot import signals.
-// If there is something at this path, the kernel ignores DalSlotImportSignals
+// Key to the flag that disables legacy DAL slot import signals.
+// If there is something at this key, the kernel ignores DalSlotImportSignals
 // external messages and instead relies on DalAttestedSlots internal messages
 // from the protocol.
-pub const DISABLE_LEGACY_DAL_SIGNALS: RefPath =
-    RefPath::assert_from(b"/base/feature_flags/disable_legacy_dal_signals");
+const DISABLE_LEGACY_DAL_SIGNALS_KEY: Key =
+    Key::from_static(b"/feature_flags/disable_legacy_dal_signals");
 
-// Path to the DAL slot indices to use.
-pub const DAL_SLOTS: RefPath = RefPath::assert_from(b"/base/dal_slots");
+// Key to the DAL slot indices to use, inside the `/base` keyspace. Both
+// reader (`dal_slots`) and writer (`store_dal_slots`, migration only) go
+// through the keyspace; the key resolves to the durable path `/base/dal_slots`.
+const DAL_SLOTS_KEY: Key = Key::from_static(b"/dal_slots");
 
-// Path to the whitelist of authorized DAL publishers (public key hashes).
+// Key to the whitelist of authorized DAL publishers (public key hashes).
 // These are the keys authorized to publish DAL slots that the kernel will accept.
 // NOTE: Empty whitelist means reject all publishers (therefore all slots).
-pub const DAL_PUBLISHERS_WHITELIST: RefPath =
-    RefPath::assert_from(b"/base/dal_publishers_whitelist");
+const DAL_PUBLISHERS_WHITELIST_KEY: Key = Key::from_static(b"/dal_publishers_whitelist");
 
 // Path where the input for the tracer is stored by the sequencer.
 const TRACER_INPUT: RefPath = RefPath::assert_from(b"/base/trace/input");
@@ -994,18 +996,11 @@ pub fn sequencer(host: &impl StorageV1) -> anyhow::Result<Option<PublicKey>> {
     }
 }
 
-pub fn enable_dal<Host>(host: &Host) -> anyhow::Result<bool>
-where
-    Host: StorageV1 + IsEvmNode,
-{
-    if let Some(ValueType::Value) = host.store_has(&ENABLE_DAL)? {
-        // When run from the EVM node, the DAL feature is always
-        // considered as disabled.
-        let b = host.is_evm_node();
-        Ok(!b)
-    } else {
-        Ok(false)
-    }
+pub fn enable_dal(base: &impl KeySpace, is_evm_node: bool) -> bool {
+    // When run from the EVM node, the DAL feature is always considered as
+    // disabled. The flag is passed as a boolean because it is read through
+    // the raw host at bootstrap, before any keyspace exists.
+    base.contains(&ENABLE_DAL_KEY) && !is_evm_node
 }
 
 pub fn enable_tezos_runtime(host: &impl StorageV1) -> bool {
@@ -1038,35 +1033,38 @@ pub fn enable_michelson_gas_refund(host: &impl StorageV1) -> bool {
 }
 
 pub fn tweak_dal_activation(
-    host: &mut impl StorageV1,
+    host: &mut (impl StorageV1 + KeySpaceLoader),
     activate_dal: bool,
 ) -> anyhow::Result<()> {
+    // The reader (`enable_dal`) tests key presence, so an empty value enables
+    // the flag and deleting it disables it.
+    let mut base = load_base_keyspace(host)?;
     if activate_dal {
-        host.store_write(&ENABLE_DAL, &[], 0)?
+        base.set(&ENABLE_DAL_KEY, b"")?;
     } else {
-        host.store_delete(&ENABLE_DAL)?
+        base.delete(&ENABLE_DAL_KEY);
     }
     Ok(())
 }
 
-pub fn store_dal_slots(host: &mut impl StorageV1, slots: &[u8]) -> anyhow::Result<()> {
-    Ok(host.store_write_all(&DAL_SLOTS, slots)?)
+pub fn store_dal_slots(
+    host: &mut (impl StorageV1 + KeySpaceLoader),
+    slots: &[u8],
+) -> anyhow::Result<()> {
+    let mut base = load_base_keyspace(host)?;
+    base.set(&DAL_SLOTS_KEY, slots)?;
+    Ok(())
 }
 
 /// Returns true if legacy DAL slot import signals are disabled.
 /// When disabled, the kernel ignores `DalSlotImportSignals` external messages
 /// and instead relies on `DalAttestedSlots` internal messages.
-pub fn is_legacy_dal_signals_disabled(host: &impl StorageV1) -> anyhow::Result<bool> {
-    Ok(host.store_has(&DISABLE_LEGACY_DAL_SIGNALS)?.is_some())
+pub fn is_legacy_dal_signals_disabled(base: &impl KeySpace) -> bool {
+    base.contains(&DISABLE_LEGACY_DAL_SIGNALS_KEY)
 }
 
-pub fn dal_slots(host: &impl StorageV1) -> anyhow::Result<Option<Vec<u8>>> {
-    if host.store_has(&DAL_SLOTS)?.is_some() {
-        let bytes = host.store_read_all(&DAL_SLOTS)?;
-        Ok(Some(bytes))
-    } else {
-        Ok(None)
-    }
+pub fn dal_slots(base: &impl KeySpace) -> Option<Vec<u8>> {
+    base.get(&DAL_SLOTS_KEY)
 }
 
 /// Read the whitelist of authorized DAL publishers from storage.
@@ -1076,10 +1074,9 @@ pub fn dal_slots(host: &impl StorageV1) -> anyhow::Result<Option<Vec<u8>>> {
 /// NOTE: An empty whitelist means NO publishers are authorized
 /// The kernel will reject all DAL slots if the whitelist is empty.
 pub fn read_dal_publishers_whitelist(
-    host: &impl StorageV1,
+    base: &impl KeySpace,
 ) -> anyhow::Result<Vec<tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash>> {
-    if host.store_has(&DAL_PUBLISHERS_WHITELIST)?.is_some() {
-        let rlp_bytes = host.store_read_all(&DAL_PUBLISHERS_WHITELIST)?;
+    if let Some(rlp_bytes) = base.get(&DAL_PUBLISHERS_WHITELIST_KEY) {
         let rlp = rlp::Rlp::new(&rlp_bytes);
 
         let mut whitelist = Vec::new();
@@ -1231,10 +1228,24 @@ pub fn read_delayed_transaction_bridge(base: &impl KeySpace) -> Option<ContractK
 
 #[cfg(test)]
 mod tests {
+    use tezos_data_encoding::enc::BinWriter;
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash;
     use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_host::storage::StorageV1;
     use tezosx_journal::{CracId, TezosXJournal};
+
+    // RLP-encode a list of public key hashes the way the DAL publishers
+    // whitelist is stored: an RLP list whose items are the binary-encoded PKHs.
+    fn encode_dal_publishers_whitelist(pkhs: &[PublicKeyHash]) -> Vec<u8> {
+        let mut stream = rlp::RlpStream::new_list(pkhs.len());
+        for pkh in pkhs {
+            let mut pkh_bytes = Vec::new();
+            pkh.bin_write(&mut pkh_bytes).unwrap();
+            stream.append(&pkh_bytes);
+        }
+        stream.out().to_vec()
+    }
 
     // Byte-compat check for the values migrated to the `/base` keyspace:
     // each value written through the raw host at its historical absolute
@@ -1271,6 +1282,28 @@ mod tests {
         host.store_write_all(&super::ENABLE_FA_BRIDGE, &[1u8])
             .unwrap();
 
+        // DAL readers go through `/base`; seed their durable paths raw here
+        // so the reader side is exercised against a known on-chain layout.
+        host.store_write_all(
+            &RefPath::assert_from(b"/base/feature_flags/enable_dal"),
+            &[1u8],
+        )
+        .unwrap();
+        host.store_write_all(
+            &RefPath::assert_from(b"/base/feature_flags/disable_legacy_dal_signals"),
+            &[1u8],
+        )
+        .unwrap();
+        host.store_write_all(&RefPath::assert_from(b"/base/dal_slots"), &[3u8, 7u8])
+            .unwrap();
+        let pkh =
+            PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
+        host.store_write_all(
+            &RefPath::assert_from(b"/base/dal_publishers_whitelist"),
+            &encode_dal_publishers_whitelist(&[pkh.clone()]),
+        )
+        .unwrap();
+
         let base = super::load_base_keyspace(&mut host).unwrap();
         assert_eq!(super::read_admin(&base), Some(kt1.clone()));
         assert_eq!(super::read_kernel_governance(&base), Some(kt1.clone()));
@@ -1285,6 +1318,73 @@ mod tests {
             300
         );
         assert!(super::is_enable_fa_bridge(&base));
+        assert!(super::enable_dal(&base, false));
+        // EVM node always sees the DAL feature as disabled.
+        assert!(!super::enable_dal(&base, true));
+        assert!(super::is_legacy_dal_signals_disabled(&base));
+        assert_eq!(super::dal_slots(&base), Some(vec![3u8, 7u8]));
+        assert_eq!(
+            super::read_dal_publishers_whitelist(&base).unwrap(),
+            vec![pkh]
+        );
+    }
+
+    // Sibling of `base_keyspace_readers_resolve_to_absolute_paths`: on a fresh
+    // `/base` keyspace every migrated reader must report its absent value
+    // (`None` / error / `false` / empty whitelist). A reader resolving to a
+    // wrong-but-present key, or defaulting to a "present" value when the key is
+    // missing, would slip past the positive test but is caught here.
+    #[test]
+    fn base_keyspace_readers_on_empty_base_return_absent() {
+        let mut host = MockKernelHost::default();
+        let base = super::load_base_keyspace(&mut host).unwrap();
+
+        assert_eq!(super::read_admin(&base), None);
+        assert_eq!(super::read_kernel_governance(&base), None);
+        assert_eq!(super::read_kernel_security_governance(&base), None);
+        assert_eq!(super::read_delayed_transaction_bridge(&base), None);
+        assert_eq!(super::read_maximum_allowed_ticks(&base), None);
+        assert!(super::max_blueprint_lookahead_in_seconds(&base).is_err());
+        assert!(!super::is_enable_fa_bridge(&base));
+        assert!(!super::enable_dal(&base, false));
+        assert!(!super::is_legacy_dal_signals_disabled(&base));
+        assert_eq!(super::dal_slots(&base), None);
+        // An absent whitelist decodes to the empty list, which the kernel
+        // treats as "reject all publishers".
+        assert!(super::read_dal_publishers_whitelist(&base)
+            .unwrap()
+            .is_empty());
+    }
+
+    // The DAL writers (migration-only) now go through the `/base` keyspace,
+    // matching their already-keyspace readers. This proves the keyspace
+    // writer lands at the historical absolute path and round-trips through
+    // the reader, and that disabling deletes the flag.
+    #[test]
+    fn base_keyspace_dal_writers_resolve_to_absolute_paths() {
+        let mut host = MockKernelHost::default();
+
+        let enable_dal_path = RefPath::assert_from(b"/base/feature_flags/enable_dal");
+        let dal_slots_path = RefPath::assert_from(b"/base/dal_slots");
+
+        super::tweak_dal_activation(&mut host, true).unwrap();
+        assert!(host.store_read_all(&enable_dal_path).is_ok());
+        {
+            let base = super::load_base_keyspace(&mut host).unwrap();
+            assert!(super::enable_dal(&base, false));
+        }
+
+        super::tweak_dal_activation(&mut host, false).unwrap();
+        assert!(host.store_read_all(&enable_dal_path).is_err());
+        {
+            let base = super::load_base_keyspace(&mut host).unwrap();
+            assert!(!super::enable_dal(&base, false));
+        }
+
+        super::store_dal_slots(&mut host, &[0, 1, 2]).unwrap();
+        assert_eq!(host.store_read_all(&dal_slots_path).unwrap(), vec![0, 1, 2]);
+        let base = super::load_base_keyspace(&mut host).unwrap();
+        assert_eq!(super::dal_slots(&base), Some(vec![0, 1, 2]));
     }
 
     #[test]

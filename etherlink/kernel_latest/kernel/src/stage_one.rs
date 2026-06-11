@@ -29,6 +29,7 @@ use tezos_smart_rollup_host::metadata::RAW_ROLLUP_ADDRESS_SIZE;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 
 pub fn fetch_proxy_blueprints<Host>(
     host: &mut Host,
@@ -131,7 +132,7 @@ fn fetch_sequencer_blueprints<Host>(
     chain_configuration: &TezosXChainConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode + KeySpaceLoader,
 {
     match read_sequencer_inbox(
         host,
@@ -171,7 +172,7 @@ pub fn fetch_blueprints<Host>(
     config: &mut Configuration,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode + KeySpaceLoader,
 {
     match &mut config.mode {
         ConfigurationMode::Sequencer {

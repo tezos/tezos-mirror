@@ -126,7 +126,7 @@ pub fn stage_one<Host>(
     configuration: &mut Configuration,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode + KeySpaceLoader,
 {
     log!(Debug, "Entering stage one.");
     log!(Debug, "Chain Configuration: {chain_config:?}");

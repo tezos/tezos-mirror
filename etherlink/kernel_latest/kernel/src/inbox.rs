@@ -43,6 +43,7 @@ use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 
 #[derive(Debug, PartialEq)]
 pub struct ProxyInboxContent {
@@ -663,7 +664,7 @@ pub fn read_sequencer_inbox<Host>(
     chain_configuration: &TezosXChainConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode + KeySpaceLoader,
 {
     // The mutable variable is used to retrieve the information of whether the
     // inbox was empty or not. As we consume all the inbox in one go, if the
@@ -673,10 +674,14 @@ where
     let next_blueprint_number: U256 =
         crate::blueprint_storage::read_next_blueprint_number(host)?;
     let experimental_features = ExperimentalFeatures::read_from_storage(host);
-    let legacy_dal_signals_disabled =
-        crate::storage::is_legacy_dal_signals_disabled(host).unwrap_or(false);
-    let dal_publishers_whitelist =
-        crate::storage::read_dal_publishers_whitelist(host).unwrap_or_default();
+    let (legacy_dal_signals_disabled, dal_publishers_whitelist) = {
+        let base = crate::storage::load_base_keyspace(host)
+            .map_err(|e| anyhow::anyhow!("failed to load the `/base` keyspace: {e}"))?;
+        (
+            crate::storage::is_legacy_dal_signals_disabled(&base),
+            crate::storage::read_dal_publishers_whitelist(&base).unwrap_or_default(),
+        )
+    };
     let mut parsing_context = SequencerParsingContext {
         sequencer,
         delayed_bridge,
