@@ -902,7 +902,7 @@ where
         } else {
             None
         };
-        let (sender_alias, target_remaining) = {
+        let (sender_alias, sender_resolution) = {
             let (host, journal, registry) = ctx.cross_runtime_split();
             registry
                 .ensure_alias(
@@ -916,7 +916,8 @@ where
                 )
                 .map_err(|e| TransferError::GatewayError(e.to_string()))?
         };
-        let sender_target_consumed = target_budget - target_remaining;
+        // TODO(L2-1519): handle the sender_resolution storage cost delegated by the callee.
+        let sender_target_consumed = target_budget - sender_resolution.gas_remaining;
         let sender_milligas =
             convert_gas(target_runtime, RuntimeId::Tezos, sender_target_consumed)
                 .ok_or(OutOfGas)?;
@@ -959,7 +960,7 @@ where
             let target_budget =
                 convert_gas(RuntimeId::Tezos, target_runtime, remaining_milligas)
                     .ok_or(OutOfGas)?;
-            let (source_alias, target_remaining) = {
+            let (source_alias, source_resolution) = {
                 let (host, journal, registry) = ctx.cross_runtime_split();
                 registry
                     .ensure_alias(
@@ -973,7 +974,8 @@ where
                     )
                     .map_err(|e| TransferError::GatewayError(e.to_string()))?
             };
-            let source_target_consumed = target_budget - target_remaining;
+            // TODO(L2-1519): handle the source_resolution storage cost delegated by the callee.
+            let source_target_consumed = target_budget - source_resolution.gas_remaining;
             let source_milligas =
                 convert_gas(target_runtime, RuntimeId::Tezos, source_target_consumed)
                     .ok_or(OutOfGas)?;

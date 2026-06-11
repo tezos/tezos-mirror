@@ -29,8 +29,8 @@ use revm_etherlink::{
 use tezos_ethereum::block::BlockConstants;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::{
-    AliasInfo, Classification, CrossRuntimeContext, Origin, Registry, RuntimeInterface,
-    TezosXRuntimeError, ALIAS_LOOKUP_COST, X_TEZOS_GAS_CONSUMED,
+    AliasInfo, AliasResolution, Classification, CrossRuntimeContext, Origin, Registry,
+    RuntimeInterface, TezosXRuntimeError, ALIAS_LOOKUP_COST, X_TEZOS_GAS_CONSUMED,
 };
 use tezosx_journal::TezosXJournal;
 
@@ -631,7 +631,7 @@ impl RuntimeInterface for EthereumRuntime {
         native_public_key: Option<&[u8]>,
         context: CrossRuntimeContext,
         gas_remaining: u64,
-    ) -> Result<(String, u64), TezosXRuntimeError>
+    ) -> Result<(String, AliasResolution), TezosXRuntimeError>
     where
         Host: StorageV1,
     {
@@ -668,13 +668,13 @@ impl RuntimeInterface for EthereumRuntime {
             .pending_alias_origin(&alias)
             .is_some()
         {
-            return Ok((alias.to_string(), gas_remaining));
+            return Ok((alias.to_string(), AliasResolution::build(gas_remaining)));
         }
         match alias_account.get_origin(host).map_err(|e| {
             TezosXRuntimeError::Custom(format!("Failed to read alias origin: {e}"))
         })? {
             Some(Origin::Alias(_)) => {
-                return Ok((alias.to_string(), gas_remaining));
+                return Ok((alias.to_string(), AliasResolution::build(gas_remaining)));
             }
             Some(Origin::Native) => {
                 return Err(TezosXRuntimeError::Custom(format!(
@@ -693,7 +693,7 @@ impl RuntimeInterface for EthereumRuntime {
                 .evm
                 .layered_state
                 .create_alias(alias, Origin::Alias(alias_info));
-            return Ok((alias.to_string(), gas_remaining));
+            return Ok((alias.to_string(), AliasResolution::build(gas_remaining)));
         }
 
         // Branch 3: full materialization. Stage the alias, then run init.
@@ -704,7 +704,7 @@ impl RuntimeInterface for EthereumRuntime {
             .layered_state
             .create_alias(alias, Origin::Alias(alias_info.clone()));
 
-        self.materialize_alias(
+        let (alias_str, remaining_after) = self.materialize_alias(
             registry,
             host,
             journal,
@@ -713,7 +713,8 @@ impl RuntimeInterface for EthereumRuntime {
             native_public_key,
             &context,
             gas_remaining,
-        )
+        )?;
+        Ok((alias_str, AliasResolution::build(remaining_after)))
     }
 
     fn compute_alias(&self, native_address: &[u8]) -> Result<String, TezosXRuntimeError> {

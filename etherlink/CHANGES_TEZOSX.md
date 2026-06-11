@@ -205,6 +205,15 @@
 
 ### Internals
 
+- EVM caller absorbs the storage cost a CRAC callee delegates back
+  through `X-Tezos-Storage-Cost`: `g2 = V / base_fee_per_gas` is
+  deducted from the gas remaining at the return site, reverting
+  with `OutOfGas` if insufficient. (!22094)
+- EVM caller absorbs the storage cost the target runtime delegates
+  back through the alias-resolution interface when an alias is
+  materialized on outgoing CRAC: `g2_alias = cost / base_fee_per_gas`
+  is deducted from the gas remaining at the resolution site, before
+  HTTP dispatch. (!22094)
 - Reserve the `X-Tezos-Storage-Cost` CRAC response header in the
   `X-Tezos-*` namespace. The header lets a callee convey, in mutez,
   the storage cost it asks the caller to bill back for bytes

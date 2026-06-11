@@ -39,8 +39,8 @@ use tezos_ethereum::block::BlockConstants;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::{
-    canonicalize_native_address, resolve_routing, AliasInfo, CrossRuntimeContext,
-    Registry, RoutingDecision, RuntimeId,
+    canonicalize_native_address, resolve_routing, AliasInfo, AliasResolution,
+    CrossRuntimeContext, Registry, RoutingDecision, RuntimeId,
 };
 
 /// A journal of state changes internal to the EVM
@@ -596,6 +596,22 @@ impl<Host: StorageV1, R: Registry> Journal<'_, Host, R> {
     }
 }
 
+/// Outcome of resolving a source alias for an outgoing CRAC: what the
+/// caller must charge for the resolution.
+///
+/// Distinct from [`AliasResolution`] (returned by `ensure_alias`, whose
+/// `gas_remaining` is the gas *remaining*): here the gas figure is what
+/// the resolution *consumed*, ready to be charged to the caller.
+pub struct ResolvedAliasCost {
+    /// Gas consumed by the resolution, in the target runtime's units
+    /// (milligas for Tezos, EVM gas for Ethereum); 0 on cache hit.
+    pub consumed_gas: u64,
+    /// Storage cost the target runtime delegates to the caller, in mutez
+    /// (`None` when it makes no claim). Forwarded verbatim from
+    /// `AliasResolution.delegated_storage_cost`.
+    pub delegated_storage_cost: Option<u64>,
+}
+
 /// Trait for cross-runtime call support on the journal.
 ///
 /// This is implemented for Journal backed by EtherlinkVMDB, which has access
@@ -605,15 +621,16 @@ pub trait CrossRuntimeCall {
     /// `remaining_evm_gas` is the caller's remaining gas budget (used to
     /// cap alias generation).
     ///
-    /// Returns `(alias, generation_gas_consumed)` where `generation_gas_consumed`
-    /// is in `target_runtime` units (milligas for Tezos, EVM gas for Ethereum),
-    /// 0 on cache hit.
+    /// Returns `(alias, ResolvedAliasCost)`: the gas consumed by the
+    /// resolution (in `target_runtime` units, 0 on cache hit) and the
+    /// storage cost (in mutez) the target runtime delegates to the
+    /// caller, `None` when it does not delegate.
     fn tezosx_resolve_source_alias(
         &mut self,
         source: Address,
         target_runtime: RuntimeId,
         remaining_evm_gas: u64,
-    ) -> Result<(String, u64), CustomPrecompileError>;
+    ) -> Result<(String, ResolvedAliasCost), CustomPrecompileError>;
 
     /// Read-only variant of [`Self::tezosx_resolve_source_alias`]: on
     /// cache hit returns the persisted alias for `target_runtime`, on
@@ -691,11 +708,17 @@ where
         source: Address,
         target_runtime: RuntimeId,
         remaining_evm_gas: u64,
-    ) -> Result<(String, u64), CustomPrecompileError> {
+    ) -> Result<(String, ResolvedAliasCost), CustomPrecompileError> {
         if target_runtime == RuntimeId::Ethereum {
             // Short-circuit for Ethereum: the alias is the EVM address itself,
             // and no generation cost is incurred even on cache miss.
-            return Ok((source.to_string(), 0));
+            return Ok((
+                source.to_string(),
+                ResolvedAliasCost {
+                    consumed_gas: 0,
+                    delegated_storage_cost: None,
+                },
+            ));
         }
         let context = CrossRuntimeContext {
             gas_limit: self.database.block.gas_limit,
@@ -716,7 +739,15 @@ where
         let alias_info = match resolve_routing(origin, target_runtime)
             .map_err(|e| CustomPrecompileError::Revert(e.to_string(), remaining))?
         {
-            RoutingDecision::RoundTrip(target) => return Ok((target, 0)),
+            RoutingDecision::RoundTrip(target) => {
+                return Ok((
+                    target,
+                    ResolvedAliasCost {
+                        consumed_gas: 0,
+                        delegated_storage_cost: None,
+                    },
+                ))
+            }
             RoutingDecision::Transitive(info) => info,
             RoutingDecision::Native => AliasInfo {
                 runtime: RuntimeId::Ethereum,
@@ -740,7 +771,13 @@ where
                 remaining,
             )
         })?;
-        let (alias_str, target_gas_remaining) = self
+        let (
+            alias_str,
+            AliasResolution {
+                gas_remaining,
+                delegated_storage_cost,
+            },
+        ) = self
             .database
             .registry
             .ensure_alias(
@@ -758,8 +795,14 @@ where
                     remaining,
                 )
             })?;
-        let consumed_target = target_gas_budget - target_gas_remaining;
-        Ok((alias_str, consumed_target))
+        let consumed_gas = target_gas_budget - gas_remaining;
+        Ok((
+            alias_str,
+            ResolvedAliasCost {
+                consumed_gas,
+                delegated_storage_cost,
+            },
+        ))
     }
 
     fn tezosx_resolve_source_alias_readonly(

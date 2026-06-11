@@ -33,7 +33,7 @@ impl Registry for UnimplementedRegistry {
         _target_runtime: RuntimeId,
         _context: CrossRuntimeContext,
         _gas_remaining: u64,
-    ) -> Result<(String, u64), TezosXRuntimeError>
+    ) -> Result<(String, crate::AliasResolution), TezosXRuntimeError>
     where
         Host: StorageV1,
     {
@@ -98,7 +98,7 @@ impl Registry for NotWiredRegistry {
         target_runtime: RuntimeId,
         _context: CrossRuntimeContext,
         _gas_remaining: u64,
-    ) -> Result<(String, u64), TezosXRuntimeError>
+    ) -> Result<(String, crate::AliasResolution), TezosXRuntimeError>
     where
         Host: StorageV1,
     {
@@ -192,14 +192,17 @@ impl Registry for MockRegistry {
         target_runtime: RuntimeId,
         _context: CrossRuntimeContext,
         gas_remaining: u64,
-    ) -> Result<(String, u64), TezosXRuntimeError>
+    ) -> Result<(String, crate::AliasResolution), TezosXRuntimeError>
     where
         Host: StorageV1,
     {
         self.ensure_alias_calls
             .borrow_mut()
             .push((alias_info, target_runtime));
-        Ok((self.generated_alias.clone(), gas_remaining))
+        Ok((
+            self.generated_alias.clone(),
+            crate::AliasResolution::build(gas_remaining),
+        ))
     }
 
     fn compute_alias(
@@ -325,7 +328,7 @@ impl Registry for StubRegistry {
         target_runtime: RuntimeId,
         context: CrossRuntimeContext,
         gas_remaining: u64,
-    ) -> Result<(String, u64), TezosXRuntimeError>
+    ) -> Result<(String, crate::AliasResolution), TezosXRuntimeError>
     where
         Host: StorageV1,
     {
