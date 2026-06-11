@@ -11,5 +11,6 @@ opam/virtual/cohttp.opam.locked
 opam/virtual/cohttp-lwt.opam.locked
 opam/virtual/cohttp-lwt-unix.opam.locked
 images/common/install-nvm.sh
+images/scripts/install_datadog_static.sh
 scripts/install_dal_trusted_setup.sh
 scripts/version.sh

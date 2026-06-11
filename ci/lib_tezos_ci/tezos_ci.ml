@@ -1409,16 +1409,25 @@ module Images_external = struct
   (* Image used in initial pipeline job that sends to Datadog useful
      info for CI visibility.
 
-     https://hub.docker.com/layers/datadog/ci/v5.13.1/images/sha256-cdf912e7d4c2002dcbb40f048449053695f980157b7249d3d7891e5444cd807b
+     https://hub.docker.com/layers/datadog/ci/v5.18.0/images/sha256-07475bc65fc5efec461feeaca7a16cc32c13742393db6cce5352fc5f7e1bd5a2
 
-     The [datadog-ci] version should be consistent across all CI
-     images that use it. At the moment it is installed in the
-     external image below and the internal image [monitoring]. *)
+     The [datadog-ci] version must be kept consistent across all CI
+     images that use it. It lives in two independent places that have
+     to be bumped together:
+       - the external [datadog/ci] image pinned below (tag + Docker Hub
+         digest), and
+       - the static binary installer [images/scripts/install_datadog_static.sh]
+         (the [DATADOG_RELEASE] variable AND the four GitHub-release
+         SHA-256 checksums), used by the internal [monitoring] and
+         [alpine_docker_ci] images.
+     When bumping the version, update BOTH: a new tag here implies a new
+     Docker Hub digest, and a new [DATADOG_RELEASE] there implies four new
+     checksums. *)
 
   let datadog_ci =
     Image.mk_external
       ~image_path:
-        "datadog/ci:v5.13.1@sha256:12dada7483a8bb9b2c0505ec471ed391d32562e43c107cfc3dddbb61c88edbd2"
+        "datadog/ci:v5.18.0@sha256:07475bc65fc5efec461feeaca7a16cc32c13742393db6cce5352fc5f7e1bd5a2"
 
   (* https://hub.docker.com/layers/hadolint/hadolint/v2.14.0-alpine/images/sha256-be27962427a85de242820cb710a374478cce9bfb534a2c07e4fa54741d98908f *)
   let hadolint =

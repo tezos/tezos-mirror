@@ -22,22 +22,14 @@ ENV PATH $PATH:/usr/local/gcloud/google-cloud-sdk/bin
 # python3 py3-crcmod are needed to run gcloud
 
 # hadolint ignore=DL3018,DL3019
-RUN apk update && apk add --no-cache npm curl jq python3 py3-crcmod
+RUN apk update && apk add --no-cache curl jq python3 py3-crcmod
 
-# Set NPM registry
-# NPM_REGISTRY_DOMAIN and NPM_REGISTRY are set in the GitLab CI/CD
-ARG NPM_REGISTRY_DOMAIN
-ARG NPM_REGISTRY
-COPY datadog/package.json datadog/package-lock.json /usr/local/lib/datadog/
-# hadolint ignore=DL3003
-RUN --mount=type=secret,id=npm_token \
-    if [ -n "$NPM_REGISTRY" ] ; then \
-      npm set registry "$NPM_REGISTRY" && \
-      npm set //"${NPM_REGISTRY_DOMAIN}":_authToken="$(cat /run/secrets/npm_token)"; \
-    fi \
-    && cd /usr/local/lib/datadog && npm ci
+# Install datadog-ci static binary (Alpine/musl-native since v5.18.0).
+# This replaces the previous npm-based installation, removing the need
+# for Node.js and npm in this image.
+COPY scripts/install_datadog_static.sh /tmp/install_datadog_static.sh
+RUN /tmp/install_datadog_static.sh && rm /tmp/install_datadog_static.sh
 
 USER tezos
 ENV USER=tezos
-ENV PATH=/usr/local/lib/datadog/node_modules/.bin:$PATH
 WORKDIR /home/tezos

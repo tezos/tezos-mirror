@@ -143,8 +143,7 @@ module Files = struct
       "images/base-images/Dockerfile.alpine-docker-ci";
       "images/scripts/install-gcloud-apk.sh";
       "scripts/ci/docker_initialize.sh";
-      "images/ci/datadog/package.json";
-      "images/ci/datadog/package-lock.json";
+      "images/scripts/install_datadog_static.sh";
     ]
     @ build_script
 
