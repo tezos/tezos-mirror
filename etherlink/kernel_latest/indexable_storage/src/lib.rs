@@ -10,6 +10,7 @@ use tezos_evm_logging::Level::Error;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, PathError, RefPath};
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace, KeySpaceWriteError};
 use tezos_smart_rollup_storage::StorageError;
 use tezos_storage::{error::Error as GenStorageError, read_u64_le, write_u64_le};
 use thiserror::Error;
@@ -54,6 +55,10 @@ pub enum IndexableStorageError {
     TryFromBigIntError(TryFromBigIntError<BigUint>),
     #[error("Internal invariant violation: {0}")]
     Internal(String),
+    #[error(transparent)]
+    KeySpaceWrite(#[from] KeySpaceWriteError),
+    #[error("Invalid keyspace key: {0}")]
+    KeySpaceKey(#[from] KeyError),
 }
 
 impl From<GenStorageError> for IndexableStorageError {
@@ -233,11 +238,118 @@ impl IndexableStorage {
     }
 }
 
+/// KeySpace-native variant of [`IndexableStorage`]: the same push-only
+/// mapping from increasing integers to bytes, addressed by a relative key
+/// `prefix` inside a [`KeySpace`] instead of an absolute durable path.
+///
+/// Byte-compatible with [`IndexableStorage`]: for a keyspace loaded under
+/// the name `/name` and a prefix `/p`, the counter lives at
+/// `/name/p/length` and the values at `/name/p/<index>` — exactly where
+/// the [`StorageV1`] variant rooted at the absolute path `/name/p` puts
+/// them.
+pub struct KeyspaceIndexableStorage {
+    prefix: Key,
+}
+
+impl KeyspaceIndexableStorage {
+    pub fn new(prefix: Key) -> Self {
+        Self { prefix }
+    }
+
+    fn value_key(&self, index: u64) -> Result<Key, IndexableStorageError> {
+        // The index being an integer, it is always a valid key segment; the
+        // construction can only fail if `prefix` plus the segment exceeds
+        // the maximum key size.
+        Key::try_from(format!("{}/{}", self.prefix, index)).map_err(Into::into)
+    }
+
+    fn length_key(&self) -> Result<Key, IndexableStorageError> {
+        Key::try_from(format!("{}/length", self.prefix)).map_err(Into::into)
+    }
+
+    /// `length` returns the number of keys in the storage. If the length
+    /// key does not exist, the storage is considered as empty and returns
+    /// '0'.
+    pub fn length(&self, ks: &impl KeySpace) -> Result<u64, IndexableStorageError> {
+        // Mirrors the `StorageV1` variant: the buffer is zero-initialised
+        // and the read size deliberately unchecked, so a missing key is an
+        // empty storage and a short value is zero-extended.
+        let mut bytes = [0u8; std::mem::size_of::<u64>()];
+        match ks.read(&self.length_key()?, 0, &mut bytes) {
+            Some(_) => Ok(u64::from_le_bytes(bytes)),
+            None => Ok(0),
+        }
+    }
+
+    fn store_length(
+        &self,
+        ks: &mut impl KeySpace,
+        length: u64,
+    ) -> Result<(), IndexableStorageError> {
+        ks.set(&self.length_key()?, length.to_le_bytes())
+            .map_err(Into::into)
+    }
+
+    /// Returns the value at the given index. Fails if the index is greater
+    /// or equal to the length.
+    pub fn get_value(
+        &self,
+        ks: &impl KeySpace,
+        index: u64,
+    ) -> Result<Vec<u8>, IndexableStorageError> {
+        let length = self.length(ks)?;
+        if index >= length {
+            return Err(IndexableStorageError::IndexOutOfBounds);
+        };
+        ks.get(&self.value_key(index)?)
+            .ok_or(IndexableStorageError::Runtime(RuntimeError::PathNotFound))
+    }
+
+    /// Push a value at index `length`, and increments the length.
+    pub fn push_value(
+        &self,
+        ks: &mut impl KeySpace,
+        value: &[u8],
+    ) -> Result<(), IndexableStorageError> {
+        let new_index = self.length(ks)?;
+        self.store_length(ks, new_index + 1)?;
+        ks.set(&self.value_key(new_index)?, value)
+            .map_err(Into::into)
+    }
+
+    /// Push multiple values in batch, reading and writing the length only
+    /// once.
+    pub fn push_values(
+        &self,
+        ks: &mut impl KeySpace,
+        values: &[Vec<u8>],
+    ) -> Result<(), IndexableStorageError> {
+        if values.is_empty() {
+            return Ok(());
+        }
+        let base_index = self.length(ks)?;
+        for (i, value) in values.iter().enumerate() {
+            ks.set(&self.value_key(base_index + i as u64)?, value)?;
+        }
+        self.store_length(ks, base_index + values.len() as u64)
+    }
+
+    pub fn clear(&self, ks: &mut impl KeySpace) -> Result<(), IndexableStorageError> {
+        let length = self.length(ks)?;
+        for index in 0..length {
+            ks.delete(&self.value_key(index)?);
+        }
+        ks.delete(&self.length_key()?);
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::path::RefPath;
+    use tezos_smart_rollup_keyspace::KeySpaceLoader;
 
     #[test]
     fn test_indexable_empty() {
@@ -334,5 +446,86 @@ mod tests {
             .expect("Empty batch push failed");
 
         assert_eq!(storage.length(&host), Ok(0));
+    }
+
+    fn keyspace_storage() -> KeyspaceIndexableStorage {
+        KeyspaceIndexableStorage::new(Key::from_bytes(b"/values").unwrap())
+    }
+
+    #[test]
+    fn test_keyspace_empty() {
+        let mut host = MockKernelHost::default();
+        let ks = host.load_or_create("/indexed".parse().unwrap()).unwrap();
+        assert_eq!(keyspace_storage().length(&ks).unwrap(), 0);
+    }
+
+    #[test]
+    fn test_keyspace_push_get_and_bounds() {
+        let mut host = MockKernelHost::default();
+        let mut ks = host.load_or_create("/indexed".parse().unwrap()).unwrap();
+        let storage = keyspace_storage();
+
+        storage.push_value(&mut ks, b"value").unwrap();
+
+        assert_eq!(storage.length(&ks).unwrap(), 1);
+        assert_eq!(storage.get_value(&ks, 0).unwrap(), b"value".to_vec());
+        assert_eq!(
+            storage.get_value(&ks, 1),
+            Err(IndexableStorageError::IndexOutOfBounds)
+        );
+    }
+
+    #[test]
+    fn test_keyspace_push_values_batch_and_clear() {
+        let mut host = MockKernelHost::default();
+        let mut ks = host.load_or_create("/indexed".parse().unwrap()).unwrap();
+        let storage = keyspace_storage();
+
+        storage.push_value(&mut ks, b"existing").unwrap();
+        storage
+            .push_values(&mut ks, &[b"new1".to_vec(), b"new2".to_vec()])
+            .unwrap();
+
+        assert_eq!(storage.length(&ks).unwrap(), 3);
+        assert_eq!(storage.get_value(&ks, 0).unwrap(), b"existing".to_vec());
+        assert_eq!(storage.get_value(&ks, 1).unwrap(), b"new1".to_vec());
+        assert_eq!(storage.get_value(&ks, 2).unwrap(), b"new2".to_vec());
+
+        storage.clear(&mut ks).unwrap();
+        assert_eq!(storage.length(&ks).unwrap(), 0);
+        assert_eq!(
+            storage.get_value(&ks, 0),
+            Err(IndexableStorageError::IndexOutOfBounds)
+        );
+    }
+
+    // The byte-compat guarantee the consumer migration relies on: values
+    // written through the `StorageV1` variant at the absolute path
+    // `/indexed/values` are read back through the KeySpace variant
+    // (keyspace `/indexed`, prefix `/values`) and vice versa, proving both
+    // resolve to identical durable paths.
+    #[test]
+    fn test_keyspace_variant_is_byte_compatible_with_storage_v1_variant() {
+        let mut host = MockKernelHost::default();
+        let raw = IndexableStorage::new(&RefPath::assert_from(b"/indexed/values"))
+            .expect("Path to index is invalid");
+        let storage = keyspace_storage();
+
+        raw.push_value(&mut host, b"first").unwrap();
+        raw.push_value(&mut host, b"second").unwrap();
+
+        {
+            let mut ks = host.load_or_create("/indexed".parse().unwrap()).unwrap();
+            assert_eq!(storage.length(&ks).unwrap(), 2);
+            assert_eq!(storage.get_value(&ks, 0).unwrap(), b"first".to_vec());
+            assert_eq!(storage.get_value(&ks, 1).unwrap(), b"second".to_vec());
+
+            storage.push_value(&mut ks, b"third").unwrap();
+            storage.push_values(&mut ks, &[b"fourth".to_vec()]).unwrap();
+        }
+
+        assert_eq!(raw.length(&host), Ok(4));
+        assert_eq!(raw.get_value(&host, 2), Ok(b"third".to_vec()));
+        assert_eq!(raw.get_value(&host, 3), Ok(b"fourth".to_vec()));
     }
 }

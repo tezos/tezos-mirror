@@ -19,7 +19,7 @@ mod irmin_path_validator;
 pub mod wasm_nds;
 
 /// Key creation error
-#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum KeyError {
     /// Attempted to create a key that exceeds the maximum allowed size.
     #[error("key exceeds the maximum allowed size")]
@@ -193,7 +193,7 @@ impl TryFrom<String> for Name {
 }
 
 /// Errors that can occur when writing to a [`KeySpace`].
-#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum KeySpaceWriteError {
     /// Attempted to write more than the maximum allowed bytes at a given key.
     #[error("value size exceeded the maximum allowed")]

@@ -15,6 +15,7 @@ use tezos_smart_rollup_encoding::entrypoint::EntrypointError;
 use tezos_smart_rollup_encoding::michelson::ticket::TicketError;
 use tezos_smart_rollup_host::path::PathError;
 use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_smart_rollup_keyspace::{KeyError, KeySpaceLoaderError, KeySpaceWriteError};
 use tezos_storage::error::Error as GenStorageError;
 use tezos_tezlink::enc_wrappers::BlockNumberOverflowError;
 use thiserror::Error;
@@ -57,6 +58,12 @@ pub enum StorageError {
     InvalidLoadValue { expected: usize, actual: usize },
     #[error("Storage error: storing the current block hash failed")]
     BlockHashStorageFailed,
+    #[error(transparent)]
+    KeySpaceWrite(KeySpaceWriteError),
+    #[error(transparent)]
+    KeySpaceLoad(KeySpaceLoaderError),
+    #[error("Invalid keyspace key: {0}")]
+    KeySpaceKey(KeyError),
 }
 
 #[derive(Error, Debug)]
@@ -162,6 +169,24 @@ impl From<RuntimeError> for StorageError {
     }
 }
 
+impl From<KeySpaceWriteError> for StorageError {
+    fn from(e: KeySpaceWriteError) -> Self {
+        Self::KeySpaceWrite(e)
+    }
+}
+
+impl From<KeySpaceLoaderError> for StorageError {
+    fn from(e: KeySpaceLoaderError) -> Self {
+        Self::KeySpaceLoad(e)
+    }
+}
+
+impl From<KeyError> for StorageError {
+    fn from(e: KeyError) -> Self {
+        Self::KeySpaceKey(e)
+    }
+}
+
 impl From<PathError> for Error {
     fn from(e: PathError) -> Self {
         Self::Storage(StorageError::Path(e))
@@ -170,6 +195,18 @@ impl From<PathError> for Error {
 impl From<RuntimeError> for Error {
     fn from(e: RuntimeError) -> Self {
         Self::Storage(StorageError::Runtime(e))
+    }
+}
+
+impl From<KeySpaceWriteError> for Error {
+    fn from(e: KeySpaceWriteError) -> Self {
+        Self::Storage(StorageError::KeySpaceWrite(e))
+    }
+}
+
+impl From<KeySpaceLoaderError> for Error {
+    fn from(e: KeySpaceLoaderError) -> Self {
+        Self::Storage(StorageError::KeySpaceLoad(e))
     }
 }
 
@@ -245,6 +282,12 @@ impl From<IndexableStorageError> for Error {
                 Error::TryFromBigIntError(msg)
             }
             IndexableStorageError::Internal(msg) => Error::Internal(msg),
+            IndexableStorageError::KeySpaceWrite(e) => {
+                Error::Storage(StorageError::KeySpaceWrite(e))
+            }
+            IndexableStorageError::KeySpaceKey(e) => {
+                Error::Storage(StorageError::KeySpaceKey(e))
+            }
         }
     }
 }
