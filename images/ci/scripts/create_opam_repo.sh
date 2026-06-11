@@ -3,8 +3,10 @@
 set -eu
 
 # use opam proxy, if available
+# Respect an OPAMFETCH inherited from the environment (set by the Dockerfile),
+# falling back to the legacy /tmp location when run standalone.
 # shellcheck disable=SC2034
-OPAMFETCH="/tmp/kiss-fetch.sh"
+OPAMFETCH="${OPAMFETCH:-/tmp/kiss-fetch.sh}"
 # shellcheck disable=SC2034
 KISSCACHE="http://kisscache.kisscache.svc.cluster.local"
 
