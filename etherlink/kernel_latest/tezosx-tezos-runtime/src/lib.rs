@@ -2502,6 +2502,72 @@ mod tests {
         );
     }
 
+    /// The top-level error of a failed CRAC receipt is persisted **twice** —
+    /// once as the top-level operation result and once as the synthetic
+    /// alias(E_1)→target failed-transfer internal op (so indexers see the
+    /// attempted call). `charge_persisted_error` prices `2 * wrapped_len` on
+    /// the strength of this; this test pins the premise so the charge and the
+    /// receipt shape cannot silently drift apart. If the receipt is ever
+    /// de-duplicated to carry the error once, this count drops to 1 and the
+    /// `2 *` factor in `charge_persisted_error` must drop with it.
+    #[test]
+    fn failed_crac_receipt_persists_top_level_error_twice() {
+        let null_pkh = PublicKeyHash::from_b58check(NULL_PKH).unwrap();
+        let source_contract = Contract::Originated(
+            ContractKt1Hash::from_b58check("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT")
+                .unwrap(),
+        );
+        let sender_contract = Contract::Originated(
+            ContractKt1Hash::from_b58check("KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2")
+                .unwrap(),
+        );
+        let destination = Contract::Originated(
+            ContractKt1Hash::from_b58check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
+                .unwrap(),
+        );
+        let amount = Narith(0u64.into());
+        let parameters = Parameters::default();
+
+        // A distinctive, attacker-shaped payload that won't otherwise appear
+        // in the serialized op. Bounded by `"` on both sides once rendered as
+        // `MichelsonContractInterpretError("ZZZ…")`, so a window of exactly
+        // its length matches once per persisted copy.
+        let payload = "Z".repeat(2000);
+        let error = TransferError::MichelsonContractInterpretError(payload.clone());
+
+        let applied = build_failed_crac_receipt(
+            &null_pkh,
+            &source_contract,
+            &sender_contract,
+            &amount,
+            &destination,
+            &parameters,
+            error,
+            vec![],
+            vec![],
+            "1-0",
+            0,
+        )
+        .expect("build_failed_crac_receipt should succeed");
+
+        let mut serialized = Vec::new();
+        applied
+            .op_and_receipt
+            .bin_write(&mut serialized)
+            .expect("serialize failed CRAC receipt");
+
+        let needle = payload.as_bytes();
+        let occurrences = serialized
+            .windows(needle.len())
+            .filter(|w| *w == needle)
+            .count();
+        assert_eq!(
+            occurrences, 2,
+            "top-level error is persisted twice (top-level result + synthetic \
+             failed-transfer entry); charge_persisted_error prices 2× on this"
+        );
+    }
+
     // `serve` opens its own dispatch slot and only takes from that one;
     // an outer slot sitting on the stack must survive untouched.  This
     // test fails at URL parsing, so it does NOT exercise serve's

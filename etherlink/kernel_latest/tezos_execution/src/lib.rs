@@ -4,6 +4,7 @@
 use account_storage::Code;
 use account_storage::Manager;
 use account_storage::TezlinkAccount;
+use enshrined_contracts::charge_persisted_error;
 use enshrined_contracts::get_enshrined_contract_entrypoint;
 use enshrined_contracts::CracError;
 use mir::ast::BinWriter;
@@ -1523,8 +1524,18 @@ where
             internal_receipts
                 .iter_mut()
                 .for_each(|t| t.op.transform_result_backtrack());
+            // Meter the persisted error body before recording the failed
+            // receipt.  Only `CracError::Operation` errors are stored in
+            // the BSON sink; `CracError::BlockAbort` aborts the block so
+            // no receipt is produced and no per-byte charge applies.
+            let metered_error = match e {
+                CracError::Operation(te) => {
+                    charge_persisted_error(tc_ctx.operation_gas, te)
+                }
+                block_abort => block_abort,
+            };
             Err(CracTransferError {
-                error: e,
+                error: metered_error,
                 internal_receipts: untag_internals(internal_receipts),
             })
         }
@@ -2343,15 +2354,19 @@ mod tests {
     use tezosx_journal::TezosXJournal;
     use typed_arena::Arena;
 
+    use crate::enshrined_contracts::CracError;
     use crate::gas::TezlinkOperationGas;
     use crate::make_default_ctx;
     use crate::storage_fees::{COST_PER_BYTES, ORIGINATION_SIZE};
     use crate::{
         account_storage::{Manager, TezlinkAccount},
-        burn_pass, context, validate_and_apply_operation, FeeRefundConfig,
-        OperationError, ProcessedOperation, TaggedInternalOp,
+        burn_pass, context, cross_runtime_transfer, validate_and_apply_operation,
+        CracTransferError, FeeRefundConfig, OperationError, ProcessedOperation,
+        TaggedInternalOp,
     };
+    use tezos_smart_rollup::types::Timestamp;
     use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
+    use tezos_tezlink::enc_wrappers::BlockNumber;
 
     /// Test-only SafeStorage roots matching the `TezlinkContext::init_context`
     /// root path, so the inner SafeStorage wrap inside
@@ -8903,6 +8918,170 @@ mod tests {
         assert_eq!(
             skipped[1].operation_consumed_milligas, 0,
             "Skipped op should consume 0 gas"
+        );
+    }
+
+    // --- cross_runtime_transfer metering tests ---
+
+    /// Build a Michelson script that pushes `n` copies of the character 'x' as
+    /// a string then FAILWITHs with it, so the attacker-controlled error body
+    /// is exactly `n` bytes.
+    fn push_failwith_script(n: usize) -> String {
+        let payload = "x".repeat(n);
+        format!(
+            r#"parameter unit;
+               storage unit;
+               code {{ DROP; PUSH string "{payload}"; FAILWITH }}"#
+        )
+    }
+
+    /// Drive a `PUSH string "<n bytes>"; FAILWITH` script through
+    /// `cross_runtime_transfer` and return the `CracTransferError`.
+    ///
+    /// `milligas_limit` is the operation-level budget placed in the
+    /// `TezlinkOperationGas` that `cross_runtime_transfer` charges against.
+    fn run_failwith_crac(
+        n: usize,
+        milligas_limit: u64,
+    ) -> (CracTransferError, u64 /* consumed milligas */) {
+        let mut host = MockKernelHost::default();
+        let context = context::TezlinkContext::init_context();
+
+        // Sender: an implicit account (tz1).
+        let src = bootstrap1();
+        let sender_account = init_account(&mut host, &src.pkh, 100_000);
+
+        // Destination: a KT1 contract with `PUSH string; FAILWITH`.
+        let dest_kt1 = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
+        init_contract(
+            &mut host,
+            &dest_kt1,
+            &push_failwith_script(n),
+            &Micheline::from(()),
+            &0_u64.into(),
+        );
+        let dest = Contract::Originated(dest_kt1);
+
+        let parameters = Parameters {
+            entrypoint: mir::ast::Entrypoint::default(),
+            value: Micheline::from(())
+                .encode(&mut Gas::default())
+                .unwrap()
+                .unwrap(),
+        };
+
+        let parser = Parser::new();
+        let mut operation_gas = TezlinkOperationGas::start_milligas(milligas_limit)
+            .expect("milligas within limit");
+        let mut tc_ctx = TcCtx {
+            host: &mut host,
+            context: &context,
+            operation_gas: &mut operation_gas,
+            big_map_diff: std::collections::BTreeMap::new(),
+            interpret_context: crate::mir_ctx::InterpretContext::new(),
+            next_temporary_id: &mut mir::ast::big_map::BigMapId { value: (-1).into() },
+        };
+        let mut origination_nonce = OriginationNonce::default();
+        let mut counter = 0u128;
+        let level = BlockNumber { block_number: 0 };
+        let now = Timestamp::from(0);
+        let chain_id = tezos_crypto_rs::hash::ChainId::from([0, 0, 0, 0]);
+        let mut operation_ctx = crate::mir_ctx::OperationCtx {
+            source: &sender_account,
+            origination_nonce: &mut origination_nonce,
+            counter: &mut counter,
+            level: &level,
+            now: &now,
+            chain_id: &chain_id,
+            source_public_key: &[],
+            crac_chain_depth: 0,
+            crac_origin: None,
+            delegated_storage_cost: 0,
+        };
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+        let mut nonce_counter: u16 = 0;
+
+        let result = cross_runtime_transfer(
+            &mut tc_ctx,
+            &mut operation_ctx,
+            &NotWiredRegistry,
+            &mut journal,
+            &sender_account,
+            &Narith::from(0u64),
+            &dest,
+            &parameters,
+            &parser,
+            &mut nonce_counter,
+        );
+        let err = match result {
+            Ok(_) => panic!("FAILWITH script must return an error"),
+            Err(e) => e,
+        };
+
+        let consumed = u64::from(operation_gas.total_milligas_consumed());
+        (err, consumed)
+    }
+
+    /// Gas consumed by `cross_runtime_transfer` scales with the FAILWITH
+    /// payload length — a longer body charges proportionally more milligas.
+    #[test]
+    fn cross_runtime_transfer_meters_failwith_body() {
+        // Ample budget: 10 M milligas — well above what either script needs.
+        const BUDGET: u64 = 10_000_000;
+        let (err_short, gas_short) = run_failwith_crac(10, BUDGET);
+        let (err_long, gas_long) = run_failwith_crac(200, BUDGET);
+
+        // Both should fail with an Operation-level error (MichelsonContractInterpretError).
+        assert!(
+            matches!(
+                err_short.error,
+                CracError::Operation(TransferError::MichelsonContractInterpretError(_))
+            ),
+            "expected interpret error (short), got: {:?}",
+            err_short.error
+        );
+        assert!(
+            matches!(
+                err_long.error,
+                CracError::Operation(TransferError::MichelsonContractInterpretError(_))
+            ),
+            "expected interpret error (long), got: {:?}",
+            err_long.error
+        );
+
+        // A longer body must cost more gas (metering scales with length).
+        assert!(
+            gas_long > gas_short,
+            "longer FAILWITH body should cost more gas: {gas_long} vs {gas_short}"
+        );
+    }
+
+    /// When the gas budget is too tight to meter the FAILWITH body,
+    /// `cross_runtime_transfer` returns `OutOfGas` AND still records the
+    /// failed CRAC receipt (small — no bloated body), preserving the
+    /// invariant that a failed CRAC receipt is always produced.  The
+    /// `internal_receipts` field on the error is still present (not dropped)
+    /// even on OOG.
+    #[test]
+    fn cross_runtime_transfer_oog_on_large_failwith_body() {
+        // A body that will overflow a tight budget.  We first run with an
+        // ample budget to find the actual gas cost, then re-run with a budget
+        // below that threshold.
+        const N: usize = 500;
+        const AMPLE: u64 = 10_000_000;
+        let (_, gas_ample) = run_failwith_crac(N, AMPLE);
+
+        // Budget just below what the ample run consumed → must OOG.
+        let tight_budget = gas_ample - 1;
+        let (err_tight, _gas_tight) = run_failwith_crac(N, tight_budget);
+
+        assert!(
+            matches!(
+                err_tight.error,
+                CracError::Operation(TransferError::OutOfGas(_))
+            ),
+            "expected OutOfGas on tight budget, got: {:?}",
+            err_tight.error
         );
     }
 

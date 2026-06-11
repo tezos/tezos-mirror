@@ -120,6 +120,17 @@
   forwarder script deployed for new aliases forwards through `%call`;
   forwarders originated before this change keep the old script and fail
   to forward until their alias is re-created.
+- A native Michelson `FAILWITH` reached through an EVM→Michelson
+  cross-runtime call now charges the gateway per-byte payload surcharge
+  on the error body before it is persisted in the failed CRAC receipt and
+  before the 4xx response body is returned to the EVM caller. Previously
+  the attacker-controlled `FAILWITH` payload was copied unmetered into both
+  sinks — the persisted receipt BSON and the EVM-side revert returndata —
+  letting a malicious Michelson contract bloat Michelson block metadata at
+  near-zero cost. The persisted form (`Debug`-rendered) is now bounded at
+  the same per-byte rate used by `GatewayError` bodies (see !22068); on gas
+  exhaustion the receipt records a small `OutOfGas` error instead of the
+  full payload, preserving the receipt invariant. (!22158)
 - Re-priced the gas costs of many Michelson instructions
   from the values inherited from L1 (a Tallinn-era snapshot) to values
   re-benchmarked directly on the MIR (Rust) interpreter. This changes the
