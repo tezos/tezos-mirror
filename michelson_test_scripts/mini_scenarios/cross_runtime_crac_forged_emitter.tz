@@ -1,0 +1,24 @@
+parameter (unit %run) ;
+storage unit ;
+# Michelson contract whose %run entrypoint emits two EMIT ops,
+# one with tag %crac and one with tag %crac_end (the same tags used by
+# kernel-generated CRAC frame markers), from a KT1 sender.
+#
+# Used to verify that user-contract EMITs with tags "crac" and "crac_end"
+# do NOT perturb the CRAC bracket walk in check_crac_brackets: the walk
+# filters on source = null implicit account (handler_address), so any
+# event emitted by a KT1 is excluded regardless of its tag.  In
+# particular, a forged %crac_end must not drive the walk's depth
+# negative even if no matching begin was seen from the null sender.
+code
+  { CDR ;
+    PUSH string "forged-crac-end-marker" ;
+    EMIT %crac_end string ;
+    PUSH string "forged-crac-marker" ;
+    EMIT %crac string ;
+    NIL operation ;
+    SWAP ;
+    CONS ;
+    SWAP ;
+    CONS ;
+    PAIR } ;

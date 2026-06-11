@@ -247,6 +247,19 @@
   `--michelson-hard-gas-limit-per-block` to raise the Michelson per-block
   gas cap (default 3M). Sandbox-only; intended for capacity benchmarking.
   (!21968)
+- Michelson block receipts now bracket every CRAC frame with a paired
+  begin (`"crac"`) and end (`"crac_end"`) synthetic event in
+  `internal_operation_results`. The markers carry the same null-implicit
+  sender and `crac_id` payload as before; the new `"crac_end"` tag
+  distinguishes end from begin. Markers form a balanced parenthesis
+  forest: an indexer can reconstruct the full frame tree by filtering to
+  ops with null sender and tag `"crac"` or `"crac_end"`, then
+  stack-walking in list order. Coverage is complete: EVM-originated
+  top-level frames, nested re-entrant frames, sibling frames within one
+  EVM transaction, and Tezos-originated re-entry into Michelson all
+  carry bracket pairs. The existing begin-event byte shape is unchanged,
+  so consumers that only inspect the `"crac"` begin event keep working.
+  (!22151)
 
 ### Native Atomic Composability
 
