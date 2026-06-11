@@ -115,6 +115,10 @@ let update_account address state_override evm_state =
                       |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
                       |> Ethereum_types.decode_hash)
                     state_override.code;
+                (* Round-trip the classification tag: overriding state
+                   must not clobber it nor add a field an older kernel
+                   would reject. *)
+                origin = old_info.origin;
               }
           in
           let* evm_state =
