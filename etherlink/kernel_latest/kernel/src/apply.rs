@@ -477,15 +477,14 @@ pub fn renumber_nonces(operations: &mut [AppliedOperation]) {
 /// always pass through.
 /// Nonces are left as-is; renumber_nonces() fixes them at block finalization.
 fn merge_crac_internals(target: &mut AppliedOperation, other: AppliedOperation) {
-    use tezos_execution::enshrined_contracts::is_synthetic_crac_event;
+    use tezos_execution::enshrined_contracts::synthetic_crac_marker_tag;
     use tezos_tezlink::operation_result::{OperationDataAndMetadata, OperationResultSum};
-    // Partition `other`'s internals into non-synthetic-event and
-    // synthetic-event entries.  User EMITs (Event variants with a
-    // non-`crac` tag) join the non-synthetic bucket so they are
-    // appended after `target`'s existing operations rather than being
-    // mistakenly treated as duplicates of the synthetic CRAC-ID event.
-    let (other_non_synthetic, other_synthetic_events): (Vec<_>, Vec<_>) = match other
-        .op_and_receipt
+    // Partition `other`'s internals into non-marker and marker entries.
+    // User EMITs (Event variants with a non-marker tag) join the non-marker
+    // bucket so they are appended after `target`'s existing operations
+    // rather than being mistakenly treated as duplicates of the synthetic
+    // CRAC markers.
+    let (other_non_markers, other_markers): (Vec<_>, Vec<_>) = match other.op_and_receipt
     {
         OperationDataAndMetadata::OperationWithMetadata(batch) => batch
             .operations
@@ -494,9 +493,9 @@ fn merge_crac_internals(target: &mut AppliedOperation, other: AppliedOperation) 
                 OperationResultSum::Transfer(result) => result.internal_operation_results,
                 _ => vec![],
             })
-            .partition(|iop| !is_synthetic_crac_event(iop)),
+            .partition(|iop| synthetic_crac_marker_tag(iop).is_none()),
     };
-    // Append to `target`'s internal operations, before the CRAC event.
+    // Append to `target`'s internal operations, before the begin marker.
     // CRAC receipts are built by build_crac_receipt which guarantees exactly
     // one operation (a Transfer).  Assert this so violations are caught early.
     let OperationDataAndMetadata::OperationWithMetadata(ref mut batch) =
@@ -512,27 +511,24 @@ fn merge_crac_internals(target: &mut AppliedOperation, other: AppliedOperation) 
                 "CRAC receipt operation must be a Transfer"
             );
             if let OperationResultSum::Transfer(ref mut result) = op.receipt {
-                let has_synthetic_event = result
+                let has_begin_marker = result
                     .internal_operation_results
                     .iter()
-                    .any(is_synthetic_crac_event);
-                if !has_synthetic_event && !other_synthetic_events.is_empty() {
-                    // Target has no synthetic CRAC-ID event — prepend
-                    // other's first one, then re-append existing
-                    // operations.  Duplicate synthetic events past the
-                    // first one are dropped.
+                    .any(|iop| synthetic_crac_marker_tag(iop).is_some());
+                if !has_begin_marker && !other_markers.is_empty() {
+                    // Target has no begin marker — prepend other's first
+                    // one, then re-append existing operations.  Duplicate
+                    // markers past the first one are dropped.
                     let existing = std::mem::take(&mut result.internal_operation_results);
                     result
                         .internal_operation_results
-                        .extend(other_synthetic_events.into_iter().take(1));
+                        .extend(other_markers.into_iter().take(1));
                     result.internal_operation_results.extend(existing);
                 }
-                // Append other's non-synthetic-event entries after
-                // existing operations, preserving execution order.
+                // Append other's non-marker entries after existing
+                // operations, preserving execution order.
                 // User EMITs flow through here unchanged.
-                result
-                    .internal_operation_results
-                    .extend(other_non_synthetic);
+                result.internal_operation_results.extend(other_non_markers);
             }
         }
     }

@@ -66,10 +66,9 @@ pub(crate) const TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH: RefPath =
     RefPath::assert_from(b"/tez/tez_accounts");
 
 /// Re-export the canonical null PKH from `tezos_execution` so the rest
-/// of this crate can keep its short name.  Both the synthetic
-/// CRAC-ID event built here and the `is_synthetic_crac_event`
-/// predicate in `tezos_execution::enshrined_contracts` match against
-/// the same constant.
+/// of this crate can keep its short name.  Both the synthetic CRAC
+/// markers built here and the `synthetic_crac_marker_tag` helper in
+/// `tezos_execution::enshrined_contracts` match against the same constant.
 pub(crate) use tezos_execution::NULL_PKH;
 
 use crate::{
@@ -175,6 +174,67 @@ fn finalize_response(
     build_response(result, consumed_milligas, frame_result)
 }
 
+/// Build a synthetic kernel-emitted CRAC frame marker event.
+///
+/// `tag` is either [`tezos_execution::enshrined_contracts::SYNTHETIC_CRAC_EVENT_TAG`]
+/// (begin) or [`tezos_execution::enshrined_contracts::SYNTHETIC_CRAC_END_EVENT_TAG`]
+/// (end).  Both share the same null implicit sender, same payload (the CRAC-ID
+/// string), and sponsored gas encoding (the encode runs against a dedicated
+/// kernel-owned counter rather than the caller's budget so it is infallible
+/// by construction).
+///
+/// `applied` controls the internal-op result status: `true` → Applied,
+/// `false` → Backtracked (used by failed CRAC receipts whose events must
+/// be backtracked to match Tezos protocol semantics).
+fn build_synthetic_crac_marker(
+    null_pkh: &PublicKeyHash,
+    tag: &str,
+    crac_id: &str,
+    nonce: u16,
+    applied: bool,
+) -> Result<InternalOperationSum, TezosXRuntimeError> {
+    use mir::{
+        ast::annotations::NO_ANNS, ast::micheline::Micheline, ast::Entrypoint, lexer,
+    };
+    let mut sponsored_event_gas = Gas::default();
+    let ty = Micheline::App(lexer::Prim::string, &[], NO_ANNS)
+        .encode(&mut sponsored_event_gas)
+        .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
+        .map_err(|e| {
+            TezosXRuntimeError::Custom(format!("Failed to encode CRAC marker type: {e}"))
+        })?;
+    let payload = Micheline::from(crac_id.to_string())
+        .encode(&mut sponsored_event_gas)
+        .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
+        .map_err(|e| {
+            TezosXRuntimeError::Custom(format!(
+                "Failed to encode CRAC marker payload: {e}"
+            ))
+        })?;
+    let result = if applied {
+        ContentResult::Applied(EventSuccess {
+            consumed_milligas: Narith(0u64.into()),
+        })
+    } else {
+        ContentResult::BackTracked(BacktrackedResult {
+            errors: None,
+            result: EventSuccess {
+                consumed_milligas: Narith(0u64.into()),
+            },
+        })
+    };
+    Ok(InternalOperationSum::Event(InternalContentWithMetadata {
+        content: EventContent {
+            tag: Some(Entrypoint::from_string_unchecked(tag.into())),
+            payload: Some(payload.into()),
+            ty: ty.into(),
+        },
+        sender: Contract::Implicit(null_pkh.clone()),
+        nonce,
+        result,
+    }))
+}
+
 /// Build a serialized two-step receipt for an incoming CRAC (EVM → Michelson).
 ///
 /// The receipt structure (CRAC Derived Block Contents):
@@ -221,61 +281,23 @@ fn build_crac_receipt(
     let mut all_internal = Vec::new();
     let mut next_nonce = base_nonce;
 
-    {
-        use mir::{
-            ast::annotations::NO_ANNS, ast::micheline::Micheline, ast::Entrypoint, lexer,
-        };
-        // Synthetic kernel-emitted CRAC begin event. The event is
-        // *sponsored*: it is Micheline-encoded against a dedicated
-        // kernel-owned gas counter (`Gas::default()` — the standard L1
-        // per-operation cap, the idiom for non-user-billed kernel
-        // bookkeeping) rather than the caller's remaining budget. The
-        // encoded payload is tiny and bounded, so against this counter
-        // the encode can never run out of gas: the event always lands
-        // in the receipt. The internal-op `EventSuccess.consumed_milligas`
-        // is hardcoded to 0; the top-level receipt's
-        // `consumed_milligas` no longer includes this encode cost — the
-        // kernel absorbs it instead of charging the user (L2-1464).
-        let mut sponsored_event_gas = Gas::default();
-        let ty = Micheline::App(lexer::Prim::string, &[], NO_ANNS)
-            .encode(&mut sponsored_event_gas)
-            .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
-            .map_err(|e| {
-                TezosXRuntimeError::Custom(format!(
-                    "Failed to encode CRAC event type: {e}"
-                ))
-            })?;
-        let payload = Micheline::from(crac_id.to_string())
-            .encode(&mut sponsored_event_gas)
-            .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
-            .map_err(|e| {
-                TezosXRuntimeError::Custom(format!(
-                    "Failed to encode CRAC event payload: {e}"
-                ))
-            })?;
-        let event_nonce = next_nonce;
-        next_nonce = next_nonce.saturating_add(1);
-        all_internal.push(InternalOperationSum::Event(InternalContentWithMetadata {
-            content: EventContent {
-                tag: Some(Entrypoint::from_string_unchecked(
-                    tezos_execution::enshrined_contracts::SYNTHETIC_CRAC_EVENT_TAG.into(),
-                )),
-                payload: Some(payload.into()),
-                ty: ty.into(),
-            },
-            sender: Contract::Implicit(null_pkh.clone()),
-            nonce: event_nonce,
-            result: ContentResult::Applied(EventSuccess {
-                consumed_milligas: Narith(0u64.into()),
-            }),
-        }));
-    }
+    // Begin marker: first internal op of the frame.
+    all_internal.push(build_synthetic_crac_marker(
+        null_pkh,
+        tezos_execution::enshrined_contracts::SYNTHETIC_CRAC_EVENT_TAG,
+        crac_id,
+        next_nonce,
+        true,
+    )?);
+    next_nonce = next_nonce.saturating_add(1);
 
     all_internal.extend(pre_transfer_internals);
 
+    let transfer_nonce = next_nonce;
+    next_nonce = next_nonce.saturating_add(1);
     let transfer_internal = InternalOperationSum::Transfer(InternalContentWithMetadata {
         sender: sender_contract.clone(),
-        nonce: next_nonce,
+        nonce: transfer_nonce,
         content: TransferContent {
             amount: amount.clone(),
             destination: destination.clone(),
@@ -284,7 +306,20 @@ fn build_crac_receipt(
         result: ContentResult::Applied(target),
     });
     all_internal.push(transfer_internal);
+
+    // Carry internal receipts from nested Michelson execution, then close
+    // the frame with the end marker.
+    // The nonce here is a placeholder; `renumber_nonces` reassigns all
+    // internal nonces positionally at block finalization.
+    let end_nonce = next_nonce;
     all_internal.extend(internal_receipts);
+    all_internal.push(build_synthetic_crac_marker(
+        null_pkh,
+        tezos_execution::enshrined_contracts::SYNTHETIC_CRAC_END_EVENT_TAG,
+        crac_id,
+        end_nonce,
+        true,
+    )?);
 
     // Top-level result: handler → alias(E_0) (applied, with all internals nested).
     // TransferSuccess::default() is intentional — this is a synthetic wrapper;
@@ -368,65 +403,31 @@ fn build_failed_crac_receipt(
     // the CRAC body ran and their storage effects are persistent.
     let mut all_internal = Vec::new();
     let mut next_nonce = base_nonce;
-    {
-        use mir::{
-            ast::annotations::NO_ANNS, ast::micheline::Micheline, ast::Entrypoint, lexer,
-        };
-        // Synthetic kernel-emitted CRAC begin event (backtracked variant
-        // for failed CRAC receipt). Like the success-path builder, the
-        // event is *sponsored*: encoded against a dedicated kernel-owned
-        // gas counter (`Gas::default()`) rather than the caller's
-        // remaining budget. This is the crux of L2-1464: a gas-tight
-        // failed CRAC must still record its failed receipt for indexers,
-        // so crafting the event must never depend on (and never exhaust)
-        // the caller's leftover gas. The internal-op `EventSuccess`'s
-        // `consumed_milligas` stays 0 inside the `BacktrackedResult`.
-        let mut sponsored_event_gas = Gas::default();
-        let ty = Micheline::App(lexer::Prim::string, &[], NO_ANNS)
-            .encode(&mut sponsored_event_gas)
-            .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
-            .map_err(|e| {
-                TezosXRuntimeError::Custom(format!(
-                    "Failed to encode CRAC event type: {e}"
-                ))
-            })?;
-        let payload = Micheline::from(crac_id.to_string())
-            .encode(&mut sponsored_event_gas)
-            .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
-            .map_err(|e| {
-                TezosXRuntimeError::Custom(format!(
-                    "Failed to encode CRAC event payload: {e}"
-                ))
-            })?;
-        let event_nonce = next_nonce;
-        next_nonce = next_nonce.saturating_add(1);
-        all_internal.push(InternalOperationSum::Event(InternalContentWithMetadata {
-            content: EventContent {
-                tag: Some(Entrypoint::from_string_unchecked(
-                    tezos_execution::enshrined_contracts::SYNTHETIC_CRAC_EVENT_TAG.into(),
-                )),
-                payload: Some(payload.into()),
-                ty: ty.into(),
-            },
-            sender: Contract::Implicit(null_pkh.clone()),
-            nonce: event_nonce,
-            result: ContentResult::BackTracked(BacktrackedResult {
-                errors: None,
-                result: EventSuccess {
-                    consumed_milligas: Narith(0u64.into()),
-                },
-            }),
-        }));
-    }
+
+    // Begin marker: first internal op, backtracked (the failure
+    // backtracks all ops that had not yet completed).
+    // Sponsored encoding — like the success path, encoded against a
+    // dedicated kernel-owned counter so it never draws on the caller's
+    // leftover gas; a gas-tight failed CRAC still records its receipt.
+    all_internal.push(build_synthetic_crac_marker(
+        null_pkh,
+        tezos_execution::enshrined_contracts::SYNTHETIC_CRAC_EVENT_TAG,
+        crac_id,
+        next_nonce,
+        false,
+    )?);
+    next_nonce = next_nonce.saturating_add(1);
 
     all_internal.extend(pre_transfer_internals);
 
     // Include the failed transfer (alias(E_1) → target) so
     // indexers can see which contract call was attempted.
+    let transfer_nonce = next_nonce;
+    next_nonce = next_nonce.saturating_add(1);
     all_internal.push(InternalOperationSum::Transfer(
         InternalContentWithMetadata {
             sender: sender_contract.clone(),
-            nonce: next_nonce,
+            nonce: transfer_nonce,
             content: TransferContent {
                 amount: amount.clone(),
                 destination: destination.clone(),
@@ -437,8 +438,20 @@ fn build_failed_crac_receipt(
             )),
         },
     ));
+
     // Internal receipts already have block-global nonces from execution.
+    // End marker closes the frame; also backtracked on failure.
+    // The nonce here is a placeholder; `renumber_nonces` reassigns all
+    // internal nonces positionally at block finalization.
+    let end_nonce = next_nonce;
     all_internal.extend(internal_receipts);
+    all_internal.push(build_synthetic_crac_marker(
+        null_pkh,
+        tezos_execution::enshrined_contracts::SYNTHETIC_CRAC_END_EVENT_TAG,
+        crac_id,
+        end_nonce,
+        false,
+    )?);
 
     let top_level_result = OperationResult {
         balance_updates: vec![],
@@ -711,17 +724,11 @@ where
     // Each operation uses 0-based nonces; block-sequential nonces are
     // assigned at block finalization by renumber_nonces().
     let base_nonce: u16 = 0;
-    // Pre-allocate nonce slots for the event and transfer wrapper that
-    // build_crac_receipt will prepend, so MIR ops start after them.
-    let mut nonce_counter: u16 = if is_crac {
-        if crac_id_for_event.is_some() {
-            2
-        } else {
-            1
-        }
-    } else {
-        0
-    };
+    // Pre-allocate nonce slots for the begin event (nonce 0) and the
+    // synthetic transfer (nonce 1) that build_crac_receipt prepends, so
+    // MIR ops start at nonce 2.  The end event's nonce is computed
+    // after internal_receipts are assembled and does not need a slot here.
+    let mut nonce_counter: u16 = if is_crac { 2 } else { 0 };
     // Stamp the alias-forwarder origination internal ops (drained
     // from the journal at function entry) with placeholder nonces
     // taken from `nonce_counter` BEFORE running `cross_runtime_transfer`,
@@ -862,6 +869,8 @@ where
                         base_nonce,
                     ) {
                         Ok(receipt) => {
+                            #[cfg(debug_assertions)]
+                            assert_receipt_markers_balanced(&receipt);
                             journal.michelson.push_failed_crac_receipt(receipt);
                         }
                         Err(e) => {
@@ -926,6 +935,8 @@ where
             &crac_id_str,
             base_nonce,
         )?;
+        #[cfg(debug_assertions)]
+        assert_receipt_markers_balanced(&receipt);
         journal.michelson.push_pending_crac_receipt(receipt);
         TransferSuccess::default()
     } else {
@@ -933,6 +944,58 @@ where
     };
     *consumed_milligas = gas.total_milligas_consumed().into();
     Ok(transfer)
+}
+
+/// Assert that the CRAC frame markers in a receipt are balanced.
+///
+/// Gated to debug/test builds (`#[cfg(debug_assertions)]`): compiled out
+/// of every release build — the production kernel and the release kernel
+/// the tezt suite runs — so it adds no runtime cost and cannot affect the
+/// block hash.
+///
+/// A production check would be redundant: marker balance holds by
+/// construction (both builders emit the begin/end pair atomically, and no
+/// later splice/merge step can unbalance a receipt).  Asserting that
+/// directly for every CRAC shape is awkward, so instead this walks the
+/// fully-assembled receipt at push time whenever the kernel runs under
+/// `cargo test`, turning any such run into an indirect balance check that
+/// trips on a regression in the builders, the splice, or the merge.
+///
+/// Steps through `internal_operation_results` using
+/// [`tezos_execution::enshrined_contracts::synthetic_crac_marker_tag`] to
+/// identify null-sender events with tag `"crac"` (push) or `"crac_end"`
+/// (pop).  Asserts depth never goes negative and that the final depth is
+/// zero.  Events with the null sender but a different tag (e.g. `"deposit"`)
+/// return `None` from the helper and do not affect the walk.
+#[cfg(debug_assertions)]
+fn assert_receipt_markers_balanced(receipt: &tezos_tezlink::block::AppliedOperation) {
+    use tezos_execution::enshrined_contracts::{
+        synthetic_crac_marker_tag, SYNTHETIC_CRAC_END_EVENT_TAG, SYNTHETIC_CRAC_EVENT_TAG,
+    };
+    use tezos_tezlink::operation_result::{OperationDataAndMetadata, OperationResultSum};
+    let OperationDataAndMetadata::OperationWithMetadata(ref batch) =
+        receipt.op_and_receipt;
+    let Some(op) = batch.operations.first() else {
+        return;
+    };
+    let OperationResultSum::Transfer(ref result) = op.receipt else {
+        return;
+    };
+    let mut depth: i64 = 0;
+    for iop in &result.internal_operation_results {
+        if let Some(tag) = synthetic_crac_marker_tag(iop) {
+            if tag == SYNTHETIC_CRAC_EVENT_TAG {
+                depth += 1;
+            } else if tag == SYNTHETIC_CRAC_END_EVENT_TAG {
+                depth -= 1;
+                debug_assert!(
+                    depth >= 0,
+                    "CRAC marker imbalance: end marker without matching begin"
+                );
+            }
+        }
+    }
+    debug_assert_eq!(depth, 0, "CRAC marker imbalance: unmatched begin markers");
 }
 
 // --- Alias generation gas constants (milligas) ---
@@ -2034,14 +2097,14 @@ mod tests {
         let OperationResultSum::Transfer(ref result) = op.receipt else {
             panic!("expected Transfer receipt");
         };
-        // Internal op #0 = CRAC event, internal op #1 = transfer
+        // Internal op #0 = CRAC begin event, #1 = transfer, #2 = CRAC end event
         assert_eq!(
             result.internal_operation_results.len(),
-            2,
-            "two internal operations (CRAC event + transfer)"
+            3,
+            "three internal operations (CRAC begin + transfer + CRAC end)"
         );
 
-        // Internal op #0: CRAC event
+        // Internal op #0: CRAC begin event
         let InternalOperationSum::Event(ref event) = result.internal_operation_results[0]
         else {
             panic!(
@@ -2077,6 +2140,45 @@ mod tests {
         assert_eq!(
             internal.content.amount, amount,
             "internal amount must match"
+        );
+
+        // Internal op #2: CRAC end event
+        let InternalOperationSum::Event(ref end_event) =
+            result.internal_operation_results[2]
+        else {
+            panic!(
+                "expected Event at index 2, got {:?}",
+                result.internal_operation_results[2]
+            );
+        };
+        assert_eq!(
+            end_event.content.tag.as_ref().and_then(|e| e.as_str()),
+            Some("crac_end"),
+            "last internal op tag must be 'crac_end'"
+        );
+        assert_eq!(
+            end_event.sender,
+            Contract::Implicit(null_pkh.clone()),
+            "crac_end sender must be the handler implicit account"
+        );
+        assert!(
+            matches!(end_event.result, ContentResult::Applied(_)),
+            "crac_end must be Applied on the success path"
+        );
+        // Payload must equal the CRAC-ID string encoded as Micheline string bytes.
+        let expected_payload = {
+            use mir::ast::micheline::Micheline;
+            use mir::serializer::MichelineExpr;
+            let bytes = Micheline::from(crac_id.to_string())
+                .encode(&mut Gas::default())
+                .expect("gas should not be exhausted")
+                .expect("crac_id Micheline encoding must succeed");
+            MichelineExpr::from(bytes)
+        };
+        assert_eq!(
+            end_event.content.payload,
+            Some(expected_payload),
+            "crac_end payload must equal the CRAC-ID string encoded as Micheline"
         );
 
         // Round-trip: serialize and read back
@@ -2150,11 +2252,11 @@ mod tests {
         let OperationResultSum::Transfer(ref result) = op.receipt else {
             panic!("expected Transfer receipt");
         };
-        // CRAC event at #0, synthetic transfer at #1.
+        // CRAC begin event at #0, synthetic transfer at #1, CRAC end event at #2.
         assert_eq!(
             result.internal_operation_results.len(),
-            2,
-            "two internal operations (CRAC event + transfer)"
+            3,
+            "three internal operations (CRAC begin + transfer + CRAC end)"
         );
 
         assert!(
@@ -2162,7 +2264,7 @@ mod tests {
                 result.internal_operation_results[0],
                 InternalOperationSum::Event(_)
             ),
-            "internal op #0 must be the CRAC event"
+            "internal op #0 must be the CRAC begin event"
         );
 
         let InternalOperationSum::Transfer(ref internal) =
@@ -2190,6 +2292,30 @@ mod tests {
         assert!(
             matches!(internal.result, ContentResult::Applied(_)),
             "internal op must be applied"
+        );
+
+        // Internal op #2: CRAC end event
+        let InternalOperationSum::Event(ref end_event) =
+            result.internal_operation_results[2]
+        else {
+            panic!(
+                "expected Event at index 2, got {:?}",
+                result.internal_operation_results[2]
+            );
+        };
+        assert_eq!(
+            end_event.content.tag.as_ref().and_then(|e| e.as_str()),
+            Some("crac_end"),
+            "last internal op tag must be 'crac_end'"
+        );
+        assert_eq!(
+            end_event.sender,
+            Contract::Implicit(null_pkh.clone()),
+            "crac_end sender must be the handler implicit account (null)"
+        );
+        assert!(
+            matches!(end_event.result, ContentResult::Applied(_)),
+            "crac_end must be Applied on the success path"
         );
     }
 
@@ -2246,18 +2372,18 @@ mod tests {
 
         assert_eq!(
             result.internal_operation_results.len(),
-            2,
-            "two internal operations (CRAC event + failed transfer)"
+            3,
+            "three internal operations (CRAC begin + failed transfer + CRAC end)"
         );
 
-        // Internal op #0: CRAC event must be backtracked
+        // Internal op #0: CRAC begin event must be backtracked
         let InternalOperationSum::Event(ref event) = result.internal_operation_results[0]
         else {
             panic!("expected Event");
         };
         assert!(
             matches!(event.result, ContentResult::BackTracked(_)),
-            "CRAC event must be backtracked when downstream transfer fails"
+            "CRAC begin event must be backtracked when downstream transfer fails"
         );
 
         // Internal op #1: transfer must be failed
@@ -2267,6 +2393,30 @@ mod tests {
             panic!("expected Transfer");
         };
         assert!(transfer.result.is_failed(), "transfer must be failed");
+
+        // Internal op #2: CRAC end event must also be backtracked
+        let InternalOperationSum::Event(ref end_event) =
+            result.internal_operation_results[2]
+        else {
+            panic!(
+                "expected Event at index 2, got {:?}",
+                result.internal_operation_results[2]
+            );
+        };
+        assert_eq!(
+            end_event.content.tag.as_ref().and_then(|e| e.as_str()),
+            Some("crac_end"),
+            "last internal op tag must be 'crac_end'"
+        );
+        assert_eq!(
+            end_event.sender,
+            Contract::Implicit(null_pkh.clone()),
+            "crac_end sender must be the handler implicit account (null)"
+        );
+        assert!(
+            matches!(end_event.result, ContentResult::BackTracked(_)),
+            "crac_end must be BackTracked when the frame failed"
+        );
     }
 
     // `serve` opens its own dispatch slot and only takes from that one;
