@@ -399,20 +399,14 @@ where
             .verify_crac_id(&crac_id)
             .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
     }
-    // Save transaction info for building the fake EVM transaction.
-    // set_crac_tx_info is only called once subsequent calls in the same CRAC execution will
-    // result in an error.
-    if !journal.evm.has_crac_data() {
-        journal
-            .evm
-            .set_crac_tx_info(tezosx_journal::CracTransactionInfo {
-                source: hdrs.source.unwrap_or_default(),
-                sender: hdrs.sender,
-                gas_limit: revm::primitives::U256::from(hdrs.gas_limit),
-                amount: revm::primitives::U256::from_limbs(hdrs.amount.into_limbs()),
-            })
-            .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
-    }
+    // Record this mutating crossing so a fake EVM transaction is built
+    // to mirror the op in the EVM block. Only the invariant originator
+    // is kept; this crossing's own sender / target / amount are recorded
+    // in the `CracReceived` log emitted below, not aggregated into the
+    // fake tx (see `CracTransactionInfo` and L2-1408).
+    journal
+        .evm
+        .record_crac_crossing(hdrs.source.unwrap_or_default(), true);
     // `crac_chain_depth` is per-call: save the outer frame's value, set
     // this call's inbound depth for the duration of the inner EVM
     // execution, and restore it on return (below). Otherwise a
@@ -549,19 +543,13 @@ where
             .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
     }
 
-    // Set CRAC tx info on first hit (forced `amount = 0`); same
-    // sender/source headers as `execute_call`.
-    if !journal.evm.has_crac_data() {
-        journal
-            .evm
-            .set_crac_tx_info(tezosx_journal::CracTransactionInfo {
-                source: hdrs.source.unwrap_or_default(),
-                sender: hdrs.sender,
-                gas_limit: revm::primitives::U256::from(hdrs.gas_limit),
-                amount: revm::primitives::U256::ZERO,
-            })
-            .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
-    }
+    // Record this read-only crossing. It contributes no `has_mutating`,
+    // so an op that only ever read EVM state produces no fake tx, and a
+    // leading `staticcall_evm` can no longer latch the slot and poison a
+    // later value-bearing `%call_evm` (L2-1408).
+    journal
+        .evm
+        .record_crac_crossing(hdrs.source.unwrap_or_default(), false);
     // Per-call `crac_chain_depth`: save / set / restore around the inner
     // execution, same as the POST path. See `execute_call`.
     let saved_crac_chain_depth = journal.evm.crac_chain_depth();

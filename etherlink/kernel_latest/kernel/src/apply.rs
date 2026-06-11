@@ -273,6 +273,11 @@ pub enum RuntimeTransactionResult {
 
 /// Extract cross-runtime side effects accumulated in the journal
 /// during a Michelson transaction that may have CRACed into EVM.
+///
+/// Returns no EVM effect when every crossing was a read-only
+/// `staticcall_evm` (`take_crac_data` suppresses the static-only case):
+/// such an op left no EVM-observable state change, so no fake tx mirrors
+/// it (L2-1408).
 pub fn extract_cross_runtime_effects(
     journal: &mut TezosXJournal,
     consumed_milligas: u64,
@@ -298,9 +303,6 @@ pub fn extract_cross_runtime_effects(
             crac_id,
             logs,
             source: H160(*tx_info.source.0),
-            sender: H160(*tx_info.sender.0),
-            gas_limit: U256::from_little_endian(&tx_info.gas_limit.to_le_bytes::<32>()),
-            amount: U256::from_little_endian(&tx_info.amount.to_le_bytes::<32>()),
             gas_used: U256::from(
                 tezosx_interfaces::gas::convert(
                     RuntimeId::Tezos,
@@ -1065,21 +1067,22 @@ pub enum CrossRuntimeEffect {
     Evm(EvmCracEffect),
 }
 
-/// Data needed to construct a fake EVM transaction from incoming CRACs.
-#[allow(dead_code)]
+/// Data needed to construct a fake EVM transaction mirroring the
+/// incoming CRACs of one foreign-runtime op.
+///
+/// The fake tx is a neutral envelope: it carries only the invariant
+/// originator (`source`, used as both `from` and `to`), no value, and
+/// the accumulated gas. The per-crossing sender/target/amount facts are
+/// in `logs` (the `CracReceived` events), not in the envelope — see
+/// L2-1408.
 pub struct EvmCracEffect {
     /// CRAC-ID shared by all CRACs in this transaction.
     pub crac_id: String,
     /// Logs accumulated from all `serve()` calls.
     pub logs: Vec<revm::primitives::Log>,
-    /// EVM address (alias) of the top-level sender (from X-Tezos-Source).
+    /// EVM address (alias) of the top-level originator (from
+    /// X-Tezos-Source). Invariant across all crossings in the op.
     pub source: H160,
-    /// EVM address (alias) of the immediate caller (from X-Tezos-Sender).
-    pub sender: H160,
-    /// Gas limit forwarded to the call.
-    pub gas_limit: U256,
-    /// Value attached to the call (in wei).
-    pub amount: U256,
     /// Cumulative gas used across all CRAC executions.
     pub gas_used: U256,
 }

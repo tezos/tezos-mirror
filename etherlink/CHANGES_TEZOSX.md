@@ -4,6 +4,17 @@
 
 ### EVM Runtime
 
+- The synthetic EVM transaction that mirrors a Michelson operation's
+  inbound cross-runtime calls is now a neutral envelope: `from` and `to`
+  are both the originator's alias and `value` is `0`. It no longer
+  aggregates a single `value`/sender across crossings — a behaviour that
+  let a leading read-only `staticcall_evm` pin the reported value to `0`
+  and shadow a later value-bearing `%call_evm`, and that misattributed
+  the summed value to the originator rather than the calling contracts
+  that actually held it. The per-crossing sender, target, and amount are
+  carried by the `CracReceived` logs instead. A Michelson operation that
+  only ever reads EVM state (no mutating crossing) no longer produces a
+  synthetic transaction at all. (!22097)
 - The runtime gateway's typed `callMichelsonView` selector now charges
   the same per-word payload surcharge as the generic `call(GET)` path,
   on the inbound calldata, the outgoing view input body, and the
