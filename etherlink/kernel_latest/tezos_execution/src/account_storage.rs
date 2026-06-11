@@ -22,9 +22,10 @@ use tezos_smart_rollup::{
     host::{RuntimeError, ValueType},
     types::{PublicKey, PublicKeyHash},
 };
-use tezos_smart_rollup_host::path::OwnedPath;
+use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_storage::{read_nom_value, read_optional_nom_value, store_bin};
+use tezosx_interfaces::Origin;
 
 // This enum is inspired of `src/proto_alpha/lib_protocol/manager_repr.ml`
 // A manager can be:
@@ -253,6 +254,43 @@ pub enum Code {
     Enshrined(EnshrinedContracts),
 }
 
+/// Durable-storage path of the single shared Michelson implementation that
+/// backs every Tezos X alias. An alias `KT1` carries no script of its own;
+/// when its `/data/code` is absent and it is classified [`Origin::Alias`], its
+/// code resolves to the bytes stored here (see [`TezosOriginatedAccount::code`]).
+///
+/// The slot lives in a `__system__` subtree of the `tezosx/` account namespace
+/// (`__system__` is not a valid base58 account address, so it cannot collide
+/// with a per-account directory) and, being rooted under `/tez/tez_accounts`,
+/// is covered by the Michelson state-hash commitment `h(/tez/tez_accounts)`:
+/// replicas that disagree on the implementation diverge on the Michelson block
+/// `state_root`.
+pub(crate) const ALIAS_IMPLEMENTATION_PATH: RefPath =
+    RefPath::assert_from(b"/tez/tez_accounts/tezosx/__system__/alias_implementation");
+
+/// Read the shared alias implementation. Returns `None` when the slot has not
+/// been seeded yet.
+pub fn read_alias_implementation(
+    host: &impl StorageV1,
+) -> Result<Option<Vec<u8>>, tezos_storage::error::Error> {
+    match host.store_read_all(&ALIAS_IMPLEMENTATION_PATH) {
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(RuntimeError::PathNotFound) => Ok(None),
+        Err(err) => Err(err.into()),
+    }
+}
+
+/// Overwrite the shared alias implementation with `code`. A single write here
+/// changes the behaviour of every existing and future alias at once — the O(1)
+/// upgrade primitive.
+pub fn write_alias_implementation(
+    host: &mut impl StorageV1,
+    code: &[u8],
+) -> Result<(), tezos_storage::error::Error> {
+    host.store_write_all(&ALIAS_IMPLEMENTATION_PATH, code)?;
+    Ok(())
+}
+
 /// Snapshot of a contract's storage-space.
 pub struct StorageSpace {
     pub used_bytes: Zarith,
@@ -278,20 +316,73 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
     fn kt1(&self) -> &ContractKt1Hash;
 
     fn code(&self, host: &impl StorageV1) -> Result<Code, tezos_storage::error::Error> {
-        match enshrined_contracts::from_kt1(self.kt1()) {
-            Some(c) => Ok(Code::Enshrined(c)),
-            None => {
-                let code_path = context::code::code_path(self)?;
-                let code = host.store_read_all(&code_path)?;
-                Ok(Code::Code(code))
+        if let Some(c) = enshrined_contracts::from_kt1(self.kt1()) {
+            return Ok(Code::Enshrined(c));
+        }
+        let code_path = context::code::code_path(self)?;
+        match host.store_read_all(&code_path) {
+            Ok(code) => Ok(Code::Code(code)),
+            // A KT1 with no `/data/code` is either a Tezos X alias — whose
+            // script is the single shared implementation — or a genuinely
+            // missing contract. Resolving on the code-miss keeps the common
+            // path at one read and never reads `/origin` for ordinary
+            // contracts; the gate on `is_alias` also means implicit `tz1`
+            // accounts (which never reach this trait) are untouched.
+            Err(RuntimeError::PathNotFound) => {
+                if self.is_alias(host)? {
+                    // TODO: https://linear.app/tezos/issue/L2-1529
+                    // Today this is unreachable: the slot is seeded at
+                    // migration and at Michelson-runtime activation before any
+                    // alias can exist, and aliases still carry their own
+                    // `/data/code`. Once L2-1529 makes aliases code-less, the
+                    // switch-over must keep guaranteeing "seed precedes alias"
+                    // and route this as a catchable user-level failure rather
+                    // than a code-fetch error (which aborts the block).
+                    read_alias_implementation(host)?
+                        .map(Code::Code)
+                        .ok_or_else(|| {
+                            tezos_storage::error::Error::Internal(
+                                "alias implementation slot is not seeded".to_string(),
+                            )
+                        })
+                } else {
+                    Err(RuntimeError::PathNotFound.into())
+                }
             }
+            Err(err) => Err(err.into()),
         }
     }
 
-    /// Whether the originated contract exists in durable storage. The
-    /// presence of a code blob at `/data/code` is the marker, since
-    /// `Origination` always writes one. Enshrined contracts always
-    /// exist (their code is synthetic).
+    /// Read the classification record (`Origin`) at the account's `/origin`
+    /// path. `None` when the account carries no classification.
+    ///
+    /// This is the same decode as
+    /// [`tezosx_tezos_runtime::account::get_origin_at`] /
+    /// `Context::read_origin_for_address`, kept here because `tezos_execution`
+    /// sits below those: if the on-disk `Origin` encoding ever changes, all of
+    /// them move together. `read_optional_nom_value` already maps a missing
+    /// path to `None` and rejects incomplete / trailing bytes.
+    fn origin(
+        &self,
+        host: &impl StorageV1,
+    ) -> Result<Option<Origin>, tezos_storage::error::Error> {
+        read_optional_nom_value(host, &context::code::origin_path(self)?)
+    }
+
+    /// Whether this originated account is a Tezos X alias (classified
+    /// [`Origin::Alias`]), whose script resolves to the shared implementation.
+    fn is_alias(
+        &self,
+        host: &impl StorageV1,
+    ) -> Result<bool, tezos_storage::error::Error> {
+        Ok(matches!(self.origin(host)?, Some(Origin::Alias(_))))
+    }
+
+    /// Whether the originated contract exists in durable storage. A regular
+    /// contract is marked by the presence of a code blob at `/data/code`
+    /// (`Origination` always writes one); enshrined contracts always exist
+    /// (their code is synthetic); a Tezos X alias exists despite having no
+    /// `/data/code`, since its script is the shared implementation.
     ///
     /// Used as a guard before transferring to an originated destination,
     /// so a Transaction to a never-originated KT1 produces a typed
@@ -302,7 +393,11 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
             return Ok(true);
         }
         let code_path = context::code::code_path(self)?;
-        Ok(Some(ValueType::Value) == host.store_has(&code_path)?)
+        if Some(ValueType::Value) == host.store_has(&code_path)? {
+            return Ok(true);
+        }
+        // A code-less KT1 exists iff it is an alias.
+        self.is_alias(host)
     }
 
     fn set_code_size(
@@ -1202,5 +1297,131 @@ mod test {
 
         assert_eq!(used_bytes, Zarith::from(0u64));
         assert_eq!(allocated_bytes, Zarith::from(0u64));
+    }
+
+    /// The shared alias-implementation slot must stay under `/tez/tez_accounts`
+    /// so it remains covered by the `h(/tez/tez_accounts)` state-hash
+    /// commitment. Nothing enforces this at compile time, so guard it here.
+    #[test]
+    fn alias_implementation_path_is_under_the_accounts_root() {
+        use tezos_smart_rollup_host::path::Path;
+        assert!(ALIAS_IMPLEMENTATION_PATH
+            .as_bytes()
+            .starts_with(b"/tez/tez_accounts"));
+    }
+
+    fn classify_as_alias(
+        host: &mut impl StorageV1,
+        account: &impl TezosOriginatedAccount,
+    ) {
+        use tezosx_interfaces::{AliasInfo, RuntimeId};
+        let origin = Origin::Alias(AliasInfo {
+            runtime: RuntimeId::Ethereum,
+            native_address: b"0xabc".to_vec(),
+        });
+        let mut buf = vec![];
+        origin.bin_write(&mut buf).unwrap();
+        host.store_write_all(&context::code::origin_path(account).unwrap(), &buf)
+            .unwrap();
+    }
+
+    /// A KT1 classified `Origin::Alias` and carrying no `/data/code` resolves to
+    /// the shared implementation, and reports as existing.
+    #[test]
+    fn alias_code_resolves_to_shared_implementation() {
+        let mut host = MockKernelHost::default();
+        let context = context::TezlinkContext::init_context();
+        let contract = Contract::from_b58check(KT1).unwrap();
+        let account = context.originated_from_contract(&contract).unwrap();
+
+        classify_as_alias(&mut host, &account);
+        let implementation = vec![0x02u8, 0x00, 0x00, 0x00, 0x00];
+        write_alias_implementation(&mut host, &implementation).unwrap();
+
+        assert_eq!(account.code(&host).unwrap(), Code::Code(implementation));
+        assert!(account.exists(&host).unwrap());
+    }
+
+    /// An alias whose shared implementation has not been seeded is an error, not
+    /// a silent fallback.
+    #[test]
+    fn alias_without_seeded_implementation_errors() {
+        let mut host = MockKernelHost::default();
+        let context = context::TezlinkContext::init_context();
+        let contract = Contract::from_b58check(KT1).unwrap();
+        let account = context.originated_from_contract(&contract).unwrap();
+
+        classify_as_alias(&mut host, &account);
+        // Pin the error type: an unseeded slot is an internal invariant breach,
+        // not a generic/typecheck error (so it can't silently change meaning).
+        assert!(matches!(
+            account.code(&host),
+            Err(tezos_storage::error::Error::Internal(_))
+        ));
+        // Still classified, so it exists.
+        assert!(account.exists(&host).unwrap());
+    }
+
+    /// A code-less KT1 that is not an alias is a genuinely missing contract:
+    /// `code()` errors and `exists()` is false. The `/origin` read only happens
+    /// because `/data/code` is absent — a regular contract never pays for it.
+    #[test]
+    fn code_less_non_alias_is_missing() {
+        let host = MockKernelHost::default();
+        let context = context::TezlinkContext::init_context();
+        let contract = Contract::from_b58check(KT1).unwrap();
+        let account = context.originated_from_contract(&contract).unwrap();
+
+        // Pin the variant: a code-less non-alias must surface as the plain
+        // missing-path error, not get routed through the alias branch (which
+        // would yield `Internal`).
+        assert!(matches!(
+            account.code(&host),
+            Err(tezos_storage::error::Error::Runtime(
+                RuntimeError::PathNotFound
+            ))
+        ));
+        assert!(!account.exists(&host).unwrap());
+    }
+
+    /// A code-less KT1 classified `Origin::Native` is not an alias either:
+    /// still a genuinely missing contract. Guards against relaxing `is_alias`
+    /// to `origin.is_some()`, which would flip every Native-classified code-less
+    /// KT1 to the shared forwarder.
+    #[test]
+    fn code_less_native_classified_is_missing() {
+        let mut host = MockKernelHost::default();
+        let context = context::TezlinkContext::init_context();
+        let contract = Contract::from_b58check(KT1).unwrap();
+        let account = context.originated_from_contract(&contract).unwrap();
+
+        let mut buf = vec![];
+        Origin::Native.bin_write(&mut buf).unwrap();
+        host.store_write_all(&context::code::origin_path(&account).unwrap(), &buf)
+            .unwrap();
+
+        assert!(matches!(
+            account.code(&host),
+            Err(tezos_storage::error::Error::Runtime(
+                RuntimeError::PathNotFound
+            ))
+        ));
+        assert!(!account.exists(&host).unwrap());
+    }
+
+    /// A regular originated contract (with `/data/code`) is unaffected: its own
+    /// script is returned and it exists, regardless of the shared slot.
+    #[test]
+    fn regular_contract_returns_own_code() {
+        let mut host = MockKernelHost::default();
+        let context = context::TezlinkContext::init_context();
+        let contract = Contract::from_b58check(KT1).unwrap();
+        let account = context.originated_from_contract(&contract).unwrap();
+
+        let own_code = vec![0x05u8, 0x01, 0x02, 0x03];
+        account.set_code(&mut host, &own_code).unwrap();
+
+        assert_eq!(account.code(&host).unwrap(), Code::Code(own_code));
+        assert!(account.exists(&host).unwrap());
     }
 }

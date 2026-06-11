@@ -81,6 +81,10 @@
   current forwarder code at Michelson runtime activation and via storage
   migration. Foundation for upgrading every alias atomically; no behaviour
   change yet, as nothing resolves the slot. (!22099)
+- Michelson alias `KT1`s classified `Origin::Alias` and carrying no
+  `/data/code` now resolve their script to the shared implementation,
+  transparently for execution and the entrypoints RPC. Dormant until aliases
+  are originated code-less. (!22103)
 - Expose a contract's storage-space watermarks through two read-only
   RPCs, `GET .../contracts/<id>/storage/used_space` and `.../paid_space`,
   mirroring L1's `get_used_storage_space` / `get_paid_storage_space`

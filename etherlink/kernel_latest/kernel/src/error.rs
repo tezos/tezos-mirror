@@ -135,6 +135,8 @@ pub enum Error {
     TcError(String),
     #[error("BigInt conversion error: {0}")]
     TryFromBigIntError(TryFromBigIntError<BigUint>),
+    #[error("Internal invariant violation: {0}")]
+    Internal(String),
     #[error("Unexpected error from native bridge: {0}")]
     BridgeError(String),
     #[error(transparent)]
@@ -252,6 +254,7 @@ impl From<IndexableStorageError> for Error {
             IndexableStorageError::TryFromBigIntError(msg) => {
                 Error::TryFromBigIntError(msg)
             }
+            IndexableStorageError::Internal(msg) => Error::Internal(msg),
         }
     }
 }
@@ -274,6 +277,7 @@ impl From<GenStorageError> for Error {
             GenStorageError::OriginatedToImplicit => Error::OriginatedToImplicit,
             GenStorageError::TcError(msg) => Error::TcError(msg),
             GenStorageError::TryFromBigIntError(msg) => Error::TryFromBigIntError(msg),
+            GenStorageError::Internal(msg) => Error::Internal(msg),
         }
     }
 }

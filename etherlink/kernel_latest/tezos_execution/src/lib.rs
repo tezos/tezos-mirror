@@ -2001,6 +2001,52 @@ mod tests {
             PAIR
         }"#;
 
+    /// The entrypoints RPC (`get_contract_entrypoint`) goes through
+    /// `code()`, so a code-less alias transparently exposes the entrypoints of
+    /// the shared implementation — here the `default : unit` of `UNIT_SCRIPT`.
+    #[test]
+    fn alias_entrypoints_resolve_via_shared_implementation() {
+        use crate::account_storage::write_alias_implementation;
+        use crate::context::{code::origin_path, Context};
+        use crate::get_contract_entrypoint;
+        use mir::ast::{AddressHash, Entrypoint, Type};
+        use tezosx_interfaces::{AliasInfo, Origin, RuntimeId};
+
+        let mut host = MockKernelHost::default();
+        let context = context::TezlinkContext::init_context();
+        let parser = mir::parser::Parser::new();
+
+        // Seed the shared implementation with a real Michelson script.
+        let code = parser
+            .parse_top_level(UNIT_SCRIPT)
+            .unwrap()
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+        write_alias_implementation(&mut host, &code).unwrap();
+
+        // A code-less KT1 classified as an alias.
+        let kt1 = ContractKt1Hash::from_b58check(CONTRACT_1).unwrap();
+        let account = context.originated_from_kt1(&kt1).unwrap();
+        let origin = Origin::Alias(AliasInfo {
+            runtime: RuntimeId::Ethereum,
+            native_address: b"0xabc".to_vec(),
+        });
+        let mut buf = vec![];
+        origin.bin_write(&mut buf).unwrap();
+        host.store_write_all(&origin_path(&account).unwrap(), &buf)
+            .unwrap();
+
+        let entrypoints = get_contract_entrypoint(
+            &host,
+            &context,
+            &AddressHash::Kt1(kt1),
+            &mut Gas::default(),
+        )
+        .expect("alias entrypoints resolve to the shared implementation");
+        assert_eq!(entrypoints.get(&Entrypoint::default()), Some(&Type::Unit));
+    }
+
     static SCRIPT_EMITING_INTERNAL_TRANSFER: &str = r#"
         parameter (list address);
         storage unit;

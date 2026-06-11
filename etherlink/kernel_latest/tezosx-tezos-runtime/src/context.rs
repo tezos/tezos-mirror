@@ -194,4 +194,56 @@ mod tests {
             Some(Origin::Native),
         );
     }
+
+    /// End-to-end check that the entrypoints RPC (`get_contract_entrypoint`),
+    /// which goes through `code()`, resolves a code-less alias KT1 to the
+    /// *real* shared forwarder and exposes its `default : unit` entrypoint.
+    ///
+    /// Uses `alias_forwarder::forwarder_code()` rather than a stand-in script,
+    /// so it pins the actual entrypoint surface that ships.
+    #[test]
+    fn alias_entrypoints_resolve_to_real_forwarder() {
+        use crate::alias_forwarder::forwarder_code;
+        use mir::ast::{Entrypoint, Type};
+        use mir::gas::Gas;
+        use tezos_crypto_rs::blake2b;
+        use tezos_execution::account_storage::write_alias_implementation;
+        use tezos_execution::get_contract_entrypoint;
+        use tezosx_interfaces::{AliasInfo, RuntimeId};
+
+        let mut host = MockKernelHost::default();
+        // Root at the production Michelson accounts path: aliases resolve under
+        // `/tez/tez_accounts` (lib.rs:626) and the slot path is absolute, so this
+        // pins the real composition rather than a mixed layout that never ships.
+        let context = TezosRuntimeContext::from_root(
+            &crate::TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
+        )
+        .unwrap();
+
+        // Seed the shared slot with the real forwarder code.
+        write_alias_implementation(&mut host, &forwarder_code().unwrap()).unwrap();
+
+        // A code-less KT1 classified as an alias (no /data/code written).
+        let kt1 = ContractKt1Hash::from(blake2b::digest_160(b"alias-entrypoint-test"));
+        context
+            .record_origin(
+                &mut host,
+                &kt1,
+                &Origin::Alias(AliasInfo {
+                    runtime: RuntimeId::Ethereum,
+                    native_address: b"0xabc".to_vec(),
+                }),
+            )
+            .unwrap();
+
+        // The entrypoints RPC resolves through code() to the shared forwarder.
+        let entrypoints = get_contract_entrypoint(
+            &host,
+            &context,
+            &AddressHash::Kt1(kt1),
+            &mut Gas::default(),
+        )
+        .expect("alias entrypoints resolve to the shared forwarder");
+        assert_eq!(entrypoints.get(&Entrypoint::default()), Some(&Type::Unit));
+    }
 }

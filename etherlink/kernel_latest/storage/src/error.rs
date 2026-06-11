@@ -36,6 +36,8 @@ pub enum Error {
     TcError(String),
     #[error("BigInt conversion error: {0}")]
     TryFromBigIntError(TryFromBigIntError<BigUint>),
+    #[error("Internal invariant violation: {0}")]
+    Internal(String),
 }
 
 impl From<TryFromBigIntError<BigUint>> for Error {
