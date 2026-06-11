@@ -1693,6 +1693,27 @@ release_page.tezt:
       junit: $JUNIT
     when: always
 
+npm_audit:
+  image: node:22-alpine
+  stage: sanity
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  allow_failure: true
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - apk add --no-cache git jq
+  - ./scripts/ci/npm_audit.sh --all
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
 oc.misc_checks:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci/test:amd64--master
   stage: sanity
