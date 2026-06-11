@@ -2245,11 +2245,8 @@ let test_cross_runtime_staticcall_evm_nested_view_view =
      `tezosx_resolve_source_alias_readonly`. EVM `MSTORE` of the
      20-byte address left-pads it with 12 zero bytes inside the
      32-byte word. *)
-  let expected_alias_bytes =
-    Tezos_crypto.Hacl.Hash.Keccak_256.digest (Bytes.of_string kt1_address)
-  in
   let expected_alias_hex =
-    Hex.show (Hex.of_bytes (Bytes.sub expected_alias_bytes 0 20))
+    Test_helpers.(remove_0x (evm_alias_of_tezos_address kt1_address))
   in
   let expected_body_hex =
     "0a00000020" ^ String.make 24 '0' ^ expected_alias_hex
