@@ -4681,10 +4681,10 @@ mod tests {
     #[test]
     fn origin_of_evm_with_backstop_native() {
         let host = MockKernelHost::default();
-        // When the code-presence back-stop fires on an EVM address with no
-        // `/origin` record, `read_origin` classifies the address as Native.
-        // The actual gas accounting (ALIAS_LOOKUP_COST + CODE_BACKSTOP_COST)
-        // is tested in `tezosx-ethereum-runtime` against the real EVM impl.
+        // When the code-presence back-stop fires on an unclassified EVM
+        // address, `read_origin` classifies the address as Native. The
+        // actual gas accounting (ALIAS_LOOKUP_COST) is tested in
+        // `tezosx-ethereum-runtime` against the real EVM impl.
         // Here we verify that `dispatch_origin_of_get` correctly encodes
         // the Native result when `read_origin` returns Native.
         let registry = StubRegistry::with_classification(Classification::Native);

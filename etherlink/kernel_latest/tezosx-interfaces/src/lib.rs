@@ -207,11 +207,12 @@ pub trait RuntimeInterface {
     /// `(Classification, consumed)`. Malformed addresses short-circuit to
     /// `(Unknown, 0)` — no storage read, no charge.
     ///
-    /// For the EVM runtime, when the storage record is absent **and** the
-    /// account exposes non-empty bytecode (CREATE contract or EIP-7702
-    /// SET_CODE delegation), the back-stop fires: returns `Native` and
-    /// charges `ALIAS_LOOKUP_COST + CODE_BACKSTOP_COST`. Returns `OutOfGas`
-    /// when the budget is insufficient.
+    /// For the EVM runtime, when the account is unclassified **and**
+    /// exposes non-empty bytecode (CREATE contract or EIP-7702 SET_CODE
+    /// delegation), the back-stop fires and returns `Native`. A single
+    /// account-record read serves the whole lookup, charged
+    /// `ALIAS_LOOKUP_COST`. Returns `OutOfGas` when the budget is
+    /// insufficient.
     ///
     /// For the Tezos runtime, no back-stop is applied — a storage miss
     /// returns `Unknown` after charging `ALIAS_LOOKUP_MILLIGAS`.

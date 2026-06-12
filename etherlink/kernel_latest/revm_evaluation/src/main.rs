@@ -12,8 +12,11 @@ use revm::{
     state::AccountInfo,
 };
 use revm_etherlink::{
-    run_transaction, storage::world_state_handler::StorageAccount, ExecutionOutcome,
-    GasData, TransactionOrigin,
+    run_transaction,
+    storage::world_state_handler::{
+        AccountInfo as EtherlinkAccountInfo, AccountOrigin, StorageAccount,
+    },
+    ExecutionOutcome, GasData, TransactionOrigin,
 };
 use std::{
     ffi::OsStr,
@@ -205,7 +208,15 @@ fn fill_state(host: &mut impl StorageV1, state: HashMap<Address, Account>) {
         for (index, value) in &info.storage {
             storage_account.set_storage(host, index, value).unwrap();
         }
-        storage_account.set_info(host, info.into()).unwrap();
+        storage_account
+            .set_info(
+                host,
+                EtherlinkAccountInfo::with_origin(
+                    info.into(),
+                    AccountOrigin::Unclassified,
+                ),
+            )
+            .unwrap();
     }
 }
 
@@ -228,7 +239,9 @@ fn check_result(
         }
 
         let mut expected_info: AccountInfo = info.into();
-        let commited_info = storage_account.info(host).unwrap();
+        // Compare on the revm view: the expected fixtures know nothing
+        // about the origin classification the commit may have recorded.
+        let commited_info: AccountInfo = storage_account.info(host).unwrap().into();
 
         // ==> HACK
         // A few tests falsely expect the balance to not contain the refunded gas which

@@ -9,8 +9,8 @@ use crate::storage::{
     code::CodeStorage,
     sequencer_key_change::store_sequencer_key_change,
     world_state_handler::{
-        StorageAccount, GOVERNANCE_SEQUENCER_UPGRADE_PATH, KT1_B58_SIZE,
-        NATIVE_TOKEN_TICKETER_PATH, SEQUENCER_KEY_PATH,
+        AccountInfo, AccountOrigin, StorageAccount, GOVERNANCE_SEQUENCER_UPGRADE_PATH,
+        KT1_B58_SIZE, NATIVE_TOKEN_TICKETER_PATH, SEQUENCER_KEY_PATH,
     },
 };
 use evm_types::{
@@ -22,7 +22,9 @@ use revm::{
     primitives::{
         Address, AddressMap, HashMap, StorageKey, StorageValue, B256, KECCAK_EMPTY, U256,
     },
-    state::{Account, AccountInfo, Bytecode, EvmStorage, EvmStorageSlot},
+    state::{
+        Account, AccountInfo as RevmAccountInfo, Bytecode, EvmStorage, EvmStorageSlot,
+    },
     Database, DatabaseCommit,
 };
 use tezos_crypto_rs::{
@@ -32,7 +34,7 @@ use tezos_crypto_rs::{
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, tracing::instrument, Level};
 use tezos_smart_rollup_host::{runtime::RuntimeError, storage::StorageV1};
-use tezosx_interfaces::{Origin, Registry};
+use tezosx_interfaces::{AliasInfo, Origin, Registry};
 
 pub struct EtherlinkVMDB<'a, Host: StorageV1, R: Registry> {
     pub registry: &'a R,
@@ -50,13 +52,26 @@ pub struct EtherlinkVMDB<'a, Host: StorageV1, R: Registry> {
     withdrawals: Vec<Withdrawal>,
     /// Storage access to address zero aka the system address
     system: StorageAccount,
-    /// Account info snapshot when read to avoid re-write them if they haven't change and only
-    /// the storage has been touched
+    /// Account info snapshot (origin included) taken when read, to
+    /// avoid re-writing it if it hasn't changed and only the storage
+    /// has been touched, and to thread the existing classification
+    /// through the commit write.
     original_account_infos: HashMap<Address, AccountInfo>,
+    /// Caller to classify as Native at commit when still unclassified.
+    /// Set for user-input (natively signed) transactions; the caller's
+    /// info record is rewritten anyway (nonce bump), so the
+    /// classification write is free.
+    classify_native: Option<Address>,
+    /// Alias classifications staged by the journal and flushed by the
+    /// precompile-state commit; the account commit consumes them when
+    /// writing the info record, and the leftovers (alias staged for an
+    /// account untouched by the EVM run) are written at the end of the
+    /// commit.
+    staged_alias_origins: HashMap<Address, AliasInfo>,
 }
 
 enum AccountState {
-    Touched((AccountInfo, EvmStorage)),
+    Touched((RevmAccountInfo, EvmStorage)),
     SelfDestructed,
 }
 
@@ -69,6 +84,7 @@ where
         host: &'a mut Host,
         registry: &'a R,
         block: &'a BlockConstants,
+        classify_native: Option<Address>,
     ) -> Result<Self, EvmDbError> {
         let system = StorageAccount::from_address(&Address::ZERO)?;
         Ok(EtherlinkVMDB {
@@ -79,6 +95,8 @@ where
             withdrawals: vec![],
             system,
             original_account_infos: HashMap::default(),
+            classify_native,
+            staged_alias_origins: HashMap::default(),
         })
     }
 }
@@ -110,7 +128,39 @@ where
         self.commit_status = false;
     }
 
+    /// Origin classification currently persisted for `address`. Read
+    /// from the snapshot taken in `basic`; accounts committed without
+    /// a prior `basic` on this instance (external cross-runtime
+    /// commits) fall back to one durable read — never on the
+    /// user-input hot path.
+    fn existing_origin(
+        &mut self,
+        address: &Address,
+    ) -> Result<AccountOrigin, EvmDbError> {
+        match self.original_account_infos.get(address) {
+            Some(info) => Ok(info.origin.clone()),
+            None => {
+                let storage_account = StorageAccount::from_address(address)?;
+                Ok(storage_account
+                    .info_without_migration(self.host)?
+                    .map(|info| info.origin)
+                    .unwrap_or_default())
+            }
+        }
+    }
+
     fn update_account(&mut self, address: Address, account_state: AccountState) {
+        let existing_origin = match self.existing_origin(&address) {
+            Ok(origin) => origin,
+            Err(err) => {
+                self.abort();
+                log!(
+                    Level::Error,
+                    "DatabaseCommit `existing_origin` error: {err:?}"
+                );
+                return;
+            }
+        };
         match StorageAccount::from_address(&address) {
             Ok(mut storage_account) => match account_state {
                 AccountState::Touched((mut info, storage)) => {
@@ -125,33 +175,33 @@ where
                             "DatabaseCommit `CodeStorage::add`"
                         );
                     }
-                    // Mark Native if the account has code.
-                    // Only writes when the path is empty, so existing
-                    // classifications survive.
+                    // Decide the classification persisted with this
+                    // commit. Existing classifications always survive;
+                    // unclassified accounts become Native when they
+                    // signed this transaction (`classify_native`) or
+                    // carry code — at zero host-call cost since the
+                    // origin travels with the info write below. An
+                    // alias staged by ensure_alias takes precedence:
+                    // its forwarder account is being created in this
+                    // very commit.
+                    let staged_alias = self.staged_alias_origins.remove(&address);
                     let has_code = info.code_hash != KECCAK_EMPTY;
-                    if has_code {
-                        match storage_account.get_origin(self.host) {
-                            Ok(None) => {
-                                abort_on_error!(
-                                    self,
-                                    storage_account
-                                        .set_origin(self.host, &Origin::Native),
-                                    "DatabaseCommit `set_origin(Native)`"
-                                );
-                            }
-                            Ok(Some(_)) => {}
-                            Err(err) => {
-                                self.abort();
-                                log!(
-                                    Level::Error,
-                                    "DatabaseCommit `get_origin` error: {err:?}"
-                                );
-                                return;
-                            }
-                        }
-                    }
+                    let final_origin = if let Some(alias_info) = staged_alias {
+                        AccountOrigin::Alias(alias_info)
+                    } else if existing_origin != AccountOrigin::Unclassified {
+                        existing_origin
+                    } else if self.classify_native == Some(address) || has_code {
+                        AccountOrigin::Native
+                    } else {
+                        AccountOrigin::Unclassified
+                    };
+                    let info = AccountInfo::with_origin(info, final_origin);
                     // Avoid rewriting the account info if it hasn't changed
-                    if self.original_account_infos.get(&address) != Some(&info) {
+                    let unchanged = matches!(
+                        self.original_account_infos.get(&address),
+                        Some(original_info) if *original_info == info
+                    );
+                    if !unchanged {
                         abort_on_error!(
                             self,
                             storage_account.set_info_without_code(self.host, info),
@@ -182,10 +232,16 @@ where
                     }
                 }
                 AccountState::SelfDestructed => {
+                    // The classification survives a selfdestruct.
                     abort_on_error!(
                         self,
-                        storage_account
-                            .set_info_without_code(self.host, AccountInfo::default()),
+                        storage_account.set_info_without_code(
+                            self.host,
+                            AccountInfo {
+                                origin: existing_origin,
+                                ..AccountInfo::default()
+                            },
+                        ),
                         "DatabaseCommit `set_info_without_code`"
                     );
                 }
@@ -256,14 +312,17 @@ where
 {
     type Error = EvmDbError;
 
-    fn basic(&mut self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
+    fn basic(
+        &mut self,
+        address: Address,
+    ) -> Result<Option<RevmAccountInfo>, Self::Error> {
         let storage_account = StorageAccount::from_address(&address)?;
         let account_info = storage_account.info(self.host)?;
 
         self.original_account_infos
-            .insert(address, account_info.copy_without_code());
+            .insert(address, account_info.clone());
 
-        Ok(Some(account_info))
+        Ok(Some(account_info.into()))
     }
 
     fn code_by_hash(&mut self, code_hash: B256) -> Result<Bytecode, Self::Error> {
@@ -339,24 +398,22 @@ where
                 "DatabaseCommitPrecompileStateChanges `remove_deposit_from_queue`"
             );
         }
-        // Flush deferred alias classifications before the account commit
-        // runs, so update_account sees the existing origin and keeps it
-        // instead of overwriting with Native.
+        // Hand the staged alias classifications over to the account
+        // commit, which runs right after on the same instance: the
+        // alias payload is written inside the forwarder's info record.
         for (address, origin) in etherlink_data.created_aliases {
-            match StorageAccount::from_address(&address) {
-                Ok(mut storage_account) => {
-                    abort_on_error!(
-                        self,
-                        storage_account.set_origin(self.host, &origin),
-                        "DatabaseCommitPrecompileStateChanges `set_origin`"
-                    );
+            match origin {
+                Origin::Alias(alias_info) => {
+                    self.staged_alias_origins.insert(address, alias_info);
                 }
-                error => {
-                    abort_on_error!(
-                        self,
-                        error,
-                        "DatabaseCommitPrecompileStateChanges `StorageAccount::from_address`"
-                    )
+                // The journal only stages Alias classifications.
+                Origin::Native => {
+                    self.abort();
+                    log!(
+                        Level::Error,
+                        "DatabaseCommitPrecompileStateChanges: staged Native origin for {address}"
+                    );
+                    return;
                 }
             }
         }
@@ -388,6 +445,32 @@ where
                 AccountState::Touched((account.info, account.storage)),
             );
         }
+        // Aliases staged for addresses the EVM run never touched
+        // (ensure_alias Branch 2: forwarder already deployed) still
+        // need their classification written into the info record.
+        for (address, alias_info) in std::mem::take(&mut self.staged_alias_origins) {
+            abort_on_error!(
+                self,
+                write_alias_origin(self.host, &address, alias_info),
+                "DatabaseCommit `write_alias_origin`"
+            );
+        }
         self.original_account_infos.clear();
     }
+}
+
+/// Read-modify-write of the info record setting the alias
+/// classification, creating a default record if the account does not
+/// exist yet.
+fn write_alias_origin(
+    host: &mut impl StorageV1,
+    address: &Address,
+    alias_info: AliasInfo,
+) -> Result<(), EvmDbError> {
+    let mut storage_account = StorageAccount::from_address(address)?;
+    let mut info = storage_account
+        .info_without_migration(host)?
+        .unwrap_or_default();
+    info.origin = AccountOrigin::Alias(alias_info);
+    storage_account.set_info_without_code(host, info)
 }

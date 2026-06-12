@@ -7103,7 +7103,14 @@ let test_reveal_storage =
     | Some hex_str -> (
         let bytes = Hex.to_bytes (`Hex hex_str) in
         match Rlp.decode bytes with
-        | Ok (List [Value balance; Value nonce; Value _code_hash]) ->
+        (* The kernel may append a fourth field (origin-classification
+           tag) to the account info record; tolerate both shapes. *)
+        | Ok
+            (List
+               (Value balance
+               :: Value nonce
+               :: Value _code_hash
+               :: ([] | [Value _]))) ->
             let balance = Wei.to_wei_z (Helpers.decode_z_le balance) in
             let nonce = Helpers.decode_z_le nonce |> Z.to_int64 in
             return (balance, nonce)

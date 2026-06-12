@@ -51,31 +51,144 @@ let subkeys_durable evm_state key =
   Tezos_scoru_wasm.Durable.list durable key
 
 (** Decoded form of the [/evm/world_state/accounts/<addr>/info] record:
-    balance, nonce, and code hash for an EVM account. *)
+    balance, nonce, and code hash for an EVM account. The kernel may
+    append a fourth field carrying the origin classification (with its
+    alias payload); the node only round-trips it ([None] for legacy
+    3-field records, never invented) so rewriting a record cannot
+    clobber it nor add a field an older kernel would reject. *)
 module EVM_account_info = struct
+  (** Mirrors the kernel's [AccountOrigin] enum: a one-byte tag (0, 1,
+      2), followed by the alias payload for [Alias]. The payload is the
+      kernel's binary [AliasInfo] encoding; the node stores it opaquely
+      (as [bytes]) but validates its shape on decode so it rejects
+      exactly what the kernel's [AliasInfo::nom_read] rejects. *)
+  type origin = Unclassified | Native | Alias of bytes
+
   type t = {
     balance : Ethereum_types.quantity;
     nonce : Ethereum_types.quantity;
     code_hash : Ethereum_types.hash;
+    origin : origin option;
   }
 
-  let encode {balance; nonce; code_hash} =
+  (* Mirrors [tezosx_types::RuntimeId] (#[encoding(tags = "u8")]): a
+     one-byte tag, 0 = Tezos, 1 = Ethereum. Unknown tags are rejected. *)
+  let runtime_id_encoding =
+    let open Data_encoding in
+    union
+      ~tag_size:`Uint8
+      [
+        case
+          ~title:"Tezos"
+          (Tag 0)
+          (constant "tezos")
+          (fun () -> Some ())
+          (fun () -> ());
+        case
+          ~title:"Ethereum"
+          (Tag 1)
+          (constant "ethereum")
+          (fun () -> Some ())
+          (fun () -> ());
+      ]
+
+  (* Mirrors [tezosx_types::AliasInfo]: the [RuntimeId] tag followed by
+     the native address as [#[encoding(dynamic, bytes)]] — a 4-byte
+     big-endian length prefix then the raw bytes. [`Uint30] is
+     byte-identical to the kernel's [u32] prefix for the address sizes
+     the bounded [/info] record can hold. Used only to validate the
+     payload; the node still stores it opaquely. *)
+  let alias_info_encoding =
+    let open Data_encoding in
+    obj2
+      (req "runtime" runtime_id_encoding)
+      (req "native_address" (dynamic_size ~kind:`Uint30 Variable.bytes))
+
+  (* Aligned with the kernel codec: a one-byte tag, where only [Alias]
+     carries a (non-empty) payload. A record the kernel would reject
+     must fail to decode rather than be silently "repaired" by a node
+     round-trip. A kernel introducing new tag values requires a node
+     release first, like every storage encoding change. *)
+  let origin_encoding =
+    let open Data_encoding in
+    union
+      ~tag_size:`Uint8
+      [
+        case
+          ~title:"Unclassified"
+          (Tag 0)
+          (obj1 (req "kind" (constant "unclassified")))
+          (function Unclassified -> Some () | _ -> None)
+          (fun () -> Unclassified);
+        case
+          ~title:"Native"
+          (Tag 1)
+          (obj1 (req "kind" (constant "native")))
+          (function Native -> Some () | _ -> None)
+          (fun () -> Native);
+        case
+          ~title:"Alias"
+          (Tag 2)
+          (obj2
+             (req "kind" (constant "alias"))
+             (req
+                "payload"
+                (conv_with_guard
+                   Fun.id
+                   (fun b ->
+                     (* Reject anything the kernel's [AliasInfo::nom_read]
+                        would: bad runtime tag, inconsistent length
+                        prefix, trailing bytes, or empty payload. *)
+                     match
+                       Data_encoding.Binary.of_bytes_opt alias_info_encoding b
+                     with
+                     | Some _ -> Ok b
+                     | None ->
+                         Error
+                           "Malformed alias payload (not a well-formed \
+                            AliasInfo)")
+                   Variable.bytes)))
+          (function Alias payload -> Some ((), payload) | _ -> None)
+          (fun ((), payload) -> Alias payload);
+      ]
+
+  let encode_origin origin =
+    Data_encoding.Binary.to_bytes_exn origin_encoding origin
+
+  let decode_origin b = Data_encoding.Binary.of_bytes_opt origin_encoding b
+
+  let encode {balance; nonce; code_hash; origin} =
     let open Rlp in
-    Rlp.encode
-      (List
-         [
-           Value (Ethereum_types.encode_u256_le balance);
-           Value (Ethereum_types.encode_u64_le nonce);
-           Value (Ethereum_types.encode_hash code_hash);
-         ])
+    let fields =
+      [
+        Value (Ethereum_types.encode_u256_le balance);
+        Value (Ethereum_types.encode_u64_le nonce);
+        Value (Ethereum_types.encode_hash code_hash);
+      ]
+    in
+    let fields =
+      match origin with
+      | None -> fields
+      | Some origin -> fields @ [Value (encode_origin origin)]
+    in
+    Rlp.encode (List fields)
 
   let decode_opt b =
     match Rlp.decode b with
-    | Ok (List [Value balance; Value nonce; Value code_hash]) ->
-        let balance = Ethereum_types.decode_number_le balance in
-        let nonce = Ethereum_types.decode_number_le nonce in
-        let code_hash = Ethereum_types.decode_hash code_hash in
-        Some {balance; nonce; code_hash}
+    | Ok (List (Value balance :: Value nonce :: Value code_hash :: rest)) -> (
+        let decoded origin =
+          let balance = Ethereum_types.decode_number_le balance in
+          let nonce = Ethereum_types.decode_number_le nonce in
+          let code_hash = Ethereum_types.decode_hash code_hash in
+          {balance; nonce; code_hash; origin}
+        in
+        match rest with
+        | [] -> Some (decoded None)
+        | [Value origin] ->
+            Option.map
+              (fun origin -> decoded (Some origin))
+              (decode_origin origin)
+        | _ -> None)
     | _ -> None
 
   let decode b =

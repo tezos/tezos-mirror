@@ -151,10 +151,10 @@ impl Registry for RegistryImpl {
 mod tests {
     use super::*;
     use alloy_primitives::{hex::FromHex, Address, Bytes};
-    use revm::state::AccountInfo;
     use revm_etherlink::helpers::storage::bytes_hash;
-    use revm_etherlink::precompiles::constants::CODE_BACKSTOP_COST;
-    use revm_etherlink::storage::world_state_handler::StorageAccount;
+    use revm_etherlink::storage::world_state_handler::{
+        AccountInfo, AccountOrigin, StorageAccount,
+    };
     use tezos_crypto_rs::public_key_hash::PublicKeyHash;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezosx_interfaces::{
@@ -209,7 +209,15 @@ mod tests {
         let addr_str = format!("0x{}", alloy_primitives::hex::encode(addr.0 .0));
 
         let mut account = StorageAccount::from_address(&addr).unwrap();
-        account.set_origin(&mut host, &Origin::Native).unwrap();
+        account
+            .set_info(
+                &mut host,
+                AccountInfo {
+                    origin: AccountOrigin::Native,
+                    ..AccountInfo::default()
+                },
+            )
+            .unwrap();
 
         let budget = 100_000;
         let (class, consumed) = registry
@@ -250,8 +258,8 @@ mod tests {
             Address::from_hex("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb").unwrap();
         let addr_str = format!("0x{}", alloy_primitives::hex::encode(addr.0 .0));
 
-        // Account with non-empty bytecode, no /origin record — exercises
-        // the code-presence back-stop.
+        // Unclassified account with non-empty bytecode — exercises the
+        // code-presence back-stop.
         let bytecode_raw = Bytes::from_static(&[0x60, 0x00]);
         let code_hash = bytes_hash(&bytecode_raw);
         let mut account = StorageAccount::from_address(&addr).unwrap();
@@ -270,7 +278,7 @@ mod tests {
             .read_origin(&host, RuntimeId::Ethereum, &addr_str, budget)
             .unwrap();
         assert_eq!(class, Classification::Native);
-        assert_eq!(consumed, ALIAS_LOOKUP_COST + CODE_BACKSTOP_COST);
+        assert_eq!(consumed, ALIAS_LOOKUP_COST);
     }
 
     #[test]

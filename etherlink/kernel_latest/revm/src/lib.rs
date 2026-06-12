@@ -595,29 +595,16 @@ where
         &mut origin,
     )?;
 
-    match origin {
-        TransactionOrigin::UserInput { .. } => {
-            let mut storage_account =
-                StorageAccount::from_address(&caller).map_err(EvmDbError::from)?;
-            match storage_account.get_origin(host) {
-                Ok(Some(_)) => {}
-                Ok(None) => {
-                    storage_account
-                        .set_origin(host, &tezosx_interfaces::Origin::Native)
-                        .map_err(EvmDbError::from)?;
-                }
-                Err(e) => return Err(EvmDbError::from(e).into()),
-            }
-        }
-        TransactionOrigin::CrossRuntime { .. }
-        | TransactionOrigin::CrossRuntimeStatic => (),
-    };
-
     let is_cross_runtime = matches!(
         origin,
         TransactionOrigin::CrossRuntime { .. } | TransactionOrigin::CrossRuntimeStatic
     );
-    let db = EtherlinkVMDB::new(host, registry, block_constants)?;
+    // A user-input transaction was natively signed: have the commit
+    // classify its caller as Native if still unclassified. The tag
+    // rides the info write the nonce bump forces anyway, so this
+    // costs no host call — unlike a pre-execution /origin check.
+    let classify_native = (!is_cross_runtime).then_some(caller);
+    let db = EtherlinkVMDB::new(host, registry, block_constants, classify_native)?;
 
     if let Some(tracer_input) = tracer_input {
         let mut evm_context = build_evm_inspector_context(
@@ -787,7 +774,7 @@ mod test {
             transaction::AccessList,
         },
         primitives::{hex::FromHex, Address, Bytes, U256},
-        state::{AccountInfo, Bytecode},
+        state::Bytecode,
     };
     use rlp::Decodable;
     use tezos_crypto_rs::{
@@ -835,8 +822,8 @@ mod test {
         storage::{
             sequencer_key_change::SequencerKeyChange,
             world_state_handler::{
-                StorageAccount, NATIVE_TOKEN_TICKETER_PATH, SEQUENCER_KEY_CHANGE_PATH,
-                SEQUENCER_KEY_PATH,
+                AccountInfo, AccountOrigin, StorageAccount, NATIVE_TOKEN_TICKETER_PATH,
+                SEQUENCER_KEY_CHANGE_PATH, SEQUENCER_KEY_PATH,
             },
         },
         test::utilities::CallAndRevert::{self, callAndRevertCall},
@@ -1246,7 +1233,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
-            account_id: None,
+            origin: AccountOrigin::Unclassified,
             code: None,
         };
 
@@ -1303,13 +1290,13 @@ mod test {
         let destination_info = destination_account.info(&mut host).unwrap();
         assert_eq!(destination_info.balance, value_sent);
 
-        // Caller is marked Native via the nonce bump. The destination
-        // only received funds, so it stays unrecorded.
-        assert_eq!(
-            caller_account.get_origin(&host).unwrap(),
-            Some(tezosx_interfaces::Origin::Native)
-        );
-        assert!(destination_account.get_origin(&host).unwrap().is_none());
+        // Caller is classified Native in its info record at commit.
+        // The destination only received funds, so it stays
+        // unclassified.
+        let caller_origin = caller_account.info(&mut host).unwrap().origin;
+        assert_eq!(caller_origin, AccountOrigin::Native);
+        let destination_origin = destination_account.info(&mut host).unwrap().origin;
+        assert_eq!(destination_origin, AccountOrigin::Unclassified);
     }
 
     #[test]
@@ -1329,7 +1316,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
-            account_id: None,
+            origin: AccountOrigin::Unclassified,
             code: None,
         };
 
@@ -1408,7 +1395,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
-            account_id: None,
+            origin: AccountOrigin::Unclassified,
             code: None,
         };
         let mut caller_account = StorageAccount::from_address(&caller).unwrap();
@@ -1502,7 +1489,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
-            account_id: None,
+            origin: AccountOrigin::Unclassified,
             code: None,
         };
 
@@ -1521,7 +1508,7 @@ mod test {
             // Code hash will be automatically computed and inserted when
             // inserting the account info into the db.
             code_hash: bytes_hash(bytecode.original_byte_slice()),
-            account_id: None,
+            origin: AccountOrigin::Unclassified,
             // PUSH1 0x42      # Value to store
             // PUSH1 0x01      # Storage slot index
             // SSTORE          # Store the value in storage
@@ -1617,7 +1604,7 @@ mod test {
                         balance: U256::MAX,
                         nonce: 0,
                         code_hash: Default::default(),
-                        account_id: None,
+                        origin: AccountOrigin::Unclassified,
                         code: None,
                     },
                 )
@@ -1630,7 +1617,7 @@ mod test {
                         balance: U256::ZERO,
                         nonce: 0,
                         code_hash: bytes_hash(bytecode.original_byte_slice()),
-                        account_id: None,
+                        origin: AccountOrigin::Unclassified,
                         code: Some(bytecode.clone()),
                     },
                 )
@@ -1643,7 +1630,7 @@ mod test {
                         balance: U256::ZERO,
                         nonce: 0,
                         code_hash: bytes_hash(callee_bytecode.original_byte_slice()),
-                        account_id: None,
+                        origin: AccountOrigin::Unclassified,
                         code: Some(callee_bytecode.clone()),
                     },
                 )
@@ -1713,7 +1700,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
-            account_id: None,
+            origin: AccountOrigin::Unclassified,
             code: None,
         };
 
@@ -1776,18 +1763,13 @@ mod test {
                         .original_bytes()
                 );
 
-                // Deployed contract is marked Native via the code
-                // transition; caller is marked Native via the nonce
-                // bump.
-                assert_eq!(
-                    contract_account.get_origin(&host).unwrap(),
-                    Some(tezosx_interfaces::Origin::Native)
-                );
+                // Deployed contract is classified Native via the code
+                // presence; caller is classified Native as the signer.
+                let contract_origin = contract_account.info(&mut host).unwrap().origin;
+                assert_eq!(contract_origin, AccountOrigin::Native);
                 let caller_account = StorageAccount::from_address(&caller).unwrap();
-                assert_eq!(
-                    caller_account.get_origin(&host).unwrap(),
-                    Some(tezosx_interfaces::Origin::Native)
-                );
+                let caller_origin = caller_account.info(&mut host).unwrap().origin;
+                assert_eq!(caller_origin, AccountOrigin::Native);
             }
             other => panic!("ERROR: ended up in {other:?}"),
         }
@@ -1807,7 +1789,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
-            account_id: None,
+            origin: AccountOrigin::Unclassified,
             code: None,
         };
         let mut storage_account = StorageAccount::from_address(&caller).unwrap();
@@ -1887,7 +1869,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
-            account_id: None,
+            origin: AccountOrigin::Unclassified,
             code: None,
         };
         let mut storage_account = StorageAccount::from_address(&caller).unwrap();
@@ -1974,7 +1956,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
-            account_id: None,
+            origin: AccountOrigin::Unclassified,
             code: None,
         };
 
@@ -2136,7 +2118,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
-            account_id: None,
+            origin: AccountOrigin::Unclassified,
             code: None,
         };
         let mut storage_account = StorageAccount::from_address(&caller).unwrap();
@@ -2319,7 +2301,7 @@ mod test {
             balance: initial_balance,
             nonce: 0,
             code_hash: Default::default(),
-            account_id: None,
+            origin: AccountOrigin::Unclassified,
             code: None,
         };
 
@@ -2378,7 +2360,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
-            account_id: None,
+            origin: AccountOrigin::Unclassified,
             code: None,
         };
 
@@ -2530,7 +2512,6 @@ mod test {
                 alloy_primitives::IntoLogData, hex::FromHex, keccak256, Address, Bytes,
                 FixedBytes, Log, B256, U256,
             },
-            state::AccountInfo,
         };
         use tezos_crypto_rs::hash::ContractKt1Hash;
         use tezos_ethereum::block::BlockConstants;
@@ -2548,7 +2529,10 @@ mod test {
                 initializer::init_precompile_bytecodes,
             },
             run_transaction,
-            storage::{code::CodeStorage, world_state_handler::StorageAccount},
+            storage::{
+                code::CodeStorage,
+                world_state_handler::{AccountInfo, StorageAccount},
+            },
             test::{
                 fa_bridge::{
                     DelegateCaller::makeDelegateCallCall,
@@ -3436,7 +3420,6 @@ mod test {
                 transaction::AccessList,
             },
             primitives::{hex::FromHex, Address, Bytes, U256},
-            state::AccountInfo,
         };
         use tezos_ethereum::block::BlockConstants;
         use tezos_evm_runtime::runtime::MockKernelHost;
@@ -3454,7 +3437,7 @@ mod test {
                 },
             },
             run_transaction,
-            storage::world_state_handler::StorageAccount,
+            storage::world_state_handler::{AccountInfo, StorageAccount},
             test::{
                 utilities::{
                     last_recorded_sender, last_recorded_source, Registry, DEFAULT_SPEC_ID,
@@ -4117,7 +4100,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
-            account_id: None,
+            origin: AccountOrigin::Unclassified,
             code: None,
         };
 
@@ -4141,7 +4124,7 @@ mod test {
             balance: U256::ZERO,
             nonce: 0,
             code_hash: bytes_hash(bytecode.original_byte_slice()),
-            account_id: None,
+            origin: AccountOrigin::Unclassified,
             code: Some(bytecode),
         };
 
@@ -4256,6 +4239,50 @@ mod test {
         );
     }
 
+    /// ensure_alias must refuse an address whose info record is tagged
+    /// Native — a natively signing account cannot become an alias.
+    #[test]
+    fn test_ensure_alias_refuses_native_tagged_address() {
+        let mut host = MockKernelHost::default();
+        init_precompile_bytecodes(&mut host, true).unwrap();
+
+        let native_address = "tz1NativeTagged";
+        let alias = {
+            let hash = bytes_hash(native_address.as_bytes());
+            Address::from_slice(&hash.0[0..20])
+        };
+        StorageAccount::from_address(&alias)
+            .unwrap()
+            .set_info_without_code(
+                &mut host,
+                AccountInfo {
+                    nonce: 1,
+                    origin: AccountOrigin::Native,
+                    ..AccountInfo::default()
+                },
+            )
+            .unwrap();
+
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+        let result = registry.ensure_alias(
+            &mut host,
+            &mut journal,
+            AliasInfo {
+                runtime: tezosx_interfaces::RuntimeId::Tezos,
+                native_address: native_address.as_bytes().to_vec(),
+            },
+            None,
+            tezosx_interfaces::RuntimeId::Ethereum,
+            test_alias_creation_context(),
+            1_000_000,
+        );
+        assert!(
+            result.is_err(),
+            "a Native-tagged address must not be aliased"
+        );
+    }
+
     /// Branch 2: a legacy forwarder already has the delegation code but no
     /// Origin classification. ensure_alias stages the classification and
     /// commits it durably without re-running init.
@@ -4287,8 +4314,10 @@ mod test {
         alias_account
             .set_info_without_code(&mut host, info)
             .unwrap();
-        assert!(
-            alias_account.get_origin(&host).unwrap().is_none(),
+        let precondition_origin = alias_account.info(&mut host).unwrap().origin;
+        assert_eq!(
+            precondition_origin,
+            AccountOrigin::Unclassified,
             "precondition: alias must have no classification yet"
         );
 
@@ -4310,12 +4339,14 @@ mod test {
             .expect("Branch 2 ensure_alias should succeed");
 
         // The classification is staged, not yet durable.
-        assert!(
-            StorageAccount::from_address(&alias)
-                .unwrap()
-                .get_origin(&host)
-                .unwrap()
-                .is_none(),
+        let staged_origin = StorageAccount::from_address(&alias)
+            .unwrap()
+            .info(&mut host)
+            .unwrap()
+            .origin;
+        assert_eq!(
+            staged_origin,
+            AccountOrigin::Unclassified,
             "classification must be deferred until commit"
         );
 
@@ -4328,18 +4359,69 @@ mod test {
         )
         .expect("flush evm journal");
 
-        match StorageAccount::from_address(&alias)
+        // The info record carries the alias classification and its
+        // payload even though the account itself was untouched by an
+        // EVM run (leftover staged alias).
+        let origin = StorageAccount::from_address(&alias)
             .unwrap()
-            .get_origin(&host)
+            .info(&mut host)
             .unwrap()
-        {
-            Some(tezosx_interfaces::Origin::Alias(info)) => assert_eq!(
+            .origin;
+        match origin {
+            AccountOrigin::Alias(info) => assert_eq!(
                 info.native_address,
                 native_address.as_bytes().to_vec(),
                 "classification must record the native address"
             ),
-            other => panic!("expected Origin::Alias after commit, got {other:?}"),
+            other => {
+                panic!("expected an Alias classification after commit, got {other:?}")
+            }
         }
+    }
+
+    /// An unclassified EOA that 7702-delegated to the forwarder
+    /// designator resolves to Native at commit through the has-code
+    /// rule: real aliases are classified through their staged alias,
+    /// never through code shape.
+    #[test]
+    fn test_commit_resolves_self_delegated_eoa_to_native() {
+        use crate::database::EtherlinkVMDB;
+        use crate::precompiles::constants::alias_forwarder_delegation_code_hash;
+        use revm::primitives::AddressMap;
+        use revm::state::{Account, AccountStatus};
+        use revm::DatabaseCommit;
+
+        let mut host = MockKernelHost::default();
+        let block = BlockConstants::test_block_with_no_fees();
+        let registry = Registry::new();
+
+        let eoa = Address::from_slice(&[0x78; 20]);
+        let mut account = StorageAccount::from_address(&eoa).unwrap();
+        let info = AccountInfo {
+            balance: U256::from(1),
+            nonce: 1,
+            code_hash: alias_forwarder_delegation_code_hash(),
+            origin: AccountOrigin::Unclassified,
+            code: None,
+        };
+        account
+            .set_info_without_code(&mut host, info.clone())
+            .unwrap();
+
+        let mut db = EtherlinkVMDB::new(&mut host, &registry, &block, None).unwrap();
+        let mut touched = Account {
+            info: info.into(),
+            ..Account::default()
+        };
+        touched.status = AccountStatus::Touched;
+        DatabaseCommit::commit(&mut db, AddressMap::from_iter([(eoa, touched)]));
+
+        let origin = account.info(&mut host).unwrap().origin;
+        assert_eq!(
+            origin,
+            AccountOrigin::Native,
+            "a self-delegated EOA without a staged alias is Native"
+        );
     }
 
     /// Cross-frame atomicity: a successful Branch 3 materialization that is
@@ -4388,11 +4470,12 @@ mod test {
             .layered_state
             .pending_alias_origin(&alias)
             .is_some());
-        assert!(StorageAccount::from_address(&alias)
+        let staged_origin = StorageAccount::from_address(&alias)
             .unwrap()
-            .get_origin(&host)
+            .info(&mut host)
             .unwrap()
-            .is_none());
+            .origin;
+        assert_eq!(staged_origin, AccountOrigin::Unclassified);
 
         // Outer frame reverts: unwind both layers, as checkpoint_revert does.
         journal.evm.layered_state.checkpoint_revert();
@@ -4423,8 +4506,10 @@ mod test {
             alias_forwarder_delegation_code_hash(),
             "no delegation code_hash may survive an outer-frame revert"
         );
-        assert!(
-            alias_account.get_origin(&host).unwrap().is_none(),
+        let reverted_origin = alias_account.info(&mut host).unwrap().origin;
+        assert_eq!(
+            reverted_origin,
+            AccountOrigin::Unclassified,
             "no Origin classification may survive an outer-frame revert"
         );
     }
@@ -4444,12 +4529,15 @@ mod test {
         // Durable fallback classification: a distinct native address.
         StorageAccount::from_address(&source)
             .unwrap()
-            .set_origin(
+            .set_info_without_code(
                 &mut host,
-                &Origin::Alias(AliasInfo {
-                    runtime: RuntimeId::Tezos,
-                    native_address: b"tz1durable".to_vec(),
-                }),
+                AccountInfo {
+                    origin: AccountOrigin::Alias(AliasInfo {
+                        runtime: RuntimeId::Tezos,
+                        native_address: b"tz1durable".to_vec(),
+                    }),
+                    ..AccountInfo::default()
+                },
             )
             .unwrap();
 
@@ -4468,7 +4556,7 @@ mod test {
 
         // Overlay hit: resolves to the staged native, not the durable one.
         {
-            let db = EtherlinkVMDB::new(&mut host, &registry, &block).unwrap();
+            let db = EtherlinkVMDB::new(&mut host, &registry, &block, None).unwrap();
             let journal = Journal::new_with_inner(db, &mut tj);
             let target = journal
                 .tezosx_resolve_source_alias_readonly(source, RuntimeId::Tezos, 1_000_000)
@@ -4479,7 +4567,7 @@ mod test {
         // Frame revert drops the staging; the same call falls back to durable.
         tj.evm.layered_state.checkpoint_revert();
         {
-            let db = EtherlinkVMDB::new(&mut host, &registry, &block).unwrap();
+            let db = EtherlinkVMDB::new(&mut host, &registry, &block, None).unwrap();
             let journal = Journal::new_with_inner(db, &mut tj);
             let target = journal
                 .tezosx_resolve_source_alias_readonly(source, RuntimeId::Tezos, 1_000_000)
@@ -4530,9 +4618,13 @@ mod test {
         host.store_write_all(&world, b"v0").unwrap();
 
         let mut tjournal = TezosXJournal::mock(RuntimeId::Ethereum);
-        let db =
-            crate::database::EtherlinkVMDB::new(&mut host, &registry, &block_constants)
-                .unwrap();
+        let db = crate::database::EtherlinkVMDB::new(
+            &mut host,
+            &registry,
+            &block_constants,
+            None,
+        )
+        .unwrap();
         let mut journal = crate::journal::Journal::new_with_inner(db, &mut tjournal);
 
         // 1) Constructor (CREATE) frame opens. revm uses
@@ -4728,7 +4820,7 @@ mod test {
             balance: U256::from(10_000_000_000_000_000_000u128), // 10 ETH
             nonce: 0,
             code_hash: Default::default(),
-            account_id: None,
+            origin: AccountOrigin::Unclassified,
             code: None,
         };
         let mut sender_account = StorageAccount::from_address(&sender).unwrap();

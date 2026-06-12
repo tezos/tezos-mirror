@@ -16,10 +16,19 @@
 (** Decoded form of the [/evm/world_state/accounts/<addr>/info] record:
     balance, nonce, and code hash for an EVM account. *)
 module EVM_account_info : sig
+  (** Mirrors the kernel's [AccountOrigin] enum: a one-byte tag,
+      followed by the kernel-encoded alias payload for [Alias], which
+      stays opaque to the node. *)
+  type origin = Unclassified | Native | Alias of bytes
+
   type t = {
     balance : Ethereum_types.quantity;
     nonce : Ethereum_types.quantity;
     code_hash : Ethereum_types.hash;
+    origin : origin option;
+        (** Origin classification appended by the kernel as an optional
+            fourth RLP field. The node only round-trips it: [None] for
+            legacy 3-field records, never invented. *)
   }
 
   val encode : t -> bytes

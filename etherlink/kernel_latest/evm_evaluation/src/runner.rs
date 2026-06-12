@@ -5,10 +5,11 @@
 // SPDX-License-Identifier: MIT
 
 use revm::primitives::{hardfork::SpecId, keccak256, Bytes};
-use revm::state::AccountInfo;
 use revm_etherlink::helpers::legacy::{h256_to_alloy, u256_to_alloy};
 use revm_etherlink::storage::code::CodeStorage;
-use revm_etherlink::storage::world_state_handler::StorageAccount;
+use revm_etherlink::storage::world_state_handler::{
+    AccountInfo, AccountOrigin, StorageAccount,
+};
 use revm_etherlink::{
     run_transaction, EvmRunError, ExecutionOutcome, GasData, TransactionOrigin,
 };
@@ -141,7 +142,9 @@ fn initialize_accounts(host: &mut EvalHost, unit: &TestUnit) {
                     nonce: info.nonce,
                     balance: u256_to_alloy(&info.balance),
                     code_hash,
-                    account_id: None,
+                    // Accounts pre-existing an Ethereum-spec evaluation
+                    // are native EVM accounts.
+                    origin: AccountOrigin::Native,
                     code: None,
                 },
             )

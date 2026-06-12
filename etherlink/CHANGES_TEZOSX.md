@@ -4,6 +4,19 @@
 
 ### EVM Runtime
 
+- **Breaking change (requires a previewnet reset):** the address origin
+  classification — alias payload included — now lives inside the
+  account info record (`/info`, fourth RLP field); the sibling
+  `/origin` path is gone. This removes the per-transaction and
+  per-committed-contract `/origin` reads introduced with the default
+  classification: the transfer hot path performs exactly the same host
+  calls as before it, and `ensure_alias` / the origin translation
+  resolve from a single account-record read (the translation now
+  charges `ALIAS_LOOKUP_COST` only, the separate back-stop charge is
+  gone). Legacy 3-field records decode as unclassified and converge as
+  accounts are touched, but classifications recorded in the old
+  `/origin` records are **not** migrated — networks holding such state
+  must be reset. (!22126)
 - The synthetic EVM transaction that mirrors a Michelson operation's
   inbound cross-runtime calls is now a neutral envelope: `from` and `to`
   are both the originator's alias and `value` is `0`. It no longer
