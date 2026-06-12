@@ -101,6 +101,13 @@
   implementation. The EVM node's Michelson RPC backend resolves code-less
   aliases too, so `/script`, `/storage` and `/entrypoints` stay consistent
   with the kernel. (!22105)
+- Add the O(1) primitive that upgrades the shared alias implementation in a
+  single durable-storage write, changing the behaviour of every code-less
+  alias at once. It enforces entrypoint monotonicity (an exposed entrypoint
+  may never be removed, renamed, or retyped) to protect contracts that
+  hardcode entrypoint annotations, and forbids changing the storage type
+  (which would brick every alias at its next execution). No governance
+  trigger is wired yet. (!22157)
 - Expose a contract's storage-space watermarks through two read-only
   RPCs, `GET .../contracts/<id>/storage/used_space` and `.../paid_space`,
   mirroring L1's `get_used_storage_space` / `get_paid_storage_space`

@@ -29,6 +29,7 @@ use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKey;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_storage::error::Error as StorageError;
 use tezos_tezlink::lazy_storage_diff::LazyStorageDiffList;
 use tezos_tezlink::operation::{
     ManagerOperationContentConv, ManagerOperationField as _, Operation,
@@ -1046,22 +1047,25 @@ where
     }
 }
 
-fn get_originated_contract_entrypoint(
-    code: Vec<u8>,
+/// Typecheck originated-contract `code`, returning its exposed entrypoints
+/// (annotation → type) together with its declared storage type. `None` if
+/// `code` is not a well-formed, typeable script (or gas is exhausted).
+fn typecheck_originated_script(
+    code: &[u8],
     gas: &mut Gas,
-) -> Option<HashMap<Entrypoint, mir::ast::Type>> {
+) -> Option<(HashMap<Entrypoint, mir::ast::Type>, mir::ast::Type)> {
     let parser = Parser::new();
-    let micheline = Micheline::decode_raw(&parser.arena, &code, gas)
-        .ok()?
-        .ok()?;
+    let micheline = Micheline::decode_raw(&parser.arena, code, gas).ok()?.ok()?;
     let typechecked = micheline
         .split_script()
         .ok()?
         .typecheck_script(gas, true, false)
         .ok()?;
-    let entrypoints_annotations = typechecked.annotations;
-    // Cast  the entry_points_annotations to the expected type
-    let entrypoints = entrypoints_annotations
+    // `typechecked` is only used afterwards via `.annotations`, so the
+    // (recursive, non-trivial) storage type can be moved out instead of cloned.
+    let storage_ty = typechecked.storage;
+    let entrypoints = typechecked
+        .annotations
         .into_iter()
         .filter_map(|(field_annotation, (_, ty))| {
             mir::ast::Entrypoint::try_from(field_annotation)
@@ -1069,7 +1073,14 @@ fn get_originated_contract_entrypoint(
                 .map(|entrypoint| (entrypoint, ty.clone()))
         })
         .collect();
-    Some(entrypoints)
+    Some((entrypoints, storage_ty))
+}
+
+fn get_originated_contract_entrypoint(
+    code: Vec<u8>,
+    gas: &mut Gas,
+) -> Option<HashMap<Entrypoint, mir::ast::Type>> {
+    typecheck_originated_script(&code, gas).map(|(entrypoints, _)| entrypoints)
 }
 
 pub fn get_contract_entrypoint<C: Context>(
@@ -1085,6 +1096,109 @@ pub fn get_contract_entrypoint<C: Context>(
         Code::Code(code) => get_originated_contract_entrypoint(code, gas),
         Code::Enshrined(contract) => get_enshrined_contract_entrypoint(contract),
     }
+}
+
+/// Errors returned by [`upgrade_alias_implementation`].
+#[derive(Debug, PartialEq, Eq)]
+pub enum AliasUpgradeError {
+    /// `new_code` is not a well-formed, typeable Michelson script.
+    InvalidScript,
+    /// The currently-installed implementation no longer typechecks. Should
+    /// never happen; indicates a corrupted slot.
+    CurrentImplementationInvalid,
+    /// `new_code` removes (or renames) an entrypoint exposed by the current
+    /// implementation. Downstream Michelson contracts may hardcode entrypoint
+    /// annotations, so an exposed entrypoint may never disappear.
+    EntrypointRemoved(String),
+    /// `new_code` changes the type of an already-exposed entrypoint.
+    EntrypointTypeChanged(String),
+    /// `new_code` changes the contract's storage type. Every alias keeps its
+    /// own storage typed against the shared code; a storage-type change would
+    /// brick every alias at its next execution.
+    StorageTypeChanged,
+    /// Durable-storage failure while reading or writing the slot.
+    Storage(StorageError),
+}
+
+impl From<StorageError> for AliasUpgradeError {
+    fn from(e: StorageError) -> Self {
+        Self::Storage(e)
+    }
+}
+
+/// Atomically upgrade the single shared Michelson alias implementation (see
+/// [`account_storage::ALIAS_IMPLEMENTATION_PATH`]). A single durable-storage
+/// write here changes the behaviour of **every** existing and future alias at
+/// once — O(1) in the number of aliases.
+///
+/// `new_code` must be a typeable Michelson script. To protect downstream
+/// callers, the upgrade enforces two invariants against the currently-installed
+/// implementation:
+///
+/// - **Entrypoint monotonicity:** every entrypoint exposed today must still be
+///   present, with the same type, in `new_code` (new entrypoints may be added).
+///   This protects callers that hardcode entrypoint annotations.
+/// - **Storage-type invariance:** the storage type must not change. Each alias
+///   keeps its own `/data/storage` typed against the shared code, so a
+///   storage-type change would brick every alias at its next execution.
+///
+/// Note on widening the parameter while keeping the implicit `default`
+/// entrypoint: in Michelson the `default` entrypoint's type is the *whole* root
+/// parameter unless a branch is annotated `%default`. So to add an entrypoint
+/// via an `or` while preserving `default`, the old default branch must be
+/// annotated `%default` in `new_code` — otherwise `default`'s type changes and
+/// the upgrade is (correctly) rejected.
+///
+/// This is the upgrade primitive only.
+// TODO: https://linear.app/tezos/issue/L2-1530
+// Wire this to the Tezos X governance trigger that authorises an upgrade.
+// Until then it has no caller outside tests; the mechanism by which a
+// governance decision reaches the kernel is out of scope for L2-1528. When a
+// metered caller is wired, revisit gas accounting and distinguishing
+// out-of-gas from a genuinely invalid script.
+pub fn upgrade_alias_implementation<Host: StorageV1>(
+    host: &mut Host,
+    new_code: &[u8],
+    gas: &mut Gas,
+) -> Result<(), AliasUpgradeError> {
+    // `new_code` (untrusted) must be a well-formed, typeable script.
+    let (new_entrypoints, new_storage_ty) = typecheck_originated_script(new_code, gas)
+        .ok_or(AliasUpgradeError::InvalidScript)?;
+
+    // Check invariants against the currently-installed implementation. An
+    // absent slot (not seeded yet) means there is nothing to preserve.
+    if let Some(current_code) = account_storage::read_alias_implementation(host)? {
+        // The current implementation is already installed and trusted; typecheck
+        // it with a fresh budget (it is small and known-good) so `new_code`'s
+        // gas consumption cannot starve this check and misreport it as corrupt.
+        let (current_entrypoints, current_storage_ty) =
+            typecheck_originated_script(&current_code, &mut Gas::default())
+                .ok_or(AliasUpgradeError::CurrentImplementationInvalid)?;
+
+        if new_storage_ty != current_storage_ty {
+            return Err(AliasUpgradeError::StorageTypeChanged);
+        }
+
+        for (entrypoint, ty) in current_entrypoints.iter() {
+            match new_entrypoints.get(entrypoint) {
+                Some(new_ty) if new_ty == ty => {}
+                Some(_) => {
+                    return Err(AliasUpgradeError::EntrypointTypeChanged(format!(
+                        "{entrypoint}"
+                    )))
+                }
+                None => {
+                    return Err(AliasUpgradeError::EntrypointRemoved(format!(
+                        "{entrypoint}"
+                    )))
+                }
+            }
+        }
+    }
+
+    // One write upgrades every alias.
+    account_storage::write_alias_implementation(host, new_code)?;
+    Ok(())
 }
 
 /// Look up the synthetic views declared by an enshrined contract.
@@ -2238,6 +2352,190 @@ mod tests {
         )
         .expect("alias entrypoints resolve to the shared implementation");
         assert_eq!(entrypoints.get(&Entrypoint::default()), Some(&Type::Unit));
+    }
+
+    use crate::{account_storage, upgrade_alias_implementation, AliasUpgradeError};
+
+    /// Encode a Michelson script source into the Micheline bytes the alias
+    /// implementation slot holds.
+    fn encode_script(src: &str) -> Vec<u8> {
+        mir::parser::Parser::new()
+            .parse_top_level(src)
+            .unwrap()
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap()
+    }
+
+    // `default : unit`.
+    const UPGRADE_BASE_SCRIPT: &str =
+        "parameter unit; storage unit; code { CDR; NIL operation; PAIR }";
+    // `default : unit` plus an added `foo : string` — a valid superset.
+    const UPGRADE_SUPERSET_SCRIPT: &str = "parameter (or (unit %default) (string \
+         %foo)); storage unit; code { CDR; NIL operation; PAIR }";
+
+    #[test]
+    fn upgrade_accepts_entrypoint_superset() {
+        let mut host = MockKernelHost::default();
+        account_storage::write_alias_implementation(
+            &mut host,
+            &encode_script(UPGRADE_BASE_SCRIPT),
+        )
+        .unwrap();
+
+        let superset = encode_script(UPGRADE_SUPERSET_SCRIPT);
+        upgrade_alias_implementation(&mut host, &superset, &mut Gas::default())
+            .expect("adding an entrypoint while keeping `default` must be accepted");
+        assert_eq!(
+            account_storage::read_alias_implementation(&host).unwrap(),
+            Some(superset)
+        );
+    }
+
+    #[test]
+    fn upgrade_rejects_dropped_entrypoint() {
+        let mut host = MockKernelHost::default();
+        // Start from the superset (default + foo)...
+        account_storage::write_alias_implementation(
+            &mut host,
+            &encode_script(UPGRADE_SUPERSET_SCRIPT),
+        )
+        .unwrap();
+
+        // ...then try to drop `foo` by going back to the bare default script.
+        let dropped = encode_script(UPGRADE_BASE_SCRIPT);
+        let err = upgrade_alias_implementation(&mut host, &dropped, &mut Gas::default())
+            .expect_err("dropping an exposed entrypoint must be rejected");
+        assert!(matches!(err, AliasUpgradeError::EntrypointRemoved(_)));
+        // The slot is left untouched.
+        assert_eq!(
+            account_storage::read_alias_implementation(&host).unwrap(),
+            Some(encode_script(UPGRADE_SUPERSET_SCRIPT))
+        );
+    }
+
+    #[test]
+    fn upgrade_rejects_entrypoint_type_change() {
+        let mut host = MockKernelHost::default();
+        account_storage::write_alias_implementation(
+            &mut host,
+            &encode_script(UPGRADE_BASE_SCRIPT),
+        )
+        .unwrap();
+
+        // `default : string` changes the type of the existing `default` entrypoint.
+        let retyped = encode_script(
+            "parameter string; storage unit; code { CDR; NIL operation; PAIR }",
+        );
+        let err = upgrade_alias_implementation(&mut host, &retyped, &mut Gas::default())
+            .expect_err("changing an entrypoint's type must be rejected");
+        assert!(matches!(err, AliasUpgradeError::EntrypointTypeChanged(_)));
+    }
+
+    #[test]
+    fn upgrade_rejects_storage_type_change() {
+        let mut host = MockKernelHost::default();
+        // Base storage is `string` (like the forwarder).
+        account_storage::write_alias_implementation(
+            &mut host,
+            &encode_script(UPGRADE_SUPERSET_SCRIPT),
+        )
+        .unwrap();
+
+        // Same entrypoints, but `storage nat` — would brick every alias (whose
+        // stored storage is a `string`) at execution.
+        let retyped_storage = encode_script(
+            "parameter (or (unit %default) (string %foo)); storage nat; code { CDR; \
+             NIL operation; PAIR }",
+        );
+        let err = upgrade_alias_implementation(
+            &mut host,
+            &retyped_storage,
+            &mut Gas::default(),
+        )
+        .expect_err("changing the storage type must be rejected");
+        assert!(matches!(err, AliasUpgradeError::StorageTypeChanged));
+    }
+
+    #[test]
+    fn upgrade_rejects_widening_without_default_annotation() {
+        // Documents the `%default` requirement: widening the parameter via an
+        // `or` *without* annotating the old branch `%default` changes the
+        // implicit `default` entrypoint's type (it becomes the whole `or`), so
+        // the upgrade is correctly rejected. The safe path is to annotate
+        // `(unit %default)` — exercised by `upgrade_accepts_entrypoint_superset`.
+        let mut host = MockKernelHost::default();
+        account_storage::write_alias_implementation(
+            &mut host,
+            &encode_script(UPGRADE_BASE_SCRIPT),
+        )
+        .unwrap();
+
+        let widened_no_default = encode_script(
+            "parameter (or (unit %a) (string %b)); storage unit; code { CDR; NIL \
+             operation; PAIR }",
+        );
+        let err = upgrade_alias_implementation(
+            &mut host,
+            &widened_no_default,
+            &mut Gas::default(),
+        )
+        .expect_err("widening without %default changes `default`'s type");
+        assert!(matches!(err, AliasUpgradeError::EntrypointTypeChanged(_)));
+    }
+
+    #[test]
+    fn upgrade_rejects_invalid_script() {
+        let mut host = MockKernelHost::default();
+        account_storage::write_alias_implementation(
+            &mut host,
+            &encode_script(UPGRADE_BASE_SCRIPT),
+        )
+        .unwrap();
+
+        let err = upgrade_alias_implementation(
+            &mut host,
+            b"not a michelson script",
+            &mut Gas::default(),
+        )
+        .expect_err("a non-typeable script must be rejected");
+        assert!(matches!(err, AliasUpgradeError::InvalidScript));
+        // The core safety property: the slot is left untouched on rejection.
+        assert_eq!(
+            account_storage::read_alias_implementation(&host).unwrap(),
+            Some(encode_script(UPGRADE_BASE_SCRIPT))
+        );
+    }
+
+    #[test]
+    fn upgrade_rejects_corrupt_current_implementation() {
+        // A non-typeable slot means the current implementation is corrupt.
+        let mut host = MockKernelHost::default();
+        account_storage::write_alias_implementation(&mut host, b"garbage").unwrap();
+
+        let err = upgrade_alias_implementation(
+            &mut host,
+            &encode_script(UPGRADE_BASE_SCRIPT),
+            &mut Gas::default(),
+        )
+        .expect_err("a corrupt current implementation must be rejected");
+        assert!(matches!(
+            err,
+            AliasUpgradeError::CurrentImplementationInvalid
+        ));
+    }
+
+    #[test]
+    fn upgrade_into_empty_slot_is_accepted() {
+        // No current implementation: nothing to preserve.
+        let mut host = MockKernelHost::default();
+        let code = encode_script(UPGRADE_BASE_SCRIPT);
+        upgrade_alias_implementation(&mut host, &code, &mut Gas::default())
+            .expect("seeding an empty slot has no monotonicity constraint");
+        assert_eq!(
+            account_storage::read_alias_implementation(&host).unwrap(),
+            Some(code)
+        );
     }
 
     static SCRIPT_EMITING_INTERNAL_TRANSFER: &str = r#"

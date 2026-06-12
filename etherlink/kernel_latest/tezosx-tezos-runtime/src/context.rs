@@ -246,4 +246,38 @@ mod tests {
         .expect("alias entrypoints resolve to the shared forwarder");
         assert_eq!(entrypoints.get(&Entrypoint::default()), Some(&Type::Unit));
     }
+
+    /// Upgrading the real shipped forwarder to a superset that keeps
+    /// `default : unit` and `storage string` is accepted. Pins the production
+    /// storage type and default surface against the upgrade invariants (the
+    /// `upgrade_*` tests in `tezos_execution` use toy `storage unit` scripts;
+    /// this lives here because `tezos_execution` cannot reach `forwarder_code`).
+    #[test]
+    fn upgrade_real_forwarder_to_superset_is_accepted() {
+        use crate::alias_forwarder::forwarder_code;
+        use mir::gas::Gas;
+        use tezos_execution::account_storage::{
+            read_alias_implementation, write_alias_implementation,
+        };
+        use tezos_execution::upgrade_alias_implementation;
+
+        let mut host = MockKernelHost::default();
+        write_alias_implementation(&mut host, &forwarder_code().unwrap()).unwrap();
+
+        // Keep `default : unit` (annotated `%default`) and `storage string`,
+        // add a `foo` entrypoint.
+        let superset = mir::parser::Parser::new()
+            .parse_top_level(
+                "parameter (or (unit %default) (string %foo)); storage string; \
+                 code { CDR; NIL operation; PAIR }",
+            )
+            .unwrap()
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+
+        upgrade_alias_implementation(&mut host, &superset, &mut Gas::default())
+            .expect("a superset of the real forwarder must be accepted");
+        assert_eq!(read_alias_implementation(&host).unwrap(), Some(superset));
+    }
 }
