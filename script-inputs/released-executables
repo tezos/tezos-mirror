@@ -9,3 +9,6 @@ octez-baker
 octez-node
 octez-accuser-PtTALLiN
 octez-baker-PtTALLiN
+octez-teztale-snitch
+octez-teztale-archiver
+octez-teztale-server
