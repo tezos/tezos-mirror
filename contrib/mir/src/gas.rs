@@ -365,7 +365,8 @@ pub mod interpret_cost {
     pub const IF_NONE: u32 = 10;
     pub const IF_CONS: u32 = 855;
     pub const IF_LEFT: u32 = 10;
-    pub const LOOP: u32 = 10;
+    // corresponds to cost_N_ILoop in the Tezos protocol
+    pub const LOOP: u32 = 15;
     // Iteration cost (`cost_N_IList_iter` / `cost_N_ISet_iter` /
     // `cost_N_IMap_iter`). L1's `set`/`map` variants are size-dependent
     // because L1 first materialises the collection into a list; MIR iterates
