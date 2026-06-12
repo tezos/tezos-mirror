@@ -77,15 +77,16 @@ module Setup = struct
       ~with_runtimes
 
   let register_fullstack_test ~title ~tags ~with_runtimes
-      ?tez_bootstrap_accounts =
+      ?(kernel = Kernel.Latest) ?additional_uses ?tez_bootstrap_accounts =
     Setup.register_test
       ~__FILE__
       ~rpc_server:Evm_node.Resto
       ~title
       ~tags:(["tezosx"] @ runtime_tags with_runtimes @ tags)
-      ~kernel:Latest
+      ~kernel
       ~with_runtimes
       ~enable_dal:false
+      ?additional_uses
       ?tez_bootstrap_accounts
 end
 
@@ -5589,6 +5590,100 @@ let check_eip1271_for_account ~setup ~counter (account : Account.key) =
   Log.info "[%s] wrong hash → failure" label ;
   unit
 
+(** Boots on Kernel.Previewnet with the Tezos runtime enabled at genesis,
+    upgrades to Kernel.Latest, then checks the AliasForwarder predeploy still
+    forwards a cross-runtime transfer and validates a signature end to end. *)
+let test_kernel_upgrade_replaces_alias_forwarder =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Kernel upgrade preserves the AliasForwarder"
+    ~tags:["upgrade"; "kernel_governance"; "alias"; "forwarder"]
+    ~with_runtimes:[Tezos]
+    ~kernel:Kernel.Previewnet
+    ~additional_uses:[Constant.WASM.evm_kernel]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@ fun setup _protocol ->
+  let Tezt_etherlink.Setup.
+        {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      =
+    setup
+  in
+  (* The admin contract's dictator defaults to bootstrap2, so that is the
+     key that must sign the upgrade governance transfer. *)
+  let admin = Constant.bootstrap2 in
+  let alias_forwarder_address = "0xff00000000000000000000000000000000ffff08" in
+  let*@ _ = Rpc.produce_block sequencer in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~client ~sequencer ()
+  in
+  (* The AliasForwarder is installed from genesis because the setup
+     enabled the Tezos runtime. *)
+  let*@ pre_upgrade_code =
+    Rpc.get_code ~address:alias_forwarder_address sequencer
+  in
+  Check.((pre_upgrade_code <> "0x") string)
+    ~error_msg:
+      "Pre-upgrade AliasForwarder should have non-empty bytecode, got %L" ;
+  (* Upgrade from Previewnet to Latest as a plain kernel swap; the
+     governance flag is already set via the genesis runtime. *)
+  let* _root_hash =
+    Test_helpers.upgrade
+      ~sc_rollup_node
+      ~sc_rollup_address
+      ~admin:admin.public_key_hash
+      ~admin_contract:l1_contracts.admin
+      ~client
+      ~upgrade_to:(Kernel.to_uses Kernel.Latest)
+      ~activation_timestamp:"0"
+  in
+  let* () =
+    repeat 3 (fun () ->
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  let*@ _ = Rpc.produce_block sequencer in
+  let* () =
+    Test_helpers.bake_until_sync
+      ~timeout:120.
+      ~sc_rollup_node
+      ~client
+      ~sequencer
+      ()
+  in
+  let*@ post_upgrade_code =
+    Rpc.get_code ~address:alias_forwarder_address sequencer
+  in
+  Check.((post_upgrade_code <> "0x") string)
+    ~error_msg:
+      "Post-upgrade AliasForwarder should have non-empty bytecode, got %L" ;
+  (* Previewnet genesis does not fund EVM bootstrap accounts, so credit the
+     EVM sender from the Tezos side before driving the forwarding path. *)
+  let evm_sender = Eth_account.bootstrap_accounts.(0) in
+  let tezos_receiver = Constant.bootstrap1.public_key_hash in
+  let* () =
+    michelson_to_evm_transfer
+      ~source:Constant.bootstrap3
+      ~evm_destination:evm_sender.address
+      ~transfer_amount:(Tez.of_int 10)
+      ~counter:1
+      setup
+  in
+  (* The forwarder must still forward a cross-runtime transfer after the
+     upgrade: sending tez from the EVM sender to a Tezos address forces the
+     kernel to materialize the sender alias and forward the value. *)
+  let* _receipt =
+    check_evm_to_michelson_transfer
+      ~sequencer
+      ~sender:evm_sender
+      ~nonce:0
+      ~tezos_destination:tezos_receiver
+      ~transfer_amount:(Tez.of_int 1)
+      ()
+  in
+  (* Check the upgraded forwarder's signature validation endpoint: a valid
+     signature must be accepted and a wrong one rejected on a fresh alias. *)
+  check_eip1271_for_account ~setup ~counter:1 Constant.bootstrap1
+
 (** EIP-1271 signature verification across tz1, tz2 and tz3 key types *)
 let test_eip1271_signature_verification =
   Setup.register_fullstack_test
@@ -5846,6 +5941,7 @@ let () =
   test_alias_forwarder_created_by_evm_cross_runtime_call [Alpha] ;
   test_alias_forwarder_backtracked_when_evm_reverts [Alpha] ;
   test_alias_forwarders_multi_crac_in_one_evm_tx [Alpha] ;
+  test_kernel_upgrade_replaces_alias_forwarder [Alpha] ;
   test_tez_transfer [Alpha] ;
   test_michelson_runtime_chain_id_derivation
     ~evm_chain_id:1337
