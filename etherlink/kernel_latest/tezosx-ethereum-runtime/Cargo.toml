@@ -28,6 +28,7 @@ tezos-smart-rollup-host.workspace = true
 
 [dev-dependencies]
 tezos_ethereum = { workspace = true, features = ["testing"] }
+tezos_crypto_rs.workspace = true
 
 [features]
 testing = ["tezosx-interfaces/testing"]

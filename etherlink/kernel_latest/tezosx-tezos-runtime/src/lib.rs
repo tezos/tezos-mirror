@@ -656,8 +656,7 @@ where
     // forward-compatible with hypothetical additional non-Tezos
     // runtimes.
     //
-    // `CracId::origin_runtime` is a raw `u8` (the journal crate
-    // cannot import `RuntimeId` because of the inverse dep), but
+    // `CracId::origin_runtime` is stored as a raw `u8`, but
     // `u8::from(RuntimeId::Tezos)` resolves to the same canonical
     // discriminant so the comparison stays typed-by-construction.
     let crac_id_for_event =

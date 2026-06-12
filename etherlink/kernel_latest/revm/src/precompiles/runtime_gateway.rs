@@ -14,10 +14,11 @@ use tezos_ethereum::wei::{mutez_to_evm_gas, Wei};
 use tezosx_interfaces::{
     canonicalize_native_address, gas,
     headers::{format_tez_from_wei, parse_u64_opt},
-    AliasInfo, Classification, Origin, Registry, RuntimeId, ALIAS_LOOKUP_COST,
-    ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_DEPTH,
-    X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER,
-    X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME, X_TEZOS_STORAGE_COST, X_TEZOS_TIMESTAMP,
+    translate_original_source, AliasInfo, Classification, Origin, Registry, RuntimeId,
+    ALIAS_LOOKUP_COST, ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER,
+    X_TEZOS_CRAC_DEPTH, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT,
+    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME, X_TEZOS_STORAGE_COST,
+    X_TEZOS_TIMESTAMP,
 };
 
 use crate::{
@@ -584,9 +585,20 @@ fn emit_crac_sent<'j, CTX, Host, R>(
 }
 
 /// Build an [`OriginalSource`] for `source_addr` under the current
-/// originating runtime, without touching the journal. For Tezos
-/// origins, the address's stored `Origin` is read back to recover the
-/// PKH instead of the lossy EVM alias.
+/// originating runtime.
+///
+/// Records the originator's address in its *own* native runtime plus that
+/// runtime, never the per-target aliases (those translate on demand via
+/// [`translate_original_source`], a pure derivation). `source_addr` is the
+/// originator's EVM-form address — the handle every EVM frame has
+/// (`cross_runtime_originator()` / `tx().caller()`):
+/// - when the originator is Ethereum-native its native address *is*
+///   `source_addr`, so capture touches no storage; this is the nominal
+///   single-CRAC flow, kept read-free.
+/// - when the originator is native to another runtime (a transaction that
+///   originated there and crossed into EVM), its native address is
+///   resolved from `source_addr` once, here — the only durable read, and
+///   it lands solely on the genuinely cross-runtime path.
 fn build_original_source<'j, CTX, Host, R>(
     context: &CTX,
     source_addr: Address,
@@ -598,80 +610,60 @@ where
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
     let runtime = context.journal().crac_origin_runtime();
-    let native_address = match runtime {
-        RuntimeId::Ethereum => source_addr.to_string().to_lowercase(),
-        RuntimeId::Tezos => context.journal().tezosx_resolve_source_alias_readonly(
+    let original_address = if runtime == RuntimeId::Ethereum {
+        source_addr.to_string().to_lowercase()
+    } else {
+        context.journal().tezosx_resolve_source_alias_readonly(
             source_addr,
-            RuntimeId::Tezos,
+            runtime,
             remaining_evm_gas,
-        )?,
+        )?
     };
-    Ok(OriginalSource::new(
-        runtime,
-        native_address,
-        source_addr.to_string(),
-    ))
+    Ok(OriginalSource::new(runtime, original_address))
 }
 
-/// Parse the originator's cached EVM alias back into an [`Address`] for
-/// the resolvers, which key alias resolution off the source address. The
-/// alias was produced from a valid `Address`, so this only fails on
+/// Resolve the originator's EVM-form address as an [`Address`] for the
+/// state-mutating resolver, which keys alias materialization off the
+/// source address. Translates the stored native address into Ethereum
+/// (identity when the originator is Ethereum-native, a pure
+/// `compute_alias` otherwise) and parses the result, which only fails on
 /// internal corruption.
-fn original_source_evm_address(
+fn original_source_evm_address<R: Registry>(
     source: &OriginalSource,
+    registry: &R,
     gas: Gas,
 ) -> Result<Address, CustomPrecompileError> {
-    source.evm_alias().parse::<Address>().map_err(|e| {
+    let evm_str = translate_original_source(registry, source, RuntimeId::Ethereum)
+        .map_err(|e| {
+            CustomPrecompileError::Revert(
+                format!("failed to translate originator to EVM address: {e:?}"),
+                gas,
+            )
+        })?;
+    evm_str.parse::<Address>().map_err(|e| {
         CustomPrecompileError::Revert(
-            format!("invalid originator EVM alias '{}': {e}", source.evm_alias()),
+            format!("invalid originator EVM address '{evm_str}': {e}"),
             gas,
         )
     })
 }
 
-/// Capture the original source for the state-mutating gateway entries,
-/// which persist the result via [`resolve_original_source`] and propagate
-/// it across re-entrant frames.
+/// Capture the original source for a gateway entry — both the
+/// state-mutating entries and the read-only ones
+/// (`callMichelsonView`, generic `call(..., GET)`) go through
+/// [`resolve_original_source`], which persists the result so it
+/// propagates across re-entrant frames.
 ///
 /// Prefers the inbound CRAC's transitive originator
 /// ([`CrossRuntimeCall::cross_runtime_originator`]) when one is present,
 /// falling back to `tx().caller()` for a direct EVM transaction — the
-/// same precedence applied by [`capture_readonly_original_source`] and
-/// the custom `ORIGIN` opcode (`etherlink_origin` in `revm/src/lib.rs`).
-/// This ensures `X-Tezos-Source` always identifies the transitive
-/// originator, not the immediate caller (L2-1450; mirrors the L2-1462
-/// fix on the read-only path).
-fn capture_original_source<'j, CTX, Host, R>(
-    context: &CTX,
-    remaining_evm_gas: u64,
-) -> Result<OriginalSource, CustomPrecompileError>
-where
-    Host: StorageV1 + 'j,
-    R: Registry + 'j,
-    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
-{
-    let source_addr = context
-        .journal()
-        .cross_runtime_originator()
-        .unwrap_or_else(|| context.tx().caller());
-    build_original_source(context, source_addr, remaining_evm_gas)
-}
-
-/// Capture the original source for the read-only gateway entries
-/// (`callMichelsonView`, generic `call(..., GET)`) when no source has
-/// been persisted yet.
-///
-/// Unlike [`capture_original_source`], this prefers the inbound CRAC's
-/// transitive originator ([`CrossRuntimeCall::cross_runtime_originator`])
-/// when one is present, falling back to `tx().caller()` for a direct EVM
-/// transaction — the exact precedence the custom `ORIGIN` opcode applies
-/// (`etherlink_origin` in `revm/src/lib.rs`). The outgoing
-/// `X-Tezos-Source` of the first read-only gateway call therefore agrees
+/// exact precedence the custom `ORIGIN` opcode applies (`etherlink_origin`
+/// in `revm/src/lib.rs`). The outgoing `X-Tezos-Source` therefore agrees
 /// with `tx.origin` as observed in the same frame; without it, a
-/// Michelson → EVM CRAC frame would forward the immediate sender alias
-/// as `X-Tezos-Source` while `ORIGIN` reported the real transitive
-/// source (L2-1462). `X-Tezos-Sender` stays on the immediate caller.
-fn capture_readonly_original_source<'j, CTX, Host, R>(
+/// Michelson → EVM CRAC frame would forward the immediate sender alias as
+/// `X-Tezos-Source` while `ORIGIN` reported the real transitive source.
+/// `X-Tezos-Sender` stays on the immediate caller.
+fn capture_original_source<'j, CTX, Host, R>(
     context: &CTX,
     remaining_evm_gas: u64,
 ) -> Result<OriginalSource, CustomPrecompileError>
@@ -691,7 +683,9 @@ where
 /// the first call. Re-entrant frames (EVM → TEZ → EVM → …) re-read
 /// the depth-0 capture instead of falling back to their own
 /// `tx().caller()` (which would be the alias of the Michelson contract
-/// that re-entered the EVM).
+/// that re-entered the EVM). The read-only entries persist through here
+/// too, so a nested Michelson `staticcall_evm` view sees the same
+/// originator on the shared journal.
 fn resolve_original_source<'j, CTX, Host, R>(
     context: &mut CTX,
     remaining_evm_gas: u64,
@@ -958,7 +952,8 @@ where
                 })?;
 
             let source = resolve_original_source(context, gas.remaining())?;
-            let source_addr = original_source_evm_address(&source, gas)?;
+            let source_addr =
+                original_source_evm_address(&source, context.db().registry, gas)?;
             let (sender_alias, source_alias) = resolve_aliases(
                 context,
                 &mut gas,
@@ -1030,7 +1025,8 @@ where
                 })?;
 
             let source = resolve_original_source(context, gas.remaining())?;
-            let source_addr = original_source_evm_address(&source, gas)?;
+            let source_addr =
+                original_source_evm_address(&source, context.db().registry, gas)?;
             let (sender_alias, source_alias) = resolve_aliases(
                 context,
                 &mut gas,
@@ -1108,23 +1104,34 @@ where
                     )
                 })?;
 
-            // STATICCALL-compatible: read the persisted source if a
-            // prior outgoing call has captured one, otherwise build
-            // one locally without writing to the journal.
-            let source = match context.journal().original_source() {
-                Some(s) => s.clone(),
-                None => capture_readonly_original_source(context, gas.remaining())?,
-            };
+            // Capture and persist the top-level originator on the shared
+            // journal so any nested gateway call this view triggers can
+            // read it back — in particular a Michelson `staticcall_evm`
+            // re-entering the EVM resolves `tx.origin` from this shared
+            // value rather than a durable origin record, which a read-only
+            // call never writes. Persisting a journal field is not an EVM
+            // state change, so it is STATICCALL-safe.
+            let source = resolve_original_source(context, gas.remaining())?;
             let sender_alias = context.journal().tezosx_resolve_source_alias_readonly(
                 inputs.caller,
                 RuntimeId::Tezos,
                 gas.remaining(),
             )?;
-            let source_alias = context.journal().tezosx_resolve_source_alias_readonly(
-                original_source_evm_address(&source, gas)?,
+            // Translate the captured originator's native address into its
+            // Tezos representation on demand — identity when the originator
+            // is Tezos-native, a pure `compute_alias` derivation otherwise.
+            // No durable write, so it stays STATICCALL-safe.
+            let source_alias = translate_original_source(
+                context.db().registry,
+                &source,
                 RuntimeId::Tezos,
-                gas.remaining(),
-            )?;
+            )
+            .map_err(|e| {
+                CustomPrecompileError::Revert(
+                    format!("callMichelsonView: failed to translate source: {e:?}"),
+                    gas,
+                )
+            })?;
 
             let gas_limit =
                 gas::convert(RuntimeId::Ethereum, RuntimeId::Tezos, gas.remaining())
@@ -1208,22 +1215,29 @@ where
                         gas,
                     ));
                 }
-                // STATICCALL-compatible: capture without persisting.
-                let source = match context.journal().original_source() {
-                    Some(s) => s.clone(),
-                    None => capture_readonly_original_source(context, gas.remaining())?,
-                };
+                // Capture and persist the originator on the shared
+                // journal, as `callMichelsonView` does, then translate its
+                // native address into the target runtime on demand — a pure
+                // derivation, no durable write, so it stays STATICCALL-safe.
+                let source = resolve_original_source(context, gas.remaining())?;
+                let source_alias = translate_original_source(
+                    context.db().registry,
+                    &source,
+                    target_runtime,
+                )
+                .map_err(|e| {
+                    CustomPrecompileError::Revert(
+                        format!("call: failed to translate source: {e:?}"),
+                        gas,
+                    )
+                })?;
                 (
                     context.journal().tezosx_resolve_source_alias_readonly(
                         inputs.caller,
                         target_runtime,
                         gas.remaining(),
                     )?,
-                    context.journal().tezosx_resolve_source_alias_readonly(
-                        original_source_evm_address(&source, gas)?,
-                        target_runtime,
-                        gas.remaining(),
-                    )?,
+                    source_alias,
                     source.runtime(),
                 )
             } else {
@@ -1234,7 +1248,8 @@ where
                     ));
                 }
                 let source = resolve_original_source(context, gas.remaining())?;
-                let source_addr = original_source_evm_address(&source, gas)?;
+                let source_addr =
+                    original_source_evm_address(&source, context.db().registry, gas)?;
                 let (sender_alias, source_alias) = resolve_aliases(
                     context,
                     &mut gas,

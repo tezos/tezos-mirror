@@ -3552,6 +3552,7 @@ dependencies = [
  "tezos-evm-logging-latest",
  "tezos-evm-runtime-latest",
  "tezos-smart-rollup-host",
+ "tezos_crypto_rs",
  "tezos_ethereum_latest",
  "tezosx-interfaces",
  "tezosx-journal",

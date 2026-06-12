@@ -377,8 +377,8 @@ mod tests {
         )
     }
 
-    fn eth_origin(addr: &str) -> OriginalSource {
-        OriginalSource::new(RuntimeId::Ethereum, addr.to_string(), addr.to_string())
+    fn eth_origin(evm: &str) -> OriginalSource {
+        OriginalSource::new(RuntimeId::Ethereum, evm.to_string())
     }
 
     #[test]
@@ -401,25 +401,14 @@ mod tests {
     }
 
     #[test]
-    fn test_original_source_preserves_tezos_pkh() {
+    fn test_original_source_round_trips_through_journal() {
         let mut journal = fresh_journal();
         let tz_origin = OriginalSource::new(
             RuntimeId::Tezos,
             "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx".to_string(),
-            "0xabababababababababababababababababababab".to_string(),
         );
         journal.set_original_source(tz_origin.clone());
-        let stored = journal.original_source().unwrap();
-        assert_eq!(stored, &tz_origin);
-        assert_eq!(stored.runtime(), RuntimeId::Tezos);
-        assert_eq!(
-            stored.native_address(),
-            "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
-        );
-        assert_eq!(
-            stored.evm_alias(),
-            "0xabababababababababababababababababababab"
-        );
+        assert_eq!(journal.original_source(), Some(&tz_origin));
     }
 
     #[test]

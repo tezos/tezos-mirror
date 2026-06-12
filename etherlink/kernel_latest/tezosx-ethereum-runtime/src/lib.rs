@@ -2044,7 +2044,21 @@ mod tests {
         // which address bytes were forwarded as the source alias.
         let registry = MockRegistry::new("tz1_mock_alias");
 
-        let mut journal = TezosXJournal::mock(RuntimeId::Tezos);
+        // Ethereum-origin CRAC chain: the transitive originator A is an
+        // EVM-native account, so `crac_origin_runtime` is Ethereum and the
+        // gateway captures A's own EVM address as the source basis. A
+        // default (Tezos-origin) journal would instead route A through the
+        // foreign-runtime readonly-alias path, yielding the mock's fixed
+        // "tz1_mock_alias" — which fails to parse as an EVM address and
+        // reverts the precompile before `resolve_aliases` runs.
+        let mut journal = TezosXJournal::new(
+            tezosx_journal::CracId::new(
+                u8::from(tezosx_interfaces::RuntimeId::Ethereum),
+                0,
+            ),
+            tezos_crypto_rs::hash::OperationHash::default(),
+            BlockConstants::dummy(),
+        );
         // Inbound CRAC: source = A (originator), sender = B (caller).
         // Use a finite gas limit: gas::convert(Ethereum, Tezos, gas) =
         // gas * EVM_GAS_TO_MILLIGAS (100), so u64::MAX overflows and the
