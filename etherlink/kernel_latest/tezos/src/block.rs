@@ -23,15 +23,6 @@ pub struct AppliedOperation {
     pub op_and_receipt: OperationDataAndMetadata,
 }
 
-impl Encodable for AppliedOperation {
-    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        match self.to_bytes() {
-            Ok(bytes) => bytes.rlp_append(stream),
-            Err(_err) => (),
-        }
-    }
-}
-
 #[derive(PartialEq, Debug, Default, BinWriter, NomReader)]
 pub struct OperationsWithReceipts {
     pub list: Vec<AppliedOperation>,
