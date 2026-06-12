@@ -38,6 +38,8 @@ let init_michelson_sandbox ~tez_bootstrap_accounts =
            tezlink_prevalidation.ml. The default 3M (= per-op cap) only fits
            one full call per block. *)
       ~michelson_hard_gas_limit_per_block:1_000_000_000
+      ~minimum_base_fee_per_gas:Wei.zero
+      ~tx_queue_tx_per_addr_limit:100_000
       ()
   in
   let* client =
