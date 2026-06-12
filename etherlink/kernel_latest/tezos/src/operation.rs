@@ -5,15 +5,15 @@
 //! Tezos operations: this module defines the fragment of Tezos operations supported by Tezlink and how to serialize them.
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/operation_repr.ml` to represent the operation
 use crate::operation_result::ValidityError;
-use rlp::Decodable;
+use rlp::{Decodable, Encodable};
 use tezos_crypto_rs::blake2b::digest_256;
 use tezos_crypto_rs::hash::{
-    BlockHash, OperationHash, SecretKeyEd25519, UnknownSignature,
+    BlockHash, HashType, OperationHash, SecretKeyEd25519, UnknownSignature,
 };
 use tezos_data_encoding::types::Narith;
 use tezos_data_encoding::{
-    enc::{BinError, BinWriter},
-    nom::NomReader,
+    enc::{BinError, BinResult, BinWriter},
+    nom::{self as tezos_nom, NomReader, NomResult},
 };
 pub use tezos_protocol::operation::{
     ManagerOperationContent as ManagerOperation,
@@ -60,23 +60,97 @@ pub enum OperationContent {
 
 // In Tezlink, we'll only support ManagerOperation so we don't
 // have to worry about other operations
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Operation {
     pub branch: BlockHash,
     pub content: Vec<ManagerOperationContent>,
     pub signature: UnknownSignature,
 }
 
-impl Operation {
-    // The `rlp_append` function from the Encodable trait can't fail but `to_bytes`
-    // return a result. To avoid unwrapping and risk a panic we're not implementing
-    // the trait exactly, but we expose a serialization function.
-    pub fn rlp_append(&self, s: &mut rlp::RlpStream) -> Result<(), BinError> {
-        let bytes = self.to_bytes()?;
-        s.append(&bytes);
-        Ok(())
+// Manual `BinWriter` (the derived one would accept any `content`) so that
+// writing an operation with an empty content list is rejected, keeping the
+// writer symmetric with `nom_read` below which refuses to parse such
+// operations: an empty-content operation can never be persisted and then
+// fail to decode.
+impl BinWriter for Operation {
+    fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
+        if self.content.is_empty() {
+            return Err(BinError::custom("empty operation content list".to_string()));
+        }
+        self.branch.bin_write(output)?;
+        for content in &self.content {
+            content.bin_write(output)?;
+        }
+        self.signature.bin_write(output)
     }
+}
 
+// Byte length of the trailing `UnknownSignature`. Derived from the crypto
+// type's own size so it cannot silently drift if the signature representation
+// ever changes. It is 64 bytes for the non-BLS (Ed25519/Secp256k1/P256)
+// signatures that `UnknownSignature` covers; BLS signatures are not used here.
+const SIGNATURE_SIZE: usize = HashType::UnknownSignature.size();
+
+// This reader locates the end of the variable-length `content` list purely by
+// length: it parses content items until exactly `SIGNATURE_SIZE` (signature)
+// bytes remain. It is therefore only correct when the operation occupies the
+// entire input buffer, i.e. the 64-byte signature is the trailing suffix of
+// `input`. Call it via `nom_read_exact` or on a length-delimited buffer;
+// embedding `Operation` as a non-final field of a derived `NomReader` struct
+// would make it over-consume following bytes as content.
+impl NomReader<'_> for Operation {
+    fn nom_read(input: &'_ [u8]) -> NomResult<'_, Self> {
+        let (mut input, branch) = BlockHash::nom_read(input)?;
+        let mut content = Vec::new();
+
+        while input.len() > SIGNATURE_SIZE {
+            let (remaining, operation_content) =
+                ManagerOperationContent::nom_read(input)?;
+            // Defensive guard against an infinite loop: every content item must
+            // consume at least one byte (its tag). If a parser ever returned
+            // `Ok` without making progress, bail out instead of spinning forever.
+            if remaining.len() >= input.len() {
+                return Err(nom::Err::Error(tezos_nom::error::DecodeError::invalid_tag(
+                    input,
+                    "operation content parser made no progress".into(),
+                )));
+            }
+            content.push(operation_content);
+            input = remaining;
+        }
+
+        if content.is_empty() {
+            return Err(nom::Err::Error(tezos_nom::error::DecodeError::invalid_tag(
+                input,
+                "empty operation content list".into(),
+            )));
+        }
+
+        let (input, signature) = UnknownSignature::nom_read(input)?;
+        Ok((
+            input,
+            Self {
+                branch,
+                content,
+                signature,
+            },
+        ))
+    }
+}
+
+// `Encodable::rlp_append` can't fail but `to_bytes` can. We don't want the
+// kernel to panic and we can't log without host access, so on failure encode
+// an empty byte string (0x80): the RLP item count stays correct and decoding
+// fails cleanly instead of corrupting the surrounding list. Use
+// `bytes.rlp_append(stream)` (not `stream.append(&bytes)`) so the outer
+// `stream.append(&operation)` doesn't double-count the item.
+impl Encodable for Operation {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        self.to_bytes().unwrap_or_default().rlp_append(stream)
+    }
+}
+
+impl Operation {
     pub fn hash(&self) -> Result<OperationHash, BinError> {
         let serialized_op = self.to_bytes()?;
         let op_hash = digest_256(&serialized_op);
@@ -326,7 +400,7 @@ mod tests {
     };
     use mir::ast::michelson_address::Entrypoint;
     use pretty_assertions::assert_eq;
-    use rlp::{Decodable, Rlp, RlpStream};
+    use rlp::{Decodable, Rlp};
     use tezos_crypto_rs::{hash::UnknownSignature, public_key::PublicKey};
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::types::PublicKeyHash;
@@ -334,15 +408,26 @@ mod tests {
     #[test]
     fn operation_rlp_roundtrip() {
         let operation = make_dummy_reveal_operation();
-        let mut stream = RlpStream::new();
-        operation
-            .rlp_append(&mut stream)
-            .expect("rlp_append should have succeeded");
-        let bytes = stream.as_raw();
-        let rlp = Rlp::new(bytes);
+        let encoded = rlp::encode(&operation);
+        let rlp = Rlp::new(&encoded);
         let decoded_operation =
             Operation::decode(&rlp).expect("Decoding operation should have succeeded");
         assert_eq!(operation, decoded_operation);
+    }
+
+    // The reader rejects empty content lists; the writer must do the same so
+    // an empty-content operation can never be persisted and then fail to
+    // decode.
+    #[test]
+    fn empty_content_operation_is_rejected_by_writer() {
+        let operation = Operation {
+            content: vec![],
+            ..make_dummy_reveal_operation()
+        };
+        assert!(
+            operation.to_bytes().is_err(),
+            "writing an operation with an empty content list should fail"
+        );
     }
 
     #[test]
@@ -356,6 +441,67 @@ mod tests {
             .expect("Decoding reveal operation should have succeeded");
 
         assert_eq!(operation, operation_from_bytes);
+    }
+
+    #[test]
+    fn operation_decoder_does_not_parse_signature_as_content() {
+        let operation_bytes = hex::decode(
+            "ff1879f62b76d83d374e3e31238f0ac647898cc2e0d5ff8861f35f2f59ece67a6c0010d0238c078cb24b0dd11ba7e1f667b7390b8ad3a01ff30ab02200010000a51db41927a83e359322a34acc7644350b5581c200f80a705d5c26abed0d6548ba34785c80e10690338dbcfb14bd91a7d952c66c02d8ef89bec99bcc4eb8be6cf8bc0c88ee1acac83f0c467c5b49713019e3874b0e",
+        )
+        .expect("operation hex should decode");
+
+        let operation = Operation::nom_read_exact(&operation_bytes).expect(
+            "operation should decode without consuming signature bytes as content",
+        );
+
+        assert_eq!(operation.content.len(), 1);
+        assert_eq!(
+            operation
+                .to_bytes()
+                .expect("operation should encode after decoding"),
+            operation_bytes
+        );
+    }
+
+    #[test]
+    fn operation_decoder_handles_multiple_contents() {
+        // Reuse the single-content fixture to obtain a valid content item and
+        // signature without hand-crafting hex, then build an operation whose
+        // content list contains that item twice. This exercises the manual
+        // reader's ability to separate a multi-item content list from the
+        // trailing signature.
+        let operation_bytes = hex::decode(
+            "ff1879f62b76d83d374e3e31238f0ac647898cc2e0d5ff8861f35f2f59ece67a6c0010d0238c078cb24b0dd11ba7e1f667b7390b8ad3a01ff30ab02200010000a51db41927a83e359322a34acc7644350b5581c200f80a705d5c26abed0d6548ba34785c80e10690338dbcfb14bd91a7d952c66c02d8ef89bec99bcc4eb8be6cf8bc0c88ee1acac83f0c467c5b49713019e3874b0e",
+        )
+        .expect("operation hex should decode");
+
+        let single = Operation::nom_read_exact(&operation_bytes)
+            .expect("single-content operation should decode");
+        assert_eq!(single.content.len(), 1);
+
+        let content_item = single.content[0].clone();
+        let operation = Operation {
+            branch: single.branch.clone(),
+            content: vec![content_item.clone(), content_item],
+            signature: single.signature.clone(),
+        };
+
+        let bytes = operation
+            .to_bytes()
+            .expect("multi-content operation should encode");
+
+        let decoded = Operation::nom_read_exact(&bytes).expect(
+            "multi-content operation should decode without consuming signature bytes as content",
+        );
+
+        assert_eq!(decoded.content.len(), 2);
+        assert_eq!(decoded, operation);
+        assert_eq!(
+            decoded
+                .to_bytes()
+                .expect("multi-content operation should re-encode"),
+            bytes
+        );
     }
 
     #[test]

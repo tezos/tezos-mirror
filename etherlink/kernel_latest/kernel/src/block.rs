@@ -2830,4 +2830,62 @@ mod tests {
         assert_eq!(protocol, current_protocol);
         assert_eq!(next_protocol, current_protocol);
     }
+
+    #[test]
+    fn test_can_fit_in_reboot_tezos_operation() {
+        // Test that can_fit_in_reboot accounts for the gas of Tezos
+        // operations.  Before the fix, EvmChainConfig::can_fit_in_reboot
+        // returned Ok(true) for all Tezos operations regardless of gas,
+        // so this test would see Finished instead of RebootNeeded.
+
+        let mut host = MockKernelHost::default();
+        let registry = RegistryImpl::default();
+        let block_constants = first_block(&mut host);
+
+        // Build a Tezos reveal operation with gas_limit = 500.
+        let reveal = make_reveal_operation(1, 1, 500, 0, bootstrap1());
+        let tx_hash = reveal.hash().unwrap().into();
+        let tezos_op = TezlinkOperation {
+            tx_hash,
+            content: TezlinkContent::Tezos(reveal),
+        };
+        let tezos_tx = TezosXTransaction::Tezos(tezos_op);
+
+        let transactions = vec![tezos_tx].into();
+        let mut block_in_progress = BlockInProgress::new(
+            U256::from(1),
+            transactions,
+            block_constants
+                .evm_runtime_block_constants
+                .block_fees
+                .base_fee_per_gas(),
+        );
+
+        // Fill the run's gas to just below the reboot limit so that
+        // the Tezos operation's converted gas pushes it over.
+        let limits = EvmLimits::default();
+        let cumulative_gas_in_run = max_gas_per_reboot(&limits) - 1;
+        host.add_execution_gas(cumulative_gas_in_run);
+
+        let chain_config = dummy_evm_config_with_tezos_runtime(&mut host);
+
+        let result = compute(
+            &mut host,
+            &registry,
+            &chain_config,
+            &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
+            &mut block_in_progress,
+            &block_constants,
+            None,
+            None,
+            false,
+        )
+        .expect("compute should succeed");
+
+        assert_eq!(
+            result,
+            BlockInProgressComputationResult::RebootNeeded,
+            "Tezos operation should not fit when gas is nearly exhausted"
+        );
+    }
 }

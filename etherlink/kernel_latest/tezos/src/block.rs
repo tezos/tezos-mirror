@@ -23,15 +23,6 @@ pub struct AppliedOperation {
     pub op_and_receipt: OperationDataAndMetadata,
 }
 
-impl Encodable for AppliedOperation {
-    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        match self.to_bytes() {
-            Ok(bytes) => bytes.rlp_append(stream),
-            Err(_err) => (),
-        }
-    }
-}
-
 #[derive(PartialEq, Debug, Default, BinWriter, NomReader)]
 pub struct OperationsWithReceipts {
     pub list: Vec<AppliedOperation>,
@@ -45,7 +36,10 @@ impl Encodable for OperationsWithReceipts {
             // convert to bytes.
             operations.to_bytes().unwrap()
         });
-        s.append_internal(&bytes);
+        // Use `bytes.rlp_append(s)` (not `s.append(&bytes)`) so we don't
+        // double-count this value in the surrounding list: the outer
+        // `stream.append(&ops)` already calls `note_appended(1)`.
+        bytes.rlp_append(s);
     }
 }
 
@@ -312,6 +306,41 @@ mod tests {
         let ops_rlp_decoded: OperationsWithReceipts =
             rlp::Decodable::decode(&rlp).expect("RLP decode for OperationsWithReceipts");
         assert_eq!(ops, ops_rlp_decoded, "RLP round-trip mismatch");
+    }
+
+    #[test]
+    fn operations_with_receipts_rlp_is_a_byte_string() {
+        let ops = OperationsWithReceipts::default();
+        let bytes = ops
+            .to_bytes()
+            .expect("BinWriter for OperationsWithReceipts");
+
+        let encoded = rlp::encode(&ops);
+        let rlp = rlp::Rlp::new(&encoded);
+        assert_eq!(
+            rlp.data().expect("RLP data item"),
+            bytes.as_slice(),
+            "OperationsWithReceipts must be stored as one RLP byte string"
+        );
+
+        let mut stream = rlp::RlpStream::new_list(2);
+        stream.append(&ops);
+        stream.append(&1u8);
+        let nested = stream.out();
+        let list = rlp::Rlp::new(&nested);
+        let decoded: OperationsWithReceipts = list
+            .at(0)
+            .expect("first list item")
+            .as_val()
+            .expect("OperationsWithReceipts in nested RLP");
+        assert_eq!(decoded, ops);
+        assert_eq!(
+            list.at(1)
+                .expect("second list item")
+                .as_val::<u8>()
+                .expect("u8 in nested RLP"),
+            1
+        );
     }
 
     #[test]

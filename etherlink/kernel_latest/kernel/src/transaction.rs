@@ -60,10 +60,7 @@ impl Encodable for TransactionContent {
             }
             TransactionContent::TezosDelayed(op) => {
                 stream.append(&TEZOS_DELAYED_OPERATION_TX_TAG);
-                // We don't want the kernel to panic if there's an error
-                // and we can't print a log as we don't have access to
-                // the host. So we just ignore the result.
-                let _ = op.rlp_append(stream);
+                stream.append(op);
             }
         }
     }
@@ -241,5 +238,24 @@ impl Transaction {
             TransactionContent::Ethereum(tx)
             | TransactionContent::EthereumDelayed(tx) => tx.type_,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::chains::make_test_operation;
+
+    #[test]
+    fn tezos_delayed_transaction_content_rlp_roundtrip() {
+        // Guards the `TransactionContent::TezosDelayed` encoding: on the happy
+        // path it must produce a well-formed 2-element list that decodes back
+        // to the same value (the error path appends empty data so `out()`
+        // never panics on an unfinished list).
+        let op = make_test_operation();
+        let content = TransactionContent::TezosDelayed(op);
+        let encoded = rlp::encode(&content);
+        let decoded: TransactionContent = rlp::decode(&encoded).unwrap();
+        assert_eq!(decoded, content);
     }
 }
