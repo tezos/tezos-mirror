@@ -452,7 +452,8 @@ let deploy_evm_contract ~sequencer ~sender ~nonce ~init_code () =
 
 (** [call_evm_gateway ~sequencer ~sender ~nonce ~value ~destination ()]
     calls the cross-runtime gateway precompile to reach [destination] (a Tezos
-    address).  Asserts the receipt status matches [expected_status] (default
+    address), through the generic [call] entrypoint as an HTTP POST with an
+    empty body.  Asserts the receipt status matches [expected_status] (default
     [true]).  Returns the transaction receipt. *)
 let call_evm_gateway ~sequencer ~sender ~nonce ~value ~destination
     ?expected_status () =
@@ -462,8 +463,8 @@ let call_evm_gateway ~sequencer ~sender ~nonce ~value ~destination
     ~nonce
     ~value
     ~address:evm_gateway_address
-    ~abi_signature:"transfer(string)"
-    ~arguments:[destination]
+    ~abi_signature:"call(string,(string,string)[],bytes,uint8)"
+    ~arguments:[sf "http://tezos/%s" destination; "[]"; "0x"; "1"]
     ?expected_status
     ()
 
@@ -1641,10 +1642,20 @@ let michelson_to_evm_transfer ~source ~evm_destination ~transfer_amount
   let transfer_amount_mutez = Tez.to_mutez transfer_amount in
   (* Build a Tezos operation that calls the gateway KT1. When [call] is
      provided as (fn_sig, calldata), uses the "call_evm" entrypoint; otherwise
-     uses the default entrypoint for a simple transfer. *)
+     uses the generic "call" entrypoint (HTTP POST with an empty body) for a
+     simple transfer. *)
   let* entrypoint, arg =
     match call with
-    | None -> Lwt.return ("default", `O [("string", `String evm_destination)])
+    | None ->
+        let* arg =
+          Client.convert_data_to_json
+            ~data:
+              (sf
+                 {|Pair "http://ethereum/%s" (Pair {} (Pair 0x (Pair 1 None)))|}
+                 evm_destination)
+            client
+        in
+        Lwt.return ("call", arg)
     | Some (fn_sig, calldata) ->
         let* arg =
           Client.convert_data_to_json
@@ -1698,44 +1709,10 @@ let michelson_to_evm_transfer ~source ~evm_destination ~transfer_amount
   let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
   unit
 
-let test_cross_runtime_transfer_to_evm =
-  Setup.register_fullstack_test
-    ~time_between_blocks:Nothing
-    ~title:"Cross-runtime transfer from Tezos to EVM via gateway"
-    ~tags:["cross_runtime"; "transfer"]
-    ~with_runtimes:[Tezos]
-  @@ fun setup _protocol ->
-  let evm_destination = "0x1111111111111111111111111111111111111111" in
-  let amount = Tez.of_int 100 in
-  let* () =
-    michelson_to_evm_transfer
-      ~source:Constant.bootstrap1
-      ~evm_destination
-      ~transfer_amount:amount
-      setup
-  in
-  (* Check the EVM balance of the destination.
-     The gateway passes the raw mutez amount to the EVM bridge,
-     which credits it directly as the EVM balance. *)
-  let*@ balance = Rpc.get_balance ~address:evm_destination setup.sequencer in
-  let expected_balance = Wei.of_tez amount in
-  Check.(
-    (balance = expected_balance) Wei.typ ~error_msg:"Expected %R but got %L") ;
-  (* Check that the gateway did not retain any funds. *)
-  let* tez_client = tezos_client setup.sequencer in
-  let* gateway_balance =
-    Client.get_balance_for ~account:gateway_address tez_client
-  in
-  Check.(
-    (Tez.to_mutez gateway_balance = 0)
-      int
-      ~error_msg:"Expected gateway balance 0 but got %L") ;
-  unit
-
-(** Same as [test_cross_runtime_transfer_to_evm] but using the generic
-    %call entrypoint instead of %default. Verifies that value transfer
-    works through the %call path (HTTP POST to the EVM runtime) and
-    that the gateway balance is zeroed after forwarding. *)
+(** Cross-runtime transfer from Tezos to EVM through the gateway's
+    generic %call entrypoint. Verifies that value transfer works
+    through the %call path (HTTP POST to the EVM runtime) and that
+    the gateway balance is zeroed after forwarding. *)
 let test_cross_runtime_transfer_to_evm_via_call =
   Setup.register_fullstack_test
     ~time_between_blocks:Nothing
@@ -1780,10 +1757,10 @@ let test_cross_runtime_transfer_to_evm_via_call =
       ~error_msg:"Expected gateway balance 0 but got %L") ;
   unit
 
-(** Same as [test_cross_runtime_transfer_to_evm] but using the
-    %call_evm entrypoint with an empty calldata instead of %default.
-    Verifies that value transfer works through %call_evm and that the
-    gateway balance is zeroed after forwarding. *)
+(** Same as [test_cross_runtime_transfer_to_evm_via_call] but using
+    the %call_evm entrypoint with an empty calldata. Verifies that
+    value transfer works through %call_evm and that the gateway
+    balance is zeroed after forwarding. *)
 let test_cross_runtime_transfer_to_evm_via_call_evm =
   Setup.register_fullstack_test
     ~time_between_blocks:Nothing
@@ -6039,7 +6016,6 @@ let () =
   test_reveal [Alpha] ;
   test_delayed_inbox_transfer [Alpha] ;
   test_cross_runtime_transfer_from_evm_to_tz [Alpha] ;
-  test_cross_runtime_transfer_to_evm [Alpha] ;
   test_cross_runtime_transfer_to_evm_via_call [Alpha] ;
   test_cross_runtime_transfer_to_evm_via_call_evm [Alpha] ;
   test_cross_runtime_call_executes_evm_bytecode [Alpha] ;
