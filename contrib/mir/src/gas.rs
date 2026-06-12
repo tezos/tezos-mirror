@@ -1297,16 +1297,16 @@ pub mod interpret_cost {
     }
 
     pub fn pair_n(size: usize) -> Result<u32, CostOverflow> {
-        // corresponds to cost_N_IComb in the Tezos protocol
-        let size = Checked::from(size);
-        let v0 = size - 2;
+        // corresponds to cost_N_IComb in the Tezos protocol; the protocol's
+        // S.sub floors at 0, hence saturating_sub
+        let v0 = Checked::from(size.saturating_sub(2));
         (50 + (v0 * 15)).as_gas_cost()
     }
 
     pub fn unpair_n(size: usize) -> Result<u32, CostOverflow> {
-        // corresponds to cost_N_IUncomb in the Tezos protocol
-        let size = Checked::from(size);
-        let v0 = size - 2;
+        // corresponds to cost_N_IUncomb in the Tezos protocol; the protocol's
+        // S.sub floors at 0, hence saturating_sub
+        let v0 = Checked::from(size.saturating_sub(2));
         (50 + ((v0 * 7) + (v0 >> 2))).as_gas_cost()
     }
 
