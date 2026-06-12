@@ -8,8 +8,6 @@
 module type NDS_BACKEND = sig
   module Proof : Octez_riscv_nds_common.Intf.PROOF
 
-  val empty_registry_hash : bytes
-
   type prove_session
 
   val open_prove_session :
@@ -18,9 +16,19 @@ module type NDS_BACKEND = sig
   val produce_proof : prove_session -> Proof.t
 
   val open_verify_session : Proof.t -> Octez_riscv_nds_common.Nds.t
-
-  val make_empty_nds : unit -> Octez_riscv_nds_common.Nds.t
 end
+
+(* Documented in the .mli.  Hardcoded as a literal — rather than
+   computed from an in-memory registry — so this library need not link
+   the in-memory NDS FFI.  The value is the content hash of a fresh
+   empty registry (hex
+   5acf012a6bf720adac5156e7b970dde14033ff12b594999e0ff6c6158977c872) and
+   is guarded against drift by [test_empty_registry_hash_is_canonical] in
+   src/lib_smart_rollup_wasm_in_memory/test/test_dual_state.ml, which
+   recomputes it from the in-memory backend. *)
+let empty_registry_hash =
+  Bytes.of_string
+    "\x5a\xcf\x01\x2a\x6b\xf7\x20\xad\xac\x51\x56\xe7\xb9\x70\xdd\xe1\x40\x33\xff\x12\xb5\x94\x99\x9e\x0f\xf6\xc6\x15\x89\x77\xc8\x72"
 
 module Make
     (Irmin : sig
@@ -349,7 +357,7 @@ struct
              canonical [empty_registry_hash].  A mismatch means the
              kernel mutated the registry during the activation tick
              (or the encoder wrote a stale hash) — refuse to emit. *)
-          if Bytes.equal post_nds_hash Backend.empty_registry_hash then
+          if Bytes.equal post_nds_hash empty_registry_hash then
             Lwt.return_some (Irmin_only irmin, a)
           else Lwt.return_none
 
@@ -429,7 +437,7 @@ struct
              tag and the durable agree on [Inactive].  Accept. *)
           Lwt.return_some ((irmin', Inactive), v)
       | Some (irmin', ((Active _ as nds_state'), Some post_nds_hash, v))
-        when Bytes.equal post_nds_hash Backend.empty_registry_hash ->
+        when Bytes.equal post_nds_hash empty_registry_hash ->
           (* Activation tick: step minted a fresh [Active] handle via
              the verifier-configured factory and the encoder wrote
              the canonical empty-registry hash to [/pvm/nds_hash].
@@ -462,11 +470,11 @@ struct
       | Dual dual -> verify_dual_proof dual step
   end
 
-  let wasm_pvm_machine_dual ~config =
+  let wasm_pvm_machine_dual ~config ~make_empty_nds =
     let module Vm = Tezos_scoru_wasm.Wasm_vm.Make_vm (struct
       let config = config
 
-      let make_empty_nds = Some Backend.make_empty_nds
+      let make_empty_nds = Some make_empty_nds
     end) in
     (module Tezos_scoru_wasm.Wasm_pvm.Make_pvm (Vm) (Dual_state)
     : Tezos_scoru_wasm.Wasm_pvm_sig.S

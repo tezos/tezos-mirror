@@ -13,13 +13,6 @@ module In_memory_backend :
     with module Proof = Octez_riscv_nds_memory.Proof = struct
   module Proof = Octez_riscv_nds_memory.Proof
 
-  (** Hash of an empty registry, computed once at module load.  Every
-      empty [Normal] registry hashes to this value, so prover and
-      verifier agree on the activation-tick marker. *)
-  let empty_registry_hash =
-    Octez_riscv_nds_memory.Normal.Registry.hash
-      (Octez_riscv_nds_memory.Normal.Registry.create ())
-
   type prove_session = Octez_riscv_nds_memory.Prove.Registry.t
 
   let open_prove_session nds =
@@ -52,8 +45,6 @@ module In_memory_backend :
       Octez_riscv_nds_memory.Verify_tag
       (module Octez_riscv_nds_memory.Verify)
       verify_registry
-
-  let make_empty_nds = Octez_riscv_nds_memory.make_empty_normal_nds
 end
 
 module Irmin = struct

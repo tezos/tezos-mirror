@@ -51,7 +51,8 @@ struct
   module Dual_lib = Tezos_smart_rollup_wasm_dual_state.Make (Irmin) (Backend)
   module Dual = Dual_lib.Dual_state
 
-  let wasm_pvm_machine_dual = Dual_lib.wasm_pvm_machine_dual
+  let wasm_pvm_machine_dual ~config =
+    Dual_lib.wasm_pvm_machine_dual ~config ~make_empty_nds:Setup.make_empty_nds
 
   open Setup
 
@@ -1363,9 +1364,41 @@ module In_memory_tests =
       let make_empty_nds () = Octez_riscv_nds_memory.make_empty_normal_nds ()
     end)
 
+(* Regression guard for the hardcoded
+   [Tezos_smart_rollup_wasm_dual_state.empty_registry_hash].  That
+   constant is a literal so the library need not link the in-memory NDS
+   FFI, but it must stay equal to the hash the backend computes for a
+   fresh empty registry — the value a verifier cross-checks the
+   activation tick against.  A mismatch means the NDS hashing scheme or
+   the empty registry changed: update the literal deliberately. *)
+let test_empty_registry_hash_is_canonical () =
+  let open Lwt_result_syntax in
+  let live =
+    Octez_riscv_nds_memory.Normal.Registry.hash
+      (Octez_riscv_nds_memory.Normal.Registry.create ())
+  in
+  let canonical = Tezos_smart_rollup_wasm_dual_state.empty_registry_hash in
+  if not (Bytes.equal canonical live) then
+    Test.fail
+      ~__LOC__
+      "empty_registry_hash drifted from the in-memory backend: hardcoded %s, \
+       computed %s"
+      (Hex.show (Hex.of_bytes canonical))
+      (Hex.show (Hex.of_bytes live)) ;
+  return_unit
+
 let () =
   Alcotest_lwt.run
     ~__FILE__
     "test lib smart rollup wasm in memory"
-    [("Dual state and PVM", In_memory_tests.tests)]
+    [
+      ("Dual state and PVM", In_memory_tests.tests);
+      ( "empty_registry_hash",
+        [
+          tztest
+            "regression: empty_registry_hash matches the in-memory backend"
+            `Quick
+            test_empty_registry_hash_is_canonical;
+        ] );
+    ]
   |> Lwt_main.run

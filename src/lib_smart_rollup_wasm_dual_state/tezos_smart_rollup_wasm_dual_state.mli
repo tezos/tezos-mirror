@@ -21,10 +21,6 @@ module type NDS_BACKEND = sig
       cross-checked against the [/pvm/nds_hash] marker. *)
   module Proof : Octez_riscv_nds_common.Intf.PROOF
 
-  (** Hash of a freshly created empty registry — the expected
-      [/pvm/nds_hash] on the (host-function-free) activation tick. *)
-  val empty_registry_hash : bytes
-
   (** An in-progress [Prove]-mode session.  An NDS handle runs in one of
       three modes: [Normal] during live kernel execution, [Prove] to
       record a step's host-function operations, and [Verify] to replay
@@ -50,10 +46,18 @@ module type NDS_BACKEND = sig
       replaying the step against it checks each host-function call against
       [proof]. *)
   val open_verify_session : Proof.t -> Octez_riscv_nds_common.Nds.t
-
-  (** Mints the empty NDS handle installed at the activation boundary. *)
-  val make_empty_nds : unit -> Octez_riscv_nds_common.Nds.t
 end
+
+(** Content hash of an empty NDS registry — the expected
+    [/pvm/nds_hash] marker on the (host-function-free) activation tick.
+
+    A constant of the NDS hashing scheme, not of any backend: a proof
+    produced against one backend is verified against another (the
+    rollup node proves on disk, the protocol verifies in memory), so
+    the activation-tick cross-checks only make sense if every backend
+    hashes the empty registry identically.  Defined once here rather
+    than required from each {!NDS_BACKEND}. *)
+val empty_registry_hash : bytes
 
 (** [Make (Irmin) (Backend)] specialises the dual-state WASM PVM to a
     concrete Irmin durable and NDS [Backend].
@@ -84,6 +88,12 @@ module Make
     (** Activation tag carried alongside the Irmin tree: [Inactive] is
         pre-activation, [Active nds] carries the live NDS handle. *)
     type nds_state = Inactive | Active of Octez_riscv_nds_common.Nds.t
+
+    (** Durable path of the NDS marker, relative to the PVM state root.
+        Consumers reconstructing the NDS half from a persisted state
+        (e.g. a context backend restoring on checkout) read the marker
+        at this path. *)
+    val nds_hash_path : string list
 
     (** Composite proof: an Irmin proof of the durable transition plus an
         NDS proof of the step's host-function operations. *)
@@ -160,10 +170,18 @@ module Make
     end
   end
 
-  (** [wasm_pvm_machine_dual ~config] returns a WASM PVM machine over
-      {!Dual_state}. *)
+  (** [wasm_pvm_machine_dual ~config ~make_empty_nds] returns a WASM
+      PVM machine over {!Dual_state}.
+
+      [make_empty_nds] is the activation-boundary factory: the
+      [Normal]-mode handle the VM installs when the kernel opens the
+      NDS gate.  It is a runtime argument (not part of {!NDS_BACKEND})
+      because it is the only place a backend's store handle enters the
+      machine — e.g. the on-disk backend closes it over the rocksdb
+      repository the node opened at startup. *)
   val wasm_pvm_machine_dual :
     config:Tezos_scoru_wasm.Wasm_pvm_config.t ->
+    make_empty_nds:(unit -> Octez_riscv_nds_common.Nds.t) ->
     (module Tezos_scoru_wasm.Wasm_pvm_sig.S
        with type context = Dual_state.context
         and type state = Dual_state.state
