@@ -88,9 +88,9 @@ let amplification_timeout = 120.
 
 (* Maximum number of in-flight amplification reconstructions: jobs queued in the
    amplificator's [query_pipe] plus those currently being processed by the
-   crypto worker (this count is tracked by the length of the query store). When
-   this bound is reached, new amplification requests are dropped (and logged)
-   instead of being enqueued. *)
+   crypto worker (this count is tracked by the [in_flight_slots] field of the
+   amplificator). When this bound is reached, new amplification requests are
+   dropped (and logged) instead of being enqueued. *)
 let amplification_queue_max_length = 8
 
 (* Initial reconnection delay to L1 node from the DAL crawler in seconds. See

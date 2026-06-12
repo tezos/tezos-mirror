@@ -963,6 +963,18 @@ open struct
       ("slot_index", Data_encoding.int31)
       ("queue_length", Data_encoding.int31)
 
+  let amplification_already_in_flight =
+    declare_2
+      ~section:(section @ ["crypto"])
+      ~prefix_name_with_section:true
+      ~name:"amplification_already_in_flight"
+      ~msg:
+        "a reconstruction for slot index {slot_index} at level {level} is \
+         already in flight: skipping the duplicate amplification request."
+      ~level:Debug
+      ("level", Data_encoding.int32)
+      ("slot_index", Data_encoding.int31)
+
   let get_attestable_slots_ok_notice =
     declare_3
       ~section
@@ -1779,6 +1791,9 @@ let emit_main_process_enqueue_query ~query_id =
 
 let emit_amplification_queue_full ~level ~slot_index ~queue_length =
   emit amplification_queue_full (level, slot_index, queue_length)
+
+let emit_amplification_already_in_flight ~level ~slot_index =
+  emit amplification_already_in_flight (level, slot_index)
 
 let emit_get_attestable_slots_ok_notice ~attester ~published_level
     ~slots_indices =
