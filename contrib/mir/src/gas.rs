@@ -1174,14 +1174,20 @@ pub mod interpret_cost {
     // Tezos protocol. BLS is not part of the re-benchmarked set; its arm
     // keeps the previous total (including the former 32 * len serialization
     // surcharge, now folded in).
+    // Saturating arithmetic, as the protocol's `Saturation_repr`: a
+    // saturated cost exceeds any operation budget and exhausts gas instead
+    // of wrapping in release builds.
     pub fn check_signature(k: &PublicKey, msg: &[u8]) -> Result<u32, CryptoError> {
         let len = msg.len().min(u32::MAX as usize) as u32;
         let cost = match k {
-            PublicKey::Ed25519(..) => 48_395 + ((len >> 4) + (len >> 5) + len),
-            PublicKey::Secp256k1(..) => 183_265 + ((len >> 3) + len),
-            PublicKey::P256(..) => 487_855 + ((len >> 3) + len),
+            PublicKey::Ed25519(..) => 48_395_u32
+                .saturating_add(len >> 4)
+                .saturating_add(len >> 5)
+                .saturating_add(len),
+            PublicKey::Secp256k1(..) => 183_265_u32.saturating_add(len >> 3).saturating_add(len),
+            PublicKey::P256(..) => 487_855_u32.saturating_add(len >> 3).saturating_add(len),
             #[cfg(feature = "bls")]
-            PublicKey::Bls(..) => 1_570_000 + (len * 35),
+            PublicKey::Bls(..) => 1_570_000_u32.saturating_add(len.saturating_mul(35)),
             #[cfg(not(feature = "bls"))]
             PublicKey::Bls(..) => {
                 return Err(CryptoError::Unsupported(
