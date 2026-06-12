@@ -258,6 +258,8 @@
 - The sequencer block producer now clears the optimistically-popped pending
   transactions when block production fails, so a rejected blueprint can no
   longer permanently stall the sequencer. (!22092)
+- The `blueprint_application` event now accounts for Michelson runtime
+  operations in its `txs_nb` count. (!22155)
 
 ## Version 0.6 (ae3d731879b9443f52dc14de64e3208ab256d7a0)
 

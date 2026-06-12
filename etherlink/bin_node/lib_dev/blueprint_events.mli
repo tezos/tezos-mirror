@@ -18,16 +18,26 @@ val publisher_is_ready : unit -> unit Lwt.t
 val publisher_shutdown : unit -> unit Lwt.t
 
 (** [blueprint_applied block execution_gas ~evm_execution_gas
-    ~michelson_execution_gas duration] advertises that the blueprint
-    leading to [block] was applied in [duration].
+    ~michelson_execution_gas ~tezos_nb_operations duration] advertises
+    that the blueprint leading to [block] was applied in [duration].
 
     [execution_gas] is the EVM-equivalent weighted sum:
-    [evm_execution_gas + michelson_execution_gas * multiplier]. *)
+    [evm_execution_gas + michelson_execution_gas * multiplier].
+
+    [tezos_nb_operations] is the number of Michelson runtime operations
+    to attribute to the block: the manager-operation contents of [block]
+    itself when it is a ([Tez]) block, or those of the companion
+    Michelson block produced alongside an EVM block in TezosX
+    cross-runtime mode. Synthetic CRAC contents (internal sub-operations
+    of an EVM transaction) are not counted — symmetrically with internal
+    EVM calls. For an EVM block it is added to the block's own (EVM)
+    transaction count. *)
 val blueprint_applied :
   'transaction_object L2_types.block ->
   Z.t ->
   evm_execution_gas:Z.t ->
   michelson_execution_gas:Z.t ->
+  tezos_nb_operations:int ->
   Time.System.Span.t ->
   unit Lwt.t
 
