@@ -2230,6 +2230,7 @@ fn interpret_one<'a>(
             overloads::Xor::Bytes => {
                 let mut o1 = pop!(V::Bytes);
                 let o2 = top_mut!(V::Bytes);
+                ctx.gas().consume(interpret_cost::xor_bytes(&o1, o2)?)?;
 
                 // The resulting vector length is the largest length among the
                 // operands, so to reuse memory we put the largest vector to
@@ -3965,6 +3966,8 @@ mod interpreter_tests {
             let mut ctx = Ctx::default();
             assert!(interpret_one(&instr, &mut ctx, &mut stack).is_ok());
             assert_eq!(stack, stk![expected]);
+            // every arm must charge gas (Xor::Bytes once consumed nothing)
+            assert!(ctx.gas().milligas().unwrap() < Ctx::default().gas.milligas().unwrap());
         }
 
         #[test]
