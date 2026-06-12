@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez Mempool RPC",
     "description": "The RPC API for the mempool served by the Octez node.",
-    "version": "Octez 24.4 (56bd3e33)"
+    "version": "Octez 25.0 (187a915b)"
   },
   "paths": {
     "/ban_operation": {
@@ -1764,7 +1764,7 @@
                 ]
               },
               "source": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "period": {
                 "type": "integer",
@@ -1796,7 +1796,7 @@
                 ]
               },
               "source": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "period": {
                 "type": "integer",
@@ -1834,7 +1834,7 @@
                 ]
               },
               "source": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "fee": {
                 "$ref": "#/components/schemas/024-PtTALLiN.mutez"
@@ -1849,7 +1849,7 @@
                 "$ref": "#/components/schemas/positive_bignum"
               },
               "public_key": {
-                "$ref": "#/components/schemas/Signature.Public_key"
+                "$ref": "#/components/schemas/Signature.V2.Public_key"
               },
               "proof": {
                 "$ref": "#/components/schemas/Bls12_381_signature"
@@ -1876,7 +1876,7 @@
                 ]
               },
               "source": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "fee": {
                 "$ref": "#/components/schemas/024-PtTALLiN.mutez"
@@ -1932,7 +1932,7 @@
                 ]
               },
               "source": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "fee": {
                 "$ref": "#/components/schemas/024-PtTALLiN.mutez"
@@ -1950,7 +1950,7 @@
                 "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "delegate": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "script": {
                 "$ref": "#/components/schemas/024-PtTALLiN.scripted.contracts"
@@ -1978,7 +1978,7 @@
                 ]
               },
               "source": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "fee": {
                 "$ref": "#/components/schemas/024-PtTALLiN.mutez"
@@ -1993,7 +1993,7 @@
                 "$ref": "#/components/schemas/positive_bignum"
               },
               "delegate": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               }
             },
             "required": [
@@ -2016,7 +2016,7 @@
                 ]
               },
               "source": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "fee": {
                 "$ref": "#/components/schemas/024-PtTALLiN.mutez"
@@ -2054,7 +2054,7 @@
                 ]
               },
               "source": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "fee": {
                 "$ref": "#/components/schemas/024-PtTALLiN.mutez"
@@ -2097,7 +2097,7 @@
                 ]
               },
               "source": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "fee": {
                 "$ref": "#/components/schemas/024-PtTALLiN.mutez"
@@ -2112,7 +2112,7 @@
                 "$ref": "#/components/schemas/positive_bignum"
               },
               "pk": {
-                "$ref": "#/components/schemas/Signature.Public_key"
+                "$ref": "#/components/schemas/Signature.V2.Public_key"
               },
               "proof": {
                 "$ref": "#/components/schemas/Bls12_381_signature"
@@ -2139,7 +2139,7 @@
                 ]
               },
               "source": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "fee": {
                 "$ref": "#/components/schemas/024-PtTALLiN.mutez"
@@ -2154,7 +2154,7 @@
                 "$ref": "#/components/schemas/positive_bignum"
               },
               "pk": {
-                "$ref": "#/components/schemas/Signature.Public_key"
+                "$ref": "#/components/schemas/Signature.V2.Public_key"
               },
               "proof": {
                 "$ref": "#/components/schemas/Bls12_381_signature"
@@ -2181,13 +2181,13 @@
                 ]
               },
               "consensus_key": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "delegate": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "destination": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               }
             },
             "required": [
@@ -2228,7 +2228,7 @@
                 ]
               },
               "source": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "fee": {
                 "$ref": "#/components/schemas/024-PtTALLiN.mutez"
@@ -2265,7 +2265,7 @@
                 ]
               },
               "source": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "fee": {
                 "$ref": "#/components/schemas/024-PtTALLiN.mutez"
@@ -2320,7 +2320,7 @@
                 ]
               },
               "source": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "fee": {
                 "$ref": "#/components/schemas/024-PtTALLiN.mutez"
@@ -2378,7 +2378,7 @@
                 ]
               },
               "source": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "fee": {
                 "$ref": "#/components/schemas/024-PtTALLiN.mutez"
@@ -2408,7 +2408,7 @@
               "whitelist": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/Signature.Public_key_hash"
+                  "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
                 }
               }
             },
@@ -2435,7 +2435,7 @@
                 ]
               },
               "source": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "fee": {
                 "$ref": "#/components/schemas/024-PtTALLiN.mutez"
@@ -2478,7 +2478,7 @@
                 ]
               },
               "source": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "fee": {
                 "$ref": "#/components/schemas/024-PtTALLiN.mutez"
@@ -2517,7 +2517,7 @@
                 ]
               },
               "source": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "fee": {
                 "$ref": "#/components/schemas/024-PtTALLiN.mutez"
@@ -2582,7 +2582,7 @@
                 ]
               },
               "source": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "fee": {
                 "$ref": "#/components/schemas/024-PtTALLiN.mutez"
@@ -2600,7 +2600,7 @@
                 "$ref": "#/components/schemas/smart_rollup_address"
               },
               "opponent": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "refutation": {
                 "oneOf": [
@@ -2873,7 +2873,7 @@
                 ]
               },
               "source": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "fee": {
                 "$ref": "#/components/schemas/024-PtTALLiN.mutez"
@@ -2894,10 +2894,10 @@
                 "type": "object",
                 "properties": {
                   "alice": {
-                    "$ref": "#/components/schemas/Signature.Public_key_hash"
+                    "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
                   },
                   "bob": {
-                    "$ref": "#/components/schemas/Signature.Public_key_hash"
+                    "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
                   }
                 },
                 "required": [
@@ -2928,7 +2928,7 @@
                 ]
               },
               "source": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "fee": {
                 "$ref": "#/components/schemas/024-PtTALLiN.mutez"
@@ -2976,7 +2976,7 @@
                 ]
               },
               "source": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "fee": {
                 "$ref": "#/components/schemas/024-PtTALLiN.mutez"
@@ -2994,7 +2994,7 @@
                 "$ref": "#/components/schemas/smart_rollup_address"
               },
               "staker": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               }
             },
             "required": [
@@ -3019,7 +3019,7 @@
                 ]
               },
               "source": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "fee": {
                 "$ref": "#/components/schemas/024-PtTALLiN.mutez"
@@ -3121,7 +3121,7 @@
                 ]
               },
               "source": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "fee": {
                 "$ref": "#/components/schemas/024-PtTALLiN.mutez"
@@ -3168,7 +3168,7 @@
                             ]
                           },
                           "l1_dst": {
-                            "$ref": "#/components/schemas/Signature.Public_key_hash"
+                            "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
                           },
                           "rollup_id": {
                             "$ref": "#/components/schemas/Zk_rollup_hash"
@@ -3241,7 +3241,7 @@
                 ]
               },
               "source": {
-                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                "$ref": "#/components/schemas/Signature.V2.Public_key_hash"
               },
               "fee": {
                 "$ref": "#/components/schemas/024-PtTALLiN.mutez"
@@ -3439,7 +3439,15 @@
           }
         ]
       },
-      "Signature.Public_key": {
+      "Signature.V2": {
+        "title": "A Ed25519, Secp256k1, P256 or BLS signature (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Signature.V2.Public_key": {
         "title": "A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded)",
         "oneOf": [
           {
@@ -3447,16 +3455,8 @@
           }
         ]
       },
-      "Signature.Public_key_hash": {
+      "Signature.V2.Public_key_hash": {
         "title": "A Ed25519, Secp256k1, P256, or BLS public key hash (Base58Check-encoded)",
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/unistring"
-          }
-        ]
-      },
-      "Signature.V2": {
-        "title": "A Ed25519, Secp256k1, P256 or BLS signature (Base58Check-encoded)",
         "oneOf": [
           {
             "$ref": "#/components/schemas/unistring"
