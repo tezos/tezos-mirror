@@ -40,8 +40,8 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
-use tezosx_interfaces::Registry;
-use tezosx_journal::TezosXJournal;
+use tezosx_interfaces::{Registry, RuntimeId};
+use tezosx_journal::{CracId, TezosXJournal};
 
 // SIMULATION/SIMPLE/RLP_ENCODED_SIMULATION
 pub const SIMULATION_SIMPLE_TAG: u8 = 1;
@@ -505,12 +505,17 @@ impl Evaluation {
         // as the applied path seeds the real block — so a CRAC dispatched
         // during the simulated call observes the live block environment
         // (`BASEFEE`, `GASLIMIT`, ...) instead of the placeholder
-        // `BlockConstants::dummy()` a `TezosXJournal::default()` would
-        // carry, keeping `eth_call`/`estimateGas` consistent with
-        // execution. The zero crac-id / operation-hash seed above is
-        // preserved.
-        let mut journal =
-            TezosXJournal::new(Default::default(), Default::default(), constants.clone());
+        // `BlockConstants::dummy()` a placeholder journal would carry,
+        // keeping `eth_call`/`estimateGas` consistent with execution. The
+        // CracId records `Ethereum` as the origin runtime, matching the
+        // EVM-entered applied path so a gateway crossing captures the EVM
+        // caller as Ethereum-native. The operation-hash seed is left zero
+        // (simulated KT1s are non-authoritative, see above).
+        let mut journal = TezosXJournal::new(
+            CracId::mock(RuntimeId::Ethereum),
+            Default::default(),
+            constants.clone(),
+        );
         let sim_result = match revm_run_transaction(
             host,
             registry,
@@ -821,7 +826,7 @@ mod tests {
         let gas_price = block.base_fee_per_gas() + 1;
         // create contract
         let registry = RegistryImpl::default();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let outcome = run_transaction(
             host,
             &registry,

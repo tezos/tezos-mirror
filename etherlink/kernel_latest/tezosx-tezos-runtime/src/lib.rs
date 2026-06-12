@@ -1616,7 +1616,7 @@ mod tests {
     #[test]
     fn ensure_alias_returns_valid_kt1_string() {
         let mut host = test_host();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let runtime = test_runtime();
 
         let alias = runtime
@@ -1642,7 +1642,7 @@ mod tests {
     #[test]
     fn ensure_alias_materializes_code_less() {
         let mut host = test_host();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let runtime = test_runtime();
         let evm_address = "0x1234567890abcdef1234567890abcdef12345678";
 
@@ -1713,7 +1713,7 @@ mod tests {
     #[test]
     fn ensure_alias_stores_evm_address_in_storage() {
         let mut host = test_host();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let runtime = test_runtime();
         let evm_address = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
 
@@ -1746,7 +1746,7 @@ mod tests {
     #[test]
     fn ensure_alias_sets_zero_balance() {
         let mut host = test_host();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let runtime = test_runtime();
         let evm_address = "0xabcdef";
 
@@ -1772,7 +1772,7 @@ mod tests {
     fn ensure_alias_is_deterministic() {
         let mut host1 = test_host();
         let mut host2 = test_host();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let runtime = test_runtime();
         let evm_address = "0x1111111111111111111111111111111111111111";
 
@@ -1805,7 +1805,7 @@ mod tests {
     #[test]
     fn ensure_alias_different_addresses_produce_different_aliases() {
         let mut host = test_host();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let runtime = test_runtime();
 
         let alias1 = runtime
@@ -1841,7 +1841,7 @@ mod tests {
         // unchanged. The first call deploys; the second is just a
         // read of the classification path.
         let mut host = test_host();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let runtime = test_runtime();
         let evm_address = "0x3333333333333333333333333333333333333333";
 
@@ -1894,7 +1894,7 @@ mod tests {
         use tezos_smart_rollup_host::path::concat;
 
         let mut host = test_host();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let runtime = test_runtime();
         let evm_address = "0x4444444444444444444444444444444444444444";
 
@@ -1953,7 +1953,7 @@ mod tests {
         use crate::account::set_origin_at;
 
         let mut host = MockKernelHost::default();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let runtime = test_runtime();
         let evm_address = "0x5555555555555555555555555555555555555555";
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
@@ -2300,7 +2300,7 @@ mod tests {
         let runtime = test_runtime();
         let registry = NotWiredRegistry;
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         journal.michelson.push_dispatch_slot();
         journal
             .michelson

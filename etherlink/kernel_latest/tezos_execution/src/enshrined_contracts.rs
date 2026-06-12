@@ -2232,7 +2232,7 @@ mod tests {
         let dest = "0x1234567890123456789012345678901234567890";
         let amount = 500i64;
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
 
         let gas_before = ctx.operation_gas().remaining.milligas().unwrap();
@@ -2267,7 +2267,7 @@ mod tests {
         let dest = "0x1234567890123456789012345678901234567890";
         let amount = 500i64;
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
 
         let result1 =

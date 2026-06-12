@@ -7,13 +7,13 @@ use std::fmt;
 use crate::{EvmJournal, MichelsonJournal};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 use tezos_ethereum::block::BlockConstants;
-use tezosx_types::OriginalSource;
+use tezosx_types::{OriginalSource, RuntimeId};
 
 /// Unique identifier for a cross-runtime call chain within a block.
 ///
 /// Composed of the origin runtime and the transaction index within
 /// the block. Known at journal creation time.
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CracId {
     /// Runtime that originated the transaction (0 = Tezos, 1 = Ethereum).
     pub origin_runtime: u8,
@@ -28,6 +28,22 @@ impl CracId {
             origin_runtime,
             tx_index,
         }
+    }
+
+    /// Build a CracId for `runtime` with a placeholder (zero) transaction
+    /// index.
+    ///
+    /// There is deliberately **no** `Default` impl. A CracId is only
+    /// meaningful relative to an origin runtime, and a universal default
+    /// silently stamped one runtime onto contexts belonging to the other:
+    /// e.g. a simulated Tezos operation built from `Default` acquired an
+    /// Ethereum origin, so a gateway crossing kept the EVM-form source
+    /// address instead of resolving it back to the Tezos PKH and emitted the
+    /// wrong `X-Tezos-CRAC-ID`. Call sites that lack a real per-block tx index
+    /// — kernel-synthesized deposits, `eth_call`/`estimateGas` simulation, and
+    /// tests — must still name the runtime they enter from.
+    pub fn mock(runtime: RuntimeId) -> Self {
+        Self::new(u8::from(runtime), 0)
     }
 }
 
@@ -170,7 +186,7 @@ impl HttpTrace {
 /// HTTP traces are recorded with proper nesting: when a cross-runtime call
 /// triggers further cross-runtime calls, the inner calls appear in the
 /// parent trace's [inner_traces] field.
-#[derive(Default, Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct TezosXJournal {
     pub evm: EvmJournal,
     pub michelson: MichelsonJournal,
@@ -218,6 +234,21 @@ impl TezosXJournal {
             crac_id,
             original_source: None,
         }
+    }
+
+    /// Build a journal entered from `runtime` with placeholder seeds: a zero
+    /// operation hash (so origination addresses are non-deterministic — see
+    /// [`Self::new`]) and [`BlockConstants::dummy`]. This reproduces what the
+    /// removed `Default` impl yielded, but forces the caller to name the
+    /// origin runtime so a journal can no longer be silently stamped with the
+    /// wrong one (see [`CracId::mock`]). Intended for tests and the kernel
+    /// contexts that genuinely lack a real tx index and block environment.
+    pub fn mock(runtime: RuntimeId) -> Self {
+        Self::new(
+            CracId::mock(runtime),
+            tezos_crypto_rs::hash::OperationHash::default(),
+            BlockConstants::dummy(),
+        )
     }
 
     /// Canonical derivation for the synthetic operation hash that
