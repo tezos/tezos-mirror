@@ -814,6 +814,7 @@ mod tests {
     use tezos_ethereum::block::BlockConstants;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezosx_interfaces::testing::UnimplementedRegistry;
+    use tezosx_interfaces::RuntimeId;
     use tezosx_interfaces::{RuntimeInterface, TezosXRuntimeError};
     use tezosx_journal::TezosXJournal;
 
@@ -874,7 +875,7 @@ mod tests {
         // the transfer amount (the calling runtime already debited it).
         let five_tez_wei = revm::primitives::U256::from(5_000_000_000_000_000_000u128);
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request = build_serve_request(
             &sender,
             &destination,
@@ -931,7 +932,7 @@ mod tests {
             .unwrap();
         CodeStorage::add(&mut host, &bytecode_raw, Some(code_hash)).unwrap();
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request = build_serve_request(
             &sender,
             &contract,
@@ -992,7 +993,7 @@ mod tests {
             .unwrap();
         CodeStorage::add(&mut host, &bytecode_raw, Some(code_hash)).unwrap();
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request = build_serve_request(
             &sender,
             &contract,
@@ -1087,7 +1088,7 @@ mod tests {
         let sender = Address::from_slice(&[0x11; 20]);
         let destination = Address::from_slice(&[0x22; 20]);
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         journal.evm.set_crac_chain_depth(OUTER_DEPTH);
 
         let request = serve_request_with_depth(
@@ -1116,7 +1117,7 @@ mod tests {
         let sender = Address::from_slice(&[0x11; 20]);
         let destination = Address::from_slice(&[0x22; 20]);
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         journal.evm.set_crac_chain_depth(OUTER_DEPTH);
 
         let request = serve_request_with_depth(
@@ -1150,7 +1151,7 @@ mod tests {
         let destination = Address::from_slice(&[0x22; 20]);
         let outer_originator = Address::from_slice(&[0x33; 20]);
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         journal
             .evm
             .set_cross_runtime_originator(Some(outer_originator));
@@ -1180,7 +1181,7 @@ mod tests {
         let destination = Address::from_slice(&[0x22; 20]);
         let outer_originator = Address::from_slice(&[0x33; 20]);
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         journal
             .evm
             .set_cross_runtime_originator(Some(outer_originator));
@@ -1215,7 +1216,7 @@ mod tests {
         let sender = Address::from_slice(&[0x11; 20]);
         let destination = Address::from_slice(&[0x22; 20]);
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         journal.evm.set_revm_call_depth(Some(7));
 
         let request = serve_request_with_depth(
@@ -1547,7 +1548,7 @@ mod tests {
         let sender = Address::from_slice(&[0x11; 20]);
         let destination = Address::from_slice(&[0x22; 20]);
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request = build_serve_request(
             &sender,
             &destination,
@@ -1585,7 +1586,7 @@ mod tests {
         // 0.5 TEZ = 500_000_000_000_000_000 wei
         let half_tez_wei = revm::primitives::U256::from(500_000_000_000_000_000u64);
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request = build_serve_request(
             &sender,
             &destination,
@@ -1668,7 +1669,7 @@ mod tests {
             .body(vec![])
             .unwrap();
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let resp = runtime.serve(&registry, &mut host, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
     }
@@ -1737,7 +1738,7 @@ mod tests {
             Bytes::from_hex(ORIGIN_CALLER_RECORDER).unwrap(),
         );
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request =
             build_serve_request_with_source(&sender, &source, &contract, "0", vec![]);
         let resp = runtime.serve(&registry, &mut host, &mut journal, request);
@@ -1813,7 +1814,7 @@ mod tests {
             .body(vec![])
             .unwrap();
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let resp = runtime.serve(&registry, &mut host, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
 
@@ -1853,7 +1854,7 @@ mod tests {
         // `build_serve_request_with_source` omits X-Tezos-Source-Runtime.
         let request =
             build_serve_request_with_source(&sender, &source, &destination, "0", vec![]);
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let resp = runtime.serve(&registry, &mut host, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
 
@@ -1887,7 +1888,7 @@ mod tests {
             Bytes::from_hex(ORIGIN_CALLER_RECORDER).unwrap(),
         );
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request = build_serve_request_with_source(&eoa, &eoa, &contract, "0", vec![]);
         let resp = runtime.serve(&registry, &mut host, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
@@ -1928,7 +1929,7 @@ mod tests {
         let guard = Address::from_slice(&[0x33; 20]);
         deploy_at(&mut host, &guard, Bytes::from_hex(EOA_ONLY_GUARD).unwrap());
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request =
             build_serve_request_with_source(&sender, &source, &guard, "0", vec![]);
         let resp = runtime.serve(&registry, &mut host, &mut journal, request);
@@ -1951,7 +1952,7 @@ mod tests {
         let guard = Address::from_slice(&[0x55; 20]);
         deploy_at(&mut host, &guard, Bytes::from_hex(EOA_ONLY_GUARD).unwrap());
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request = build_serve_request_with_source(&eoa, &eoa, &guard, "0", vec![]);
         let resp = runtime.serve(&registry, &mut host, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
@@ -1980,7 +1981,7 @@ mod tests {
         // Target with a single STOP — trivial inner call.
         deploy_at(&mut host, &contract, Bytes::from_hex("00").unwrap());
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request =
             build_serve_request_with_source(&sender, &source, &contract, "0", vec![]);
         let resp = runtime.serve(&registry, &mut host, &mut journal, request);
@@ -2043,7 +2044,21 @@ mod tests {
         // which address bytes were forwarded as the source alias.
         let registry = MockRegistry::new("tz1_mock_alias");
 
-        let mut journal = TezosXJournal::default();
+        // Ethereum-origin CRAC chain: the transitive originator A is an
+        // EVM-native account, so `crac_origin_runtime` is Ethereum and the
+        // gateway captures A's own EVM address as the source basis. A
+        // default (Tezos-origin) journal would instead route A through the
+        // foreign-runtime readonly-alias path, yielding the mock's fixed
+        // "tz1_mock_alias" — which fails to parse as an EVM address and
+        // reverts the precompile before `resolve_aliases` runs.
+        let mut journal = TezosXJournal::new(
+            tezosx_journal::CracId::new(
+                u8::from(tezosx_interfaces::RuntimeId::Ethereum),
+                0,
+            ),
+            tezos_crypto_rs::hash::OperationHash::default(),
+            BlockConstants::dummy(),
+        );
         // Inbound CRAC: source = A (originator), sender = B (caller).
         // Use a finite gas limit: gas::convert(Ethereum, Tezos, gas) =
         // gas * EVM_GAS_TO_MILLIGAS (100), so u64::MAX overflows and the
@@ -2198,7 +2213,7 @@ mod tests {
         // Target stores 0x42 at slot 1 (PUSH1 0x42 PUSH1 0x01 SSTORE).
         deploy_at(&mut host, &contract, Bytes::from_hex("6042600155").unwrap());
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request = build_serve_request(
             &sender,
             &contract,
@@ -2244,7 +2259,7 @@ mod tests {
             http::Method::HEAD,
             http::Method::OPTIONS,
         ] {
-            let mut journal = TezosXJournal::default();
+            let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
             let request = build_serve_request_with_method(
                 method.clone(),
                 &sender,
@@ -2270,7 +2285,7 @@ mod tests {
         let sender = Address::from_slice(&[0x11; 20]);
         let destination = Address::from_slice(&[0x22; 20]);
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request = build_serve_request_with_method(
             http::Method::GET,
             &sender,
@@ -2303,7 +2318,7 @@ mod tests {
         let destination = Address::from_slice(&[0x33; 20]);
         deploy_at(&mut host, &destination, bytecode_raw);
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request = build_serve_request_with_method(
             http::Method::GET,
             &sender,
@@ -2357,7 +2372,7 @@ mod tests {
             revm::primitives::U256::ZERO,
         );
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request = build_serve_request_with_method(
             http::Method::GET,
             &sender,
@@ -2405,7 +2420,7 @@ mod tests {
         let destination = Address::from_slice(&[0x55; 20]);
         deploy_at(&mut host, &destination, bytecode_raw);
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request = build_serve_request_with_method(
             http::Method::GET,
             &sender,
@@ -2651,7 +2666,7 @@ mod tests {
             let mut host = MockKernelHost::default();
             let runtime = EthereumRuntime::default();
             let registry = UnimplementedRegistry;
-            let mut journal = TezosXJournal::default();
+            let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
 
             let info = alias_info();
             let alias = alias_address(&info);

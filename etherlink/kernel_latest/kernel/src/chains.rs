@@ -1642,7 +1642,16 @@ impl ChainConfigTrait for MichelsonChainConfig {
         // During simulation, skip the fee check: the client sends fee=0
         // because it doesn't know the fees yet (that's what simulation computes).
         // The OCaml node-side prevalidation also skips fees during simulation.
-        let mut tezosx_journal = TezosXJournal::default();
+        //
+        // Build the journal with an explicit Tezos-origin CracId, mirroring the
+        // applied Michelson path (`CracId::new(0, michelson_index)` above). A
+        // simulated Tezos operation that crosses into the EVM must resolve its
+        // originator back to the Tezos PKH and emit `X-Tezos-CRAC-ID` as
+        // `0-<index>`; tagging it Ethereum (as a universal default would) keeps
+        // the EVM-form source address and diverges from on-chain execution.
+        // There is no `BlockInProgress` in simulation, so the tx index is a
+        // placeholder; simulated KT1s are non-authoritative regardless.
+        let mut tezosx_journal = TezosXJournal::mock(RuntimeId::Tezos);
         let safe_roots: Vec<OwnedPath> = self
             .storage_root_paths(number)
             .iter()

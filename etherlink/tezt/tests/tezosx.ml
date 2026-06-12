@@ -369,6 +369,15 @@ let check_michelson_storage_value ~sc_rollup_node ~contract_hex ~expected () =
     See [revm/src/precompiles/constants.rs:RUNTIME_GATEWAY_PRECOMPILE_ADDRESS]. *)
 let evm_gateway_address = "0xff00000000000000000000000000000000000007"
 
+(** [evm_alias_of_kt1 kt1_address] is the deterministic Ethereum alias of
+    a Michelson contract — [keccak256(kt1_base58_ascii)] truncated to 20
+    bytes — as lowercase hex (40 chars, no 0x prefix). *)
+let evm_alias_of_kt1 kt1_address =
+  let digest =
+    Tezos_crypto.Hacl.Hash.Keccak_256.digest (Bytes.of_string kt1_address)
+  in
+  Hex.show (Hex.of_bytes (Bytes.sub digest 0 20))
+
 (** EVM predeployed address for the FA1.2 wrapper contract.
     See [revm/src/precompiles/constants.rs:FA12_WRAPPER_SOL_ADDR]. *)
 let fa12_wrapper_address = "0xff00000000000000000000000000000000ffff09"
@@ -2290,6 +2299,151 @@ let test_cross_runtime_staticcall_evm_nested_view_view =
     (Tez.to_mutez gateway_balance = 0)
       int
       ~error_msg:"Expected gateway balance 0 but got %L") ;
+  unit
+
+(** The nested [staticcall_evm] view must preserve the *outer EVM
+    originator* as the inner callee's [tx.origin] (ORIGIN) while keeping
+    the immediate Michelson caller as [msg.sender] (CALLER).
+
+    Path: EVM [eth_call] -> [callMichelsonView] -> Michelson VIEW
+    -> [VIEW "staticcall_evm"] -> EVM echo.
+
+    Expected: CALLER == alias(KT1) and ORIGIN == the EVM EOA that issued
+    the outer call. The originator's native identity is carried on the
+    shared cross-runtime journal and re-injected as [X-Tezos-Source], so
+    ORIGIN is preserved without depending on any durable alias record. *)
+let test_cross_runtime_staticcall_evm_nested_view_preserves_origin =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Nested staticcall_evm view preserves outer EVM tx.origin"
+    ~tags:["cross_runtime"; "staticcall_evm"; "get"; "nested"; "view"; "origin"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      protocol
+    ->
+  let source = Constant.bootstrap5 in
+  (* EVM echo returning CALLER (msg.sender) followed by ORIGIN
+     (tx.origin), each left-padded to a 32-byte word (64 bytes total).
+
+     Init (11B): PUSH1 0d / DUP1 / PUSH1 0b / PUSH1 0 / CODECOPY /
+       PUSH1 0 / RETURN — copies the 13-byte runtime from offset 11.
+     Runtime (13B): CALLER / PUSH1 0 / MSTORE / ORIGIN / PUSH1 32 /
+       MSTORE / PUSH1 64 / PUSH1 0 / RETURN — writes msg.sender at
+       mem[0..32], tx.origin at mem[32..64], and returns mem[0..64]. *)
+  let init_code = "600d80600b6000396000f3336000523260205260406000f3" in
+  let outer_originator = Eth_account.bootstrap_accounts.(0) in
+  let* evm_contract_address =
+    deploy_evm_contract
+      ~sequencer
+      ~sender:outer_originator
+      ~nonce:0
+      ~init_code
+      ()
+  in
+  (* Originate the Michelson contract whose `read_evm` view bridges to
+     `gateway.staticcall_evm`, targeting the EVM echo above. *)
+  let init_storage_data = sf {|"%s"|} evm_contract_address in
+  let* _contract_hex, kt1_address =
+    originate_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:1
+      ~script_name:["mini_scenarios"; "staticcall_evm_view"]
+      ~init_storage_data
+      protocol
+  in
+  (* No alias warm-up: the outer EVM originator's Tezos alias is never
+     materialized before the read-only call. Origin preservation must not
+     depend on a durable origin record — the entering `callMichelsonView`
+     gateway captures the originator's native identity on the shared
+     journal, and the nested `staticcall_evm` view reads it back from
+     there. A read-only round-trip never writes such a record, so a
+     warm-up here would mask exactly the record-dependency this test
+     guards against; do not re-add one. *)
+  (* Drive the outer call via `eth_call`, pinning `from` to the EVM EOA
+     so the asserted originator is unambiguous. `0x030b` is the Micheline
+     binary encoding of `Unit`. *)
+  let micheline_unit = "0x030b" in
+  let* calldata =
+    Cast.calldata
+      ~args:[kt1_address; "read_evm"; micheline_unit]
+      "callMichelsonView(string,string,bytes)"
+  in
+  let* response =
+    Evm_node.(
+      call_evm_rpc
+        sequencer
+        {
+          method_ = "eth_call";
+          parameters =
+            `A
+              [
+                `O
+                  [
+                    ("from", `String outer_originator.Eth_account.address);
+                    ("to", `String evm_gateway_address);
+                    ("data", `String calldata);
+                    ("gas", `String "0xf4240");
+                  ];
+                `String "latest";
+              ];
+        })
+  in
+  let call_return = response |> Evm_node.extract_result |> JSON.as_string in
+  let hex = String.sub call_return 2 (String.length call_return - 2) in
+  (* `callMichelsonView` ABI-encodes its return as `(bytes,)`: a 32-byte
+     offset word, a 32-byte length word, then the payload right-padded to
+     a 32-byte boundary. The Michelson view returned the raw 64-byte EVM
+     response wrapped in a Micheline `Bytes` literal — tag `0x0a`, 4-byte
+     big-endian length `0x00000040`, then the 64 payload bytes — a
+     69-byte (`0x45`) Micheline value. *)
+  let length_word = String.sub hex 64 64 in
+  Check.(
+    (length_word
+   = "0000000000000000000000000000000000000000000000000000000000000045")
+      string
+      ~error_msg:
+        "Expected ABI length word for the 69-byte Micheline bytes: %R, got %L") ;
+  let body_hex = String.sub hex 128 (69 * 2) in
+  let micheline_prefix = String.sub body_hex 0 10 in
+  Check.(
+    (micheline_prefix = "0a00000040")
+      string
+      ~error_msg:"Expected Micheline `Bytes` 64-byte header: %R, got %L") ;
+  let caller_word = String.sub body_hex 10 64 in
+  let origin_word = String.sub body_hex 74 64 in
+  (* CALLER (msg.sender) is the deterministic Ethereum alias of the
+     calling Michelson KT1: `keccak256(kt1_base58_ascii)[..20]`,
+     left-padded inside the 32-byte word. *)
+  let expected_alias_hex = evm_alias_of_kt1 kt1_address in
+  let expected_caller = String.make 24 '0' ^ expected_alias_hex in
+  (* ORIGIN (tx.origin) must be preserved as the outer EVM originator,
+     not collapse onto the Michelson caller alias. *)
+  let expected_origin =
+    String.make 24 '0'
+    ^ String.lowercase_ascii
+        (String.sub outer_originator.Eth_account.address 2 40)
+  in
+  (* Guard against a degenerate setup where the two identities happen to
+     coincide — that would make the ORIGIN assertion pass even under the
+     identity-collapse bug. *)
+  if expected_caller = expected_origin then
+    Test.fail
+      "Test setup error: alias(KT1) coincides with the outer EVM originator" ;
+  Check.(
+    (caller_word = expected_caller)
+      string
+      ~error_msg:"Expected inner CALLER = alias(KT1) %R, got %L") ;
+  Check.(
+    (origin_word = expected_origin)
+      string
+      ~error_msg:
+        "Expected inner ORIGIN to preserve the outer EVM originator %R, got %L") ;
   unit
 
 let test_cross_runtime_transfer_from_evm_to_kt1 =
@@ -5892,6 +6046,7 @@ let () =
   test_cross_runtime_call_get_from_michelson_routes_to_static [Alpha] ;
   test_cross_runtime_staticcall_evm_from_on_chain_entrypoint [Alpha] ;
   test_cross_runtime_staticcall_evm_nested_view_view [Alpha] ;
+  test_cross_runtime_staticcall_evm_nested_view_preserves_origin [Alpha] ;
   test_cross_runtime_transfer_from_evm_to_kt1 [Alpha] ;
   test_cross_runtime_call_failwith [Alpha] ;
   test_cross_runtime_call_from_evm_to_michelson [Alpha] ;

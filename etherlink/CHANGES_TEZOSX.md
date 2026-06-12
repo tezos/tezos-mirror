@@ -304,6 +304,31 @@
   across an `EVM -> Michelson -> EVM` round-trip — it resolves back to
   the originating EOA — rather than collapsing every originator onto a
   single `alias(null)`. (!21981)
+- The `staticcall_evm` view's read-only path now resolves the nested EVM
+  call's originator (→ `tx.origin`) from the cross-runtime originator
+  captured on the shared journal, instead of reverse-resolving the
+  inbound caller alias through a durable origin record. When a Michelson
+  view services an inbound cross-runtime call, the entering EVM gateway
+  has already stored the originator's complete native `(runtime, address)`
+  identity there, so an `EVM -> callMichelsonView -> VIEW -> staticcall_evm
+  -> EVM` round-trip preserves the outer EVM originator — and its
+  `X-Tezos-Source-Runtime` — even when that originator's Michelson alias
+  was never materialized. This makes the Michelson→EVM read-only path
+  record-independent, matching the EVM→Michelson path. The immediate
+  Michelson caller's alias stays `X-Tezos-Sender` (→ `msg.sender`); a
+  top-level Michelson view with no captured originator forwards the
+  operation source. To make the originator available across the boundary,
+  it (`OriginalSource`) now lives on the shared cross-runtime journal
+  rather than the EVM sub-journal, and the EVM gateway's read-only entries
+  (`callMichelsonView`, GET `call`) persist it like the state-mutating
+  entries already did. (L2-1455)
+- The read-only `staticcall_evm` view dispatch charges one alias-lookup
+  gas cost for the immediate caller's durable origin read. The captured
+  originator is read from the journal at no durable-read cost, so an
+  inbound-CRAC view pays only that single lookup, while a top-level view
+  (which resolves the operation source itself) pays a second one.
+  Previously these read-only origin lookups were unmetered, so the view
+  under-priced its durable storage reads. (L2-1455)
 - MIR's `PUSH timestamp "..."` value parser now matches L1's
   `Script_timestamp.of_string`: a decimal-string literal larger than
   `i64::MAX` falls back to arbitrary-precision parsing instead of being

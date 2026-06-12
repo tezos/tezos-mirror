@@ -2,11 +2,11 @@
 //
 // SPDX-License-Identifier: MIT
 
-use mir::ast::Type;
 use mir::ast::{
     Address, AddressHash, BinWriter, ByteReprTrait, Operation, OperationInfo,
     TransferTokens, TypedValue,
 };
+use mir::ast::{PublicKeyHash, Type};
 use mir::typechecker::typecheck_value;
 use mir::{
     ast::{Entrypoint, Micheline},
@@ -27,11 +27,11 @@ use tezos_tezlink::operation_result::{InternalOperationSum, TransferError};
 use tezosx_interfaces::{
     gas::convert as convert_gas,
     headers::{format_tez_from_mutez, parse_u64_opt},
-    resolve_routing, AliasInfo, Classification, CrossRuntimeContext, Registry,
-    RoutingDecision, RuntimeId, ALIAS_LOOKUP_MILLIGAS, ERR_FORBIDDEN_TEZOS_HEADER,
-    X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED,
-    X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME,
-    X_TEZOS_STORAGE_COST, X_TEZOS_TIMESTAMP,
+    resolve_routing, translate_original_source, AliasInfo, Classification,
+    CrossRuntimeContext, Registry, RoutingDecision, RuntimeId, ALIAS_LOOKUP_MILLIGAS,
+    ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_ID,
+    X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE,
+    X_TEZOS_SOURCE_RUNTIME, X_TEZOS_STORAGE_COST, X_TEZOS_TIMESTAMP,
 };
 use tezosx_journal::TezosXJournal;
 
@@ -1013,25 +1013,36 @@ where
     Ok(request)
 }
 
+/// Resolve a source address to its target-runtime alias without writing
+/// to storage (the read-only counterpart of `inject_context_headers`).
+///
+/// Returns the resolved alias together with the source address's *native*
+/// runtime — the value the state-mutating path forwards as
+/// `X-Tezos-Source-Runtime`. `RoundTrip` resolves to an account native to
+/// the target runtime, `Transitive` to the runtime recorded in its alias
+/// info, and `Native` (or a Tezos target) to Tezos (this runtime).
 fn tezosx_resolve_source_alias_readonly(
     ctx: &impl HasOriginLookup,
     registry: &impl Registry,
     source: &AddressHash,
     target_runtime: RuntimeId,
-) -> Result<String, TransferError> {
+) -> Result<(String, RuntimeId), TransferError> {
     if target_runtime == RuntimeId::Tezos {
         // Short-circuit for Tezos target: the alias is the source's
         // base58check address. This avoids the durable read and alias
         // computation for the common case of a Tezos contract calling
         // the Tezos gateway.
-        return Ok(source.to_base58_check());
+        return Ok((source.to_base58_check(), RuntimeId::Tezos));
     }
 
-    let native_bytes = match read_and_resolve_routing(ctx, source, target_runtime)? {
-        RoutingDecision::RoundTrip(target) => return Ok(target),
-        RoutingDecision::Transitive(info) => info.native_address,
-        RoutingDecision::Native => source.to_base58_check().into_bytes(),
-    };
+    let (native_bytes, source_runtime) =
+        match read_and_resolve_routing(ctx, source, target_runtime)? {
+            RoutingDecision::RoundTrip(target) => return Ok((target, target_runtime)),
+            RoutingDecision::Transitive(info) => (info.native_address, info.runtime),
+            RoutingDecision::Native => {
+                (source.to_base58_check().into_bytes(), RuntimeId::Tezos)
+            }
+        };
     // Deterministic fallback: reproduce the alias that the target
     // runtime's `ensure_alias` would compute (and persist on the
     // state-mutating path), but skip the storage writes.
@@ -1041,14 +1052,15 @@ fn tezosx_resolve_source_alias_readonly(
     // canonical implementation — and must stay in sync with it.
     // If either formula changes, this read-only path must change
     // too.
-    registry
+    let alias = registry
         .compute_alias(AliasInfo {
             runtime: target_runtime,
             native_address: native_bytes,
         })
         .map_err(|e| {
             TransferError::GatewayError(format!("Alias computation failed: {e}"))
-        })
+        })?;
+    Ok((alias, source_runtime))
 }
 
 /// Extract (evm_contract, address_bytes, value) from a typed
@@ -1607,6 +1619,28 @@ fn is_cross_runtime_oog(status: http::StatusCode) -> bool {
 /// would, fire `registry.serve`, charge `X-Tezos-Gas-Consumed` back
 /// to `operation_gas`, and classify the response.
 ///
+/// `X-Tezos-Sender` (→ the callee's `msg.sender`) is always the
+/// immediate Michelson caller's alias (`calling_kt1`), resolved with one
+/// durable origin read.
+///
+/// `X-Tezos-Source` (→ the callee's `tx.origin`) and its
+/// `X-Tezos-Source-Runtime` are the transitive top-level originator and
+/// its native runtime. When this view services an inbound cross-runtime
+/// call, the EVM gateway that entered it already captured the
+/// originator's complete native `(runtime, address)` identity on the
+/// shared journal ([`TezosXJournal::original_source`]); we forward that
+/// directly. A nested `EVM → callMichelsonView → VIEW → staticcall_evm →
+/// EVM` round-trip therefore preserves the outer EVM originator without
+/// consulting any durable alias/origin record — correct even when that
+/// originator's alias was never materialized. For a top-level Michelson
+/// view (no captured originator) the source is the operation source,
+/// resolved here as its own durable origin read.
+///
+/// Metering: the sender always costs one `ALIAS_LOOKUP_MILLIGAS`. The
+/// source costs a second one only in the top-level-view case, where it is
+/// resolved here; reading the captured originator from the shared journal
+/// performs no durable read and is free.
+///
 /// - **2xx** → `Ok(Some(body))`.
 /// - **429** → `Err(InterpretError::OutOfGas)`: the cross-runtime
 ///   out-of-gas sentinel (see [`is_cross_runtime_oog`]) must fail
@@ -1640,6 +1674,7 @@ pub fn dispatch_staticcall_evm_get<'a, Host, R, C>(
     journal: &mut TezosXJournal,
     context: &C,
     calling_kt1: &ContractKt1Hash,
+    source: &PublicKeyHash,
     crac_id: &str,
     timestamp: &str,
     block_number: &str,
@@ -1672,18 +1707,64 @@ where
         }
     }
 
-    let sender_addr_hex = {
-        let lookup = ViewOriginLookup {
-            host: &*host,
-            context,
-        };
-        tezosx_resolve_source_alias_readonly(
-            &lookup,
-            registry,
-            &AddressHash::Kt1(calling_kt1.clone()),
-            RuntimeId::Ethereum,
-        )
-        .map_err(|_| mir::interpreter::EnshrinedViewDispatchError::AliasResolution)?
+    // The captured top-level originator, shared by both runtimes (set by
+    // the EVM gateway that entered this view, if any). Read it up front so
+    // it does not collide with the mutable journal borrow taken to dispatch
+    // the request below.
+    let original_source = journal.original_source().cloned();
+
+    // `X-Tezos-Sender` → the inner EVM callee's `msg.sender`: always the
+    // immediate Michelson caller's alias. This is a durable origin read,
+    // metered like the state-mutating `inject_context_headers` meters its
+    // reads (`ALIAS_LOOKUP_MILLIGAS`); the read-only path skips only the
+    // alias *generation* (write) cost. The target is always Ethereum here,
+    // so the read always happens (no Tezos short-circuit to skip).
+    let lookup = ViewOriginLookup {
+        host: &*host,
+        context,
+    };
+    operation_gas
+        .cast_and_consume_milligas(ALIAS_LOOKUP_MILLIGAS)
+        .map_err(|_| mir::interpreter::InterpretError::OutOfGas)?;
+    let (sender_addr_hex, _sender_runtime) = tezosx_resolve_source_alias_readonly(
+        &lookup,
+        registry,
+        &AddressHash::Kt1(calling_kt1.clone()),
+        RuntimeId::Ethereum,
+    )
+    .map_err(|_| mir::interpreter::EnshrinedViewDispatchError::AliasResolution)?;
+
+    // `X-Tezos-Source` → the inner EVM callee's `tx.origin`: the transitive
+    // top-level originator. When this view services an inbound
+    // cross-runtime call, the entering EVM gateway captured the
+    // originator's complete native `(runtime, address)` identity on the
+    // shared journal, so forward it directly — no durable read, and
+    // correct even when the originator's durable alias was never
+    // materialized. Otherwise (a top-level Michelson view) the originator
+    // is the operation source, resolved here as its own durable origin read.
+    let (source_addr_hex, source_runtime) = match original_source {
+        // Translate the captured originator's native address into its EVM
+        // representation (identity when Ethereum-native, a pure
+        // `compute_alias` otherwise) — no durable read, matching the
+        // free-of-charge metering below.
+        Some(src) => (
+            translate_original_source(registry, &src, RuntimeId::Ethereum).map_err(
+                |_| mir::interpreter::EnshrinedViewDispatchError::AliasResolution,
+            )?,
+            src.runtime(),
+        ),
+        None => {
+            operation_gas
+                .cast_and_consume_milligas(ALIAS_LOOKUP_MILLIGAS)
+                .map_err(|_| mir::interpreter::InterpretError::OutOfGas)?;
+            tezosx_resolve_source_alias_readonly(
+                &lookup,
+                registry,
+                &AddressHash::Implicit(source.clone()),
+                RuntimeId::Ethereum,
+            )
+            .map_err(|_| mir::interpreter::EnshrinedViewDispatchError::AliasResolution)?
+        }
     };
 
     // Inner EVM gas budget derived from the view's remaining
@@ -1719,11 +1800,20 @@ where
         .method(http::Method::GET)
         .uri(uri)
         .header(tezosx_interfaces::X_TEZOS_SENDER, sender_addr_hex.as_str())
-        // Views have no separate operation source (the kernel
-        // synthesizes a null implicit account on this path); mirror
-        // sender so `dispatch_crac_call`'s state-mutating counterpart
-        // stays comparable.
-        .header(tezosx_interfaces::X_TEZOS_SOURCE, sender_addr_hex.as_str())
+        // `source_addr_hex` is the captured top-level originator when one
+        // exists, else the operation source (see its derivation above).
+        // This keeps the immediate caller (`X-Tezos-Sender`) distinct from
+        // the transitive originator (`X-Tezos-Source`) so `tx.origin`
+        // survives a nested cross-runtime round-trip.
+        .header(tezosx_interfaces::X_TEZOS_SOURCE, source_addr_hex.as_str())
+        // Native runtime of `X-Tezos-Source`, so the EVM side reports a
+        // self-consistent `(sourceRuntime, sourceAddress)` tuple instead
+        // of defaulting absent → Tezos, matching the state-mutating
+        // header injection.
+        .header(
+            tezosx_interfaces::X_TEZOS_SOURCE_RUNTIME,
+            u8::from(source_runtime).to_string(),
+        )
         .header(tezosx_interfaces::X_TEZOS_AMOUNT, "0")
         .header(
             tezosx_interfaces::X_TEZOS_GAS_LIMIT,
@@ -1963,7 +2053,7 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_tezlink::operation_result::{ContentResult, InternalOperationSum};
     use tezosx_interfaces::{Origin, RuntimeId};
-    use tezosx_journal::{DispatchSlotError, TezosXJournal};
+    use tezosx_journal::{DispatchSlotError, OriginalSource, TezosXJournal};
 
     use super::*;
     use crate::mir_ctx::mock::MockCtx;
@@ -2232,7 +2322,7 @@ mod tests {
         let dest = "0x1234567890123456789012345678901234567890";
         let amount = 500i64;
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
 
         let gas_before = ctx.operation_gas().remaining.milligas().unwrap();
@@ -2267,7 +2357,7 @@ mod tests {
         let dest = "0x1234567890123456789012345678901234567890";
         let amount = 500i64;
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
 
         let result1 =
@@ -2926,6 +3016,8 @@ mod tests {
         );
         let context = crate::context::TezlinkContext::init_context();
         let calling_kt1 = ContractKt1Hash::from([0u8; 20]);
+        let source =
+            PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
         let mut operation_gas =
             crate::gas::TezlinkOperationGas::start_milligas(100_000_000).unwrap();
         dispatch_staticcall_evm_get(
@@ -2935,6 +3027,7 @@ mod tests {
             &mut journal,
             &context,
             &calling_kt1,
+            &source,
             "1",
             "0",
             "1",
@@ -2962,6 +3055,182 @@ mod tests {
     fn test_staticcall_evm_400_is_none() {
         let result = run_staticcall_evm_get(400);
         assert_eq!(result, Ok(None));
+    }
+
+    /// Drive `dispatch_staticcall_evm_get` as `calling_kt1`, optionally
+    /// seeding the shared journal with a captured originator
+    /// (`original_source`, as the entering EVM gateway would). Runs against
+    /// an injective-alias registry (sender- and operation-source-derived
+    /// aliases stay distinguishable) whose default `serve` replies 200 with
+    /// `X-Tezos-Gas-Consumed: 0` and records the request. Returns the
+    /// dispatch result, the milligas consumed, and the injected
+    /// `X-Tezos-Sender` / `X-Tezos-Source` / `X-Tezos-Source-Runtime`.
+    #[allow(clippy::type_complexity)]
+    fn run_staticcall_evm_get_as(
+        calling_kt1: &ContractKt1Hash,
+        source: &PublicKeyHash,
+        original_source: Option<OriginalSource>,
+    ) -> (
+        Result<Option<Vec<u8>>, mir::interpreter::InterpretError<'static>>,
+        u64,
+        String,
+        String,
+        String,
+    ) {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("unused").with_injective_aliases();
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        if let Some(os) = original_source {
+            journal.set_original_source(os);
+        }
+        let context = crate::context::TezlinkContext::init_context();
+        let mut operation_gas =
+            crate::gas::TezlinkOperationGas::start_milligas(100_000_000).unwrap();
+        let gas_before = operation_gas.remaining.milligas().unwrap();
+
+        let result = dispatch_staticcall_evm_get(
+            &mut host,
+            &mut operation_gas,
+            &registry,
+            &mut journal,
+            &context,
+            calling_kt1,
+            source,
+            "1",
+            "0",
+            "1",
+            0,
+            "0x1234567890123456789012345678901234567890",
+            &[],
+        );
+        let consumed =
+            u64::from(gas_before - operation_gas.remaining.milligas().unwrap());
+
+        let serve_calls = registry.serve_calls.borrow();
+        assert_eq!(serve_calls.len(), 1);
+        let headers = serve_calls[0].headers();
+        let header = |name| {
+            headers
+                .get(name)
+                .expect("header must be injected")
+                .to_str()
+                .expect("header must be ascii")
+                .to_owned()
+        };
+        (
+            result,
+            consumed,
+            header(X_TEZOS_SENDER),
+            header(X_TEZOS_SOURCE),
+            header(X_TEZOS_SOURCE_RUNTIME),
+        )
+    }
+
+    /// When the `staticcall_evm` view services an inbound CRAC, the nested
+    /// EVM GET carries the *captured top-level originator* — read verbatim
+    /// from the shared journal, where the entering EVM gateway stored its
+    /// complete native `(runtime, address)` identity — as `X-Tezos-Source`
+    /// (→ the inner callee's `tx.origin`), with its native runtime in
+    /// `X-Tezos-Source-Runtime`, while keeping the immediate Michelson
+    /// caller as `X-Tezos-Sender` (→ the inner callee's `msg.sender`).
+    ///
+    /// The originator is taken straight from the journal, so NO durable
+    /// origin record is consulted: the result is correct even when the
+    /// originator's Michelson alias was never materialized (the empty
+    /// `MockKernelHost` here has no records). The test pins that the source
+    /// is the captured originator's EVM alias verbatim — not the sender,
+    /// and not an alias re-derived from a Michelson alias. Only the sender
+    /// costs a durable read; the journal-sourced originator is free.
+    #[test]
+    fn test_staticcall_evm_forwards_captured_originator_record_independent() {
+        let calling_kt1 = ContractKt1Hash::from([0xAA; 20]);
+        // The entering EVM gateway captured an Ethereum-native originator
+        // E_0: its EVM address is the handle the view forwards as
+        // `X-Tezos-Source` (the view targets Ethereum).
+        let e0_hex = "0x4242424242424242424242424242424242424242";
+        let original_source =
+            OriginalSource::new(RuntimeId::Ethereum, e0_hex.to_string());
+        // With a captured originator the operation source is irrelevant to
+        // `X-Tezos-Source`; any valid PKH works here.
+        let op_source =
+            PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
+
+        let (result, consumed, sender, source, source_runtime) =
+            run_staticcall_evm_get_as(
+                &calling_kt1,
+                &op_source,
+                Some(original_source.clone()),
+            );
+
+        assert_eq!(result, Ok(Some(vec![])));
+        // Only the sender is a durable origin read; the captured
+        // originator comes from the journal at no read cost. The mock
+        // reports zero inner gas, so one ALIAS_LOOKUP_MILLIGAS is the
+        // whole bill.
+        assert_eq!(
+            consumed, ALIAS_LOOKUP_MILLIGAS,
+            "expected one alias-lookup charge (sender only; originator is journal-sourced)"
+        );
+        assert_eq!(sender, AddressHash::Kt1(calling_kt1).to_base58_check());
+        // Source is the captured originator's native (here EVM) address
+        // verbatim — not a re-resolution through a durable record.
+        assert_eq!(source, original_source.original_address());
+        assert_ne!(
+            sender, source,
+            "tx.origin (captured originator) must not collapse onto msg.sender (sender)"
+        );
+        // The captured originator is Ethereum-native, so its runtime tag
+        // is Ethereum — preserved across the boundary rather than defaulted
+        // to the immediate Tezos sender's runtime.
+        assert_eq!(
+            source_runtime,
+            u8::from(RuntimeId::Ethereum).to_string(),
+            "X-Tezos-Source-Runtime must tag the captured originator's native runtime"
+        );
+    }
+
+    /// With no captured originator on the journal (a top-level Michelson
+    /// view), `X-Tezos-Source` resolves the *operation source*
+    /// independently of the immediate caller: the inner callee's
+    /// `tx.origin` is the account that signed the outer operation, not
+    /// `msg.sender`. The source is a distinct durable origin read, so two
+    /// alias-lookup charges are billed (sender + operation source). The
+    /// test pins that the source does not collapse onto the sender and
+    /// that both lookups are charged.
+    #[test]
+    fn test_staticcall_evm_uses_operation_source_without_captured_originator() {
+        let calling_kt1 = ContractKt1Hash::from([0xAA; 20]);
+        let op_source =
+            PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
+
+        let (result, consumed, sender, source, source_runtime) =
+            run_staticcall_evm_get_as(&calling_kt1, &op_source, None);
+
+        assert_eq!(result, Ok(Some(vec![])));
+        // Two distinct origin reads (sender + operation source), one
+        // ALIAS_LOOKUP_MILLIGAS each.
+        assert_eq!(
+            consumed,
+            2 * ALIAS_LOOKUP_MILLIGAS,
+            "expected two alias-lookup charges (sender + operation source)"
+        );
+        assert_eq!(sender, AddressHash::Kt1(calling_kt1).to_base58_check());
+        assert_eq!(source, AddressHash::Implicit(op_source).to_base58_check());
+        assert_ne!(
+            sender, source,
+            "tx.origin (operation source) must not collapse onto msg.sender (sender)"
+        );
+        // The operation source is a native implicit account, so its
+        // runtime tag is Tezos — and the header must be emitted explicitly.
+        assert_eq!(
+            source_runtime,
+            u8::from(RuntimeId::Tezos).to_string(),
+            "X-Tezos-Source-Runtime must be present and tag the source's runtime"
+        );
     }
 
     // --- address_hash_bytes encoding ---
@@ -4205,16 +4474,54 @@ mod tests {
             source.clone(),
             10_000_000,
         );
-        let result = tezosx_resolve_source_alias_readonly(
+        let (_alias, runtime) = tezosx_resolve_source_alias_readonly(
             &ctx,
             &registry,
             &source,
             RuntimeId::Tezos,
-        );
-        assert!(result.is_ok());
+        )
+        .unwrap();
+        // Tezos target short-circuits to the source's own (Tezos) runtime.
+        assert_eq!(runtime, RuntimeId::Tezos);
         // The registry is read from but not written to: the handler only
         // needs to query the alias for routing resolution.
         assert!(registry.serve_calls.borrow().is_empty());
+    }
+
+    #[test]
+    fn resolve_source_alias_readonly_round_trip_reports_target_runtime() {
+        // An EVM-origin alias resolves back to its native EVM address
+        // (`RoundTrip`), so the reported runtime is the target (Ethereum)
+        // rather than defaulting `X-Tezos-Source-Runtime` to Tezos.
+        let stub = OriginLookupStub(Some(alias_origin(
+            RuntimeId::Ethereum,
+            b"0xabcdef0123456789abcdef0123456789abcdef01",
+        )));
+        let registry = MockRegistry::new("unused");
+        let (alias, runtime) = tezosx_resolve_source_alias_readonly(
+            &stub,
+            &registry,
+            &some_address(),
+            RuntimeId::Ethereum,
+        )
+        .unwrap();
+        assert_eq!(alias, "0xabcdef0123456789abcdef0123456789abcdef01");
+        assert_eq!(runtime, RuntimeId::Ethereum);
+    }
+
+    #[test]
+    fn resolve_source_alias_readonly_native_reports_tezos() {
+        // A Tezos-native source resolves to a Tezos runtime tag.
+        let stub = OriginLookupStub(Some(Origin::Native));
+        let registry = MockRegistry::new("KT1_alias");
+        let (_alias, runtime) = tezosx_resolve_source_alias_readonly(
+            &stub,
+            &registry,
+            &some_address(),
+            RuntimeId::Ethereum,
+        )
+        .unwrap();
+        assert_eq!(runtime, RuntimeId::Tezos);
     }
 
     // ── originOf / resolveAddress synthetic views ─────────────────────────────

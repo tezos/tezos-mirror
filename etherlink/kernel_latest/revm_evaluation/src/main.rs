@@ -24,7 +24,7 @@ use std::{
 use structopt::StructOpt;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezosx_journal::TezosXJournal;
+use tezosx_journal::{RuntimeId, TezosXJournal};
 
 mod deserializer;
 mod evalhost;
@@ -404,7 +404,7 @@ pub fn main() {
                             .collect(),
                     );
 
-                    let mut journal = TezosXJournal::default();
+                    let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
                     let execution_result = run_transaction(
                         &mut host,
                         &registry,

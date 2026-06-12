@@ -231,6 +231,57 @@ impl From<Option<Origin>> for Classification {
     }
 }
 
+/// Identity of the top-level transaction originator (`tx.origin`), carried
+/// across re-entrant frames and across the cross-runtime boundary.
+///
+/// Holds the originator's address in its *own* native runtime
+/// ([`original_address`](Self::original_address)) together with
+/// [`runtime`](Self::runtime), the runtime that address is native to. The
+/// stored form is runtime-agnostic — lowercase `0x` hex when
+/// `runtime == Ethereum`, base58check (`tz1`/`KT1`) when
+/// `runtime == Tezos` — and it is the canonical native address from which
+/// every other runtime's alias is *deterministically* derived. A gateway
+/// targeting some runtime therefore obtains the originator's
+/// representation there with no durable lookup: when the target equals
+/// [`runtime`](Self::runtime) the native address is the answer directly,
+/// otherwise the answer is the registry's `compute_alias` of the native
+/// address (the same value the materialized alias holds). This is why the
+/// Michelson alias is *not* cached here — translating on demand costs only
+/// a pure hash, while caching it would force an eager `get_origin` read on
+/// every originator even when the alias is never used. The cross-runtime
+/// journal stores this once (set by the first outgoing gateway call), and
+/// both the state-mutating and the read-only/view paths read it, which is
+/// what lets `tx.origin` resolve to the same transitive native origin
+/// independently of any durable alias/origin record.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OriginalSource {
+    runtime: RuntimeId,
+    original_address: String,
+}
+
+impl OriginalSource {
+    pub fn new(runtime: RuntimeId, original_address: String) -> Self {
+        Self {
+            runtime,
+            original_address,
+        }
+    }
+
+    /// The runtime the originator's account is native to.
+    pub fn runtime(&self) -> RuntimeId {
+        self.runtime
+    }
+
+    /// The originator's address in its own native runtime
+    /// ([`runtime`](Self::runtime)): lowercase `0x` hex for Ethereum,
+    /// base58check for Tezos. The canonical native form, used directly
+    /// when the wanted runtime matches [`runtime`](Self::runtime) and as
+    /// the `compute_alias` basis otherwise.
+    pub fn original_address(&self) -> &str {
+        &self.original_address
+    }
+}
+
 /// How a source's translation toward a chosen target runtime should be routed.
 pub enum RoutingDecision {
     /// Source is recorded as an alias of an account in the target
@@ -485,5 +536,28 @@ mod origin_tests {
     #[test]
     fn truncated_alias_rejected() {
         assert!(Origin::nom_read(&[0x01]).is_err());
+    }
+}
+
+#[cfg(test)]
+mod original_source_tests {
+    use super::*;
+
+    #[test]
+    fn evm_native_address_and_runtime() {
+        // An Ethereum-native originator: the native address is the EVM
+        // address; the Michelson form is derived on demand, not stored.
+        let src = OriginalSource::new(RuntimeId::Ethereum, "0xabc".to_string());
+        assert_eq!(src.runtime(), RuntimeId::Ethereum);
+        assert_eq!(src.original_address(), "0xabc");
+    }
+
+    #[test]
+    fn tezos_native_address_and_runtime() {
+        // A Tezos-native originator: the native address is its base58check
+        // form; its runtime tag stays Tezos.
+        let src = OriginalSource::new(RuntimeId::Tezos, "tz1def".to_string());
+        assert_eq!(src.runtime(), RuntimeId::Tezos);
+        assert_eq!(src.original_address(), "tz1def");
     }
 }

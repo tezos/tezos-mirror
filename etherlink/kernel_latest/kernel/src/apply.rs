@@ -846,7 +846,7 @@ where
     // origination nonce stays deterministic and unique even though the
     // kernel-managed XTZ bridge does not NAC into Michelson today.
     let mut journal = TezosXJournal::new(
-        CracId::default(),
+        CracId::mock(RuntimeId::Ethereum),
         tezos_crypto_rs::hash::OperationHash::from(transaction_hash),
         block_constants.clone(),
     );
@@ -984,7 +984,7 @@ where
     // origination nonce stays deterministic and unique even though the
     // kernel-managed FA bridge does not NAC into Michelson today.
     let mut journal = TezosXJournal::new(
-        CracId::default(),
+        CracId::mock(RuntimeId::Ethereum),
         tezos_crypto_rs::hash::OperationHash::from(transaction_hash),
         block_constants.clone(),
     );

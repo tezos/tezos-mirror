@@ -1807,6 +1807,10 @@ where
         // JournalInner. Without this, commit_evm_journal_from_external()
         // would persist EVM state changes from a backtracked operation.
         journal.evm.clear();
+        // The captured cross-runtime originator now lives on the shared
+        // journal (not `evm`), so drop it here too — a backtracked
+        // operation's originator must not leak into the next one.
+        journal.reset_original_source();
     }
 
     // Apply fee refund after all transactional work is done.
@@ -2199,6 +2203,7 @@ mod tests {
             TransferError, TransferSuccess, TransferTarget, UpdateOrigin, ValidityError,
         },
     };
+    use tezosx_interfaces::RuntimeId;
     use tezosx_journal::TezosXJournal;
     use typed_arena::Arena;
 
@@ -2844,7 +2849,7 @@ mod tests {
         let result = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
@@ -2882,7 +2887,7 @@ mod tests {
         let result = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
@@ -2920,7 +2925,7 @@ mod tests {
         let result = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
@@ -2972,7 +2977,7 @@ mod tests {
         let processed = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
@@ -3043,7 +3048,7 @@ mod tests {
         let processed = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
@@ -3109,7 +3114,7 @@ mod tests {
         let result = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
@@ -3156,7 +3161,7 @@ mod tests {
         let processed = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
@@ -3237,7 +3242,7 @@ mod tests {
         let processed = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
@@ -3322,7 +3327,7 @@ mod tests {
         let processed = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
@@ -3421,7 +3426,7 @@ mod tests {
         let processed = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
@@ -3548,7 +3553,7 @@ mod tests {
         let res = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context,
             OperationHash::default(),
             operation.clone(),
@@ -3701,7 +3706,7 @@ mod tests {
         let processed = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
@@ -3797,7 +3802,7 @@ mod tests {
         let processed = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
@@ -3937,7 +3942,7 @@ mod tests {
         let _ = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
@@ -4004,7 +4009,7 @@ mod tests {
         let processed = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
@@ -4115,7 +4120,7 @@ mod tests {
             validate_and_apply_operation(
                 &mut host,
                 &NotWiredRegistry,
-                &mut TezosXJournal::default(),
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 &context::TezlinkContext::init_context(),
                 OperationHash::default(),
                 operation.clone(),
@@ -4226,7 +4231,7 @@ mod tests {
             validate_and_apply_operation(
                 &mut host,
                 &NotWiredRegistry,
-                &mut TezosXJournal::default(),
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 &context::TezlinkContext::init_context(),
                 OperationHash::default(),
                 operation.clone(),
@@ -4356,7 +4361,7 @@ mod tests {
         let processed = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
@@ -4449,7 +4454,7 @@ mod tests {
         let processed = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
@@ -4524,7 +4529,7 @@ mod tests {
         let processed = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
@@ -4614,7 +4619,7 @@ mod tests {
             validate_and_apply_operation(
                 &mut host,
                 &NotWiredRegistry,
-                &mut TezosXJournal::default(),
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 &ctx,
                 OperationHash::default(),
                 batch.clone(),
@@ -4804,7 +4809,7 @@ mod tests {
         let receipts = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &ctx,
             OperationHash::default(),
             batch,
@@ -4914,7 +4919,7 @@ mod tests {
             validate_and_apply_operation(
                 &mut host,
                 &NotWiredRegistry,
-                &mut TezosXJournal::default(),
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 &context::TezlinkContext::init_context(),
                 OperationHash::default(),
                 batch,
@@ -5039,7 +5044,7 @@ mod tests {
         let processed = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context,
             OperationHash::default(),
             operation.clone(),
@@ -5270,7 +5275,7 @@ mod tests {
             validate_and_apply_operation(
                 &mut host,
                 &NotWiredRegistry,
-                &mut TezosXJournal::default(),
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 &context,
                 OperationHash::default(),
                 operation,
@@ -5442,7 +5447,7 @@ mod tests {
         let _processed = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             operation.hash().unwrap(),
             operation,
@@ -5518,7 +5523,7 @@ mod tests {
         let _processed = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             operation.hash().unwrap(),
             operation,
@@ -5596,7 +5601,7 @@ mod tests {
         let _processed = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             operation.hash().unwrap(),
             operation,
@@ -5673,7 +5678,7 @@ mod tests {
             validate_and_apply_operation(
                 &mut host,
                 &NotWiredRegistry,
-                &mut TezosXJournal::default(),
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 &context::TezlinkContext::init_context(),
                 OperationHash::default(),
                 operation.clone(),
@@ -5832,7 +5837,7 @@ mod tests {
             validate_and_apply_operation(
                 &mut host,
                 &NotWiredRegistry,
-                &mut TezosXJournal::default(),
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 &context,
                 OperationHash::default(),
                 operation.clone(),
@@ -6047,7 +6052,7 @@ mod tests {
             validate_and_apply_operation(
                 &mut host,
                 &NotWiredRegistry,
-                &mut TezosXJournal::default(),
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 &context,
                 OperationHash::default(),
                 operation.clone(),
@@ -6315,7 +6320,7 @@ mod tests {
             validate_and_apply_operation(
                 &mut host,
                 &NotWiredRegistry,
-                &mut TezosXJournal::default(),
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 &ctx,
                 OperationHash::default(),
                 batch.clone(),
@@ -6603,7 +6608,7 @@ mod tests {
             validate_and_apply_operation(
                 &mut host,
                 &NotWiredRegistry,
-                &mut TezosXJournal::default(),
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 &context,
                 OperationHash::default(),
                 operation,
@@ -6685,7 +6690,7 @@ mod tests {
             validate_and_apply_operation(
                 &mut host,
                 &NotWiredRegistry,
-                &mut TezosXJournal::default(),
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 &context,
                 OperationHash::default(),
                 operation,
@@ -6736,7 +6741,7 @@ mod tests {
             validate_and_apply_operation(
                 &mut host,
                 &NotWiredRegistry,
-                &mut TezosXJournal::default(),
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 &context,
                 OperationHash::default(),
                 operation,
@@ -6788,7 +6793,7 @@ mod tests {
             validate_and_apply_operation(
                 &mut host,
                 &NotWiredRegistry,
-                &mut TezosXJournal::default(),
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 &context,
                 OperationHash::default(),
                 operation,
@@ -6848,7 +6853,7 @@ mod tests {
             validate_and_apply_operation(
                 &mut host,
                 &NotWiredRegistry,
-                &mut TezosXJournal::default(),
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 &context,
                 OperationHash::default(),
                 operation,
@@ -6950,7 +6955,7 @@ mod tests {
             validate_and_apply_operation(
                 &mut host,
                 &NotWiredRegistry,
-                &mut TezosXJournal::default(),
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 &context,
                 OperationHash::default(),
                 operation,
@@ -7051,7 +7056,7 @@ mod tests {
             validate_and_apply_operation(
                 &mut host,
                 &NotWiredRegistry,
-                &mut TezosXJournal::default(),
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 &context,
                 OperationHash::default(),
                 operation,
@@ -7166,7 +7171,7 @@ mod tests {
             validate_and_apply_operation(
                 ctx.host,
                 &NotWiredRegistry,
-                &mut TezosXJournal::default(),
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 ctx.context,
                 OperationHash::default(),
                 operation,
@@ -7474,7 +7479,7 @@ mod tests {
             validate_and_apply_operation(
                 ctx.host,
                 &NotWiredRegistry,
-                &mut TezosXJournal::default(),
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 &context,
                 OperationHash::default(),
                 operation,
@@ -7740,7 +7745,7 @@ mod tests {
             validate_and_apply_operation(
                 ctx.host,
                 &NotWiredRegistry,
-                &mut TezosXJournal::default(),
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 ctx.context,
                 OperationHash::default(),
                 operation,
@@ -7899,7 +7904,7 @@ mod tests {
         let result = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
@@ -7953,7 +7958,7 @@ mod tests {
         let result = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             batch,
@@ -8008,7 +8013,7 @@ mod tests {
         let result = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
@@ -8064,7 +8069,7 @@ mod tests {
         let result = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
@@ -8280,7 +8285,7 @@ mod tests {
             },
         );
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
@@ -8381,7 +8386,7 @@ mod tests {
         let processed = validate_and_apply_operation(
             &mut host,
             &registry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
@@ -8527,7 +8532,7 @@ mod tests {
             validate_and_apply_operation(
                 host,
                 &NotWiredRegistry,
-                &mut TezosXJournal::default(),
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 &ctx,
                 OperationHash::default(),
                 op,
@@ -8836,7 +8841,7 @@ mod tests {
         let processed = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::default(),
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
@@ -9063,7 +9068,7 @@ mod tests {
             validate_and_apply_operation(
                 &mut host,
                 &NotWiredRegistry,
-                &mut TezosXJournal::default(),
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 &context::TezlinkContext::init_context(),
                 OperationHash::default(),
                 operation,
@@ -9108,7 +9113,7 @@ mod tests {
             validate_and_apply_operation(
                 &mut host2,
                 &NotWiredRegistry,
-                &mut TezosXJournal::default(),
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 &context::TezlinkContext::init_context(),
                 OperationHash::default(),
                 operation2,
@@ -9193,7 +9198,7 @@ mod tests {
             validate_and_apply_operation(
                 &mut host,
                 &NotWiredRegistry,
-                &mut TezosXJournal::default(),
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 &context::TezlinkContext::init_context(),
                 OperationHash::default(),
                 batch,

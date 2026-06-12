@@ -652,7 +652,10 @@ impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry>
     /// `(string, bytes)` input, charges the boundary cost, then
     /// dispatches through
     /// [`crate::enshrined_contracts::dispatch_staticcall_evm_get`]
-    /// with `self.journal` and `self.registry`.
+    /// with `self.journal` and `self.registry`. The nested EVM callee's
+    /// `tx.origin` is resolved from the originator captured on the shared
+    /// journal, so it stays the outer EVM originator across the round-trip
+    /// regardless of any durable alias record.
     fn dispatch_staticcall_evm_view(
         &mut self,
         input: &TypedValue<'a>,
@@ -703,6 +706,7 @@ impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry>
             self.journal,
             context,
             &calling_kt1,
+            self.operation_ctx.source.pkh(),
             &crac_id_str,
             &timestamp_str,
             &block_number_str,

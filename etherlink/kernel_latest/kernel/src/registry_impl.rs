@@ -173,7 +173,7 @@ mod tests {
             .body(vec![])
             .unwrap();
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let response = registry.serve(&mut host, &mut journal, request);
         assert_eq!(response.status(), http::StatusCode::NOT_FOUND);
         let body = String::from_utf8(response.into_body()).unwrap();
@@ -190,7 +190,7 @@ mod tests {
             .body(vec![])
             .unwrap();
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let response = registry.serve(&mut host, &mut journal, request);
         assert_eq!(response.status(), http::StatusCode::NOT_FOUND);
         let body = String::from_utf8(response.into_body()).unwrap();

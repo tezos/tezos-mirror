@@ -148,7 +148,8 @@ impl Registry for NotWiredRegistry {
 
 /// Configurable success mock with call tracking.
 ///
-/// - `ensure_alias` / `compute_alias` return `generated_alias`.
+/// - `ensure_alias` / `compute_alias` return `generated_alias` (unless
+///   `with_injective_aliases` redirects `compute_alias`, see below).
 /// - `address_from_string` returns the UTF-8 bytes of the input.
 /// - `serve` returns 200 OK with an empty body and
 ///   `X-Tezos-Gas-Consumed: 0`, or the override pair set by
@@ -159,6 +160,7 @@ impl Registry for NotWiredRegistry {
 pub struct MockRegistry {
     pub generated_alias: String,
     pub serve_override: Option<(u16, Vec<u8>)>,
+    pub injective_aliases: bool,
     pub ensure_alias_calls: RefCell<Vec<(AliasInfo, RuntimeId)>>,
     pub serve_calls: RefCell<Vec<http::Request<Vec<u8>>>>,
 }
@@ -168,6 +170,7 @@ impl MockRegistry {
         Self {
             generated_alias: generated_alias.into(),
             serve_override: None,
+            injective_aliases: false,
             ensure_alias_calls: RefCell::new(Vec::new()),
             serve_calls: RefCell::new(Vec::new()),
         }
@@ -178,6 +181,18 @@ impl MockRegistry {
     /// override path.
     pub fn with_serve_response(mut self, status: u16, body: Vec<u8>) -> Self {
         self.serve_override = Some((status, body));
+        self
+    }
+
+    /// Make `compute_alias` injective in the native address: it renders
+    /// `alias_info.native_address` verbatim as a (lossy) UTF-8 string
+    /// instead of the fixed `generated_alias`. Native routing feeds the
+    /// source's base58check ASCII bytes there, so two distinct source
+    /// addresses yield two distinct aliases — letting a test tell apart
+    /// e.g. the alias behind `X-Tezos-Sender` from the one behind
+    /// `X-Tezos-Source`.
+    pub fn with_injective_aliases(mut self) -> Self {
+        self.injective_aliases = true;
         self
     }
 }
@@ -205,11 +220,12 @@ impl Registry for MockRegistry {
         ))
     }
 
-    fn compute_alias(
-        &self,
-        _alias_info: AliasInfo,
-    ) -> Result<String, TezosXRuntimeError> {
-        Ok(self.generated_alias.clone())
+    fn compute_alias(&self, alias_info: AliasInfo) -> Result<String, TezosXRuntimeError> {
+        if self.injective_aliases {
+            Ok(String::from_utf8_lossy(&alias_info.native_address).into_owned())
+        } else {
+            Ok(self.generated_alias.clone())
+        }
     }
 
     fn address_from_string(

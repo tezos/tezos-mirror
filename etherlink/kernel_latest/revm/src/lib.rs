@@ -797,6 +797,7 @@ mod test {
     use tezos_data_encoding::enc::BinWriter;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::storage::StorageV1;
+    use tezosx_interfaces::RuntimeId;
     use tezosx_interfaces::{AliasInfo, Registry as RegistryTrait};
     use tezosx_journal::TezosXJournal;
     use utilities::MOCK_TEZOS_GAS_CONSUMED;
@@ -1264,7 +1265,7 @@ mod test {
         assert_eq!(destination_info.balance, U256::ZERO);
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let execution_result = run_transaction(
             &mut host,
             &registry,
@@ -1347,7 +1348,7 @@ mod test {
         assert_eq!(destination_info.balance, U256::ZERO);
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let execution_result = run_transaction(
             &mut host,
             &registry,
@@ -1387,7 +1388,7 @@ mod test {
         let caller = Address::from(&[1; 20]);
         let destination = Address::from(&[2; 20]);
         let registry = Registry::new();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let alias = registry
             .ensure_alias(
                 &mut host,
@@ -1424,7 +1425,7 @@ mod test {
         .abi_encode();
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let execution_result = run_transaction(
             &mut host,
             &registry,
@@ -1534,7 +1535,7 @@ mod test {
         contract_account.set_info(&mut host, contract_info).unwrap();
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let execution_result = run_transaction(
             &mut host,
             &registry,
@@ -1649,7 +1650,7 @@ mod test {
                 .unwrap();
 
             let registry = Registry::new();
-            let mut journal = TezosXJournal::default();
+            let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
             // Simulate the state an outgoing precompile-gateway CRAC
             // left on the journal before re-entering EVM through a
             // nested `run_transaction`.
@@ -1723,7 +1724,7 @@ mod test {
             .unwrap();
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let result = run_transaction(
             &mut host,
             &registry,
@@ -1829,7 +1830,7 @@ mod test {
         let withdrawn_amount = U256::from(1_000_000_000_000u64);
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let ExecutionOutcome {
             result,
             withdrawals,
@@ -1917,7 +1918,7 @@ mod test {
             .abi_encode();
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let ExecutionOutcome { result, .. } = run_transaction(
             &mut host,
             &registry,
@@ -1984,7 +1985,7 @@ mod test {
             .unwrap();
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let result_create = run_transaction(
             &mut host,
             &registry,
@@ -2017,7 +2018,7 @@ mod test {
         };
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let result_call = run_transaction(
             &mut host,
             &registry,
@@ -2061,7 +2062,7 @@ mod test {
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
         // Deploy the CallAndRevert contract
         let registry = Registry::new();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let result_create = run_transaction(
             &mut host,
             &registry,
@@ -2145,7 +2146,7 @@ mod test {
 
         let registry = Registry::new();
         // Call the CallAndRevert contract with the calldata for FAWithdrawal
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let ExecutionOutcome {
             result,
             withdrawals: _,
@@ -2208,7 +2209,7 @@ mod test {
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
         // Deploy the CreateAndRevert contract
         let registry = Registry::new();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let result_create = run_transaction(
             &mut host,
             &registry,
@@ -2248,7 +2249,7 @@ mod test {
 
         let registry = Registry::new();
         // Call the CallAndRevert contract with the calldata for FAWithdrawal
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let ExecutionOutcome {
             result,
             withdrawals: _,
@@ -2330,7 +2331,7 @@ mod test {
 
         // Claim deposit with id 2 (wrong id), revert is expected
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let registry = Registry::new();
         run_transaction(
             &mut host,
@@ -2396,7 +2397,7 @@ mod test {
         assert_eq!(destination_info.balance, U256::ZERO);
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let result = run_transaction(
             &mut host,
             &registry,
@@ -2444,7 +2445,7 @@ mod test {
         };
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let outcome = run_transaction(
             &mut host,
             &registry,
@@ -2468,7 +2469,7 @@ mod test {
 
         assert!(outcome.result.is_success());
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let outcome = run_transaction(
             &mut host,
             &registry,
@@ -2538,6 +2539,7 @@ mod test {
         use tezos_smart_rollup_encoding::michelson::{
             ticket::FA2_1Ticket, MichelsonOption, MichelsonPair,
         };
+        use tezosx_interfaces::RuntimeId;
         use StaticCaller::makeStaticCallCall;
 
         use crate::{
@@ -2650,7 +2652,7 @@ mod test {
                 )
                 .unwrap();
             let registry = Registry::new();
-            let mut journal = TezosXJournal::default();
+            let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
             let outcome = run_transaction(
                 host,
                 &registry,
@@ -2684,7 +2686,7 @@ mod test {
                     },
                 )
                 .unwrap();
-            let mut journal = TezosXJournal::default();
+            let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
             let registry = Registry::new();
             run_transaction(
                 host,
@@ -2730,7 +2732,7 @@ mod test {
                     },
                 )
                 .unwrap();
-            let mut journal = TezosXJournal::default();
+            let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
             let registry = Registry::new();
             run_transaction(
                 host,
@@ -2770,7 +2772,7 @@ mod test {
                 )
                 .unwrap();
             let registry = Registry::new();
-            let mut journal = TezosXJournal::default();
+            let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
             let result_create = run_transaction(
                 host,
                 &registry,
@@ -3502,7 +3504,7 @@ mod test {
         ) -> Address {
             let calldata = Bytes::from_hex(bytecode_hex).unwrap();
             let registry = Registry::new();
-            let mut journal = TezosXJournal::default();
+            let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
             let outcome = run_transaction(
                 host,
                 &registry,
@@ -3539,7 +3541,7 @@ mod test {
             calldata: Bytes,
         ) -> ExecutionOutcome {
             let registry = Registry::new();
-            let mut journal = TezosXJournal::default();
+            let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
             run_transaction(
                 host,
                 &registry,
@@ -3805,7 +3807,7 @@ mod test {
             calldata: Bytes,
         ) -> ExecutionOutcome {
             let registry = Registry::new();
-            let mut journal = TezosXJournal::default();
+            let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
             journal.evm.set_cross_runtime_originator(Some(originator));
             run_transaction(
                 host,
@@ -4146,7 +4148,7 @@ mod test {
         contract_account.set_info(&mut host, contract_info).unwrap();
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let execution_result = run_transaction(
             &mut host,
             &registry,
@@ -4192,7 +4194,7 @@ mod test {
 
         // Create the Ethereum alias for this native address
         let registry = Registry::new();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let alias_bytes = registry
             .ensure_alias(
                 &mut host,
@@ -4291,7 +4293,7 @@ mod test {
         );
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         registry
             .ensure_alias(
                 &mut host,
@@ -4357,7 +4359,7 @@ mod test {
         };
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
 
         // Mirror the gateway-precompile frame checkpoint: the layered_state
         // overlay and the revm inner journal are checkpointed together.
@@ -4451,7 +4453,7 @@ mod test {
             )
             .unwrap();
 
-        let mut tj = TezosXJournal::default();
+        let mut tj = TezosXJournal::mock(RuntimeId::Ethereum);
         tj.evm.layered_state.checkpoint();
         tj.evm.layered_state.create_alias(
             source,
@@ -4527,7 +4529,7 @@ mod test {
             OwnedPath::try_from("/tez/tez_accounts/forwarder".to_string()).unwrap();
         host.store_write_all(&world, b"v0").unwrap();
 
-        let mut tjournal = TezosXJournal::default();
+        let mut tjournal = TezosXJournal::mock(RuntimeId::Ethereum);
         let db =
             crate::database::EtherlinkVMDB::new(&mut host, &registry, &block_constants)
                 .unwrap();
@@ -4623,7 +4625,7 @@ mod test {
 
         // Create the Ethereum alias - this should forward the pre-existing balance
         let registry = Registry::new();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let alias_bytes = registry
             .ensure_alias(
                 &mut host,
@@ -4681,7 +4683,7 @@ mod test {
 
         // Create the Ethereum alias for this native address
         let registry = Registry::new();
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let alias_bytes = registry
             .ensure_alias(
                 &mut host,

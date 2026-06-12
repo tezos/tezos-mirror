@@ -10,8 +10,8 @@
 pub use tezosx_types::headers;
 pub use tezosx_types::{
     canonicalize_native_address, gas, resolve_routing, AliasInfo, Classification,
-    CrossRuntimeContext, KernelStorageError, Origin, RoutingDecision, RuntimeId,
-    TezosXRuntimeError, ALIAS_LOOKUP_COST, ALIAS_LOOKUP_MILLIGAS,
+    CrossRuntimeContext, KernelStorageError, Origin, OriginalSource, RoutingDecision,
+    RuntimeId, TezosXRuntimeError, ALIAS_LOOKUP_COST, ALIAS_LOOKUP_MILLIGAS,
     ERR_FORBIDDEN_TEZOS_HEADER, MAX_CRAC_DEPTH, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER,
     X_TEZOS_CRAC_DEPTH, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT,
     X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME, X_TEZOS_STORAGE_COST,
@@ -233,6 +233,35 @@ pub trait RuntimeInterface {
         host: &mut impl StorageV1,
         address: &[u8],
     ) -> Result<U256, TezosXRuntimeError>;
+}
+
+/// Translate the captured original source into its address in `target`.
+///
+/// [`OriginalSource`] stores the originator's address in its own native
+/// runtime ([`OriginalSource::runtime`]), the canonical form from which
+/// every runtime's alias is deterministically derived. So:
+/// - when `target` is that native runtime, the native address is the
+///   answer directly — a "straightforward conversion", no work;
+/// - otherwise the answer is [`Registry::compute_alias`] of the native
+///   address bytes, which reproduces the materialized alias the
+///   state-mutating path would have written — a pure hash, no durable
+///   `get_origin` read.
+///
+/// This is the on-demand translation that lets the journal cache only the
+/// native `(runtime, address)` pair instead of every runtime's alias.
+pub fn translate_original_source<R: Registry>(
+    registry: &R,
+    source: &OriginalSource,
+    target: RuntimeId,
+) -> Result<String, TezosXRuntimeError> {
+    if target == source.runtime() {
+        Ok(source.original_address().to_string())
+    } else {
+        registry.compute_alias(AliasInfo {
+            runtime: target,
+            native_address: source.original_address().as_bytes().to_vec(),
+        })
+    }
 }
 
 #[cfg(feature = "testing")]
