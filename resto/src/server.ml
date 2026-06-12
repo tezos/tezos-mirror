@@ -525,6 +525,22 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
         in
         lwt_return_response @@ Handlers.handle_error headers server.medias err
 
+  (* Enable TCP keepalive on accepted connections. Idle connections
+     whose peer vanished without closing (e.g. a NAT or load-balancer
+     dropping idle flows without notifying either end) are otherwise
+     kept open forever, each leaking a file descriptor: the server
+     never sends on an idle connection, so it never gets a chance to
+     learn that the flow is dead. With keepalive, the kernel
+     eventually probes idle peers and errors out dead connections.
+     Probing delays are governed by the system-wide
+     net.ipv4.tcp_keepalive_* parameters. *)
+  let set_tcp_keepalive (io : Conduit_lwt_unix.flow) =
+    match io with
+    | Conduit_lwt_unix.TCP {fd; _} -> (
+        try Lwt_unix.setsockopt fd Unix.SO_KEEPALIVE true
+        with Unix.Unix_error _ | Invalid_argument _ -> ())
+    | _ -> ()
+
   (* Promise a running RPC server. *)
 
   let launch ?(host = "::") server ?(conn_closed = ignore)
@@ -552,6 +568,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
        and callback (io, con) req body =
          let con_string = Connection.to_string con in
          Log.log_debug "server (%s) connection accepted" con_string ;
+         set_tcp_keepalive io ;
          Lwt.catch
            (fun () -> callback (io, con) req body)
            (function
