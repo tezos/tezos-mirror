@@ -333,6 +333,9 @@ impl BigIntByteSize for BigUint {
 }
 
 /// Interpretation gas costs
+// TODO(L2-1315): several constants in this module come from suspicious
+// benchmark fits (flat costs for O(1) work, under-priced crypto). The
+// live list of doubtful models is tracked in the issue.
 #[allow(missing_docs)]
 pub mod interpret_cost {
     use checked::Checked;
@@ -351,10 +354,6 @@ pub mod interpret_cost {
     pub const DUP: u32 = 45;
     // correspond to cost_N_IGt / IGe / IEq / INeq / ILe / ILt in the Tezos
     // protocol.
-    // TODO(L2-1554): these benchmarked constants (~1.1-1.2 us flat) look like
-    // measurement artefacts: each instruction pops an int and tests its sign.
-    // Same family as N_IDupN / N_ICons_list / N_IList_size; re-check the
-    // micro-benchmarks.
     pub const GT: u32 = 1130;
     pub const GE: u32 = 1145;
     pub const EQ: u32 = 1115;
@@ -421,27 +420,15 @@ pub mod interpret_cost {
     pub const AMOUNT: u32 = 65;
     pub const NIL: u32 = 60;
     // corresponds to cost_N_ICons_list in the Tezos protocol
-    // TODO(L2-1548): the benchmarked constant (~840 ns flat) looks like a
-    // measurement artefact (same as N_IDupN, see TODO(L2-1553) on dupn);
-    // re-check the micro-benchmarks.
     pub const CONS: u32 = 845;
     pub const EMPTY_SET: u32 = 60;
     // correspond to cost_N_IString_size / cost_N_IBytes_size in the Tezos
     // protocol.
-    // TODO(L2-1550): these benchmarked constants (~1.6 us flat) look like
-    // measurement artefacts: SIZE on a string or bytes is an O(1) len().
-    // Same family as N_IList_size; re-check the micro-benchmarks.
     pub const SIZE_STRING: u32 = 1570;
     pub const SIZE_BYTES: u32 = 1595;
     // corresponds to cost_N_IList_size in the Tezos protocol
-    // TODO(L2-1547): the benchmarked constant (~920 ns) looks like a
-    // measurement artefact: SIZE on a list is Vec::len(), O(1). Same family
-    // as the ~840 ns constants (N_IDupN, N_ICons_list, N_IIf_cons); re-check
-    // the micro-benchmarks.
     pub const SIZE_LIST: u32 = 920;
     // corresponds to cost_N_ISet_size in the Tezos protocol
-    // TODO(L2-1547): ~110 ns for BTreeSet::len() also looks too high;
-    // re-check the micro-benchmarks.
     pub const SIZE_SET: u32 = 110;
     // corresponds to cost_N_IMap_size in the Tezos protocol
     pub const SIZE_MAP: u32 = 45;
@@ -479,9 +466,6 @@ pub mod interpret_cost {
     pub const APPLY: u32 = 85;
     // correspond to cost_N_ITicket / cost_N_IRead_ticket in the Tezos
     // protocol.
-    // TODO(L2-1557): these benchmarked constants (~3.6/3.9 us flat) look
-    // very high for building/unfolding a ticket value; re-check the
-    // micro-benchmarks.
     pub const TICKET: u32 = 3580;
     pub const READ_TICKET: u32 = 3935;
     pub const BALANCE: u32 = 60;
@@ -635,20 +619,6 @@ pub mod interpret_cost {
         // `cost_N_IDupN`, re-benchmarked on the MIR interpreter: the measured
         // slope is ~0, so the cost is size-independent and charged as a flat
         // constant.
-        //
-        // TODO(L2-1553): check the micro-benchmark results for `N_IDupN`.
-        // This 840 looks wrong. The fitted model is a flat constant (~835.8 ns,
-        // slope ~0), which is physically implausible: `DUP n` does the same work
-        // as `DUP` (clone) plus an O(n) stack walk, so it should start close to
-        // `DUP` (= 45) and grow slightly with n, not jump to 840 for every n.
-        // The flat ~840 ns const smells of `Timer_latency` contamination /
-        // scatter in the raw bench (cf. report_mir_interpreter PDF). This creates
-        // a discontinuity: `DUP` = 45 but `DUP 1` = `DUP 2` = ... = 840, even
-        // though `DUP 1` is semantically identical to `DUP` (both duplicate the
-        // top). MIR routes `DUP 1` -> DupN exactly like L1 (script_ir_translator
-        // `I_DUP [n]` -> `IDup_n` even for n = 1), so this is not a MIR bug but a
-        // benchmark/model problem to fix upstream (re-fit `N_IDupN` so it is
-        // continuous with `N_IDup`), then regenerate and re-port here.
         Ok(840)
     }
 
