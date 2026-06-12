@@ -72,9 +72,6 @@
     },
     "collect_result": {
       "prim": "bytes"
-    },
-    "default": {
-      "prim": "string"
     }
   }
 }

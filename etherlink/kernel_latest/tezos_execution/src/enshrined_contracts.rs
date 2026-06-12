@@ -215,18 +215,7 @@ where
     let typed = typecheck_entrypoint_value(contract, entrypoint, &value, ctx)?;
     match contract {
         EnshrinedContracts::TezosXGateway => {
-            if entrypoint.is_default() {
-                charge_gateway_base_cost(ctx)?;
-                let TypedValue::String(dest) = typed else {
-                    return Err(TransferError::GatewayError(
-                        "Expected string for default entrypoint".into(),
-                    )
-                    .into());
-                };
-                let request = build_ethereum_request(&dest, &[])?;
-                dispatch_crac_call(ctx, request)?;
-                Ok(vec![])
-            } else if entrypoint.as_str() == Some("call_evm") {
+            if entrypoint.as_str() == Some("call_evm") {
                 charge_gateway_base_cost(ctx)?;
                 let (dest, method_sig, abi_params, callback) =
                     extract_call_params(typed)?;
@@ -273,7 +262,7 @@ where
                 // would create a hidden fund side-channel and break EVM
                 // sub-call semantics, where the return path carries
                 // only bytes. Adapters that need to refund tez must do
-                // so via an explicit CRAC (%transfer / %call_evm).
+                // so via an explicit CRAC (%call / %call_evm).
                 if ctx.amount() != 0 {
                     return Err(TransferError::GatewayError(
                         "collect_result: amount must be 0".into(),
@@ -1981,8 +1970,6 @@ pub(crate) fn get_enshrined_contract_entrypoint(
     match contract {
         EnshrinedContracts::TezosXGateway => {
             let mut entrypoints = HashMap::new();
-            // default %default: string (destination address for simple transfers)
-            entrypoints.insert(Entrypoint::default(), Type::String);
             // %call_evm: pair string (pair string (pair bytes (option (contract bytes))))
             //   (destination, (method_signature, (abi_parameters, callback)))
             entrypoints.insert(
@@ -2714,11 +2701,11 @@ mod tests {
 
     // ── CRAC ID and event tests ─────────────────────────────────────────
 
-    /// Outgoing CRAC via default entrypoint: the gateway dispatches the
-    /// call to the EVM runtime.  CRAC events are emitted by the incoming
-    /// receipt builder, not by the gateway itself.
+    /// Outgoing CRAC via the generic %call entrypoint: the gateway
+    /// dispatches the call to the EVM runtime.  CRAC events are emitted
+    /// by the incoming receipt builder, not by the gateway itself.
     #[test]
-    fn test_outgoing_crac_via_default_entrypoint() {
+    fn test_outgoing_crac_via_call_entrypoint() {
         let mut host = MockKernelHost::default();
         let generated_alias = "KT1_mock_alias".to_string();
         let registry = MockRegistry::new(generated_alias);
@@ -2738,8 +2725,15 @@ mod tests {
         );
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
 
-        let entrypoint = Entrypoint::default();
-        let value = Micheline::String(dest.to_string());
+        let entrypoint = Entrypoint::try_from("call").unwrap();
+        let arena = typed_arena::Arena::new();
+        let value = build_http_call_micheline(
+            &arena,
+            &format!("http://ethereum/{dest}"),
+            &[],
+            &[],
+            1,
+        );
 
         let result = execute_enshrined_contract(
             EnshrinedContracts::TezosXGateway,
@@ -2758,6 +2752,41 @@ mod tests {
         assert!(
             internal_ops.is_empty(),
             "gateway should not emit internal ops"
+        );
+    }
+
+    /// The legacy %default (simple transfer) entrypoint was removed:
+    /// dispatching it must fail with an unknown-entrypoint error.
+    #[test]
+    fn test_default_entrypoint_is_rejected() {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        let mut ctx =
+            MockCtx::new(&mut host, &mut journal, &registry, source, 100_000_000);
+
+        let result = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::default(),
+            Micheline::String("0x1234567890123456789012345678901234567890".into()),
+            &mut ctx,
+        );
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string().contains("Unknown entrypoint"),
+            "error should mention unknown entrypoint: {err}"
         );
     }
 
@@ -3601,7 +3630,7 @@ mod tests {
     }
 
     #[test]
-    fn test_typecheck_wrong_type_for_default_entrypoint() {
+    fn test_typecheck_default_entrypoint_is_unknown() {
         let mut host = MockKernelHost::default();
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
         let mut journal = TezosXJournal::new(
@@ -3611,8 +3640,9 @@ mod tests {
         );
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
-        // Default entrypoint expects a string, not bytes
-        let value = Micheline::Bytes(vec![0x01, 0x02]);
+        // The legacy %default (simple transfer) entrypoint was removed:
+        // it no longer typechecks against any parameter.
+        let value = Micheline::String("0xabc".into());
         let result = typecheck_entrypoint_value(
             EnshrinedContracts::TezosXGateway,
             &Entrypoint::default(),
@@ -3622,8 +3652,8 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(
-            err.to_string().contains("Invalid parameters"),
-            "error should mention invalid parameters: {err}"
+            err.to_string().contains("Unknown entrypoint"),
+            "error should mention unknown entrypoint: {err}"
         );
     }
 
@@ -4211,7 +4241,8 @@ mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
-        let entrypoint = Entrypoint::default();
+        let entrypoint = Entrypoint::try_from("call").unwrap();
+        let arena = typed_arena::Arena::new();
 
         // Two gateway calls in the same tx
         let mut ctx1 = MockCtx::new(
@@ -4225,7 +4256,13 @@ mod tests {
         execute_enshrined_contract(
             EnshrinedContracts::TezosXGateway,
             &entrypoint,
-            Micheline::String(dest_a.to_string()),
+            build_http_call_micheline(
+                &arena,
+                &format!("http://ethereum/{dest_a}"),
+                &[],
+                &[],
+                1,
+            ),
             &mut ctx1,
         )
         .unwrap();
@@ -4236,7 +4273,13 @@ mod tests {
         execute_enshrined_contract(
             EnshrinedContracts::TezosXGateway,
             &entrypoint,
-            Micheline::String(dest_b.to_string()),
+            build_http_call_micheline(
+                &arena,
+                &format!("http://ethereum/{dest_b}"),
+                &[],
+                &[],
+                1,
+            ),
             &mut ctx2,
         )
         .unwrap();

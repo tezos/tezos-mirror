@@ -7776,6 +7776,48 @@ mod tests {
         assert_eq!(typed_storage, TypedValue::Bool(false));
     }
 
+    /// Build the gateway's generic %call argument for a plain value
+    /// transfer: `Pair "http://ethereum/<dest>" (Pair {} (Pair 0x (Pair 1 None)))`
+    /// (POST, no headers, empty body, no callback).
+    fn gateway_call_transfer_param<'a>(
+        arena: &'a Arena<Micheline<'a>>,
+        eth_destination: &str,
+    ) -> Micheline<'a> {
+        let mut gas = Gas::default();
+        let method_callback = Micheline::prim2(
+            arena,
+            mir::lexer::Prim::Pair,
+            num_bigint::BigInt::from(1).into(),
+            Micheline::prim0(mir::lexer::Prim::None, &mut gas).unwrap(),
+            &mut gas,
+        )
+        .unwrap();
+        let body_method_callback = Micheline::prim2(
+            arena,
+            mir::lexer::Prim::Pair,
+            Micheline::Bytes(vec![]),
+            method_callback,
+            &mut gas,
+        )
+        .unwrap();
+        let headers_rest = Micheline::prim2(
+            arena,
+            mir::lexer::Prim::Pair,
+            Micheline::Seq(&[]),
+            body_method_callback,
+            &mut gas,
+        )
+        .unwrap();
+        Micheline::prim2(
+            arena,
+            mir::lexer::Prim::Pair,
+            Micheline::String(format!("http://ethereum/{eth_destination}")),
+            headers_rest,
+            &mut gas,
+        )
+        .unwrap()
+    }
+
     /// Test a successful transfer from a tz1 address to an Ethereum address via the gateway.
     /// This tests the happy path: source has enough balance, gateway executes, bridge succeeds.
     #[test]
@@ -7793,10 +7835,12 @@ mod tests {
         let source_account = init_account(&mut host, &src.pkh, 100);
         reveal_account(&mut host, &src);
 
-        // Create Micheline parameters: just the destination Ethereum address
+        // Create Micheline parameters for the generic %call entrypoint:
+        // a POST to the destination Ethereum address with an empty body.
         // The amount is taken from the operation's amount field via ctx.amount()
         let eth_destination = "0x1234567890123456789012345678901234567890";
-        let params_micheline = Micheline::String(eth_destination.to_string());
+        let arena = Arena::new();
+        let params_micheline = gateway_call_transfer_param(&arena, eth_destination);
 
         let operation = make_transfer_operation(
             15,      // fee
@@ -7807,7 +7851,7 @@ mod tests {
             50_u64.into(), // amount to transfer
             Contract::Originated(gateway_kt1.clone()),
             Parameters {
-                entrypoint: Entrypoint::default(),
+                entrypoint: Entrypoint::try_from("call").unwrap(),
                 value: params_micheline
                     .encode(&mut Gas::default())
                     .unwrap()
@@ -8086,8 +8130,9 @@ mod tests {
         );
     }
 
-    /// Calling the gateway with the default entrypoint (plain tez transfer to
-    /// an EVM address) produces an Applied receipt whose storage field is None.
+    /// Calling the gateway with the generic %call entrypoint (plain tez
+    /// transfer to an EVM address) produces an Applied receipt whose storage
+    /// field is None.
     ///
     /// Enshrined contracts always return empty storage bytes; the receipt must
     /// encode this as absent storage rather than Some([]).
@@ -8101,6 +8146,7 @@ mod tests {
         init_account(&mut host, &src.pkh, 100);
         reveal_account(&mut host, &src);
 
+        let arena = Arena::new();
         let operation = make_transfer_operation(
             15,
             1,
@@ -8110,9 +8156,10 @@ mod tests {
             50_u64.into(),
             Contract::Originated(gateway_kt1),
             Parameters {
-                entrypoint: Entrypoint::default(),
-                value: Micheline::String(
-                    "0x1111111111111111111111111111111111111111".to_string(),
+                entrypoint: Entrypoint::try_from("call").unwrap(),
+                value: gateway_call_transfer_param(
+                    &arena,
+                    "0x1111111111111111111111111111111111111111",
                 )
                 .encode(&mut Gas::default())
                 .unwrap()
@@ -8335,11 +8382,23 @@ mod tests {
             storage string ;
             code { CDR ;
                    DUP ;
+                   PUSH string "http://ethereum/" ;
+                   CONCAT ;
+                   NONE (contract bytes) ;
+                   PUSH nat 1 ;
+                   PAIR ;
+                   PUSH bytes 0x ;
+                   PAIR ;
+                   NIL (pair string string) ;
+                   PAIR ;
+                   SWAP ;
+                   PAIR ;
                    PUSH address "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw" ;
-                   CONTRACT string ;
+                   CONTRACT %call (pair string (pair (list (pair string string)) (pair bytes (pair nat (option (contract bytes)))))) ;
                    IF_NONE { PUSH string "gateway" ; FAILWITH } {} ;
+                   SWAP ;
                    BALANCE ;
-                   DIG 2 ;
+                   SWAP ;
                    TRANSFER_TOKENS ;
                    NIL operation ;
                    SWAP ;

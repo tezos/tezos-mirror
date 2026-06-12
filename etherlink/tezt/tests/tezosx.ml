@@ -4398,9 +4398,10 @@ let test_entrypoints_enshrined () =
   let* ep_json = get_entrypoints sandbox gateway_address in
   Regression.capture (JSON.encode ep_json) ;
 
-  (* The gateway exposes three entrypoints: %default (string),
-     %call_evm (pair string (pair string (pair bytes (option (contract bytes))))), and
-     %call (pair string (pair (list (pair string string)) (pair bytes (pair nat (option (contract bytes)))))). *)
+  (* The gateway exposes these entrypoints:
+     %call_evm (pair string (pair string (pair bytes (option (contract bytes))))),
+     %call (pair string (pair (list (pair string string)) (pair bytes (pair nat (option (contract bytes)))))),
+     and %collect_result (bytes). *)
   let entrypoints = JSON.(ep_json |-> "entrypoints") in
   let assert_ep name expected_prim =
     let prim = JSON.(entrypoints |-> name |-> "prim" |> as_string) in
@@ -4409,9 +4410,14 @@ let test_entrypoints_enshrined () =
         string
         ~error_msg:(sf "Expected prim %%R for entrypoint %s but got %%L" name))
   in
-  assert_ep "default" "string" ;
   assert_ep "call" "pair" ;
   assert_ep "call_evm" "pair" ;
+  assert_ep "collect_result" "bytes" ;
+  (* %default was removed: it must no longer be exposed. *)
+  Check.(
+    (JSON.(entrypoints |-> "default" |> is_null) = true)
+      bool
+      ~error_msg:"Expected gateway to no longer expose the %default entrypoint") ;
 
   unit
 
