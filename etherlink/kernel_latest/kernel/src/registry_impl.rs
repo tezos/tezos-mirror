@@ -155,13 +155,11 @@ mod tests {
     use revm_etherlink::storage::world_state_handler::{
         AccountInfo, AccountOrigin, StorageAccount,
     };
-    use tezos_crypto_rs::public_key_hash::PublicKeyHash;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezosx_interfaces::{
-        Classification, Origin, RuntimeId, ALIAS_LOOKUP_COST, ALIAS_LOOKUP_MILLIGAS,
+        Classification, RuntimeId, ALIAS_LOOKUP_COST, ALIAS_LOOKUP_MILLIGAS,
     };
     use tezosx_journal::TezosXJournal;
-    use tezosx_tezos_runtime::account::set_origin_for_implicit;
 
     #[test]
     fn test_serve_unknown_host_returns_404() {
@@ -229,13 +227,10 @@ mod tests {
 
     #[test]
     fn read_origin_dispatches_to_tezos_runtime() {
-        let mut host = MockKernelHost::default();
+        let host = MockKernelHost::default();
         let registry = RegistryImpl::default();
 
-        let pkh =
-            PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
-        set_origin_for_implicit(&mut host, &pkh, &Origin::Native).unwrap();
-
+        // An implicit tz1 is Native by construction — no seeding needed.
         let budget = 1_000_000;
         let (class, consumed) = registry
             .read_origin(
@@ -282,11 +277,16 @@ mod tests {
     }
 
     #[test]
-    fn read_origin_tezos_unknown_address_no_backstop_charge() {
+    fn read_origin_tezos_implicit_address_native_no_backstop_charge() {
         let host = MockKernelHost::default();
         let registry = RegistryImpl::default();
 
         let budget = 1_000_000;
+        // An implicit tz1 with no durable state: it is Tezos-native by
+        // construction (a public-key hash can never be a cross-runtime
+        // alias), so it classifies Native without a durable read. Unlike the
+        // Ethereum path, a Tezos lookup never fires the code back-stop, so
+        // only the flat lookup milligas is charged.
         let (class, consumed) = registry
             .read_origin(
                 &host,
@@ -295,7 +295,7 @@ mod tests {
                 budget,
             )
             .unwrap();
-        assert_eq!(class, Classification::Unknown);
-        assert_eq!(consumed, ALIAS_LOOKUP_MILLIGAS); // Tezos: charges milligas even on miss
+        assert_eq!(class, Classification::Native);
+        assert_eq!(consumed, ALIAS_LOOKUP_MILLIGAS);
     }
 }

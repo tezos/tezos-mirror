@@ -1065,60 +1065,76 @@ let test_evm_resolve_address_invalid_target_runtime () =
 
 (* ── Michelson VIEW tests — classification paths ──────────────────────── *)
 
-(** [originOf] via Michelson VIEW on an unknown Tezos address.
-    Calls the [gateway_origin_of.tz] helper contract.
-    Expects storage = Left Unit (Unknown). *)
-let test_michelson_origin_of_unknown () =
+(** [originOf] via Michelson VIEW on an implicit (tz1) Tezos address with no
+    durable state.  Calls the [gateway_origin_of.tz] helper contract.  A
+    public-key hash is Tezos-native by construction (it can never be a
+    cross-runtime alias), so it classifies Native with homeRuntime=0=Tezos
+    without any durable read — storage = Right (Left 0). *)
+let test_michelson_origin_of_implicit_native () =
   Test_helpers.register_sandbox
     ~__FILE__
     ~kernel:Latest
     ~uses_client:true
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
-    ~title:"Michelson VIEW originOf: unknown Tezos address → Left Unit"
+    ~title:
+      "Michelson VIEW originOf: implicit Tezos address → Right (Left 0) \
+       (Native)"
     ~tags:
       (["tezosx"; "address_translation"]
       @ runtime_tags [Tezos]
-      @ ["origin_of"; "unknown"; "michelson"; "view"])
+      @ ["origin_of"; "implicit"; "native"; "michelson"; "view"])
   @@ fun sequencer ->
   let* tez_client = tezlink_client sequencer in
   let source = Constant.bootstrap1 in
   (* Step 1: Originate the gateway_origin_of.tz caller contract.
      Initial storage = Right (Left 1) (a sentinel value distinct from the
-     expected result Left Unit).  Starting from a sentinel ≠ Left Unit ensures
-     that reaching Left Unit proves the VIEW actually ran and returned Unknown,
-     rather than the call failing and leaving the initial value unchanged. *)
+     expected result Right (Left 0)).  Starting from a sentinel ≠ the expected
+     result ensures that reaching it proves the VIEW actually ran, rather than
+     the call failing and leaving the initial value unchanged. *)
   let* kt1_address =
     originate_contract
       ~tez_client
       ~sequencer
       ~src:source
-      ~alias:"origin_of_unknown"
+      ~alias:"origin_of_implicit"
       ~script_name:["mini_scenarios"; "gateway_origin_of"]
       ~init_storage_data:"Right (Left 1)"
       ()
   in
-  (* Step 2: Call with an unknown Tezos address and sourceRuntime=0 (Tezos). *)
-  let unknown_addr = Constant.bootstrap5.public_key_hash in
+  (* Step 2: Call with an implicit Tezos address and sourceRuntime=0 (Tezos). *)
+  let implicit_addr = Constant.bootstrap5.public_key_hash in
   let* () =
     call_contract
       ~tez_client
       ~sequencer
       ~src:source
       ~dest:kt1_address
-      ~arg_data:(sf {|Pair "%s" %s|} unknown_addr runtime_id_tezos)
+      ~arg_data:(sf {|Pair "%s" %s|} implicit_addr runtime_id_tezos)
       ()
   in
-  (* Step 3: Storage must be Left Unit (Unknown — no /origin record).
-     The storage changed from Right (Left 1) to Left Unit, proving the VIEW
-     ran and returned Unknown rather than failing. *)
+  (* Step 3: Storage must be Right (Left 0) — Native, homeRuntime=0=Tezos.
+     An implicit address is native by construction, with no /origin record
+     read.  The storage changed from the sentinel, proving the VIEW ran. *)
   check_contract_storage
     ~sequencer
     ~tez_client
     kt1_address
-    (* Micheline JSON for `Left Unit`:
-       {"prim":"Left","args":[{"prim":"Unit"}]} *)
-    (`O [("prim", `String "Left"); ("args", `A [`O [("prim", `String "Unit")]])])
+    (* Micheline JSON for `Right (Left 0)`:
+       {"prim":"Right","args":[{"prim":"Left","args":[{"int":"0"}]}]} *)
+    (`O
+       [
+         ("prim", `String "Right");
+         ( "args",
+           `A
+             [
+               `O
+                 [
+                   ("prim", `String "Left");
+                   ("args", `A [`O [("int", `String "0")]]);
+                 ];
+             ] );
+       ])
 
 (** [originOf] via Michelson VIEW: EVM contract with bytecode (code_hash !=
     KECCAK_EMPTY) is classified as Native via the cross-source code-presence
@@ -1188,40 +1204,54 @@ let test_michelson_origin_of_evm_native_cross_source () =
              ] );
        ])
 
-(** [resolveAddress] via Michelson VIEW: unknown Tezos address → None. *)
-let test_michelson_resolve_address_unknown () =
+(** [resolveAddress] via Michelson VIEW: implicit (tz1) Tezos address resolved
+    to Ethereum.  An implicit address is Tezos-native by construction, so the
+    cross-runtime resolution derives its Ethereum alias — result is
+    Some (Pair 1 alias), where 1 = Derived. *)
+let test_michelson_resolve_address_implicit_derived () =
   Test_helpers.register_sandbox
     ~__FILE__
     ~kernel:Latest
     ~uses_client:true
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
-    ~title:"Michelson VIEW resolveAddress: unknown Tezos address → None"
+    ~title:
+      "Michelson VIEW resolveAddress: implicit Tezos address → Some (Derived, \
+       alias)"
     ~tags:
       (["tezosx"; "address_translation"]
       @ runtime_tags [Tezos]
-      @ ["resolve_address"; "unknown"; "michelson"; "view"])
+      @ ["resolve_address"; "implicit"; "derived"; "michelson"; "view"])
   @@ fun sequencer ->
   let* tez_client = tezlink_client sequencer in
   let source = Constant.bootstrap1 in
   (* Step 1: Originate the gateway_resolve_address.tz caller contract.
-     Initial storage = Some (Pair 1 "sentinel") — a sentinel value distinct
-     from the expected result None.  Starting from a sentinel ≠ None ensures
-     that reaching None proves the VIEW actually ran and returned None (Unknown),
-     rather than the call failing and leaving the initial value unchanged. *)
+     Initial storage = None — a sentinel distinct from the expected
+     Some (...).  Starting from a sentinel ≠ the expected result ensures that
+     reaching it proves the VIEW actually ran, rather than the call failing and
+     leaving the initial value unchanged. *)
   let* kt1_address =
     originate_contract
       ~tez_client
       ~sequencer
       ~src:source
-      ~alias:"resolve_unknown"
+      ~alias:"resolve_implicit"
       ~script_name:["mini_scenarios"; "gateway_resolve_address"]
-      ~init_storage_data:{|Some (Pair 1 "sentinel")|}
+      ~init_storage_data:"None"
       ()
   in
-  (* Step 2: Call with an unknown Tezos address, source=Tezos, target=Ethereum.
-     No /origin record → result is None. *)
-  let unknown_addr = Constant.bootstrap3.public_key_hash in
+  (* Step 2: Call with an implicit Tezos address, source=Tezos,
+     target=Ethereum.  A tz1 is native by construction, so it resolves to its
+     Ethereum alias (Derived). *)
+  let implicit_addr = Constant.bootstrap3.public_key_hash in
+  (* The VIEW returns the EIP-55 checksummed alias; pin the constant to
+     bootstrap3's pkh by cross-checking the raw (lowercase) derivation. *)
+  let alias = "0x2BfC5de2b03599a6C8107ab2D9dA4B7daeE3352E" in
+  Check.(
+    (String.lowercase_ascii alias
+    = Test_helpers.evm_alias_of_tezos_address implicit_addr)
+      string
+      ~error_msg:"alias constant %L must match the derived alias %R") ;
   let* () =
     call_contract
       ~tez_client
@@ -1231,20 +1261,38 @@ let test_michelson_resolve_address_unknown () =
       ~arg_data:
         (sf
            {|Pair "%s" (Pair %s %s)|}
-           unknown_addr
+           implicit_addr
            runtime_id_tezos
            runtime_id_ethereum)
       ()
   in
-  (* Step 3: Storage must be None.  The storage changed from Some (Pair 1
-     "sentinel") to None, proving the VIEW ran and returned None (Unknown)
-     rather than failing. *)
+  (* Step 3: Storage must be Some (Pair 1 alias) — Derived, the tz1's Ethereum
+     alias.  The storage changed from None, proving the VIEW ran. *)
   check_contract_storage
     ~sequencer
     ~tez_client
     kt1_address
-    (* Micheline JSON for `None`: {"prim":"None"} *)
-    (`O [("prim", `String "None")])
+    (* `Some (Pair 1 alias)`:
+       {"prim":"Some","args":[{"prim":"Pair","args":[{"int":"1"},
+         {"string":"<alias>"}]}]} *)
+    (`O
+       [
+         ("prim", `String "Some");
+         ( "args",
+           `A
+             [
+               `O
+                 [
+                   ("prim", `String "Pair");
+                   ( "args",
+                     `A
+                       [
+                         `O [("int", `String "1")];
+                         `O [("string", `String alias)];
+                       ] );
+                 ];
+             ] );
+       ])
 
 (** Same-source short-circuit via Michelson VIEW: [resolveAddress] with
     sourceRuntime = targetRuntime = Tezos and a valid tz1 address returns
@@ -1904,9 +1952,9 @@ let () =
   test_evm_resolve_address_malformed_tezos_address () ;
   test_evm_resolve_address_invalid_target_runtime () ;
   (* Michelson classification paths *)
-  test_michelson_origin_of_unknown () ;
+  test_michelson_origin_of_implicit_native () ;
   test_michelson_origin_of_evm_native_cross_source () ;
-  test_michelson_resolve_address_unknown () ;
+  test_michelson_resolve_address_implicit_derived () ;
   test_michelson_resolve_address_same_source () ;
   test_michelson_resolve_address_same_source_ethereum () ;
   test_michelson_resolve_address_cross_source_ethereum () ;
