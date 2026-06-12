@@ -618,51 +618,68 @@ let make node_ctxt =
   return amplificator
 
 let enqueue_job_shards_proof amplificator commitment slot_id proto_parameters
-    shards reconstruction_start_time =
+    shards reconstruction_start_time ~number_of_already_stored_shards
+    ~number_of_shards =
   let open Lwt_result_syntax in
-  let*! shards = Seq_s.fold_left (fun res it -> it :: res) [] shards in
-  let shards =
-    Data_encoding.(Binary.to_bytes_exn (list Cryptobox.shard_encoding)) shards
-  in
-  (* This get/set is safe with the current cooperative Lwt execution model:
+  (* Bound the reconstruction queue. When too many
+     reconstructions are already in flight, drop this request instead of
+     enqueuing it: the node keeps receiving shards normally and other nodes can
+     still amplify the slot. This prevents a sustained shard flood from growing
+     [query_pipe] without bound and driving the node OOM. *)
+  let in_flight = Query_store.length amplificator.query_store in
+  if in_flight >= Constants.amplification_queue_max_length then
+    let*! () =
+      Event.emit_amplification_queue_full
+        ~level:slot_id.Types.Slot_id.slot_level
+        ~slot_index:slot_id.slot_index
+        ~queue_length:in_flight
+    in
+    return_unit
+  else
+    let () = Dal_metrics.reconstruction_started () in
+    let*! () =
+      Event.emit_reconstruct_started
+        ~level:slot_id.slot_level
+        ~slot_index:slot_id.slot_index
+        ~number_of_received_shards:number_of_already_stored_shards
+        ~number_of_shards
+    in
+    let*! shards = Seq_s.fold_left (fun res it -> it :: res) [] shards in
+    let shards =
+      Data_encoding.(Binary.to_bytes_exn (list Cryptobox.shard_encoding)) shards
+    in
+    (* This get/set is safe with the current cooperative Lwt execution model:
      there is no yield point in this critical section.
      If this path becomes truly parallel in the future (e.g. multi-domain shared
      state), this code can race and should be replaced by serialized ownership
      of the state (or a proper synchronization strategy). *)
-  let query_id = amplificator.query_id in
-  amplificator.query_id <- amplificator.query_id + 1 ;
-  (* Store some arguments in a query table, because they are necessary to publish, but not to calculate,
+    let query_id = amplificator.query_id in
+    amplificator.query_id <- amplificator.query_id + 1 ;
+    (* Store some arguments in a query table, because they are necessary to publish, but not to calculate,
      so avoid the cost of serializing them *)
-  let () =
-    Query_store.add
-      amplificator.query_store
-      query_id
-      (Query {slot_id; commitment; proto_parameters; reconstruction_start_time})
-  in
-  let length = Query_store.length amplificator.query_store in
-  let slot_level = slot_id.slot_level in
-  let () = Dal_metrics.update_amplification_queue_length length in
-  let*! () = Event.emit_main_process_enqueue_query ~query_id in
-  let () =
-    Lwt_pipe.Unbounded.push
-      amplificator.query_pipe
-      (Query_msg {query_id; shards; slot_level})
-  in
-  return_unit
+    let () =
+      Query_store.add
+        amplificator.query_store
+        query_id
+        (Query
+           {slot_id; commitment; proto_parameters; reconstruction_start_time})
+    in
+    let length = Query_store.length amplificator.query_store in
+    let slot_level = slot_id.slot_level in
+    let () = Dal_metrics.update_amplification_queue_length length in
+    let*! () = Event.emit_main_process_enqueue_query ~query_id in
+    let () =
+      Lwt_pipe.Unbounded.push
+        amplificator.query_pipe
+        (Query_msg {query_id; shards; slot_level})
+    in
+    return_unit
 
 let amplify node_store commitment (slot_id : Types.slot_id)
     ~number_of_already_stored_shards ~number_of_shards ~number_of_needed_shards
     proto_parameters amplificator =
   let open Lwt_result_syntax in
   let reconstruction_start_time = Unix.gettimeofday () in
-  Dal_metrics.reconstruction_started () ;
-  let*! () =
-    Event.emit_reconstruct_started
-      ~level:slot_id.slot_level
-      ~slot_index:slot_id.slot_index
-      ~number_of_received_shards:number_of_already_stored_shards
-      ~number_of_shards
-  in
   let* shards =
     let* seq =
       Store.Shards.read_all (Store.shards node_store) slot_id ~number_of_shards
@@ -688,6 +705,8 @@ let amplify node_store commitment (slot_id : Types.slot_id)
       proto_parameters
       shards
       reconstruction_start_time
+      ~number_of_already_stored_shards
+      ~number_of_shards
   in
   return_unit
 
