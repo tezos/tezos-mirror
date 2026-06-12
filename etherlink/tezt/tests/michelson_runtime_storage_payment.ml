@@ -624,8 +624,7 @@ let test_partial_internal_burn_failure_backtracks_all () =
   in
   let*@ _ = Rpc.produce_block evm_node in
 
-  (* Setup an account with not enough fund to pay the next operation *)
-  let initial_balance = Tez.of_mutez_int 500 in
+  let initial_balance = Tez.of_mutez_int 800 in
   let reveal_fee = Tez.of_mutez_int 200 in
   let* () =
     Client.transfer
@@ -643,7 +642,9 @@ let test_partial_internal_burn_failure_backtracks_all () =
   let*@ _ = Rpc.produce_block evm_node in
 
   let new_storage = "bigger storage" in
-  let call_fee = Tez.of_mutez_int 200 in
+  (* gas_limit 10000 requires an execution gas fee of
+     10000 * 45 * 1Gwei / 10^12 = 450 mutez, so the call fee must cover it. *)
+  let call_fee = Tez.of_mutez_int 500 in
   let* () =
     Contract.Double_send.call
       ~amount:Tez.zero
@@ -795,7 +796,9 @@ let test_partial_internal_storage_limit_overshoot_backtracks_all () =
   let new_storage = "bigger storage" in
   (* This storage-limit will trigger the fail on the second internal operation because it need `origination_size` more *)
   let storage_limit = String.length new_storage + origination_size in
-  let call_fee = Tez.of_mutez_int 200 in
+  (* gas_limit 10000 requires an execution gas fee of
+     10000 * 45 * 1Gwei / 10^12 = 450 mutez, so the call fee must cover it. *)
+  let call_fee = Tez.of_mutez_int 500 in
   let* () =
     Contract.Double_send.call
       ~amount:Tez.zero

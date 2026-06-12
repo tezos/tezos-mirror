@@ -566,6 +566,12 @@ let gas_burner =
     ~label:"gas_burner"
     ~contract:"GasBurner"
 
+let gas_burner_large =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/gas_burner_large.sol")
+    ~label:"gas_burner_large"
+    ~contract:"GasBurnerLarge"
+
 module Precompile = struct
   let xtz_bridge = "0xff00000000000000000000000000000000000001"
 

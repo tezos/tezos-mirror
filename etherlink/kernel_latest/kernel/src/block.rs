@@ -2159,24 +2159,30 @@ mod tests {
         )
         .expect("Should have set bootstrap1 account info");
 
-        // Two reveal ops with sequential counters. With multiplier =
-        // 10, each declared gas_limit of 5_000 michelson maps to
-        // 50_000 EVM gas. The second op would fail validation
-        // (account already revealed by op1), but it never reaches
-        // apply — it gets repushed by `can_fit_in_reboot`.
+        // Two reveal ops with sequential counters. Each declared
+        // gas_limit of 5_000 michelson maps to `5_000 * multiplier`
+        // EVM gas via `michelson_gas_to_evm_gas`. The second op would
+        // fail validation (account already revealed by op1), but it
+        // never reaches apply — it gets repushed by
+        // `can_fit_in_reboot`.
+        //
+        // `fee` must cover the required execution gas fees (which
+        // scale with the multiplier), otherwise op1 is dropped for
+        // insufficient fees and never advances the gas counter.
         let michelson_gas_limit = 5_000_u64;
+        let fee = 10_000_u64;
         let evm_gas_limit_per_op =
             michelson_gas_limit * DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER;
 
         let op1 =
-            make_reveal_operation(100, 1, michelson_gas_limit, 0, bootstrap.clone());
+            make_reveal_operation(fee, 1, michelson_gas_limit, 0, bootstrap.clone());
         let tx_hash_1 = op1.hash().unwrap().into();
         let tezos_tx_1 = TezosXTransaction::Tezos(TezlinkOperation {
             tx_hash: tx_hash_1,
             content: TezlinkContent::Tezos(op1),
         });
 
-        let op2 = make_reveal_operation(100, 2, michelson_gas_limit, 0, bootstrap);
+        let op2 = make_reveal_operation(fee, 2, michelson_gas_limit, 0, bootstrap);
         let tx_hash_2 = op2.hash().unwrap().into();
         let tezos_tx_2 = TezosXTransaction::Tezos(TezlinkOperation {
             tx_hash: tx_hash_2,
