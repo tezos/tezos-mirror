@@ -606,7 +606,27 @@ where
             remaining_evm_gas,
         )?,
     };
-    Ok(OriginalSource::new(runtime, native_address, source_addr))
+    Ok(OriginalSource::new(
+        runtime,
+        native_address,
+        source_addr.to_string(),
+    ))
+}
+
+/// Parse the originator's cached EVM alias back into an [`Address`] for
+/// the resolvers, which key alias resolution off the source address. The
+/// alias was produced from a valid `Address`, so this only fails on
+/// internal corruption.
+fn original_source_evm_address(
+    source: &OriginalSource,
+    gas: Gas,
+) -> Result<Address, CustomPrecompileError> {
+    source.evm_alias().parse::<Address>().map_err(|e| {
+        CustomPrecompileError::Revert(
+            format!("invalid originator EVM alias '{}': {e}", source.evm_alias()),
+            gas,
+        )
+    })
 }
 
 /// Capture the original source for the state-mutating gateway entries,
@@ -938,12 +958,13 @@ where
                 })?;
 
             let source = resolve_original_source(context, gas.remaining())?;
+            let source_addr = original_source_evm_address(&source, gas)?;
             let (sender_alias, source_alias) = resolve_aliases(
                 context,
                 &mut gas,
                 RuntimeId::Tezos,
                 inputs.caller,
-                source.evm_alias(),
+                source_addr,
             )?;
 
             // Convert remaining EVM gas to Tezos milligas for the target runtime
@@ -1009,12 +1030,13 @@ where
                 })?;
 
             let source = resolve_original_source(context, gas.remaining())?;
+            let source_addr = original_source_evm_address(&source, gas)?;
             let (sender_alias, source_alias) = resolve_aliases(
                 context,
                 &mut gas,
                 RuntimeId::Tezos,
                 inputs.caller,
-                source.evm_alias(),
+                source_addr,
             )?;
 
             let gas_limit =
@@ -1099,7 +1121,7 @@ where
                 gas.remaining(),
             )?;
             let source_alias = context.journal().tezosx_resolve_source_alias_readonly(
-                source.evm_alias(),
+                original_source_evm_address(&source, gas)?,
                 RuntimeId::Tezos,
                 gas.remaining(),
             )?;
@@ -1198,7 +1220,7 @@ where
                         gas.remaining(),
                     )?,
                     context.journal().tezosx_resolve_source_alias_readonly(
-                        source.evm_alias(),
+                        original_source_evm_address(&source, gas)?,
                         target_runtime,
                         gas.remaining(),
                     )?,
@@ -1212,12 +1234,13 @@ where
                     ));
                 }
                 let source = resolve_original_source(context, gas.remaining())?;
+                let source_addr = original_source_evm_address(&source, gas)?;
                 let (sender_alias, source_alias) = resolve_aliases(
                     context,
                     &mut gas,
                     target_runtime,
                     inputs.caller,
-                    source.evm_alias(),
+                    source_addr,
                 )?;
                 (sender_alias, source_alias, source.runtime())
             };

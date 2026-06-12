@@ -886,11 +886,11 @@ where
     }
 
     fn set_original_source(&mut self, source: OriginalSource) {
-        self.journal.evm.set_original_source(source);
+        self.journal.set_original_source(source);
     }
 
     fn original_source(&self) -> Option<&OriginalSource> {
-        self.journal.evm.original_source()
+        self.journal.original_source()
     }
 
     fn cross_runtime_originator(&self) -> Option<Address> {

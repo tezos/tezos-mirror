@@ -7,6 +7,7 @@ use std::fmt;
 use crate::{EvmJournal, MichelsonJournal};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 use tezos_ethereum::block::BlockConstants;
+use tezosx_types::OriginalSource;
 
 /// Unique identifier for a cross-runtime call chain within a block.
 ///
@@ -180,6 +181,10 @@ pub struct TezosXJournal {
     /// CRAC-ID for the current transaction context.
     /// Known at creation time from the origin runtime and tx index.
     crac_id: CracId,
+    /// Top-level transaction originator (`tx.origin`), captured on the
+    /// first outgoing gateway call and shared by both runtimes. See
+    /// [`OriginalSource`].
+    original_source: Option<OriginalSource>,
 }
 
 impl TezosXJournal {
@@ -211,6 +216,7 @@ impl TezosXJournal {
             finalized_http_traces: Vec::new(),
             pending_http_traces: Vec::new(),
             crac_id,
+            original_source: None,
         }
     }
 
@@ -282,6 +288,27 @@ impl TezosXJournal {
         &self.crac_id
     }
 
+    /// The captured top-level originator, or `None` before the first
+    /// outgoing gateway call. See [`OriginalSource`].
+    pub fn original_source(&self) -> Option<&OriginalSource> {
+        self.original_source.as_ref()
+    }
+
+    /// First call captures; subsequent calls are no-ops so re-entrant
+    /// frames cannot overwrite the original identity.
+    pub fn set_original_source(&mut self, source: OriginalSource) {
+        if self.original_source.is_none() {
+            self.original_source = Some(source);
+        }
+    }
+
+    /// Drop the captured originator. Called when a backtracked operation's
+    /// in-memory state is discarded (alongside [`EvmJournal::clear`]) so a
+    /// failed operation's originator does not leak into the next one.
+    pub fn reset_original_source(&mut self) {
+        self.original_source = None;
+    }
+
     /// Verify that a received CRAC-ID (from `X-Tezos-CRAC-ID` header)
     /// matches the expected one. Used for debug/consistency checks on
     /// incoming CRACs.
@@ -302,12 +329,82 @@ impl TezosXJournal {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tezosx_types::RuntimeId;
 
     fn test_crac_id() -> CracId {
         CracId {
             origin_runtime: 1,
             tx_index: 42,
         }
+    }
+
+    fn fresh_journal() -> TezosXJournal {
+        TezosXJournal::new(
+            test_crac_id(),
+            tezos_crypto_rs::hash::OperationHash::default(),
+            BlockConstants::dummy(),
+        )
+    }
+
+    fn eth_origin(addr: &str) -> OriginalSource {
+        OriginalSource::new(RuntimeId::Ethereum, addr.to_string(), addr.to_string())
+    }
+
+    #[test]
+    fn test_original_source_starts_unset() {
+        let journal = fresh_journal();
+        assert_eq!(journal.original_source(), None);
+    }
+
+    #[test]
+    fn test_original_source_first_set_wins() {
+        let mut journal = fresh_journal();
+        let eoa = eth_origin("0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
+        let intermediate = eth_origin("0xcccccccccccccccccccccccccccccccccccccccc");
+
+        journal.set_original_source(eoa.clone());
+        assert_eq!(journal.original_source(), Some(&eoa));
+
+        journal.set_original_source(intermediate);
+        assert_eq!(journal.original_source(), Some(&eoa));
+    }
+
+    #[test]
+    fn test_original_source_preserves_tezos_pkh() {
+        let mut journal = fresh_journal();
+        let tz_origin = OriginalSource::new(
+            RuntimeId::Tezos,
+            "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx".to_string(),
+            "0xabababababababababababababababababababab".to_string(),
+        );
+        journal.set_original_source(tz_origin.clone());
+        let stored = journal.original_source().unwrap();
+        assert_eq!(stored, &tz_origin);
+        assert_eq!(stored.runtime(), RuntimeId::Tezos);
+        assert_eq!(
+            stored.native_address(),
+            "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        );
+        assert_eq!(
+            stored.evm_alias(),
+            "0xabababababababababababababababababababab"
+        );
+    }
+
+    #[test]
+    fn test_reset_original_source() {
+        let mut journal = fresh_journal();
+        let eoa = eth_origin("0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
+        journal.set_original_source(eoa.clone());
+        assert_eq!(journal.original_source(), Some(&eoa));
+
+        journal.reset_original_source();
+        assert_eq!(journal.original_source(), None);
+
+        // After a reset the next first-set wins again.
+        let next_eoa = eth_origin("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        journal.set_original_source(next_eoa.clone());
+        assert_eq!(journal.original_source(), Some(&next_eoa));
     }
 
     // Golden vector for `synthetic_operation_hash`.

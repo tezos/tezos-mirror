@@ -231,6 +231,50 @@ impl From<Option<Origin>> for Classification {
     }
 }
 
+/// Identity of the top-level transaction originator (`tx.origin`),
+/// carried across re-entrant runtime frames and shared by both runtimes.
+///
+/// `native_address` is in the originating runtime's own encoding
+/// (lowercase `0x` hex for Ethereum, base58check PKH for Tezos);
+/// `evm_alias` is the Etherlink-side address (`0x` hex) used by
+/// `tezosx_resolve_source_alias`, cached at capture time so consumers do
+/// not pay a `keccak` round-trip on every gateway call. Both are plain
+/// strings, so the type carries no EVM-specific type and lives in
+/// `tezosx-types`, read identically by both runtimes.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OriginalSource {
+    runtime: RuntimeId,
+    native_address: String,
+    evm_alias: String,
+}
+
+impl OriginalSource {
+    pub fn new(runtime: RuntimeId, native_address: String, evm_alias: String) -> Self {
+        Self {
+            runtime,
+            native_address,
+            evm_alias,
+        }
+    }
+
+    /// The runtime the originator's account is native to.
+    pub fn runtime(&self) -> RuntimeId {
+        self.runtime
+    }
+
+    /// The originator's address in its own native runtime.
+    pub fn native_address(&self) -> &str {
+        &self.native_address
+    }
+
+    /// The originator's Etherlink-side address (`0x` hex), cached so
+    /// consumers can resolve the source alias without a `keccak`
+    /// round-trip.
+    pub fn evm_alias(&self) -> &str {
+        &self.evm_alias
+    }
+}
+
 /// How a source's translation toward a chosen target runtime should be routed.
 pub enum RoutingDecision {
     /// Source is recorded as an alias of an account in the target
@@ -485,5 +529,38 @@ mod origin_tests {
     #[test]
     fn truncated_alias_rejected() {
         assert!(Origin::nom_read(&[0x01]).is_err());
+    }
+}
+
+#[cfg(test)]
+mod original_source_tests {
+    use super::*;
+
+    #[test]
+    fn evm_native_accessors() {
+        // An Ethereum-native originator: the native address and the EVM
+        // alias coincide.
+        let src = OriginalSource::new(
+            RuntimeId::Ethereum,
+            "0xabc".to_string(),
+            "0xabc".to_string(),
+        );
+        assert_eq!(src.runtime(), RuntimeId::Ethereum);
+        assert_eq!(src.native_address(), "0xabc");
+        assert_eq!(src.evm_alias(), "0xabc");
+    }
+
+    #[test]
+    fn tezos_native_accessors() {
+        // A Tezos-native originator: the native address is its PKH, while
+        // the cached EVM alias is the Etherlink-side address.
+        let src = OriginalSource::new(
+            RuntimeId::Tezos,
+            "tz1def".to_string(),
+            "0xdef".to_string(),
+        );
+        assert_eq!(src.runtime(), RuntimeId::Tezos);
+        assert_eq!(src.native_address(), "tz1def");
+        assert_eq!(src.evm_alias(), "0xdef");
     }
 }

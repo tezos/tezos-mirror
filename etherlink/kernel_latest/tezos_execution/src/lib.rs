@@ -1807,6 +1807,10 @@ where
         // JournalInner. Without this, commit_evm_journal_from_external()
         // would persist EVM state changes from a backtracked operation.
         journal.evm.clear();
+        // The captured cross-runtime originator now lives on the shared
+        // journal (not `evm`), so drop it here too — a backtracked
+        // operation's originator must not leak into the next one.
+        journal.reset_original_source();
     }
 
     // Apply fee refund after all transactional work is done.
