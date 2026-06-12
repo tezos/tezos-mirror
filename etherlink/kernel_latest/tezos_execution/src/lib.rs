@@ -956,10 +956,14 @@ where
                 result
             };
 
-            // Charge gas for the two durable writes performed by `set_storage`:
-            // the actual storage and its size. Also charge the used bytes update
-            // in `update_storage_space` and the three reads (code_size,
-            // storage_size and used_bytes).
+            // Charge gas for the logical storage operations, mirroring L1's
+            // storage cost model. The counts are unchanged by the on-disk
+            // record aggregation — the gas model prices the logical
+            // operations independently of how many physical host calls the
+            // kernel makes (the aggregated record now folds these into a
+            // single read and a single write): the storage blob write, two
+            // counter-sized writes (storage size, then used bytes), and three
+            // counter-sized reads (code size, storage size, paid bytes).
             consume_storage_write_milligas(
                 tc_ctx.operation_gas,
                 1,
@@ -981,10 +985,6 @@ where
             // firing without a matching drain cannot be silently mispriced.
             let lazy_storage_size_diff =
                 tc_ctx.interpret_context.take_lazy_storage_size_diff();
-            let storage_size_diff =
-                dest_account
-                    .set_storage(tc_ctx.host, &new_storage)
-                    .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
 
             // In L1, the receipt of an operation only shows its own gas
             // consumption, i.e. it does not include that of its internal
@@ -996,13 +996,16 @@ where
             let lazy_storage_diff =
                 convert_big_map_diff(std::mem::take(&mut tc_ctx.big_map_diff));
 
+            // Persist the new storage and fold both the storage-size delta and
+            // the lazy-storage delta into the contract's accounting record in
+            // a single read-modify-write.
             let StorageSpace {
                 used_bytes,
                 allocated_bytes: paid_storage_size_diff,
             } = dest_account
-                .update_storage_space(
+                .set_storage_and_update_space(
                     tc_ctx.host,
-                    storage_size_diff,
+                    &new_storage,
                     lazy_storage_size_diff,
                 )
                 .map_err(|_| TransferError::FailedToUpdateContractStorage)?;

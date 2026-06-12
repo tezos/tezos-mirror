@@ -326,10 +326,7 @@ let make (ctxt : Evm_ro_context.t) =
           let* block = shell_block_param_to_eth_block_param block in
           let* state = Evm_ro_context.get_state ctxt ~block () in
           let* used =
-            Durable_storage.read_or_default
-              ~default:Z.zero
-              (Tezos_contract_used_bytes contract)
-              state
+            Durable_storage.michelson_contract_used_storage_space contract state
           in
           return_some used
 
@@ -341,10 +338,7 @@ let make (ctxt : Evm_ro_context.t) =
           let* block = shell_block_param_to_eth_block_param block in
           let* state = Evm_ro_context.get_state ctxt ~block () in
           let* paid =
-            Durable_storage.read_or_default
-              ~default:Z.zero
-              (Tezos_contract_paid_bytes contract)
-              state
+            Durable_storage.michelson_contract_paid_storage_space contract state
           in
           return_some paid
 

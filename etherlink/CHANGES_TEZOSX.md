@@ -111,6 +111,11 @@
 - Improved the performance of reading an implicit account's balance,
   counter, and manager in the Michelson runtime by reducing the number
   of durable-storage accesses each read performs. (!22137)
+- Improved the performance of originated-contract storage accounting in
+  the Michelson runtime: a contract's code size, storage size, and
+  used/paid storage watermarks are now kept in a single durable-storage
+  record, read and written together instead of as four separate keys.
+  (!22139)
 - Expose a contract's storage-space watermarks through two read-only
   RPCs, `GET .../contracts/<id>/storage/used_space` and `.../paid_space`,
   mirroring L1's `get_used_storage_space` / `get_paid_storage_space`
