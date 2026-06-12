@@ -1802,6 +1802,86 @@ let test_cross_runtime_transfer_to_evm_via_call_evm =
       ~error_msg:"Expected gateway balance 0 but got %L") ;
   unit
 
+(** The legacy [transfer(string)] selector was removed from the EVM
+    gateway precompile: a transaction carrying it must revert (invalid
+    input encoding) and leave the destination uncredited. *)
+let test_evm_gateway_rejects_removed_transfer_selector =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"EVM gateway rejects the removed transfer(string) selector"
+    ~tags:["cross_runtime"; "transfer"; "gateway"; "removed_entrypoint"]
+    ~with_runtimes:[Tezos]
+  @@ fun setup _protocol ->
+  let sequencer = setup.sequencer in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let tezos_destination = Constant.bootstrap2.public_key_hash in
+  let* tez_client = tezos_client sequencer in
+  let* destination_balance_before =
+    Client.get_balance_for ~account:tezos_destination tez_client
+  in
+  let* _receipt =
+    craft_and_send_evm_transaction
+      ~sequencer
+      ~sender
+      ~nonce:0
+      ~value:(Wei.of_tez (Tez.of_int 10))
+      ~address:evm_gateway_address
+      ~abi_signature:"transfer(string)"
+      ~arguments:[tezos_destination]
+      ~expected_status:false
+      ()
+  in
+  (* The reverted call must not have bridged any funds. *)
+  let* destination_balance_after =
+    Client.get_balance_for ~account:tezos_destination tez_client
+  in
+  Check.(
+    (Tez.to_mutez destination_balance_after
+    = Tez.to_mutez destination_balance_before)
+      int
+      ~error_msg:"Expected destination balance %R but got %L") ;
+  assert_evm_balance_zero ~address:evm_gateway_address sequencer
+
+(** The legacy %default (simple transfer) entrypoint was removed from
+    the Michelson gateway: calling it must fail with an unknown
+    entrypoint and leave the EVM destination uncredited. *)
+let test_michelson_gateway_rejects_removed_default_entrypoint =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Michelson gateway rejects the removed %default entrypoint"
+    ~tags:["cross_runtime"; "transfer"; "gateway"; "removed_entrypoint"]
+    ~with_runtimes:[Tezos]
+  @@ fun setup _protocol ->
+  let evm_destination = "0x2222222222222222222222222222222222222222" in
+  let amount = Tez.of_int 100 in
+  let* () =
+    call_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address:setup.sc_rollup_address
+      ~sc_rollup_node:setup.sc_rollup_node
+      ~client:setup.client
+      ~l1_contracts:setup.l1_contracts
+      ~sequencer:setup.sequencer
+      ~source:Constant.bootstrap1
+      ~counter:1
+      ~dest:gateway_address
+      ~entrypoint:"default"
+      ~amount:(Tez.to_mutez amount)
+      ~arg_data:(sf {|"%s"|} evm_destination)
+      ()
+  in
+  (* The failed operation must not have bridged any funds. *)
+  let*@ balance = Rpc.get_balance ~address:evm_destination setup.sequencer in
+  Check.((balance = Wei.zero) Wei.typ ~error_msg:"Expected %R but got %L") ;
+  let* tez_client = tezos_client setup.sequencer in
+  let* gateway_balance =
+    Client.get_balance_for ~account:gateway_address tez_client
+  in
+  Check.(
+    (Tez.to_mutez gateway_balance = 0)
+      int
+      ~error_msg:"Expected gateway balance 0 but got %L") ;
+  unit
+
 (* This test exercises nested cross-runtime calls:
      Tezos Runtime (tz1 transfer) -> EVM Runtime (CRAC contract) -> Tezos Runtime (KT1 destination).
      The goal is to see a modification in the storage of the KT1 destination in the Tezos runtime. *)
@@ -6023,6 +6103,8 @@ let () =
   test_delayed_inbox_transfer [Alpha] ;
   test_cross_runtime_transfer_from_evm_to_tz [Alpha] ;
   test_cross_runtime_transfer_to_evm_via_call [Alpha] ;
+  test_evm_gateway_rejects_removed_transfer_selector [Alpha] ;
+  test_michelson_gateway_rejects_removed_default_entrypoint [Alpha] ;
   test_cross_runtime_transfer_to_evm_via_call_evm [Alpha] ;
   test_cross_runtime_call_executes_evm_bytecode [Alpha] ;
   test_cross_runtime_call_get_from_michelson_routes_to_static [Alpha] ;
