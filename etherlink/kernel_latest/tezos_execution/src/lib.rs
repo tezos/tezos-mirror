@@ -166,7 +166,6 @@ enum InternalOpOrigin {
     /// Operation directly emitted by the current frame.
     Own {
         /// Storage cost delegated to the operation.
-        #[allow(dead_code)]
         delegated_storage_cost: u64,
     },
     /// Operation surfaced by the CRAC drain mechanism.
@@ -289,13 +288,23 @@ where
             .iter()
             .map(|tagged_op| {
                 let mut op = tagged_op.op.clone();
-                if tagged_op.is_own() {
-                    storage_fees::burn_internal_op_storage_fees(
-                        host,
-                        payer,
-                        storage_limit_remaining,
-                        &mut op,
-                    )?;
+                match &tagged_op.origin {
+                    InternalOpOrigin::Own {
+                        delegated_storage_cost,
+                    } => {
+                        storage_fees::burn_internal_op_storage_fees(
+                            host,
+                            payer,
+                            storage_limit_remaining,
+                            &mut op,
+                        )?;
+                        storage_fees::add_delegated_storage_fee_balance_updates(
+                            payer,
+                            &mut op,
+                            *delegated_storage_cost,
+                        )?;
+                    }
+                    InternalOpOrigin::Crac => {}
                 }
                 Ok(op)
             })
@@ -314,12 +323,14 @@ where
 /// A burn-level failure demotes the parent (and every Applied
 /// internal) to `BackTracked`, with the burn errors attached to
 /// the parent.
+#[allow(clippy::too_many_arguments)]
 fn finalize_and_burn<Host, M, A>(
     host: &mut Host,
     payer: &A,
     storage_limit: &Narith,
     balance_updates: Vec<BalanceUpdate>,
     delegated_storage_cost: u64,
+    top_level_delegated_delta: u64,
     result: Result<M::Success, ApplyOperationError>,
     mut internal_operation_results: Vec<TaggedInternalOp>,
 ) -> OperationResult<M>
@@ -337,13 +348,17 @@ where
         &mut content,
         internal_operation_results,
     );
-    // TODO(L2-1520): render the dedicated balance-updates for the delegated cost.
     let burn_outcome = burn_outcome.and_then(|()| {
         storage_fees::burn_storage_cost(
             host,
             payer,
             &mut storage_limit_remaining,
             delegated_storage_cost,
+        )?;
+        storage_fees::add_delegated_storage_fee_balance_updates_to_content(
+            payer,
+            &mut content,
+            top_level_delegated_delta,
         )
     });
     if let Err(errors) = burn_outcome {
@@ -2134,6 +2149,7 @@ where
                 storage_limit,
                 balance_updates,
                 0,
+                0,
                 reveal_result.map_err(Into::into),
                 internal_operations_receipts,
             ))
@@ -2170,7 +2186,7 @@ where
                 journal.michelson.failed_crac_receipts.len();
             let backtracked_crac_receipts_before =
                 journal.michelson.backtracked_crac_receipts.len();
-            let (transfer_result, _top_level_delegated_delta) = match transfer_external(
+            let (transfer_result, top_level_delegated_delta) = match transfer_external(
                 &mut tc_ctx,
                 &mut operation_ctx,
                 registry,
@@ -2215,6 +2231,7 @@ where
                 storage_limit,
                 balance_updates,
                 operation_ctx.delegated_storage_cost,
+                top_level_delegated_delta,
                 transfer_result.map_err(Into::into),
                 internal_operations_receipts,
             ))
@@ -2246,6 +2263,7 @@ where
                     source_account,
                     storage_limit,
                     balance_updates,
+                    0,
                     0,
                     origination_result.map_err(|e| e.into()),
                     internal_operations_receipts,

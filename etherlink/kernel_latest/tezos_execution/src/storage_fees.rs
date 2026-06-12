@@ -96,6 +96,70 @@ fn compute_storage_balance_updates(
     Ok(vec![source_update, block_fees])
 }
 
+/// Append the `Debited(payer) / Credited(StorageFees)` pair for a
+/// delegated storage cost to a top-level content's
+/// `balance_updates`, going through
+/// [`OperationStorageFees::extend_success_balance_updates`]. No-op
+/// on `mutez_cost == 0`, on non-Applied content, and on kinds whose
+/// success carries no `balance_updates` field ([`RevealSuccess`],
+/// [`EventSuccess`]).
+pub fn add_delegated_storage_fee_balance_updates_to_content<M: OperationStorageFees>(
+    payer: &impl TezlinkAccount,
+    content: &mut ContentResult<M>,
+    mutez_cost: u64,
+) -> Result<(), ApplyOperationError> {
+    if mutez_cost == 0 {
+        return Ok(());
+    }
+    if let ContentResult::Applied(success) = content {
+        let pair =
+            compute_storage_balance_updates(payer.contract(), BigUint::from(mutez_cost))
+                .map_err(|e| {
+                    ApplyOperationError::Transfer(
+                        TransferError::FailedToComputeBalanceUpdate(e.to_string()),
+                    )
+                })?;
+        M::extend_success_balance_updates(success, pair);
+    }
+    Ok(())
+}
+
+/// Append the `Debited(payer) / Credited(StorageFees)` pair for a
+/// delegated storage cost to the operation's `balance_updates`,
+/// dispatching on its [`InternalOperationSum`] variant. No-op on
+/// `mutez_cost == 0`, on non-Applied content, and on variants
+/// whose success carries no `balance_updates` field
+/// ([`EventSuccess`]).
+pub fn add_delegated_storage_fee_balance_updates(
+    payer: &impl TezlinkAccount,
+    op: &mut InternalOperationSum,
+    mutez_cost: u64,
+) -> Result<(), ApplyOperationError> {
+    match op {
+        InternalOperationSum::Transfer(meta) => {
+            add_delegated_storage_fee_balance_updates_to_content(
+                payer,
+                &mut meta.result,
+                mutez_cost,
+            )
+        }
+        InternalOperationSum::Origination(meta) => {
+            add_delegated_storage_fee_balance_updates_to_content(
+                payer,
+                &mut meta.result,
+                mutez_cost,
+            )
+        }
+        InternalOperationSum::Event(meta) => {
+            add_delegated_storage_fee_balance_updates_to_content(
+                payer,
+                &mut meta.result,
+                mutez_cost,
+            )
+        }
+    }
+}
+
 /// Returns the mutez cost of allocating `nb_consumed_bytes`:
 /// `nb_consumed_bytes × COST_PER_BYTES`. Pure: no payer debit, no
 /// `storage_limit` consumption, no host access. Errors on a
@@ -299,6 +363,14 @@ pub trait OperationStorageFees: OperationKind {
     ) -> Result<(), E>
     where
         F: Fn(StorageFee) -> Result<Vec<BalanceUpdate>, E>;
+
+    /// Append `pair` to `success.balance_updates` when the kind's
+    /// success carries one. No-op for kinds whose success has no
+    /// such field ([`RevealSuccess`], [`EventSuccess`]).
+    fn extend_success_balance_updates(
+        success: &mut Self::Success,
+        pair: Vec<BalanceUpdate>,
+    );
 }
 
 pub struct TransferStorageFees {
@@ -345,6 +417,14 @@ impl OperationStorageFees for TransferContent {
         success.balance_updates = updates;
         Ok(())
     }
+
+    fn extend_success_balance_updates(
+        success: &mut TransferTarget,
+        pair: Vec<BalanceUpdate>,
+    ) {
+        let TransferTarget::ToContrat(success) = success;
+        success.balance_updates.extend(pair);
+    }
 }
 
 pub struct OriginationStorageFees {
@@ -381,6 +461,13 @@ impl OperationStorageFees for OriginationContent {
         success.balance_updates = updates;
         Ok(())
     }
+
+    fn extend_success_balance_updates(
+        success: &mut OriginationSuccess,
+        pair: Vec<BalanceUpdate>,
+    ) {
+        success.balance_updates.extend(pair);
+    }
 }
 
 impl OperationStorageFees for RevealContent {
@@ -399,6 +486,8 @@ impl OperationStorageFees for RevealContent {
     {
         Ok(())
     }
+
+    fn extend_success_balance_updates(_: &mut RevealSuccess, _: Vec<BalanceUpdate>) {}
 }
 
 impl OperationStorageFees for EventContent {
@@ -417,6 +506,8 @@ impl OperationStorageFees for EventContent {
     {
         Ok(())
     }
+
+    fn extend_success_balance_updates(_: &mut EventSuccess, _: Vec<BalanceUpdate>) {}
 }
 
 #[cfg(test)]
