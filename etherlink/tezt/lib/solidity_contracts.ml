@@ -470,6 +470,18 @@ let gateway_call_then_revert =
     ~label:"gateway_call_then_revert"
     ~contract:"GatewayCallThenRevert"
 
+let crac_store_then_revert =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/crac_store_then_revert.sol")
+    ~label:"crac_store_then_revert"
+    ~contract:"CracStoreThenRevert"
+
+let cross_runtime_store_evm =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/cross_runtime_store_evm.sol")
+    ~label:"cross_runtime_store_evm"
+    ~contract:"CrossRuntimeStoreEvm"
+
 let gateway_chain_two_aliases =
   compile_contract
     ~source:(solidity_contracts_path ^ "/gateway_chain_two_aliases.sol")

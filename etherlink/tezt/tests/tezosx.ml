@@ -4659,7 +4659,7 @@ let test_trace_call_evm ~runtime () =
     Rpc.Tezosx.http_traceCall_evm
       ~to_:evm_gateway_address
       ~data:calldata
-      ~gas:"0x493E0"
+      ~gas:"0xF4240"
       sandbox
   in
   (* Step 4: Verify response structure *)
