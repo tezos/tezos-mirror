@@ -949,6 +949,20 @@ open struct
       ~level:Info
       ("query_id", Data_encoding.int31)
 
+  let amplification_queue_full =
+    declare_3
+      ~section:(section @ ["crypto"])
+      ~prefix_name_with_section:true
+      ~name:"amplification_queue_full"
+      ~msg:
+        "amplification queue is full ({queue_length} reconstructions in \
+         flight): dropping the reconstruction of slot index {slot_index} at \
+         level {level}."
+      ~level:Warning
+      ("level", Data_encoding.int32)
+      ("slot_index", Data_encoding.int31)
+      ("queue_length", Data_encoding.int31)
+
   let get_attestable_slots_ok_notice =
     declare_3
       ~section
@@ -1762,6 +1776,9 @@ let emit_main_process_received_reply_error ~query_id ~msg =
 
 let emit_main_process_enqueue_query ~query_id =
   emit main_process_enqueue_query query_id
+
+let emit_amplification_queue_full ~level ~slot_index ~queue_length =
+  emit amplification_queue_full (level, slot_index, queue_length)
 
 let emit_get_attestable_slots_ok_notice ~attester ~published_level
     ~slots_indices =
