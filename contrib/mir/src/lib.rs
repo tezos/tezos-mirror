@@ -216,13 +216,13 @@ mod tests {
             Gas::default().milligas().unwrap() - ctx.gas.milligas().unwrap(),
             // 14 × `interpret_cost::FRAME_PUSH` (100 milligas) reflects the
             // worklist-growth pushes the iterative driver does on the
-            // FIBONACCI_SRC run (IF / DIP / EXEC bodies). The remaining 21731
+            // FIBONACCI_SRC run (IF / DIP / EXEC bodies). The remaining 21756
             // milligas reflects the costs re-benchmarked on the MIR
             // interpreter (stack manipulation in L2-1553, then the batches of
             // this series); it no longer matches L1 (it was 1287 before
             // re-pricing). The total is dominated by the `DUP n` instructions
             // (flat 840 each) and the comparisons (~1.1-1.2 gas each).
-            21731 + 14 * crate::gas::interpret_cost::FRAME_PUSH
+            21756 + 14 * crate::gas::interpret_cost::FRAME_PUSH
         );
     }
 
