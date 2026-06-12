@@ -869,7 +869,32 @@ struct
   module Operation_list_hash = Operation_list_hash
   module Operation_list_list_hash = Operation_list_list_hash
   module Context_hash = Context_hash
-  module Account_hash = Account_hash
+
+  module Account_hash = struct
+    include Account_hash
+
+    type Error_core.error += Account_hash_invalid_notation of string
+
+    let () =
+      let open Data_encoding in
+      Error_core.register_error_kind
+        `Permanent
+        ~id:"env.account_hash_invalid_notation"
+        ~title:"Account hash invalid notation"
+        ~description:"Account hash invalid notation"
+        ~pp:(fun ppf s ->
+          Format.fprintf ppf "Account hash invalid notation: %s" s)
+        (obj1 (req "hash" (string Plain)))
+        (function Account_hash_invalid_notation s -> Some s | _ -> None)
+        (fun s -> Account_hash_invalid_notation s)
+
+    (* redefines [of_b58check] with an environment error instead of a shell error *)
+    let of_b58check s =
+      match of_b58check_opt s with
+      | Some v -> Ok v
+      | None -> Error [Account_hash_invalid_notation s]
+  end
+
   module Protocol_hash = Protocol_hash
   module Blake2B = Tezos_crypto.Blake2B
   module Fitness = Fitness
