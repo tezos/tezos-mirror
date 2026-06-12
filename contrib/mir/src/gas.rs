@@ -365,7 +365,8 @@ pub mod interpret_cost {
     pub const IF_NONE: u32 = 10;
     pub const IF_CONS: u32 = 855;
     pub const IF_LEFT: u32 = 10;
-    pub const LOOP: u32 = 10;
+    // corresponds to cost_N_ILoop in the Tezos protocol
+    pub const LOOP: u32 = 15;
     // Iteration cost (`cost_N_IList_iter` / `cost_N_ISet_iter` /
     // `cost_N_IMap_iter`). L1's `set`/`map` variants are size-dependent
     // because L1 first materialises the collection into a list; MIR iterates
@@ -564,7 +565,8 @@ pub mod interpret_cost {
     pub const LOOP_ENTER: u32 = 10; // corresponds to KLoop_in in the Tezos protocol
     pub const LOOP_LEFT_ENTER: u32 = 10; // corresponds to KLoop_in_left in the Tezos protocol
     pub const LOOP_EXIT: u32 = 15;
-    pub const CREATE_CONTRACT: u32 = 60;
+    // corresponds to cost_N_ICreate_contract in the Tezos protocol
+    pub const CREATE_CONTRACT: u32 = 340;
     pub const VIEW: u32 = 65; // corresponds to cost_N_IView_synthesized in the Tezos protocol
 
     // corresponds to cost_N_IJoin_tickets in the Tezos protocol
@@ -1172,14 +1174,20 @@ pub mod interpret_cost {
     // Tezos protocol. BLS is not part of the re-benchmarked set; its arm
     // keeps the previous total (including the former 32 * len serialization
     // surcharge, now folded in).
+    // Saturating arithmetic, as the protocol's `Saturation_repr`: a
+    // saturated cost exceeds any operation budget and exhausts gas instead
+    // of wrapping in release builds.
     pub fn check_signature(k: &PublicKey, msg: &[u8]) -> Result<u32, CryptoError> {
         let len = msg.len().min(u32::MAX as usize) as u32;
         let cost = match k {
-            PublicKey::Ed25519(..) => 48_395 + ((len >> 4) + (len >> 5) + len),
-            PublicKey::Secp256k1(..) => 183_265 + ((len >> 3) + len),
-            PublicKey::P256(..) => 487_855 + ((len >> 3) + len),
+            PublicKey::Ed25519(..) => 48_395_u32
+                .saturating_add(len >> 4)
+                .saturating_add(len >> 5)
+                .saturating_add(len),
+            PublicKey::Secp256k1(..) => 183_265_u32.saturating_add(len >> 3).saturating_add(len),
+            PublicKey::P256(..) => 487_855_u32.saturating_add(len >> 3).saturating_add(len),
             #[cfg(feature = "bls")]
-            PublicKey::Bls(..) => 1_570_000 + (len * 35),
+            PublicKey::Bls(..) => 1_570_000_u32.saturating_add(len.saturating_mul(35)),
             #[cfg(not(feature = "bls"))]
             PublicKey::Bls(..) => {
                 return Err(CryptoError::Unsupported(
@@ -1289,16 +1297,16 @@ pub mod interpret_cost {
     }
 
     pub fn pair_n(size: usize) -> Result<u32, CostOverflow> {
-        // corresponds to cost_N_IComb in the Tezos protocol
-        let size = Checked::from(size);
-        let v0 = size - 2;
+        // corresponds to cost_N_IComb in the Tezos protocol; the protocol's
+        // S.sub floors at 0, hence saturating_sub
+        let v0 = Checked::from(size.saturating_sub(2));
         (50 + (v0 * 15)).as_gas_cost()
     }
 
     pub fn unpair_n(size: usize) -> Result<u32, CostOverflow> {
-        // corresponds to cost_N_IUncomb in the Tezos protocol
-        let size = Checked::from(size);
-        let v0 = size - 2;
+        // corresponds to cost_N_IUncomb in the Tezos protocol; the protocol's
+        // S.sub floors at 0, hence saturating_sub
+        let v0 = Checked::from(size.saturating_sub(2));
         (50 + ((v0 * 7) + (v0 >> 2))).as_gas_cost()
     }
 
