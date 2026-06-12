@@ -43,7 +43,7 @@ pub type SplitDsResult<T, Err> = OcamlFallible<Result<T, Err>>;
 ///
 /// - Operational errors are converted to OCaml exceptions.
 /// - InvalidArgument errors are returned as the error variant of an OCaml result.
-pub fn split_ds_errors<T, E: From<ds_errors::InvalidArgumentError>>(
+fn split_ds_errors_inner<T, E: From<ds_errors::InvalidArgumentError>>(
     res: Result<T, ds_errors::Error>,
 ) -> OcamlFallible<Result<T, E>> {
     let inner_res = match res {
@@ -53,6 +53,23 @@ pub fn split_ds_errors<T, E: From<ds_errors::InvalidArgumentError>>(
     };
 
     Ok(inner_res)
+}
+
+/// Split handling of durable storage errors, folding not-found errors
+/// into the result error.
+///
+/// - Verify-mode operations may diverge with `NotFound` - surfaced as the outer `Err(NF)`.
+/// - For Normal/Prove (`NF = Infallible`) the outer `Err` arm is unreachable.
+pub fn split_ds_errors<T, NF, E>(
+    res: Result<Result<T, ds_errors::Error>, NF>,
+) -> OcamlFallible<Result<T, E>>
+where
+    E: From<ds_errors::InvalidArgumentError> + From<NF>,
+{
+    match res {
+        Ok(inner) => split_ds_errors_inner(inner),
+        Err(not_found) => Ok(Err(E::from(not_found))),
+    }
 }
 
 /// Map a fallible operation over inner value. Errors in mapping are converted to OCaml exceptions.

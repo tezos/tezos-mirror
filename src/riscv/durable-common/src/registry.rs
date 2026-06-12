@@ -4,9 +4,11 @@
 
 //! Generic registry state wrapper for OCaml GC resource tracking.
 
+use std::convert::Infallible;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::ops::DerefMut;
+use std::panic::AssertUnwindSafe;
 use std::sync::mpsc::SyncSender;
 use std::sync::mpsc::sync_channel;
 use std::thread::JoinHandle;
@@ -14,10 +16,16 @@ use std::thread::JoinHandle;
 use octez_riscv_api_common::move_semantics::CustomGcResource;
 use octez_riscv_api_common::move_semantics::MutableState;
 use octez_riscv_api_common::try_clone::TryClone;
+use octez_riscv_data::merkle_proof::FromProof;
+use octez_riscv_data::merkle_proof::proof_tree::MerkleProof;
+use octez_riscv_data::merkle_proof::proof_tree::ProofPart;
 use octez_riscv_data::mode::Mode;
 use octez_riscv_data::mode::Normal;
 use octez_riscv_data::mode::ProvableExt;
 use octez_riscv_data::mode::Prove;
+use octez_riscv_data::mode::Verify;
+use octez_riscv_data::mode::utils::NotFound;
+use octez_riscv_data::mode::utils::catch_not_found;
 use octez_riscv_durable_storage::errors::OperationalError;
 use octez_riscv_durable_storage::registry::Registry;
 use octez_riscv_durable_storage::storage::KeyValueStore;
@@ -30,6 +38,9 @@ pub type DsRegistry<KV, G> = MutableState<RegistryState<KV, G>>;
 
 /// Type alias for a prove-mode registry state backed by a generic key-value store.
 pub type DsProveRegistry<KV, G> = BackgroundRegistry<KV, G, Prove<'static>>;
+
+/// Type alias for a verify-mode registry state backed by a generic key-value store.
+pub type DsVerifyRegistry<KV, G> = BackgroundRegistry<KV, G, Verify>;
 
 /// Marker trait supplying OCaml GC resource names.
 pub trait GcNames: Send + Sync + 'static {
@@ -105,19 +116,21 @@ where
     KV: BackgroundKeyValueStore,
     KV::Repo: Send + Sync,
 {
-    fn apply<F, R>(&self, fun: F) -> Result<R, OperationalError>
+    type NotFoundError = Infallible;
+
+    fn apply<F, R>(&self, fun: F) -> Result<Result<R, Infallible>, OperationalError>
     where
         F: FnOnce(&mut Registry<KV, Normal>) -> R + Send + 'static,
         KV::Repo: Clone,
     {
-        MutableState::apply(self, fun)
+        Ok(Ok(MutableState::apply(self, fun)?))
     }
 
-    fn apply_ro<F, R>(&self, fun: F) -> Result<R, OperationalError>
+    fn apply_ro<F, R>(&self, fun: F) -> Result<Result<R, Infallible>, OperationalError>
     where
         F: FnOnce(&Registry<KV, Normal>) -> R + Send + 'static,
     {
-        Ok(MutableState::apply_ro(self, fun))
+        Ok(Ok(MutableState::apply_ro(self, fun)))
     }
 }
 
@@ -183,6 +196,70 @@ where
         let () = init_receiver
             .recv()
             .map_err(|_| OperationalError::WorkerThreadDied)??;
+
+        Ok(Self {
+            cmd_sender,
+            handle: Some(handle),
+            _pd: PhantomData,
+        })
+    }
+}
+
+/// Error building a verify-mode [`BackgroundRegistry`] from a proof.
+#[derive(Debug, thiserror::Error)]
+pub enum BuildVerifyError {
+    /// The worker thread could not be set up.
+    #[error("Failed to initialise verification worker thread {0}")]
+    Operational(#[from] OperationalError),
+
+    /// The proof did not describe a valid registry.
+    ///
+    /// The error is converted into a string, as the error returned from the proof deserialisation
+    /// is `!Send`, and so cannot be passed from the background thread.
+    #[error("invalid durable-storage proof: {0}")]
+    Proof(String),
+}
+
+impl<KV, G> BackgroundRegistry<KV, G, Verify>
+where
+    KV: BackgroundKeyValueStore,
+    G: GcNames,
+{
+    /// Build a verify-mode registry that replays operations against `proof`.
+    pub fn from_proof(proof: MerkleProof) -> Result<Self, BuildVerifyError> {
+        let (init_sender, init_receiver) = sync_channel::<Result<(), String>>(0);
+        let (cmd_sender, cmd_receiver) = sync_channel::<Command<KV, Verify>>(1);
+
+        let handle = std::thread::spawn(move || {
+            let mut verify = match Registry::<KV, Verify>::from_proof(ProofPart::Present(&proof)) {
+                Ok(suspended) => {
+                    let Ok(()) = init_sender.send(Ok(())) else {
+                        return;
+                    };
+                    suspended.into_result()
+                }
+                Err(err) => {
+                    // if we fail to send, swallow the error as we exit anyway
+                    let _ = init_sender.send(Err(err.to_string()));
+                    return;
+                }
+            };
+
+            // blocking receive: the only error case is the channel being closed - ie the
+            // verify handle is dropped. Exit our end too on error.
+            while let Ok(cmd) = cmd_receiver.recv() {
+                match cmd {
+                    Command::Operation(op) => op(&mut verify),
+                    Command::Exit => return,
+                }
+            }
+        });
+
+        match init_receiver.recv() {
+            Ok(Ok(())) => (),
+            Ok(Err(msg)) => return Err(BuildVerifyError::Proof(msg)),
+            Err(_) => return Err(BuildVerifyError::from(OperationalError::WorkerThreadDied)),
+        }
 
         Ok(Self {
             cmd_sender,
@@ -259,26 +336,71 @@ macro_rules! background_apply {
     }};
 }
 
-impl<KV, G, M> RegistryApply<KV, M> for BackgroundRegistry<KV, G, M>
+impl<KV, G> RegistryApply<KV, Prove<'static>> for BackgroundRegistry<KV, G, Prove<'static>>
 where
     KV: BackgroundKeyValueStore,
     KV::Repo: Send + Sync,
-    M: Mode,
 {
-    fn apply<F, R>(&self, fun: F) -> Result<R, OperationalError>
+    type NotFoundError = Infallible;
+
+    fn apply<F, R>(&self, fun: F) -> Result<Result<R, Infallible>, OperationalError>
     where
-        F: FnOnce(&mut Registry<KV, M>) -> R + Send + 'static,
+        F: FnOnce(&mut Registry<KV, Prove<'static>>) -> R + Send + 'static,
         R: Send + 'static,
         KV::Repo: Clone,
     {
-        background_apply!(self, fun, KV, M)
+        Ok(Ok(background_apply!(self, fun, KV, Prove<'static>)?))
     }
 
-    fn apply_ro<F, R>(&self, fun: F) -> Result<R, OperationalError>
+    fn apply_ro<F, R>(&self, fun: F) -> Result<Result<R, Infallible>, OperationalError>
     where
-        F: FnOnce(&Registry<KV, M>) -> R + Send + 'static,
+        F: FnOnce(&Registry<KV, Prove<'static>>) -> R + Send + 'static,
         R: Send + 'static,
     {
-        background_apply!(self, fun, KV, M)
+        Ok(Ok(background_apply!(self, fun, KV, Prove<'static>)?))
+    }
+}
+
+/// Like [`background_apply`], but runs the operation under [`catch_not_found`] in the worker
+/// thread.
+macro_rules! background_apply_verify {
+    ($self:ident, $fun:ident, $kv:ty) => {{
+        let fun = move |registry: &mut Registry<$kv, Verify>| {
+            // `AssertUnwindSafe`: the registry is abandoned once an operation diverges, so a
+            // mid-operation unwind leaving it inconsistent is harmless.
+            //
+            // TODO (TZX-174): `NotFound` errors should result in poisoning the verify
+            //     state - any subsequent uses of the registry must fail - to enforce the
+            //     above property.
+            catch_not_found(AssertUnwindSafe(move || $fun(registry)))
+        };
+
+        background_apply!($self, fun, $kv, Verify)
+    }};
+}
+
+impl<KV, G> RegistryApply<KV, Verify> for BackgroundRegistry<KV, G, Verify>
+where
+    KV: BackgroundKeyValueStore,
+    KV::Repo: Send + Sync,
+{
+    // Verify mode replays against a proof; a touch of absent data diverges with `NotFound`.
+    type NotFoundError = NotFound;
+
+    fn apply<F, R>(&self, fun: F) -> Result<Result<R, NotFound>, OperationalError>
+    where
+        F: FnOnce(&mut Registry<KV, Verify>) -> R + Send + 'static,
+        R: Send + 'static,
+        KV::Repo: Clone,
+    {
+        background_apply_verify!(self, fun, KV)
+    }
+
+    fn apply_ro<F, R>(&self, fun: F) -> Result<Result<R, NotFound>, OperationalError>
+    where
+        F: FnOnce(&Registry<KV, Verify>) -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        background_apply_verify!(self, fun, KV)
     }
 }

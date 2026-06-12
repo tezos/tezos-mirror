@@ -59,6 +59,27 @@ module Memory_prove_backend = struct
     start_proof r
 end
 
+(** Divergence free - as all operations are played from
+    an empty verify backend. *)
+module Memory_verify_backend : BACKEND = struct
+  let name = "memory_verify"
+
+  module Registry = Octez_riscv_nds_memory.Verify.Registry
+  module Database = Octez_riscv_nds_memory.Verify.Database
+
+  let create_registry_with_dbs n =
+    let empty = Octez_riscv_nds_memory.Normal.Registry.create () in
+    let prove = Octez_riscv_nds_memory.Prove.start_proof empty in
+    (* Read the (empty) registry layout in Prove mode so the proof records it;
+       otherwise the untouched proof is fully blinded and Verify diverges on
+       the very first [size]/[resize] (as registry length = 0 is missing). *)
+    let _ = Octez_riscv_nds_memory.Prove.Registry.size prove in
+    let proof = Octez_riscv_nds_memory.Prove.produce_proof prove in
+    let verify = Octez_riscv_nds_memory.Verify.start_verify proof in
+    grow_registry Octez_riscv_nds_memory.Verify.Registry.resize verify n ;
+    verify
+end
+
 (** Create a fresh disk repo in a Tezt-managed temporary directory. *)
 let get_disk_repo () =
   let path = Tezt.Temp.dir "nds_disk_test" in
@@ -84,6 +105,28 @@ module Disk_prove_backend = struct
   let create_registry_with_dbs n =
     let r = Disk_backend.create_registry_with_dbs n in
     start_proof r
+end
+
+(** Divergence free - as all operations are played from
+    an empty verify backend. *)
+module Disk_verify_backend : BACKEND = struct
+  let name = "disk_verify"
+
+  module Registry = Octez_riscv_nds_disk.Verify.Registry
+  module Database = Octez_riscv_nds_disk.Verify.Database
+
+  let create_registry_with_dbs n =
+    let repo = get_disk_repo () in
+    let empty = Octez_riscv_nds_disk.Normal.Registry.create repo in
+    let prove = Octez_riscv_nds_disk.Prove.start_proof empty in
+    (* Read the (empty) registry layout in Prove mode so the proof records it;
+       otherwise the untouched proof is fully blinded and Verify diverges on
+       the very first [size]/[resize] (as registry length = 0 is missing). *)
+    let _ = Octez_riscv_nds_disk.Prove.Registry.size prove in
+    let proof = Octez_riscv_nds_disk.Prove.produce_proof prove in
+    let verify = Octez_riscv_nds_disk.Verify.start_verify proof in
+    grow_registry Octez_riscv_nds_disk.Verify.Registry.resize verify n ;
+    verify
 end
 
 (** Backend abstraction for proof-API tests.  Unlike {!BACKEND}, which
@@ -121,6 +164,52 @@ module Disk_proof_lifecycle : PROOF_LIFECYCLE_BACKEND = struct
 
   module Normal = Octez_riscv_nds_disk.Normal
   module Prove = Octez_riscv_nds_disk.Prove
+
+  let create_normal_with_dbs n =
+    let repo = get_disk_repo () in
+    let r = Normal.Registry.create repo in
+    grow_registry Normal.Registry.resize r n ;
+    r
+end
+
+(** Backend abstraction for verify-API tests.  Extends
+    {!PROOF_LIFECYCLE_BACKEND} with the {!Intf.VERIFY} mode, so a test can
+    drive the full proof round-trip: set up Normal state, record a step in
+    Prove mode, {!Intf.PROOF.serialise}/{!Intf.PROOF.deserialise} the proof,
+    and replay the step in Verify mode against it.  Lets the verify tests
+    run against both the memory and disk backends. *)
+module type VERIFY_LIFECYCLE_BACKEND = sig
+  val name : string
+
+  module Normal : NORMAL
+
+  module Prove : PROVE with type normal_registry := Normal.Registry.t
+
+  module Verify : VERIFY with type proof := Prove.Proof.t
+
+  (** Create a fresh Normal-mode registry with [n] databases. *)
+  val create_normal_with_dbs : int -> Normal.Registry.t
+end
+
+module Memory_verify_lifecycle : VERIFY_LIFECYCLE_BACKEND = struct
+  let name = "memory"
+
+  module Normal = Octez_riscv_nds_memory.Normal
+  module Prove = Octez_riscv_nds_memory.Prove
+  module Verify = Octez_riscv_nds_memory.Verify
+
+  let create_normal_with_dbs n =
+    let r = Normal.Registry.create () in
+    grow_registry Normal.Registry.resize r n ;
+    r
+end
+
+module Disk_verify_lifecycle : VERIFY_LIFECYCLE_BACKEND = struct
+  let name = "disk"
+
+  module Normal = Octez_riscv_nds_disk.Normal
+  module Prove = Octez_riscv_nds_disk.Prove
+  module Verify = Octez_riscv_nds_disk.Verify
 
   let create_normal_with_dbs n =
     let repo = get_disk_repo () in
