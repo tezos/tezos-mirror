@@ -10,12 +10,23 @@ pragma solidity ^0.8.0;
 /// DISTINCT Tezos-side aliases -- exercising the path where one EVM
 /// transaction surfaces multiple alias originations in the merged
 /// Michelson receipt.
+struct Header {
+    string name;
+    string value;
+}
+
 contract GatewayProxyA {
     address constant gateway = 0xfF00000000000000000000000000000000000007;
 
     function transfer(string memory destination) external payable {
         (bool ok, ) = gateway.call{value: msg.value}(
-            abi.encodeWithSignature("transfer(string)", destination)
+            abi.encodeWithSignature(
+                "call(string,(string,string)[],bytes,uint8)",
+                string.concat("http://tezos/", destination),
+                new Header[](0),
+                bytes(""),
+                uint8(1)
+            )
         );
         require(ok, "GatewayProxyA: inner call failed");
     }
@@ -26,7 +37,13 @@ contract GatewayProxyB {
 
     function transfer(string memory destination) external payable {
         (bool ok, ) = gateway.call{value: msg.value}(
-            abi.encodeWithSignature("transfer(string)", destination)
+            abi.encodeWithSignature(
+                "call(string,(string,string)[],bytes,uint8)",
+                string.concat("http://tezos/", destination),
+                new Header[](0),
+                bytes(""),
+                uint8(1)
+            )
         );
         require(ok, "GatewayProxyB: inner call failed");
     }

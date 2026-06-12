@@ -2044,11 +2044,15 @@ mod tests {
             .unwrap(),
         );
 
-        // ABI-encode transfer("tz1target"): the dummy Tezos implicit address
-        // is irrelevant to the assertion; only the state-mutating dispatch
-        // path (which goes through capture_original_source) matters.
-        let calldata = RuntimeGateway::transferCall {
-            implicitAddress: "tz1target".to_string(),
+        // ABI-encode call(POST http://tezos/tz1target): the dummy Tezos
+        // implicit address is irrelevant to the assertion; only the
+        // state-mutating dispatch path (which goes through
+        // capture_original_source) matters.
+        let calldata = RuntimeGateway::callCall {
+            url: "http://tezos/tz1target".to_string(),
+            headers: vec![],
+            body: vec![].into(),
+            method: 1,
         }
         .abi_encode();
 
@@ -2109,7 +2113,7 @@ mod tests {
             String::from_utf8_lossy(resp.body())
         );
 
-        // resolve_aliases is called twice inside the transfer precompile arm:
+        // resolve_aliases is called twice inside the call(POST) precompile arm:
         //   [0] sender slot = C (inputs.caller, the contract that called the precompile)
         //   [1] source slot = should be A (originator); is B (caller) on buggy code
         let alias_calls = registry.ensure_alias_calls.borrow();

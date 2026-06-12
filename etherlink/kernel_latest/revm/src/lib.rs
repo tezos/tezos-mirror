@@ -798,7 +798,7 @@ mod test {
         FEED_DEPOSIT_ADDR, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
     };
     use crate::precompiles::runtime_gateway::RuntimeGateway::{
-        transferCall, RuntimeGatewayCalls,
+        callCall, RuntimeGatewayCalls,
     };
     use crate::storage::code::CodeStorage;
     use crate::test::utilities::CreateAndRevert::{
@@ -1406,8 +1406,13 @@ mod test {
         // Create a mock implicit address string for the test (hex-encoded for URL safety)
         let implicit_address = alias.0.strip_prefix("0x").unwrap_or(&alias.0).to_string();
 
-        let calldata = RuntimeGatewayCalls::transfer(transferCall {
-            implicitAddress: implicit_address.clone(),
+        // Value transfer through the generic `call` entrypoint: POST to
+        // the bare address with an empty body.
+        let calldata = RuntimeGatewayCalls::call(callCall {
+            url: format!("http://tezos/{implicit_address}"),
+            headers: vec![],
+            body: vec![].into(),
+            method: 1,
         })
         .abi_encode();
 
@@ -3431,7 +3436,7 @@ mod test {
                 runtime_gateway::{
                     CracSent,
                     RuntimeGateway::{
-                        callCall, callMichelsonCall, callMichelsonViewCall, transferCall,
+                        callCall, callMichelsonCall, callMichelsonViewCall,
                         RuntimeGatewayCalls,
                     },
                 },
@@ -3547,14 +3552,6 @@ mod test {
             .unwrap()
         }
 
-        fn transfer_payload() -> Bytes {
-            RuntimeGatewayCalls::transfer(transferCall {
-                implicitAddress: "tz1abc".to_string(),
-            })
-            .abi_encode()
-            .into()
-        }
-
         fn call_michelson_payload() -> Bytes {
             RuntimeGatewayCalls::callMichelson(callMichelsonCall {
                 destination: "KT1abc".to_string(),
@@ -3589,12 +3586,12 @@ mod test {
 
         // --- DELEGATECALL guard ----------------------------------------------
 
-        /// DELEGATECALL on `transfer` hits the universal guard at the
-        /// top of the precompile and reverts before any selector logic
-        /// runs. The guard pattern (`target != bytecode`) selects
+        /// DELEGATECALL on `callMichelson` hits the universal guard at
+        /// the top of the precompile and reverts before any selector
+        /// logic runs. The guard pattern (`target != bytecode`) selects
         /// DELEGATECALL/CALLCODE exclusively.
         #[test]
-        fn runtime_gateway_rejects_delegate_call_on_transfer() {
+        fn runtime_gateway_rejects_delegate_call_on_call_michelson() {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
             fund_caller(&mut host, caller);
@@ -3602,7 +3599,7 @@ mod test {
 
             let outer = makeDelegateCallCall::new((
                 RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
-                transfer_payload(),
+                call_michelson_payload(),
             ))
             .abi_encode()
             .into();
@@ -3643,35 +3640,10 @@ mod test {
 
         // --- STATICCALL on state-mutating selectors --------------------------
 
-        /// STATICCALL on `transfer` must revert: the precompile would
-        /// otherwise persist alias entries, emit a `CracSent` log, and
-        /// potentially burn precompile residual balance — all
+        /// STATICCALL on `callMichelson` must revert: the precompile
+        /// would otherwise persist alias entries, emit a `CracSent`
+        /// log, and potentially burn precompile residual balance — all
         /// state-mutating effects forbidden under STATICCALL.
-        #[test]
-        fn runtime_gateway_rejects_static_call_on_transfer() {
-            let mut host = MockKernelHost::default();
-            let caller = Address::from([1u8; 20]);
-            fund_caller(&mut host, caller);
-            let static_caller = deploy(&mut host, caller, STATIC_CALLER_BYTECODE);
-
-            let outer = makeStaticCallCall::new((
-                RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
-                transfer_payload(),
-            ))
-            .abi_encode()
-            .into();
-
-            let res = call_into(&mut host, caller, static_caller, outer);
-            match res.result {
-                ExecutionResult::Revert { .. } | ExecutionResult::Halt { .. } => {
-                    /* expected */
-                }
-                other => panic!(
-                    "STATICCALL on transfer (mutating) should revert, got {other:?}"
-                ),
-            }
-        }
-
         #[test]
         fn runtime_gateway_rejects_static_call_on_call_michelson() {
             let mut host = MockKernelHost::default();
