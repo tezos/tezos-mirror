@@ -1,0 +1,82 @@
+parameter (or (bytes %run) (or (bytes %on_result) (unit %_incrementWitness))) ;
+storage (pair (nat %count) (pair (string %destination) (option %result bytes))) ;
+# Michelson-to-Michelson bridge with FAILING callback for CRAC test scenarios.
+#
+# Identical to cross_runtime_http_call_tez_callback.tz except that
+# %run takes the body bytes as a parameter (so the CRAC target can
+# actually grow its storage with whatever the caller passes in) and
+# %on_result always FAILWITHs.  Used to test that a failing callback
+# reverts the entire operation group while the inner CRAC's storage
+# growth — committed independently by the gateway — remains charged
+# to the top-level payer.
+#
+# %run emits [pre_incr, gateway_op, post_incr] where gateway_op is
+# a %call to gateway with callback = Some(SELF %on_result) and the
+# body field set to the bytes passed to %run.  The gateway dispatches
+# the response body to %on_result, which FAILWITHs, cascading every
+# internal op back to BackTracked.
+#
+# The gateway address (KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw) is the
+# enshrined CRAC contract with a deterministic address.
+code
+  { UNPAIR ;
+    IF_LEFT
+      { # run(bytes body) — stack: body : storage
+        SWAP ;
+        # storage : body
+        DUP ; CDR ; CAR ;
+        # destination : storage : body
+        PUSH string "http://tezos/" ;
+        CONCAT ;
+        PUSH string "/default" ;
+        SWAP ;
+        CONCAT ;
+        # url : storage : body
+        DIP { PUSH @gateway address "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw" ;
+              CONTRACT %call (pair string (pair (list (pair string string)) (pair bytes (pair nat (option (contract bytes)))))) ;
+              ASSERT_SOME } ;
+        # url : (contract %call ...) : storage : body
+        SELF %on_result ; SOME ;
+        # Some(SELF %on_result) : url : (contract ...) : storage : body
+        PUSH nat 1 ;  # method: 1 = POST
+        PAIR ;
+        # (1, Some callback) : url : (contract ...) : storage : body
+        DIG 4 ;
+        # body : (1, Some callback) : url : (contract ...) : storage
+        PAIR ;
+        # (body, (1, Some callback)) : url : (contract ...) : storage
+        NIL (pair string string) ;
+        PAIR ;
+        # ([], (body, (1, Some callback))) : url : (contract ...) : storage
+        SWAP ; PAIR ;
+        # Pair url (...) : (contract ...) : storage
+        AMOUNT ; SWAP ;
+        TRANSFER_TOKENS ;
+        # gateway_op : storage
+        # Build post-increment operation
+        SELF %_incrementWitness ;
+        PUSH mutez 0 ; UNIT ; TRANSFER_TOKENS ;
+        # post_incr : gateway_op : storage
+        NIL operation ; SWAP ; CONS ; SWAP ; CONS ;
+        # [gateway_op, post_incr] : storage
+        # Build pre-increment operation
+        SELF %_incrementWitness ;
+        PUSH mutez 0 ; UNIT ; TRANSFER_TOKENS ;
+        # pre_incr : [gateway_op, post_incr] : storage
+        CONS ;
+        # [pre_incr, gateway_op, post_incr] : storage
+        PAIR
+      }
+      { IF_LEFT
+          { # on_result(bytes): always fail with a recognisable sentinel
+            DROP ;
+            PUSH string "FAILING_CALLBACK_MARKER" ;
+            FAILWITH
+          }
+          { # _incrementWitness()
+            DROP ;
+            UNPAIR ; PUSH nat 1 ; ADD ; PAIR ;
+            NIL operation ; PAIR
+          }
+      }
+  } ;
