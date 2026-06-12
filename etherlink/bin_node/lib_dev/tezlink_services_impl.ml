@@ -128,7 +128,10 @@ let make (ctxt : Evm_ro_context.t) =
          Support unparsing_mode argument. *)
       let `Main = chain in
       let* state = get_state ~block in
-      Durable_storage.read_opt (Tezos_contract_code c) state
+      (* Resolves a code-less Tezos X alias to the shared implementation
+         (mirrors the kernel), so [/script], [/storage] and [/entrypoints]
+         return the resolved forwarder rather than an empty result. *)
+      Durable_storage.read_contract_code c state
 
     let get_script chain block c =
       let open Lwt_result_syntax in

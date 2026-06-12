@@ -96,6 +96,11 @@
   `/data/code` now resolve their script to the shared implementation,
   transparently for execution and the entrypoints RPC. Dormant until aliases
   are originated code-less. (!22103)
+- Tezos X aliases are now materialized without a per-contract script: a new
+  alias `KT1` stores no `/data/code` and resolves to the shared
+  implementation. The EVM node's Michelson RPC backend resolves code-less
+  aliases too, so `/script`, `/storage` and `/entrypoints` stay consistent
+  with the kernel. (!22105)
 - Expose a contract's storage-space watermarks through two read-only
   RPCs, `GET .../contracts/<id>/storage/used_space` and `.../paid_space`,
   mirroring L1's `get_used_storage_space` / `get_paid_storage_space`

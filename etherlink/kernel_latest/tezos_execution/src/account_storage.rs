@@ -330,14 +330,12 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
             // accounts (which never reach this trait) are untouched.
             Err(RuntimeError::PathNotFound) => {
                 if self.is_alias(host)? {
-                    // TODO: https://linear.app/tezos/issue/L2-1529
-                    // Today this is unreachable: the slot is seeded at
-                    // migration and at Michelson-runtime activation before any
-                    // alias can exist, and aliases still carry their own
-                    // `/data/code`. Once L2-1529 makes aliases code-less, the
-                    // switch-over must keep guaranteeing "seed precedes alias"
-                    // and route this as a catchable user-level failure rather
-                    // than a code-fetch error (which aborts the block).
+                    // The slot is guaranteed seeded before any code-less alias
+                    // can exist: `ensure_alias` seeds it before materializing
+                    // an alias (L2-1529), and migration / runtime activation
+                    // seed it on existing networks. So an unseeded slot here is
+                    // a should-never-happen invariant violation, surfaced as an
+                    // internal error rather than silently substituting code.
                     read_alias_implementation(host)?
                         .map(Code::Code)
                         .ok_or_else(|| {
@@ -524,10 +522,18 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
         store_bin(used, host, &path)
     }
 
+    /// Initialise an originated contract's durable state.
+    ///
+    /// `code` is `Some` for an ordinary origination. It is `None` for a
+    /// Tezos X alias, which carries no script of its own: no `/data/code` is
+    /// written, so [`TezosOriginatedAccount::code`] resolves the account to the
+    /// single shared alias implementation. A zero `/len/code` is still recorded
+    /// so storage-space accounting reads a definite code size of `0` — the
+    /// shared code is not charged per alias.
     fn init(
         &self,
         host: &mut impl StorageV1,
-        code: &[u8],
+        code: Option<&[u8]>,
         storage: &[u8],
         lazy_storage_size_diff: Zarith,
     ) -> Result<StorageSpace, tezos_storage::error::Error> {
@@ -537,7 +543,16 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
                 allocated_bytes: 0.into(),
             });
         }
-        let code_size = self.set_code(host, code)?;
+        // `None` (a Tezos X alias) writes no `/data/code` but still records a
+        // zero `/len/code`, so storage-space accounting reads a definite code
+        // size of `0` — the shared implementation is not charged per alias.
+        let code_size = match code {
+            Some(code) => self.set_code(host, code)?,
+            None => {
+                self.set_code_size(host, &0u64.into())?;
+                Zarith::from(0u64)
+            }
+        };
         let storage_size = self.set_storage(host, storage)?;
         let used_bytes =
             Zarith(code_size.0 + storage_size.0 .0 + lazy_storage_size_diff.0);
@@ -945,7 +960,9 @@ mod test {
 
         let StorageSpace {
             allocated_bytes, ..
-        } = account.init(&mut host, &code, &storage, 0.into()).unwrap();
+        } = account
+            .init(&mut host, Some(&code), &storage, 0.into())
+            .unwrap();
         let initial_size = (code.len() + storage.len()) as u64;
         assert_eq!(allocated_bytes, Zarith::from(initial_size));
         assert_eq!(
@@ -988,7 +1005,9 @@ mod test {
         let storage = vec![0xcd_u8; 20];
         let smaller_storage = vec![0x34_u8; 5];
 
-        account.init(&mut host, &code, &storage, 0.into()).unwrap();
+        account
+            .init(&mut host, Some(&code), &storage, 0.into())
+            .unwrap();
         let initial_size = (code.len() + storage.len()) as u64;
 
         let diff = account.set_storage(&mut host, &smaller_storage).unwrap();
@@ -1138,7 +1157,7 @@ mod test {
         let account = context.originated_from_contract(&contract).unwrap();
         let code = vec![0xab_u8; 30];
         let storage = vec![0xcd_u8; storage_len];
-        account.init(host, &code, &storage, 0.into()).unwrap();
+        account.init(host, Some(&code), &storage, 0.into()).unwrap();
         account
     }
 
@@ -1269,7 +1288,7 @@ mod test {
             used_bytes,
             allocated_bytes,
         } = account
-            .init(&mut host, &code, &storage, initial_lazy.into())
+            .init(&mut host, Some(&code), &storage, initial_lazy.into())
             .unwrap();
 
         let expected = (code.len() + storage.len()) as u64 + initial_lazy;

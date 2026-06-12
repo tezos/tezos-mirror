@@ -1082,6 +1082,15 @@ impl RuntimeInterface for TezosRuntime {
         // Branch 3: full materialization. Deploy the forwarder via the
         // shared `originate_contract` path, passing `Origin::Alias` so
         // the classification write is performed in the same call.
+
+        // L2-1529: guarantee the shared implementation slot is seeded before a
+        // code-less alias is created, so a code-less `Origin::Alias` account
+        // can never coexist with an unseeded slot (which would make `code()`
+        // resolution fail). Idempotent — a no-op once the slot exists (seeded
+        // at runtime activation / migration). This makes "seed precedes alias"
+        // hold by construction, on every network.
+        crate::account::init_alias_implementation(host)?;
+
         let code = alias_forwarder::forwarder_code().map_err(|e| {
             TezosXRuntimeError::Custom(format!(
                 "Failed to decode forwarder code from hex: {e}"
@@ -1153,12 +1162,18 @@ impl RuntimeInterface for TezosRuntime {
                         "Failed to typecheck forwarder script: {e:?}"
                     ))
                 })?;
+            // L2-1529: materialize the alias *code-less*. Passing `None` writes
+            // no `/data/code`, so the alias resolves to the single shared
+            // implementation (see `TezosOriginatedAccount::code`). The
+            // per-alias `/data/storage` (the native address) is still written.
+            // The internal operation built below keeps the full forwarder
+            // script, preserving the receipt indexers saw before the switch.
             originate_contract(
                 &mut tc_ctx,
                 kt1,
                 &source_account,
                 &Narith(0u64.into()),
-                &script.code,
+                None,
                 typed_storage,
                 &origin,
             )
@@ -1625,7 +1640,7 @@ mod tests {
     }
 
     #[test]
-    fn ensure_alias_deploys_forwarder_code() {
+    fn ensure_alias_materializes_code_less() {
         let mut host = test_host();
         let mut journal = TezosXJournal::default();
         let runtime = test_runtime();
@@ -1649,16 +1664,49 @@ mod tests {
                 .unwrap();
         let account = context.originated_from_kt1(&kt1).unwrap();
 
-        let code = account.code(&host).unwrap();
-        match code {
-            tezos_execution::account_storage::Code::Code(bytes) => {
-                assert_eq!(
-                    bytes,
-                    alias_forwarder::forwarder_code()
-                        .expect("FORWARDER_CODE_HEX is a valid hex constant")
-                );
-            }
-            _ => panic!("Expected regular code, not enshrined"),
+        // L2-1529: a materialized alias carries no per-contract script —
+        // nothing is written at `/data/code`. Its code is the single shared
+        // implementation.
+        let code_path = tezos_execution::context::code::code_path(&account).unwrap();
+        assert!(
+            host.store_has(&code_path).unwrap().is_none(),
+            "a materialized alias must not store its own /data/code"
+        );
+
+        // Code-less storage accounting: a definite code size of 0 (the shared
+        // code is not charged per alias), and used/paid bytes account for the
+        // per-alias storage only. This also pins the receipt's
+        // `paid_storage_size_diff`, which derives from these watermarks.
+        let storage_len =
+            tezos_execution::account_storage::TezosOriginatedAccount::storage(
+                &account, &host,
+            )
+            .unwrap()
+            .len() as u64;
+        assert_eq!(account.code_size(&host).unwrap(), Zarith::from(0u64));
+        assert_eq!(
+            account.used_bytes(&host).unwrap(),
+            Zarith::from(storage_len)
+        );
+        assert_eq!(
+            account.paid_bytes(&host).unwrap(),
+            Zarith::from(storage_len)
+        );
+
+        // It is classified as an alias, so once the shared slot is seeded its
+        // code resolves to the forwarder.
+        assert!(matches!(
+            get_origin_at(&host, &account.path().clone()).unwrap(),
+            Some(Origin::Alias(_))
+        ));
+        crate::account::init_alias_implementation(&mut host).unwrap();
+        match account.code(&host).unwrap() {
+            tezos_execution::account_storage::Code::Code(bytes) => assert_eq!(
+                bytes,
+                alias_forwarder::forwarder_code()
+                    .expect("FORWARDER_CODE_HEX is a valid hex constant")
+            ),
+            _ => panic!("Expected resolved code, not enshrined"),
         }
     }
 

@@ -40,6 +40,11 @@ val michelson_contract_storage : Tezos_types.Contract.t -> path
     ([/tez/tez_accounts/contracts/index/<hex>/data/code]). *)
 val michelson_contract_code : Tezos_types.Contract.t -> path
 
+(** [michelson_contract_origin contract] is the durable storage path of
+    [contract]'s classification record ([Native]/[Alias])
+    ([/tez/tez_accounts/contracts/index/<hex>/origin]). *)
+val michelson_contract_origin : Tezos_types.Contract.t -> path
+
 (** [michelson_contract_balance contract] is the durable storage path of
     [contract]'s balance under the legacy Path data model
     ([/tez/tez_accounts/contracts/index/<hex>/balance]). *)
@@ -95,6 +100,10 @@ val contract_hex : Tezos_types.Contract.t -> string
 (** [/tez/tez_accounts/tezosx] — root of the TezosX projected accounts
     and cross-runtime alias subtree. *)
 val michelson_ledger_root : path
+
+(** [/tez/tez_accounts/tezosx/__system__/alias_implementation] — the single
+    shared Michelson implementation backing every Tezos X alias. *)
+val michelson_alias_implementation : path
 
 (** TezosX: root for Tezos blocks stored under the Michelson world state
     ([/tez/world_state/tez_blocks]). *)

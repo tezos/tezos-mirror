@@ -197,6 +197,13 @@ type ('a, 'cap) path =
   | Tezos_contract_code :
       Tezos_types.Contract.t
       -> (Tezlink_imports.Imported_context.Script.expr, ro) path
+  (* Whether an originated account is classified as a Tezos X alias
+     ([Origin::Alias]); used to resolve a code-less alias to the shared
+     implementation. [None] when the account carries no classification. *)
+  | Tezos_contract_origin : Tezos_types.Contract.t -> (bool, ro) path
+  (* The single shared Michelson implementation backing every alias. *)
+  | Tezos_alias_implementation :
+      (Tezlink_imports.Imported_context.Script.expr, ro) path
   | Tezos_contract_used_bytes : Tezos_types.Contract.t -> (Z.t, ro) path
   | Tezos_contract_paid_bytes : Tezos_types.Contract.t -> (Z.t, ro) path
   | Tezos_big_map_value :
@@ -690,6 +697,24 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
             safe_binary_decode
               Tezlink_imports.Imported_context.Script.expr_encoding;
         }
+  | Tezos_contract_origin contract ->
+      static_ro
+        {
+          path = Durable_storage_path.michelson_contract_origin contract;
+          (* The kernel encodes [Origin] as a u8-tagged enum: tag 0 is
+             [Native], tag 1 is [Alias]. We only need the discriminant. *)
+          decode =
+            (fun bytes ->
+              Ok (Bytes.length bytes > 0 && Bytes.get_uint8 bytes 0 = 1));
+        }
+  | Tezos_alias_implementation ->
+      static_ro
+        {
+          path = Durable_storage_path.michelson_alias_implementation;
+          decode =
+            safe_binary_decode
+              Tezlink_imports.Imported_context.Script.expr_encoding;
+        }
   | Tezos_contract_used_bytes contract ->
       static_ro
         {
@@ -859,6 +884,22 @@ let read_or_default (type a) ~(default : a) (p : (a, [> `Read]) path)
   let open Lwt_result_syntax in
   let+ v_opt = read_opt p state in
   Option.value v_opt ~default
+
+let read_contract_code contract state =
+  let open Lwt_result_syntax in
+  let* code = read_opt (Tezos_contract_code contract) state in
+  match code with
+  | Some _ -> return code
+  | None ->
+      (* A code-less Tezos X alias (L2-1529) stores no [/data/code]; its
+         script is the single shared implementation. Mirror the kernel's
+         resolution (see [TezosOriginatedAccount.code]): on a code miss, if the
+         account is classified as an alias, return the shared implementation.
+         Any other code-less account stays [None]. Shared by every RPC backend
+         so they cannot drift. *)
+      let* is_alias = read_opt (Tezos_contract_origin contract) state in
+      if is_alias = Some true then read_opt Tezos_alias_implementation state
+      else return_none
 
 let write : type a.
     (a, [> `Write]) path -> a -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t =
