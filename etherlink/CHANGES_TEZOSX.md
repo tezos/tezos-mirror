@@ -303,6 +303,14 @@
 
 ### Internals
 
+- Michelson callee now reports the storage cost it allocates back to
+  the caller through `X-Tezos-Storage-Cost` (post-execution) and
+  `alias_storage_cost` (pre-dispatch, on alias materialization).
+  Previously the cost was dropped. (!22124)
+- Michelson caller now consumes the storage cost a callee delegates
+  back through `X-Tezos-Storage-Cost` and `alias_storage_cost`, and
+  burns the accumulated total on the sender's balance at the top-level
+  manager-op. Previously the cost was dropped. (!22124)
 - The Michelson burn pass no longer charges operations surfaced in
   the manager-op receipt tree by the CRAC drain mechanism. Each
   frame is now responsible for the storage fees of its own
