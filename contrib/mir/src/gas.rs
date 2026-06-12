@@ -564,7 +564,8 @@ pub mod interpret_cost {
     pub const LOOP_ENTER: u32 = 10; // corresponds to KLoop_in in the Tezos protocol
     pub const LOOP_LEFT_ENTER: u32 = 10; // corresponds to KLoop_in_left in the Tezos protocol
     pub const LOOP_EXIT: u32 = 15;
-    pub const CREATE_CONTRACT: u32 = 60;
+    // corresponds to cost_N_ICreate_contract in the Tezos protocol
+    pub const CREATE_CONTRACT: u32 = 340;
     pub const VIEW: u32 = 65; // corresponds to cost_N_IView_synthesized in the Tezos protocol
 
     // corresponds to cost_N_IJoin_tickets in the Tezos protocol
