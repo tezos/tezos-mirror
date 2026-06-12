@@ -171,8 +171,6 @@ module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
 
   type repo = Irmin_context.repo
 
-  type tree = Irmin_context.tree
-
   module Ctxt_wrapper = Context_wrapper.Irmin
 
   let kind = Sc_rollup.Kind.Wasm_2_0_0

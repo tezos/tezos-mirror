@@ -102,16 +102,16 @@ end
 module type S = sig
   type repo
 
-  type tree
+  type state
 
   module Ctxt_wrapper :
-    Context.Wrapper.S with type repo = repo and type state = tree
+    Context.Wrapper.S with type repo = repo and type state = state
 
   include
     Sc_rollup.PVM.S
       with type hash = Sc_rollup.State_hash.t
        and type context = ([`Read | `Write], repo) Context_sigs.raw_index
-       and type state = tree
+       and type state := state
 
   (** Kind of the PVM. *)
   val kind : Sc_rollup.Kind.t

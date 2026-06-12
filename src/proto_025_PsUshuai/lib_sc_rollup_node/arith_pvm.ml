@@ -50,8 +50,6 @@ module Impl : Pvm_sig.S = struct
 
   type repo = Irmin_context.repo
 
-  type tree = Irmin_context.tree
-
   module Ctxt_wrapper = Context_wrapper.Irmin
 
   let kind = Sc_rollup.Kind.Example_arith
@@ -122,7 +120,7 @@ module Impl : Pvm_sig.S = struct
        and type t = Ctxt_wrapper.mut_state = struct
     include Irmin_context.PVMState
 
-    type t = tree ref
+    type t = state ref
 
     type hash = Sc_rollup.State_hash.t
 

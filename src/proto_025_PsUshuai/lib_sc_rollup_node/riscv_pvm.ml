@@ -13,8 +13,6 @@ module Storage = Octez_riscv_pvm.Storage
 
 type repo = Context.repo
 
-type tree = Context.state
-
 module Backend = Octez_riscv_pvm.Backend
 module Ctxt_wrapper = Context_wrapper.Riscv
 
@@ -92,7 +90,7 @@ module PVM :
         (fun _ -> Error "void has no inhabitant")
         unit)
 
-  type state = tree
+  type state = Context.state
 
   let pp _ = raise (Invalid_argument "pp not implemented")
 
