@@ -17,6 +17,14 @@
   accounts are touched, but classifications recorded in the old
   `/origin` records are **not** migrated — networks holding such state
   must be reset. (!22126)
+- Removed the legacy `transfer(string implicitAddress)` selector from
+  the runtime gateway precompile. Use the generic
+  `call(string,(string,string)[],bytes,uint8)` entrypoint instead: a
+  POST to `http://tezos/<address>` with an empty body and the value
+  attached performs the same transfer. A calldata carrying the removed
+  selector now reverts with `invalid input encoding`. The AliasForwarder
+  predeployed contract was updated accordingly and forwards through the
+  generic entrypoint.
 - The synthetic EVM transaction that mirrors a Michelson operation's
   inbound cross-runtime calls is now a neutral envelope: `from` and `to`
   are both the originator's alias and `value` is `0`. It no longer
@@ -88,6 +96,15 @@
 
 ### Michelson Runtime
 
+- Removed the legacy `%default` (simple transfer, `string`) entrypoint
+  from the gateway contract. Use the generic `%call` entrypoint instead:
+  a POST to `http://ethereum/<address>` with an empty body and the
+  operation's amount attached performs the same transfer. Calling the
+  removed entrypoint — including a plain tez send with no parameter —
+  now fails with an unknown-entrypoint error. The Michelson alias
+  forwarder script deployed for new aliases forwards through `%call`;
+  forwarders originated before this change keep the old script and fail
+  to forward until their alias is re-created.
 - Re-priced the gas costs of many Michelson instructions
   from the values inherited from L1 (a Tallinn-era snapshot) to values
   re-benchmarked directly on the MIR (Rust) interpreter. This changes the
