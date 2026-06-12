@@ -85,6 +85,12 @@ DAL node
   periodic heartbeat event (one per level), letting consumers detect a stalled
   connection during periods with no attestable-slot activity. (MR :gl:`!22471`)
 
+- Bounded the amplification reconstruction queue of the DAL node and stopped it
+  from enqueuing duplicates. This prevents a sustained flow of shards from
+  growing the queue without bound and driving observer/operator nodes out of
+  memory. When the bound is reached, excess amplification requests are dropped
+  and a warning is logged. (MR :gl:`!22169`)
+
 - Fixed a DAL node crash that could occur after a restart with a persisted
   store: the startup status backfill could leave a slot's status inconsistent
   with the skip-list store, tearing down the node's daemon (gossipsub, P2P and
