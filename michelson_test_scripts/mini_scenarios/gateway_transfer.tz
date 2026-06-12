@@ -1,4 +1,5 @@
-# Transfers to the TezosXGateway enshrined contract's %default entrypoint.
+# Transfers to the TezosXGateway enshrined contract's generic %call
+# entrypoint (HTTP POST to the EVM destination with an empty body).
 # Storage: pair address string
 #   address = gateway KT1
 #   string  = EVM destination address
@@ -8,7 +9,20 @@ code {
        CDR;
        DUP;
        UNPAIR;
-       CONTRACT string;
+       SWAP;
+       PUSH string "http://ethereum/";
+       CONCAT;
+       NONE (contract bytes);
+       PUSH nat 1;
+       PAIR;
+       PUSH bytes 0x;
+       PAIR;
+       NIL (pair string string);
+       PAIR;
+       SWAP;
+       PAIR;
+       SWAP;
+       CONTRACT %call (pair string (pair (list (pair string string)) (pair bytes (pair nat (option (contract bytes))))));
        ASSERT_SOME;
        SWAP;
        AMOUNT;

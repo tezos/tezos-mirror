@@ -4016,14 +4016,14 @@ let test_cross_runtime_call_from_michelson_contract_to_evm_revert =
   unit
 
 (** Test cross-runtime transfer from a Michelson contract to an EVM EOA
-    via the gateway's default entrypoint.
+    via the gateway's generic %call entrypoint.
 
     1. Originate [gateway_transfer.tz] with storage pointing to the gateway
        KT1 and an EVM destination address.
     2. Call the Michelson contract via the delayed inbox with some amount.
     3. Verify the EVM destination received the funds, proving the call went:
        delayed inbox -> Michelson contract -> TRANSFER_TOKENS ->
-       enshrined gateway (default) -> cross-runtime bridge -> EVM EOA. *)
+       enshrined gateway (%call) -> cross-runtime bridge -> EVM EOA. *)
 let test_cross_runtime_transfer_from_michelson_contract_to_evm =
   Setup.register_fullstack_test
     ~time_between_blocks:Nothing
