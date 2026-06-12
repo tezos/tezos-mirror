@@ -8,11 +8,15 @@
 (** Generic Michelson-runtime capacity benchmark.
 
     Factorises the procedure shared by all the single-contract Michelson
-    capacity scenarios (stress_INT_nat, stress_DIPN, and the generic
-    [michelson_call]). It works for any contract whose storage is [unit]
-    and whose default entrypoint takes [unit]: such a contract can be
-    called with a plain zero-amount, [Unit]-parameter transaction, which is
-    exactly what [Tezlink_utils.batch_calls] injects.
+    capacity scenarios (stress_INT_nat, stress_DIPN, the generic
+    [michelson_call] and [fa_transfer]). By default it drives a contract
+    whose storage is [unit] and whose default entrypoint takes [unit],
+    calling it with plain zero-amount, [Unit]-parameter transactions —
+    exactly what [Tezlink_utils.batch_calls] injects. The optional
+    [mk_init], [burn_cap] and [call] parameters of {!run} generalise this
+    to contracts with a non-trivial origination storage and a
+    parameterized, per-signer entrypoint call (e.g. an FA token's
+    [transfer]).
 
     The flow is: originate the contract, estimate its per-call gas with one
     real call, then drive the standard stepped iteration loop ([lanes]
@@ -47,14 +51,31 @@ let init_michelson_sandbox ~tez_bootstrap_accounts =
   in
   return (sequencer, client)
 
+(** Per-signer parameterized call. [entrypoint] is the entrypoint every
+    injected operation targets. [mk_arg ~index ~signers] returns the
+    Michelson concrete-syntax argument of the call injected by signer
+    [signers.(index)]; it is converted to JSON-Micheline once at setup
+    time, keeping the hot path free of [octez-client] subprocesses. *)
+type call_spec = {
+  entrypoint : string;
+  mk_arg : index:int -> signers:Account.key array -> string;
+}
+
 (** [run ~scenario_name ~code ()] is the test body shared by every
     single-contract Michelson capacity benchmark.
 
     - [scenario_name] is used as the origination alias and in log lines.
     - [code] is a thunk returning the contract's Michelson source (read
-      lazily, at test time rather than registration time). The contract
-      must have storage [unit] and a default entrypoint taking [unit]. *)
-let run ~scenario_name ~code () =
+      lazily, at test time rather than registration time).
+    - [mk_init] builds the origination storage from the bootstrap [admin]
+      and the lane [signers] (defaults to [Unit]).
+    - [burn_cap] caps the storage burn of the origination (useful when
+      [mk_init] pre-populates storage proportional to [--accounts]).
+    - [call] makes every injected operation a parameterized call (see
+      {!call_spec}); without it, the contract must have storage [unit]
+      and a default entrypoint taking [unit]. *)
+let run ~scenario_name ~code ?(mk_init = fun ~admin:_ ~signers:_ -> "Unit")
+    ?burn_cap ?call () =
   (* [Test_helpers.init_sequencer_sandbox] hardcodes
      [time_between_blocks = Nothing], so block production is Manual: the
      driver below drives every block via [Rpc.produce_block]. Auto mode is
@@ -73,7 +94,8 @@ let run ~scenario_name ~code () =
      of [Account.Bootstrap.keys] and lets [--accounts] scale freely. The lane
      signers sign in-process ([Account.sign_bytes] inside [batch_calls]), so —
      unlike [bootstrap1], which originates and runs the gas estimate via
-     [octez-client] — they never need to be imported into the [Client]. *)
+     [octez-client] — they never need to be imported into the [Client],
+     except when [call] is given (see the import below). *)
   let signers =
     List.init nb_signers (fun i ->
         Account.generate_new_key
@@ -83,6 +105,20 @@ let run ~scenario_name ~code () =
 
   let* sequencer, client =
     init_michelson_sandbox ~tez_bootstrap_accounts:(bootstrap1 :: signers)
+  in
+  (* With a parameterized [call], the one-shot gas estimation below runs
+     from the first lane signer (its argument may reference the signer's
+     own pkh, e.g. an FA [transfer]'s [from_]) via [Client.transfer
+     ~giver:signer.alias], so the signers' secret keys must be known to
+     the [Client]. The hot path still signs in-process. *)
+  let* () =
+    match call with
+    | None -> unit
+    | Some _ ->
+        Lwt_list.iter_s
+          (fun (s : Account.key) ->
+            Client.import_secret_key client s.secret_key ~alias:s.alias)
+          signers
   in
   let tezlink_endpoint = Tezlink_utils.tezlink_foreign_endpoint sequencer in
   let endpoint = Client.Foreign_endpoint tezlink_endpoint in
@@ -99,7 +135,8 @@ let run ~scenario_name ~code () =
       ~src:bootstrap1.alias
       ~alias:scenario_name
       ~code
-      ~init:"Unit"
+      ~init:(mk_init ~admin:bootstrap1 ~signers)
+      ?burn_cap
       ()
   in
   Log.info "Originated %s at %s (forcing block to apply)" scenario_name contract ;
@@ -109,16 +146,54 @@ let run ~scenario_name ~code () =
   | Error _ -> Test.fail "produce_block after origination failed") ;
   let* () = Lwt_unix.sleep 0.5 in
 
+  let signers_arr = Array.of_list signers in
+  (* Convert each signer's call argument to JSON-Micheline once, at setup
+     time: [batch_calls] takes a [JSON.u] (the Operation_core manager API),
+     and doing the conversion here keeps the hot path free of
+     [octez-client] subprocesses. *)
+  let* signer_args =
+    match call with
+    | None -> return (List.map (fun signer -> (signer, None)) signers)
+    | Some {mk_arg; _} ->
+        Lwt_list.map_s
+          (fun (index, (signer : Account.key)) ->
+            let data = mk_arg ~index ~signers:signers_arr in
+            let* arg = Client.convert_data_to_json ~data client in
+            return (signer, Some arg))
+          (List.mapi (fun index signer -> (index, signer)) signers)
+  in
+
   Log.report "Estimating gas for one call to %s" contract ;
+  (* With a parameterized [call] the estimate runs from the first lane
+     signer with that signer's argument; the plain case keeps using
+     [bootstrap1] with a [Unit] parameter. Either way the baselines below
+     are read after this call, so the estimate's counter bump is
+     absorbed. *)
   let* milligas =
-    Tezlink_utils.estimate_consumed_milligas
-      ~client
-      ~endpoint
-      ~sequencer
-      ~giver:bootstrap1.alias
-      ~receiver:contract
-      ~drive_block:true
-      ()
+    match call with
+    | None ->
+        Tezlink_utils.estimate_consumed_milligas
+          ~client
+          ~endpoint
+          ~sequencer
+          ~giver:bootstrap1.alias
+          ~receiver:contract
+          ~drive_block:true
+          ()
+    | Some {entrypoint; mk_arg} -> (
+        match signers with
+        | [] -> Test.fail "%s requires at least one signer" scenario_name
+        | (estimate_signer : Account.key) :: _ ->
+            Tezlink_utils.estimate_consumed_milligas
+              ~client
+              ~endpoint
+              ~sequencer
+              ~giver:estimate_signer.alias
+              ~receiver:contract
+              ~entrypoint
+              ~arg:(mk_arg ~index:0 ~signers:signers_arr)
+              ~drive_block:true
+              ())
   in
   let gas = (milligas + 999) / 1000 in
   let gas_limit = max (gas + 100) (gas * 105 / 100) in
@@ -138,7 +213,7 @@ let run ~scenario_name ~code () =
 
   let* baselines =
     Lwt_list.map_s
-      (fun (signer : Account.key) ->
+      (fun ((signer : Account.key), _arg) ->
         let* c =
           Tezlink_utils.get_counter
             ~tezlink_endpoint
@@ -146,7 +221,7 @@ let run ~scenario_name ~code () =
             ()
         in
         return (signer, c))
-      signers
+      signer_args
   in
 
   let expected =
@@ -166,7 +241,13 @@ let run ~scenario_name ~code () =
      regardless of how much gas each one consumed. *)
   let* first_benchmark_level = Tezlink_utils.head_level ~client ~endpoint () in
 
+  let entrypoint = Option.map (fun {entrypoint; _} -> entrypoint) call in
   let* _result, _visited_levels =
+    (* Report the durable-storage host-function calls performed during the
+       benchmark loop, exactly like the EVM-runtime capacity benchmarks. The
+       Michelson runtime executes in the same WASM kernel, so its host calls
+       bump the same [octez_evm_node_host_function_calls] metric. *)
+    with_collect_host_function_metrics sequencer @@ fun () ->
     Tezlink_utils.monitor_michelson_gasometer ~sequencer @@ fun () ->
     (* Iterations are stepped: all signers inject their operations for
        iteration N in parallel, then we drive the block carrying them and
@@ -189,7 +270,7 @@ let run ~scenario_name ~code () =
            resumes from wherever the signer actually is. *)
         let* iteration_expected =
           Lwt_list.map_p
-            (fun (signer : Account.key) ->
+            (fun ((signer : Account.key), arg) ->
               let* current =
                 Tezlink_utils.get_counter
                   ~tezlink_endpoint
@@ -204,6 +285,8 @@ let run ~scenario_name ~code () =
                   ~counter:(current + 1)
                   ~signer
                   ~receiver:contract
+                  ?entrypoint
+                  ?arg
                   ~gas_limit
                     (* Fee must cover per-gas base fee; sandbox + Tezos runtime
                        uses ~0.01 mutez/gas, so ~10k mutez per ~1M-gas call. *)
@@ -212,7 +295,7 @@ let run ~scenario_name ~code () =
                   ()
               in
               return (signer.public_key_hash, current + lanes, current))
-            signers
+            signer_args
         in
         let* res = Rpc.produce_block sequencer in
         (match res with
@@ -252,8 +335,10 @@ let run ~scenario_name ~code () =
     [extra_tags] are appended to the common Michelson-capacity tag set.
     [title] overrides the default title (which is derived from [name]); use
     it to avoid clashing with another scenario that shares the same [name]
-    (tezt requires unique titles). *)
-let register_benchmark ~__FILE__ ~name ?title ?(extra_tags = []) ~code () =
+    (tezt requires unique titles). [mk_init], [burn_cap] and [call] are
+    passed through to {!run}. *)
+let register_benchmark ~__FILE__ ~name ?title ?(extra_tags = []) ~code ?mk_init
+    ?burn_cap ?call () =
   Test.register
     ~__FILE__
     ~title:
@@ -271,4 +356,4 @@ let register_benchmark ~__FILE__ ~name ?title ?(extra_tags = []) ~code () =
         Constant.WASM.evm_kernel;
         Constant.smart_rollup_installer;
       ]
-  @@ fun () -> run ~scenario_name:name ~code ()
+  @@ fun () -> run ~scenario_name:name ~code ?mk_init ?burn_cap ?call ()
