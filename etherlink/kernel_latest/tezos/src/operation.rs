@@ -12,7 +12,7 @@ use tezos_crypto_rs::hash::{
 };
 use tezos_data_encoding::types::Narith;
 use tezos_data_encoding::{
-    enc::{BinError, BinWriter},
+    enc::{BinError, BinResult, BinWriter},
     nom::{self as tezos_nom, NomReader, NomResult},
 };
 pub use tezos_protocol::operation::{
@@ -60,11 +60,29 @@ pub enum OperationContent {
 
 // In Tezlink, we'll only support ManagerOperation so we don't
 // have to worry about other operations
-#[derive(PartialEq, Debug, Clone, BinWriter)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Operation {
     pub branch: BlockHash,
     pub content: Vec<ManagerOperationContent>,
     pub signature: UnknownSignature,
+}
+
+// Manual `BinWriter` (the derived one would accept any `content`) so that
+// writing an operation with an empty content list is rejected, keeping the
+// writer symmetric with `nom_read` below which refuses to parse such
+// operations: an empty-content operation can never be persisted and then
+// fail to decode.
+impl BinWriter for Operation {
+    fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
+        if self.content.is_empty() {
+            return Err(BinError::custom("empty operation content list".to_string()));
+        }
+        self.branch.bin_write(output)?;
+        for content in &self.content {
+            content.bin_write(output)?;
+        }
+        self.signature.bin_write(output)
+    }
 }
 
 // Byte length of the trailing `UnknownSignature`. Derived from the crypto
@@ -395,6 +413,21 @@ mod tests {
         let decoded_operation =
             Operation::decode(&rlp).expect("Decoding operation should have succeeded");
         assert_eq!(operation, decoded_operation);
+    }
+
+    // The reader rejects empty content lists; the writer must do the same so
+    // an empty-content operation can never be persisted and then fail to
+    // decode.
+    #[test]
+    fn empty_content_operation_is_rejected_by_writer() {
+        let operation = Operation {
+            content: vec![],
+            ..make_dummy_reveal_operation()
+        };
+        assert!(
+            operation.to_bytes().is_err(),
+            "writing an operation with an empty content list should fail"
+        );
     }
 
     #[test]
