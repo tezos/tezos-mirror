@@ -326,11 +326,12 @@ pub fn read_optional_nom_value<T: for<'a> NomReader<'a>>(
     host: &impl StorageV1,
     path: &impl Path,
 ) -> Result<Option<T>, Error> {
-    if let Some(ValueType::Value) = host.store_has(path)? {
-        let value = read_nom_value(host, path)?;
-        Ok(Some(value))
-    } else {
-        Ok(None)
+    // Read directly and map a missing path to `None`, avoiding the extra
+    // `store_has` probe (same pattern as [`read_optional_nom_value_bounded`]).
+    match host.store_read_all(path) {
+        Ok(bytes) => decode_nom_value(&bytes).map(Some),
+        Err(RuntimeError::PathNotFound) => Ok(None),
+        Err(err) => Err(err.into()),
     }
 }
 
