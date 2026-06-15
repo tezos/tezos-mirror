@@ -20,7 +20,7 @@ use mir::{
         AddressHash, IntoMicheline, Micheline, PublicKeyHash, Type, TypedValue,
     },
     context::{CtxTrait, TypecheckingCtx},
-    gas::Gas,
+    gas::{interpret_cost, Gas, OutOfGas},
 };
 use num_bigint::{BigInt, BigUint};
 use tezos_crypto_rs::blake2b::digest_256;
@@ -1023,8 +1023,18 @@ pub fn clear_temporary_big_maps<Host: StorageV1, C: Context>(
 /// Hashes a Micheline expression using the packed format (with 0x05 prefix)
 /// to match L1's Script_expr_hash.
 /// See: https://gitlab.com/tezos/tezos/-/blob/master/src/proto_023_PtSeouLo/lib_protocol/script_ir_translator.ml#L159
-fn hash_micheline_expr(expr: &Micheline<'_>) -> Result<ScriptExprHash, LazyStorageError> {
+fn hash_micheline_expr(
+    expr: &Micheline<'_>,
+    gas: &mut mir::gas::Gas,
+) -> Result<ScriptExprHash, LazyStorageError> {
     let bytes = expr.encode_for_pack()??;
+    // L1 charges the key hash via `hash_comparable_data` -> `hash_bytes`
+    // (`Cost_of.Interpreter.blake2b`). Charge MIR's blake2b model on the
+    // packed key bytes (same model as L1, with the values re-benchmarked by
+    // the re-pricing series, so not the protocol's current cost_N_IBlake2b).
+    let cost = interpret_cost::blake2b(&bytes)
+        .map_err(|_| LazyStorageError::OutOfGasError(OutOfGas))?;
+    gas.consume(cost)?;
     Ok(digest_256(&bytes).into())
 }
 
@@ -1072,7 +1082,7 @@ fn hash_key(
 ) -> Result<ScriptExprHash, LazyStorageError> {
     let parser = Parser::new();
     let key_micheline = key.into_micheline_optimized_legacy(&parser.arena, gas)?;
-    hash_micheline_expr(&key_micheline)
+    hash_micheline_expr(&key_micheline, gas)
 }
 
 /// Function to convert a BtreeMap that represent the lazy_storage_diff
@@ -1315,7 +1325,7 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         let key_encoded = micheline_expr.encode(&mut self.operation_gas.remaining)??;
         // key_hashed: hash of packed encoding (with 0x05 prefix), used for storage path
         // See: https://gitlab.com/tezos/tezos/-/blob/master/src/proto_023_PtSeouLo/lib_protocol/script_ir_translator.ml#L5563
-        let key_hashed = hash_micheline_expr(&micheline_expr)?;
+        let key_hashed = hash_micheline_expr(&micheline_expr, self.gas())?;
         let value_path = value_path(self.context, id, &key_hashed)?;
         match value {
             None => {
