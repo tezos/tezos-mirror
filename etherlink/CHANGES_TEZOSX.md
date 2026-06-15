@@ -140,7 +140,7 @@
   trigger is wired yet. (!22157)
 - Improved the performance of reading an implicit account's balance,
   counter, and manager in the Michelson runtime by reducing the number
-  of durable-storage accesses each read performs. (!22137)
+  of durable-storage accesses each read performs. (!22137, !22194)
 - Improved the performance of originated-contract storage accounting in
   the Michelson runtime: a contract's code size, storage size, and
   used/paid storage watermarks are now kept in a single durable-storage
