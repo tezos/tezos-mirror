@@ -244,6 +244,8 @@ let job_dispatch_call =
         (Job, job_gitlab_release `real);
         (Job, job_release_page `real `wait_for_build);
       ]
+    ~environment:
+      Gitlab_ci.Types.{name = "tezcapital-dispatch"; action = Some Access}
     ~script:["./scripts/releases/dispatch-call.sh"]
 
 let () =
