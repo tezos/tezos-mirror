@@ -63,33 +63,6 @@ oc.docker:rust-toolchain:amd64:
     reports:
       dotenv: rust_toolchain_image_tag.env
 
-oc.docker:rust-sdk-bindings:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: images
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_rust_sdk_bindings_build.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "false"
-    IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
-  artifacts:
-    reports:
-      dotenv: rust_sdk_bindings_image_tag.env
-
 oc.docker:ci:arm64:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: images
@@ -658,23 +631,17 @@ select_tezts:
     when: always
 
 sdk_bindings.test:
-  image: ${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust-sdk-bindings:trixie-master-a8af426e
   stage: test
   tags:
   - gcp
   rules:
   - changes:
     - contrib/sdk-bindings/**/*
-    - images/create_image.sh
-    - images/rust-sdk-bindings/**/*
-    - images/scripts/install_sccache_static.sh
-    - scripts/version.sh
     - sdk/rust/**/*
     when: on_success
-  needs:
-  - oc.docker:rust-sdk-bindings:amd64
-  dependencies:
-  - oc.docker:rust-sdk-bindings:amd64
+  needs: []
+  dependencies: []
   allow_failure: true
   timeout: 60 minutes
   cache:

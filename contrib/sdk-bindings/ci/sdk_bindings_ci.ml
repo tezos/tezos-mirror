@@ -8,17 +8,9 @@
 open Tezos_ci
 
 module Files = struct
-  let image =
-    [
-      "images/rust-sdk-bindings/**/*";
-      "images/create_image.sh";
-      "images/scripts/install_sccache_static.sh";
-      "scripts/version.sh";
-    ]
-
   let code = ["sdk/rust/**/*"; "contrib/sdk-bindings/**/*"]
 
-  let all = image @ code
+  let all = code
 end
 
 module CI = Cacio.Make (struct
@@ -35,7 +27,7 @@ let job_test =
     "test"
     ~__POS__
     ~description:"Tests bindings of the Rust SDK"
-    ~image:Images.rust_sdk_bindings
+    ~image:Images.Base_images.debian_rust_sdk_bindings
     ~stage:Test
     ~allow_failure:Yes
     ~cargo_cache:true
@@ -87,7 +79,7 @@ module Release = struct
       ~__POS__
       ~description:"Build Python SDK for Linux"
       ~stage:Build
-      ~image:Images.rust_sdk_bindings
+      ~image:Images.Base_images.debian_rust_sdk_bindings
       ~artifacts
       ~cargo_cache:true
       ~sccache:(Cacio.sccache ())
@@ -160,7 +152,7 @@ module Release = struct
       ~__POS__
       ~description:"Publish all previously built SDK"
       ~stage:Publish
-      ~image:Images.rust_sdk_bindings
+      ~image:Images.Base_images.debian_rust_sdk_bindings
       ~variables:
         [
           ("MATURIN_REPOSITORY", "testpypi");

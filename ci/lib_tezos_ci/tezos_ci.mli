@@ -581,8 +581,6 @@ module Images : sig
 
   val rust_toolchain : Image.t
 
-  val rust_sdk_bindings : Image.t
-
   val trivy : Image.t
 
   val node_alpine : Image.t
@@ -654,6 +652,10 @@ module Images : sig
     val debian_homebrew_trixie : Image.t
 
     val debian_rust_trixie : Image.t
+
+    (** Image containing all dependencies required to build the Rust SDK
+        bindings, built in the [base_images.daily] pipeline. *)
+    val debian_rust_sdk_bindings : Image.t
 
     (** The Docker version used in Docker-in-Docker CI jobs
         (e.g. ["28.5.1"]). *)

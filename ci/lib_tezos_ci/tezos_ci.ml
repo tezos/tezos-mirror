@@ -1546,6 +1546,16 @@ module Base_images = struct
      https://gitlab.com/tezos/tezos/-/commit/23205065/pipelines *)
   let debian_rust_trixie = make_img "debian-rust:trixie" "master-23205065"
 
+  (* [debian-rust-sdk-bindings-trixie] *)
+  (* Image containing all dependencies required to build the Rust SDK
+     bindings. Built by [images.debian-rust-sdk-bindings] in the
+     [base_images.daily] pipeline.
+     Version created by https://gitlab.com/tezos/tezos/-/pipelines/2593078862
+     May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
+     https://gitlab.com/tezos/tezos/-/commit/a8af426e/pipelines *)
+  let debian_rust_sdk_bindings =
+    make_img "debian-rust-sdk-bindings:trixie" "master-a8af426e"
+
   let docker_version = docker_version
 
   let dind_service = sf "docker:%s-dind@%s" docker_version dind_digest
@@ -1737,38 +1747,6 @@ module Images = struct
     in
     let image_path =
       "${rust_toolchain_image_name}:${rust_toolchain_image_tag}"
-    in
-    Image.mk_internal
-      ~image_builder_amd64:(image_builder Amd64 ())
-      ~image_builder_arm64:(image_builder Arm64 ~storage:Ramfs ())
-      ~image_path
-      ()
-
-  (** The image containing all dependencies required for Rust SDK bindings *)
-  let rust_sdk_bindings =
-    (* The job that builds the rust-sdk-bindings image.
-       This job is automatically included in any pipeline that uses this image. *)
-    let image_builder arch ?storage () =
-      job_docker_authenticated
-        ~__POS__
-        ~arch
-        ?storage
-        ~stage
-        ~name:("oc.docker:rust-sdk-bindings:" ^ Runner.Arch.show_uniform arch)
-        ~description:
-          ("Build internal rust-sdk-bindings images for "
-          ^ Runner.Arch.show_uniform arch)
-        ~ci_docker_hub:false
-        ~variables:
-          [("IMAGE", Base_images.(Format.asprintf "%a" pp debian_trixie))]
-        ~artifacts:
-          (artifacts
-             ~reports:(reports ~dotenv:"rust_sdk_bindings_image_tag.env" ())
-             [])
-        ["./scripts/ci/docker_rust_sdk_bindings_build.sh"]
-    in
-    let image_path =
-      "${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}"
     in
     Image.mk_internal
       ~image_builder_amd64:(image_builder Amd64 ())

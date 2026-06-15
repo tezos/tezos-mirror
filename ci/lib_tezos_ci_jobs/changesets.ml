@@ -38,15 +38,6 @@ let changeset_images_rust_toolchain =
       "scripts/version.sh";
     ]
 
-let changeset_images_rust_sdk_bindings =
-  Changeset.make
-    [
-      "images/rust-sdk-bindings/**/*";
-      "images/create_image.sh";
-      "images/scripts/install_datadog_static.sh";
-      "scripts/version.sh";
-    ]
-
 (** Only if octez source code has changed *)
 let changeset_octez =
   let octez_source_content =
@@ -97,8 +88,4 @@ let changeset_homebrew =
       ])
 
 let changeset_test_sdk_bindings =
-  Changeset.(
-    changeset_base
-    @ changeset_images_rust_sdk_bindings
-      (* Run if the [rust-sdk-bindings] image is updated *)
-    @ Sdk_bindings_ci.changeset)
+  Changeset.(changeset_base @ Sdk_bindings_ci.changeset)
