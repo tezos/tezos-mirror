@@ -21,8 +21,8 @@ use tezos_tezlink::operation_result::{
 use crate::account_storage::TezlinkAccount;
 use crate::burn_tez;
 
+pub const COST_PER_BYTES: u64 = 1;
 // Values from src/proto_023_PtSeouLo/lib_parameters/default_parameters.ml.
-pub const COST_PER_BYTES: u64 = 250;
 pub const ORIGINATION_SIZE: u64 = 257;
 pub const HARD_STORAGE_LIMIT_PER_OPERATION: u64 = 60_000;
 
@@ -363,7 +363,8 @@ mod tests {
     #[test]
     fn burn_storage_fee_insolvent_returns_cannot_pay() {
         let mut host = MockKernelHost::default();
-        let initial_balance = 100_u64;
+        // Cost = 10 × COST_PER_BYTES; balance is 5, strictly below.
+        let initial_balance = 5_u64;
         let nb_consumed_bytes = 10_u64;
         let payer = init_payer(&mut host, initial_balance);
 
@@ -478,7 +479,8 @@ mod tests {
     #[test]
     fn insolvent_payer_returns_cannot_pay() {
         let mut host = MockKernelHost::default();
-        let payer = init_payer(&mut host, 100);
+        // Burn cost = 10 × COST_PER_BYTES; balance is 5, strictly below.
+        let payer = init_payer(&mut host, 5);
         let mut content = applied_transfer(TransferSuccess {
             paid_storage_size_diff: 10_u64.into(),
             ..Default::default()
@@ -490,7 +492,7 @@ mod tests {
             err,
             ApplyOperationError::CannotPayStorageFee(BalanceTooLow {
                 contract: payer.contract(),
-                balance: 100_u64.into(),
+                balance: 5_u64.into(),
                 amount: (10 * COST_PER_BYTES).into(),
             }),
         );
@@ -637,9 +639,9 @@ mod tests {
     #[test]
     fn origination_insolvent_on_slot_burn_returns_cannot_pay() {
         let mut host = MockKernelHost::default();
-        // Cover variable burn (38 × COST_PER_BYTES = 9_500) but not the slot burn.
-        // 10_000 - 9_500 = 500 remaining
-        let payer = init_payer(&mut host, 10_000);
+        // Cover variable burn (38 × COST_PER_BYTES = 38) but not the
+        // slot burn (SLOT_BURN = 257). 100 - 38 = 62 remaining < 257.
+        let payer = init_payer(&mut host, 100);
         let mut content = applied_origination(origination_success(38));
 
         let err = burn_content(&mut host, &payer, u64::MAX, &mut content)
@@ -649,7 +651,7 @@ mod tests {
             err,
             ApplyOperationError::CannotPayStorageFee(BalanceTooLow {
                 contract: payer.contract(),
-                balance: 500_u64.into(),
+                balance: 62_u64.into(),
                 amount: SLOT_BURN.into(),
             }),
         );
@@ -827,9 +829,9 @@ mod tests {
     #[test]
     fn transfer_insolvent_on_slot_burn_returns_cannot_pay() {
         let mut host = MockKernelHost::default();
-        // Cover variable burn (10 × COST_PER_BYTES = 2_500) but not the slot burn.
-        // 3_000 - 2_500 = 500 remaining
-        let payer = init_payer(&mut host, 3_000);
+        // Cover variable burn (10 × COST_PER_BYTES = 10) but not the
+        // slot burn (SLOT_BURN = 257). 100 - 10 = 90 remaining < 257.
+        let payer = init_payer(&mut host, 100);
         let mut content = applied_transfer(TransferSuccess {
             paid_storage_size_diff: 10_u64.into(),
             allocated_destination_contract: true,
@@ -843,7 +845,7 @@ mod tests {
             err,
             ApplyOperationError::CannotPayStorageFee(BalanceTooLow {
                 contract: payer.contract(),
-                balance: 500_u64.into(),
+                balance: 90_u64.into(),
                 amount: SLOT_BURN.into(),
             }),
         );

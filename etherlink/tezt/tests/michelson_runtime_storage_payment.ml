@@ -187,8 +187,8 @@ module Tezos_JSON = struct
 end
 
 (** Cost of one byte burned to the storage-fees sink (`COST_PER_BYTES`
-    in the kernel; matches L1's `cost_per_byte`). *)
-let cost_per_byte = 250
+    in the kernel). *)
+let cost_per_byte = 1
 
 (** Slot size of an originated contract or a freshly allocated
     implicit account (`ORIGINATION_SIZE` in the kernel). *)
@@ -625,7 +625,7 @@ let test_partial_internal_burn_failure_backtracks_all () =
   let*@ _ = Rpc.produce_block evm_node in
 
   (* Setup an account with not enough fund to pay the next operation *)
-  let initial_balance = Tez.of_mutez_int 100_000 in
+  let initial_balance = Tez.of_mutez_int 500 in
   let reveal_fee = Tez.of_mutez_int 200 in
   let* () =
     Client.transfer

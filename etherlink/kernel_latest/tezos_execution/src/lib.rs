@@ -3774,9 +3774,9 @@ mod tests {
 
         let initial_storage = Micheline::from("initial");
 
-        // Source funded with 1050 mutez: 15 fee + 30 transfer + 1000
+        // Source funded with 54 mutez: 15 fee + 30 transfer + 4
         // storage burn (4 × COST_PER_BYTES) + 5 remaining balance.
-        let source = init_account(&mut host, &src.pkh, 1050);
+        let source = init_account(&mut host, &src.pkh, 54);
         reveal_account(&mut host, &src);
         let destination =
             init_contract(&mut host, &dest, SCRIPT, &initial_storage, &50_u64.into());
@@ -3881,7 +3881,7 @@ mod tests {
         }];
 
         // Verify that source and destination balances changed:
-        // 1050 - 15 fee - 30 transfer - 1000 burn (4 × COST_PER_BYTES) = 5.
+        // 54 - 15 fee - 30 transfer - 4 burn (4 × COST_PER_BYTES) = 5.
         assert_eq!(source.balance(&host).unwrap(), 5_u64.into());
         assert_eq!(destination.balance(&host).unwrap(), 80_u64.into());
 
@@ -3975,10 +3975,10 @@ mod tests {
             .expect("ContractKt1Hash b58 conversion should have succeeded");
 
         let initial_storage = Micheline::from("initial");
-        // Fund the source with 50 mutez: 15 fee + 30 transfer + 5
-        // left.  The storage burn (4 × COST_PER_BYTES = 1000 mutez)
+        // Fund the source with 48 mutez: 15 fee + 30 transfer + 3
+        // left.  The storage burn (4 × COST_PER_BYTES = 4 mutez)
         // does not fit; the operation must Backtrack.
-        let source = init_account(&mut host, &src.pkh, 50);
+        let source = init_account(&mut host, &src.pkh, 48);
         reveal_account(&mut host, &src);
         let destination = init_contract(
             &mut host,
@@ -4042,8 +4042,8 @@ mod tests {
                         errors: vec![ApplyOperationError::CannotPayStorageFee(
                             BalanceTooLow {
                                 contract: source.contract(),
-                                balance: 5_u64.into(), // 50 - 15 fee - 30 transfer
-                                amount: (4 * COST_PER_BYTES).into(), // 1000
+                                balance: 3_u64.into(), // 48 - 15 fee - 30 transfer
+                                amount: (4 * COST_PER_BYTES).into(), // 4
                             },
                         )],
                     }),
@@ -4083,7 +4083,7 @@ mod tests {
 
         // SafeStorage rollback: source paid the fee but neither the
         // transfer amount nor the burn. Destination storage untouched.
-        assert_eq!(source.balance(&host).unwrap(), (50_u64 - 15).into());
+        assert_eq!(source.balance(&host).unwrap(), (48_u64 - 15).into());
         assert_eq!(
             destination.storage(&host).unwrap(),
             initial_storage
@@ -4099,9 +4099,9 @@ mod tests {
         let mut host = MockKernelHost::default();
         let src = bootstrap1();
         let dest = bootstrap2();
-        // Source funded for: 15 fee + 30 transfer + 64_250 slot burn
+        // Source funded for: 15 fee + 30 transfer + 257 slot burn
         // (ORIGINATION_SIZE × COST_PER_BYTES) + 5 mutez change.
-        let source = init_account(&mut host, &src.pkh, 64_300);
+        let source = init_account(&mut host, &src.pkh, 307);
         reveal_account(&mut host, &src);
         // Note: dest is NOT pre-allocated (no init_account call).
 
@@ -4168,17 +4168,17 @@ mod tests {
                                 changes: 30,
                                 update_origin: UpdateOrigin::BlockApplication,
                             },
-                            // Slot burn pair (ORIGINATION_SIZE × COST_PER_BYTES = 64_250)
+                            // Slot burn pair (ORIGINATION_SIZE × COST_PER_BYTES = 257)
                             BalanceUpdate {
                                 balance: Balance::Account(Contract::Implicit(
                                     src.pkh.clone(),
                                 )),
-                                changes: -64_250,
+                                changes: -257,
                                 update_origin: UpdateOrigin::BlockApplication,
                             },
                             BalanceUpdate {
                                 balance: Balance::StorageFees,
-                                changes: 64_250,
+                                changes: 257,
                                 update_origin: UpdateOrigin::BlockApplication,
                             },
                         ],
@@ -4202,7 +4202,7 @@ mod tests {
             .implicit_from_public_key_hash(&dest.pkh)
             .expect("dest account");
         assert_eq!(dest_account.balance(&host).unwrap(), 30_u64.into());
-        // Source: 64_300 - 15 fee - 30 transfer - 64_250 slot burn = 5.
+        // Source: 307 - 15 fee - 30 transfer - 257 slot burn = 5.
         assert_eq!(source.balance(&host).unwrap(), 5_u64.into());
     }
 
@@ -4212,7 +4212,7 @@ mod tests {
         let src = bootstrap1();
         let dest = bootstrap2();
         // 50 mutez covers fee (15) + transfer (30) but NOT the slot
-        // burn (64_250).
+        // burn (257).
         let source = init_account(&mut host, &src.pkh, 50);
         reveal_account(&mut host, &src);
 
@@ -4267,7 +4267,7 @@ mod tests {
                                 // 50 - 15 fee - 30 transfer = 5
                                 balance: 5_u64.into(),
                                 // ORIGINATION_SIZE × COST_PER_BYTES
-                                amount: 64_250_u64.into(),
+                                amount: 257_u64.into(),
                             },
                         )],
                     }),
@@ -5079,30 +5079,30 @@ mod tests {
                 ],
                 result: ContentResult::Applied(OriginationSuccess {
                     balance_updates: vec![
-                        // Variable burn pair (storage_bus).
+                        // Variable burn pair (storage_bus): 38 × COST_PER_BYTES.
                         BalanceUpdate {
                             balance: Balance::Account(Contract::Implicit(
                                 src.pkh.clone(),
                             )),
-                            changes: -9500,
+                            changes: -38,
                             update_origin: UpdateOrigin::BlockApplication,
                         },
                         BalanceUpdate {
                             balance: Balance::StorageFees,
-                            changes: 9500,
+                            changes: 38,
                             update_origin: UpdateOrigin::BlockApplication,
                         },
-                        // Slot burn pair (origination_bus).
+                        // Slot burn pair (origination_bus): ORIGINATION_SIZE × COST_PER_BYTES.
                         BalanceUpdate {
                             balance: Balance::Account(Contract::Implicit(
                                 src.pkh.clone(),
                             )),
-                            changes: -64250,
+                            changes: -257,
                             update_origin: UpdateOrigin::BlockApplication,
                         },
                         BalanceUpdate {
                             balance: Balance::StorageFees,
-                            changes: 64250,
+                            changes: 257,
                             update_origin: UpdateOrigin::BlockApplication,
                         },
                         // Prior: initial-balance transfer (sender → contract).
@@ -5642,10 +5642,10 @@ mod tests {
         let mut host = MockKernelHost::default();
         let src = bootstrap1();
 
-        // 9_800 = 15 fee + 30 initial balance + 9_500 variable burn
-        // (code 28 bytes + storage 10 bytes = 38 bytes × 250) + 255
-        // leftover, insufficient for the 64_250 slot burn that follows.
-        let funded = 9_800_u64;
+        // 283 = 15 fee + 30 initial balance + 38 variable burn
+        // (code 28 bytes + storage 10 bytes = 38 bytes × COST_PER_BYTES)
+        // + 200 leftover, insufficient for the 257 slot burn that follows.
+        let funded = 283_u64;
         init_account(&mut host, &src.pkh, funded);
         reveal_account(&mut host, &src);
 
@@ -5716,10 +5716,10 @@ mod tests {
                         errors: vec![ApplyOperationError::CannotPayStorageFee(
                             BalanceTooLow {
                                 contract: Contract::Implicit(src.pkh.clone()),
-                                // 9_800 - 15 fee - 30 transfer - 9_500 variable burn = 255
-                                balance: 255_u64.into(),
+                                // 283 - 15 fee - 30 transfer - 38 variable burn = 200
+                                balance: 200_u64.into(),
                                 // ORIGINATION_SIZE × COST_PER_BYTES
-                                amount: 64_250_u64.into(),
+                                amount: 257_u64.into(),
                             },
                         )],
                     }),
@@ -5893,30 +5893,30 @@ mod tests {
                 },
                 result: ContentResult::Applied(OriginationSuccess {
                     balance_updates: vec![
-                        // Variable burn pair (storage_bus).
+                        // Variable burn pair (storage_bus): 30 × COST_PER_BYTES.
                         BalanceUpdate {
                             balance: Balance::Account(Contract::Implicit(
                                 src.pkh.clone()
                             )),
-                            changes: -7500,
+                            changes: -30,
                             update_origin: UpdateOrigin::BlockApplication,
                         },
                         BalanceUpdate {
                             balance: Balance::StorageFees,
-                            changes: 7500,
+                            changes: 30,
                             update_origin: UpdateOrigin::BlockApplication,
                         },
-                        // Slot burn pair (origination_bus).
+                        // Slot burn pair (origination_bus): ORIGINATION_SIZE × COST_PER_BYTES.
                         BalanceUpdate {
                             balance: Balance::Account(Contract::Implicit(
                                 src.pkh.clone()
                             )),
-                            changes: -64250,
+                            changes: -257,
                             update_origin: UpdateOrigin::BlockApplication,
                         },
                         BalanceUpdate {
                             balance: Balance::StorageFees,
-                            changes: 64250,
+                            changes: 257,
                             update_origin: UpdateOrigin::BlockApplication,
                         },
                         // Prior: initial-balance transfer (parent → child).
@@ -5961,10 +5961,10 @@ mod tests {
             .expect("Should have succeeded to create an account");
         let expected_src_balance = init_src_balance
             - 10 // fee for the operation
-            - 7500 // origination cost paid by the contract
-            - 64250 // storage cost paid by the source
-            - 6750 // post-execution storage burn for the transfer-to-chapo
-                   // (paid_storage_size_diff = 27 bytes × COST_PER_BYTES)
+            - 30 // origination cost paid by the contract (30 bytes × COST_PER_BYTES)
+            - 257 // storage cost paid by the source (ORIGINATION_SIZE × COST_PER_BYTES)
+            - 27 // post-execution storage burn for the transfer-to-chapo
+                 // (paid_storage_size_diff = 27 bytes × COST_PER_BYTES)
             - 1000; // amount sent to the originated contract
         assert_eq!(
             src_account.balance(&host).unwrap(),
@@ -6116,28 +6116,30 @@ mod tests {
                 },
                 result: ContentResult::Applied(OriginationSuccess {
                     balance_updates: vec![
+                        // Variable burn pair: 33 × COST_PER_BYTES.
                         BalanceUpdate {
                             balance: Balance::Account(Contract::Implicit(
                                 src.pkh.clone()
                             )),
-                            changes: -8250,
+                            changes: -33,
                             update_origin: UpdateOrigin::BlockApplication,
                         },
                         BalanceUpdate {
                             balance: Balance::StorageFees,
-                            changes: 8250,
+                            changes: 33,
                             update_origin: UpdateOrigin::BlockApplication,
                         },
+                        // Slot burn pair: ORIGINATION_SIZE × COST_PER_BYTES.
                         BalanceUpdate {
                             balance: Balance::Account(Contract::Implicit(
                                 src.pkh.clone()
                             )),
-                            changes: -64250,
+                            changes: -257,
                             update_origin: UpdateOrigin::BlockApplication,
                         },
                         BalanceUpdate {
                             balance: Balance::StorageFees,
-                            changes: 64250,
+                            changes: 257,
                             update_origin: UpdateOrigin::BlockApplication,
                         },
                     ],
@@ -6174,28 +6176,30 @@ mod tests {
                 },
                 result: ContentResult::Applied(OriginationSuccess {
                     balance_updates: vec![
+                        // Variable burn pair: 30 × COST_PER_BYTES.
                         BalanceUpdate {
                             balance: Balance::Account(Contract::Implicit(
                                 src.pkh.clone()
                             )),
-                            changes: -7500,
+                            changes: -30,
                             update_origin: UpdateOrigin::BlockApplication,
                         },
                         BalanceUpdate {
                             balance: Balance::StorageFees,
-                            changes: 7500,
+                            changes: 30,
                             update_origin: UpdateOrigin::BlockApplication,
                         },
+                        // Slot burn pair: ORIGINATION_SIZE × COST_PER_BYTES.
                         BalanceUpdate {
                             balance: Balance::Account(Contract::Implicit(
                                 src.pkh.clone()
                             )),
-                            changes: -64250,
+                            changes: -257,
                             update_origin: UpdateOrigin::BlockApplication,
                         },
                         BalanceUpdate {
                             balance: Balance::StorageFees,
-                            changes: 64250,
+                            changes: 257,
                             update_origin: UpdateOrigin::BlockApplication,
                         },
                     ],
@@ -6377,28 +6381,30 @@ mod tests {
                     result: ContentResult::BackTracked(backtrack_result(
                         OriginationSuccess {
                             balance_updates: vec![
+                                // Variable burn pair: 30 × COST_PER_BYTES.
                                 BalanceUpdate {
                                     balance: Balance::Account(Contract::Implicit(
                                         src.pkh.clone(),
                                     )),
-                                    changes: -7500,
+                                    changes: -30,
                                     update_origin: UpdateOrigin::BlockApplication,
                                 },
                                 BalanceUpdate {
                                     balance: Balance::StorageFees,
-                                    changes: 7500,
+                                    changes: 30,
                                     update_origin: UpdateOrigin::BlockApplication,
                                 },
+                                // Slot burn pair: ORIGINATION_SIZE × COST_PER_BYTES.
                                 BalanceUpdate {
                                     balance: Balance::Account(Contract::Implicit(
                                         src.pkh.clone(),
                                     )),
-                                    changes: -64250,
+                                    changes: -257,
                                     update_origin: UpdateOrigin::BlockApplication,
                                 },
                                 BalanceUpdate {
                                     balance: Balance::StorageFees,
-                                    changes: 64250,
+                                    changes: 257,
                                     update_origin: UpdateOrigin::BlockApplication,
                                 },
                                 BalanceUpdate {
@@ -6445,28 +6451,30 @@ mod tests {
                     result: ContentResult::BackTracked(backtrack_result(
                         OriginationSuccess {
                             balance_updates: vec![
+                                // Variable burn pair: 30 × COST_PER_BYTES.
                                 BalanceUpdate {
                                     balance: Balance::Account(Contract::Implicit(
                                         src.pkh.clone(),
                                     )),
-                                    changes: -7500,
+                                    changes: -30,
                                     update_origin: UpdateOrigin::BlockApplication,
                                 },
                                 BalanceUpdate {
                                     balance: Balance::StorageFees,
-                                    changes: 7500,
+                                    changes: 30,
                                     update_origin: UpdateOrigin::BlockApplication,
                                 },
+                                // Slot burn pair: ORIGINATION_SIZE × COST_PER_BYTES.
                                 BalanceUpdate {
                                     balance: Balance::Account(Contract::Implicit(
                                         src.pkh.clone(),
                                     )),
-                                    changes: -64250,
+                                    changes: -257,
                                     update_origin: UpdateOrigin::BlockApplication,
                                 },
                                 BalanceUpdate {
                                     balance: Balance::StorageFees,
-                                    changes: 64250,
+                                    changes: 257,
                                     update_origin: UpdateOrigin::BlockApplication,
                                 },
                                 BalanceUpdate {
