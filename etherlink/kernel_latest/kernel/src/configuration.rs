@@ -5,16 +5,15 @@
 
 use crate::{
     blueprint_storage::DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS,
-    chains::{ChainConfig, ChainFamily, EvmChainConfig, EvmLimits, ExperimentalFeatures},
+    chains::{EvmLimits, ExperimentalFeatures, TezosXChainConfig},
     delayed_inbox::DelayedInbox,
     retrieve_minimum_base_fee_per_gas,
     storage::{
         dal_slots, enable_dal, is_enable_fa_bridge, max_blueprint_lookahead_in_seconds,
-        read_admin, read_chain_family, read_delayed_transaction_bridge,
-        read_kernel_governance, read_kernel_security_governance,
-        read_maximum_allowed_ticks, read_michelson_runtime_chain_id,
-        read_or_set_maximum_gas_per_transaction, read_sequencer_governance, sequencer,
-        store_michelson_runtime_chain_id,
+        read_admin, read_delayed_transaction_bridge, read_kernel_governance,
+        read_kernel_security_governance, read_maximum_allowed_ticks,
+        read_michelson_runtime_chain_id, read_or_set_maximum_gas_per_transaction,
+        read_sequencer_governance, sequencer, store_michelson_runtime_chain_id,
     },
     tick_model::constants::{MAXIMUM_GAS_LIMIT, MAX_ALLOWED_TICKS},
 };
@@ -198,14 +197,6 @@ where
     }
 }
 
-fn fetch_evm_chain_configuration<Host>(host: &mut Host, chain_id: U256) -> ChainConfig
-where
-    Host: StorageV1,
-{
-    let config = fetch_pure_evm_config(host, chain_id);
-    ChainConfig::Evm(Box::new(config))
-}
-
 /// Derive the Michelson runtime chain ID from the EVM chain ID by
 /// hashing the EVM chain ID bytes with Blake2B-256 and taking the
 /// first 4 bytes.  This follows the same pattern as Tezos L1's
@@ -233,7 +224,10 @@ fn fetch_michelson_runtime_chain_id(
     }
 }
 
-pub fn fetch_pure_evm_config<Host>(host: &mut Host, chain_id: U256) -> EvmChainConfig
+pub fn fetch_chain_configuration<Host>(
+    host: &mut Host,
+    chain_id: U256,
+) -> TezosXChainConfig
 where
     Host: StorageV1,
 {
@@ -241,27 +235,13 @@ where
     let spec_id = read_evm_version(host).into();
     let experimental_features = ExperimentalFeatures::read_from_storage(host);
     let michelson_runtime_chain_id = fetch_michelson_runtime_chain_id(host, chain_id);
-    EvmChainConfig::create_config(
+    TezosXChainConfig::create_config(
         chain_id,
         limits,
         spec_id,
         experimental_features,
         michelson_runtime_chain_id,
     )
-}
-
-pub fn fetch_chain_configuration<Host>(host: &mut Host, chain_id: U256) -> ChainConfig
-where
-    Host: StorageV1,
-{
-    // The standalone Michelson chain family has been removed: the Michelson
-    // runtime is now embedded in the (EVM) TezosX chain configuration, so any
-    // configured chain family resolves to the EVM chain configuration.
-    match read_chain_family(host, chain_id).unwrap_or_default() {
-        ChainFamily::Evm | ChainFamily::Michelson => {
-            fetch_evm_chain_configuration(host, chain_id)
-        }
-    }
 }
 
 pub fn fetch_configuration<Host>(host: &mut Host) -> Configuration

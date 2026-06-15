@@ -955,7 +955,7 @@ where
                 EVMBlockHeader::genesis_header(),
             ),
         };
-    read_blueprint::<_, crate::chains::EvmChainConfig>(
+    read_blueprint::<_, crate::chains::TezosXChainConfig>(
         host,
         config,
         number,
@@ -1018,7 +1018,7 @@ mod tests {
 
     use super::*;
     use crate::block::GENESIS_PARENT_HASH;
-    use crate::chains::EvmChainConfig;
+    use crate::chains::TezosXChainConfig;
     use crate::configuration::{DalConfiguration, TezosContracts};
     use crate::delayed_inbox::Hash;
     use crate::sequencer_blueprint::{
@@ -1097,7 +1097,7 @@ mod tests {
         let mut delayed_inbox =
             DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
         // Blueprint should have invalid parent hash
-        let validity = parse_and_validate_blueprint::<_, EvmChainConfig>(
+        let validity = parse_and_validate_blueprint::<_, TezosXChainConfig>(
             &mut host,
             blueprint_with_hashes_bytes.as_ref(),
             &mut delayed_inbox,
@@ -1165,7 +1165,7 @@ mod tests {
         let mut delayed_inbox =
             DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
         // Blueprint should have invalid parent hash
-        let validity = parse_and_validate_blueprint::<_, EvmChainConfig>(
+        let validity = parse_and_validate_blueprint::<_, TezosXChainConfig>(
             &mut host,
             blueprint_with_hashes_bytes.as_ref(),
             &mut delayed_inbox,

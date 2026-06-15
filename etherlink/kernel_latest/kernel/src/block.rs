@@ -642,8 +642,8 @@ mod tests {
     use crate::chains::TezlinkContent;
     use crate::chains::TezlinkOperation;
     use crate::chains::{
-        EvmChainConfig, ExperimentalFeatures, TezlinkBlockConstants,
-        TezosXBlockConstants, TezosXTransaction, EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
+        ExperimentalFeatures, TezlinkBlockConstants, TezosXBlockConstants,
+        TezosXChainConfig, TezosXTransaction, EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
         TEZ_BLOCKS_PATH, TEZ_SAFE_STORAGE_ROOT_PATH,
         TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
     };
@@ -879,8 +879,8 @@ mod tests {
     const DUMMY_BASE_FEE_PER_GAS: u64 = MINIMUM_BASE_FEE_PER_GAS;
     const DUMMY_DA_FEE: u64 = DA_FEE_PER_BYTE;
 
-    fn dummy_evm_config(spec_id: SpecId) -> EvmChainConfig {
-        EvmChainConfig::create_config(
+    fn dummy_tezosx_config(spec_id: SpecId) -> TezosXChainConfig {
+        TezosXChainConfig::create_config(
             DUMMY_CHAIN_ID,
             EvmLimits::default(),
             spec_id,
@@ -1114,7 +1114,7 @@ mod tests {
             },
         ];
 
-        store_blueprints::<_, EvmChainConfig>(host, vec![blueprint(transactions)]);
+        store_blueprints::<_, TezosXChainConfig>(host, vec![blueprint(transactions)]);
 
         let sender = dummy_eth_caller();
         set_balance(host, &sender, U256::from(10000000000000000000u64));
@@ -1122,7 +1122,7 @@ mod tests {
 
         produce(
             host,
-            &dummy_evm_config(SpecId::default()),
+            &dummy_tezosx_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -1139,12 +1139,14 @@ mod tests {
         }
     }
 
-    fn dummy_evm_config_with_tezos_runtime(host: &mut impl StorageV1) -> EvmChainConfig {
+    fn dummy_tezosx_config_with_tezos_runtime(
+        host: &mut impl StorageV1,
+    ) -> TezosXChainConfig {
         host.store_write(&crate::storage::ENABLE_TEZOS_RUNTIME, &[], 0)
             .expect("Should have written feature flag");
         init_safe_storage_roots(host);
         let experimental_features = ExperimentalFeatures::read_from_storage(host);
-        EvmChainConfig::create_config(
+        TezosXChainConfig::create_config(
             DUMMY_CHAIN_ID,
             EvmLimits::default(),
             SpecId::default(),
@@ -1169,7 +1171,7 @@ mod tests {
             .allocate(&mut host)
             .expect("Contract initialization should have succeed");
 
-        let chain_config = dummy_evm_config_with_tezos_runtime(&mut host);
+        let chain_config = dummy_tezosx_config_with_tezos_runtime(&mut host);
         let mut config = dummy_configuration();
 
         let bootstrap = bootstrap1();
@@ -1192,7 +1194,10 @@ mod tests {
             content: TransactionContent::TezosDelayed(reveal),
         };
 
-        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(vec![tezos_tx])]);
+        store_blueprints::<_, TezosXChainConfig>(
+            &mut host,
+            vec![blueprint(vec![tezos_tx])],
+        );
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
         // Produce the block
@@ -1230,7 +1235,7 @@ mod tests {
             .allocate(&mut host)
             .expect("Contract initialization should have succeed");
 
-        let chain_config = dummy_evm_config_with_tezos_runtime(&mut host);
+        let chain_config = dummy_tezosx_config_with_tezos_runtime(&mut host);
         let mut config = dummy_configuration();
 
         let bootstrap = bootstrap1();
@@ -1251,7 +1256,10 @@ mod tests {
             content: TransactionContent::TezosDelayed(reveal),
         };
 
-        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(vec![tezos_tx])]);
+        store_blueprints::<_, TezosXChainConfig>(
+            &mut host,
+            vec![blueprint(vec![tezos_tx])],
+        );
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
         produce(&mut host, &chain_config, &mut config, None, None)
@@ -1371,7 +1379,7 @@ mod tests {
             .allocate(&mut host)
             .expect("Contract initialization should have succeeded");
 
-        let chain_config = dummy_evm_config_with_tezos_runtime(&mut host);
+        let chain_config = dummy_tezosx_config_with_tezos_runtime(&mut host);
         let mut config = dummy_configuration();
 
         let bootstrap = bootstrap1();
@@ -1401,7 +1409,7 @@ mod tests {
         );
 
         let reveal = make_reveal_operation(1, 1, 500, 0, bootstrap);
-        store_blueprints::<_, EvmChainConfig>(
+        store_blueprints::<_, TezosXChainConfig>(
             &mut host,
             vec![tezos_blueprint(vec![reveal], Timestamp::from(0i64))],
         );
@@ -1439,7 +1447,7 @@ mod tests {
         // Disable DA fees so the low-fee operations are not rejected.
         storage::store_da_fee(&mut host, U256::zero()).unwrap();
 
-        let chain_config = dummy_evm_config_with_tezos_runtime(&mut host);
+        let chain_config = dummy_tezosx_config_with_tezos_runtime(&mut host);
         let mut config = dummy_configuration();
 
         let bootstrap1 = bootstrap1();
@@ -1509,7 +1517,7 @@ mod tests {
             Parameters::default(),
         );
 
-        store_blueprints::<_, EvmChainConfig>(
+        store_blueprints::<_, TezosXChainConfig>(
             &mut host,
             vec![tezos_blueprint(
                 vec![reveal, transfer],
@@ -1580,7 +1588,7 @@ mod tests {
             .allocate(&mut host)
             .expect("Contract initialization should have succeeded");
 
-        let chain_config = dummy_evm_config_with_tezos_runtime(&mut host);
+        let chain_config = dummy_tezosx_config_with_tezos_runtime(&mut host);
         let mut config = dummy_configuration();
 
         // A contract storing the chain id, the level and the timestamp of the
@@ -1649,7 +1657,7 @@ mod tests {
         );
 
         let timestamp_of_call = 10i64;
-        store_blueprints::<_, EvmChainConfig>(
+        store_blueprints::<_, TezosXChainConfig>(
             &mut host,
             vec![
                 tezos_blueprint(vec![origination], Timestamp::from(0i64)),
@@ -1675,7 +1683,7 @@ mod tests {
         let expected_timestamp = timestamp_of_call;
         // The chain id observed by the contract is the michelson runtime
         // chain id, set to 1u32 little-endian by
-        // `dummy_evm_config_with_tezos_runtime`.
+        // `dummy_tezosx_config_with_tezos_runtime`.
         let expected_chain_id = "0x01000000";
         let expected_storage = format!(
             "Pair {expected_level} (Pair {expected_timestamp} {expected_chain_id})"
@@ -1717,14 +1725,17 @@ mod tests {
         };
 
         let transactions: Vec<Transaction> = vec![invalid_tx];
-        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(transactions)]);
+        store_blueprints::<_, TezosXChainConfig>(
+            &mut host,
+            vec![blueprint(transactions)],
+        );
 
         let sender = dummy_eth_caller();
         set_balance(&mut host, &sender, U256::from(30000u64));
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         produce(
             &mut host,
-            &dummy_evm_config(SpecId::default()),
+            &dummy_tezosx_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -1755,7 +1766,10 @@ mod tests {
         };
 
         let transactions: Vec<Transaction> = vec![valid_tx];
-        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(transactions)]);
+        store_blueprints::<_, TezosXChainConfig>(
+            &mut host,
+            vec![blueprint(transactions)],
+        );
 
         let sender = dummy_eth_caller();
         set_balance(&mut host, &sender, U256::from(1_000_000_000_000_000_000u64));
@@ -1763,7 +1777,7 @@ mod tests {
 
         produce(
             &mut host,
-            &dummy_evm_config(SpecId::default()),
+            &dummy_tezosx_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -1792,7 +1806,10 @@ mod tests {
         };
 
         let transactions: Vec<Transaction> = vec![valid_tx];
-        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(transactions)]);
+        store_blueprints::<_, TezosXChainConfig>(
+            &mut host,
+            vec![blueprint(transactions)],
+        );
 
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
         set_balance(&mut host, &sender, U256::from(5000000000000000u64));
@@ -1800,7 +1817,7 @@ mod tests {
 
         produce(
             &mut host,
-            &dummy_evm_config(SpecId::default()),
+            &dummy_tezosx_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -1861,7 +1878,7 @@ mod tests {
             content: Ethereum(dummy_eth_transaction_one()),
         }];
 
-        store_blueprints::<_, EvmChainConfig>(
+        store_blueprints::<_, TezosXChainConfig>(
             &mut host,
             vec![blueprint(transaction_0), blueprint(transaction_1)],
         );
@@ -1873,7 +1890,7 @@ mod tests {
         // Produce block for blueprint containing transaction_0
         produce(
             &mut host,
-            &dummy_evm_config(SpecId::default()),
+            &dummy_tezosx_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -1882,7 +1899,7 @@ mod tests {
         // Produce block for blueprint containing transaction_1
         produce(
             &mut host,
-            &dummy_evm_config(SpecId::default()),
+            &dummy_tezosx_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -1926,7 +1943,10 @@ mod tests {
             },
         ];
 
-        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(transactions)]);
+        store_blueprints::<_, TezosXChainConfig>(
+            &mut host,
+            vec![blueprint(transactions)],
+        );
 
         let sender = dummy_eth_caller();
         set_balance(&mut host, &sender, U256::from(10000000000000000000u64));
@@ -1934,7 +1954,7 @@ mod tests {
 
         produce(
             &mut host,
-            &dummy_evm_config(SpecId::default()),
+            &dummy_tezosx_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -1974,7 +1994,7 @@ mod tests {
         };
 
         let transactions = vec![tx.clone(), tx];
-        store_blueprints::<_, EvmChainConfig>(
+        store_blueprints::<_, TezosXChainConfig>(
             &mut host,
             vec![blueprint(transactions.clone()), blueprint(transactions)],
         );
@@ -1986,7 +2006,7 @@ mod tests {
 
         produce(
             &mut host,
-            &dummy_evm_config(SpecId::default()),
+            &dummy_tezosx_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -2074,7 +2094,7 @@ mod tests {
         let cumulative_gas_in_run = max_gas_per_reboot(&limits) - 1000;
         host.add_execution_gas(cumulative_gas_in_run);
 
-        let chain_config = dummy_evm_config(SpecId::default());
+        let chain_config = dummy_tezosx_config(SpecId::default());
 
         // act
         let result = compute(
@@ -2148,7 +2168,7 @@ mod tests {
             .allocate(&mut host)
             .expect("Contract initialization should have succeeded");
 
-        let chain_config = dummy_evm_config_with_tezos_runtime(&mut host);
+        let chain_config = dummy_tezosx_config_with_tezos_runtime(&mut host);
         let registry = RegistryImpl::default();
         let mut block_constants = first_block(&mut host);
         // Match production safe_roots so SafeStorage::start/revert in
@@ -2286,7 +2306,7 @@ mod tests {
             tx_hash,
             content: Ethereum(tx),
         };
-        store_blueprints::<_, EvmChainConfig>(
+        store_blueprints::<_, TezosXChainConfig>(
             &mut host,
             vec![blueprint(vec![transaction])],
         );
@@ -2295,7 +2315,7 @@ mod tests {
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         produce(
             &mut host,
-            &dummy_evm_config(SpecId::default()),
+            &dummy_tezosx_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -2339,11 +2359,11 @@ mod tests {
     #[test]
     fn test_first_blocks() {
         let mut host = MockKernelHost::default();
-        // EvmChainConfig::storage_root_paths lists EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
+        // TezosXChainConfig::storage_root_paths lists EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
         // so SafeStorage::start()'s store_copy needs each safe root to exist.
         init_safe_storage_roots(&mut host);
 
-        let chain_config = dummy_evm_config(SpecId::default());
+        let chain_config = dummy_tezosx_config(SpecId::default());
         // first block should be 0
         let blueprint = almost_empty_blueprint();
         store_inbox_blueprint(&mut host, blueprint).expect("Should store a blueprint");
@@ -2485,11 +2505,11 @@ mod tests {
             wrap_transaction(2, loop_300_tx2),
         ];
 
-        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(proposals)]);
+        store_blueprints::<_, TezosXChainConfig>(&mut host, vec![blueprint(proposals)]);
 
         host.reboot_left().expect("should be some reboot left");
 
-        let mut chain_config = dummy_evm_config(SpecId::default());
+        let mut chain_config = dummy_tezosx_config(SpecId::default());
         chain_config.limits_mut().maximum_gas_limit = 560_000;
         let mut configuration = dummy_configuration();
 
@@ -2582,9 +2602,9 @@ mod tests {
             ]),
         ];
 
-        store_blueprints::<_, EvmChainConfig>(&mut host, proposals);
+        store_blueprints::<_, TezosXChainConfig>(&mut host, proposals);
 
-        let mut chain_config = dummy_evm_config(SpecId::default());
+        let mut chain_config = dummy_tezosx_config(SpecId::default());
         chain_config.limits_mut().maximum_gas_limit = 560_000;
         let mut configuration = dummy_configuration();
 
@@ -2678,14 +2698,17 @@ mod tests {
 
         let transactions: Vec<Transaction> = vec![tx];
 
-        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(transactions)]);
+        store_blueprints::<_, TezosXChainConfig>(
+            &mut host,
+            vec![blueprint(transactions)],
+        );
 
         let sender = H160::from_str("05f32b3cc3888453ff71b01135b34ff8e41263f2").unwrap();
         set_balance(&mut host, &sender, U256::from(1_000_000_000_000_000_000u64));
 
         produce(
             &mut host,
-            &dummy_evm_config(SpecId::default()),
+            &dummy_tezosx_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -2729,7 +2752,7 @@ mod tests {
             content: EthereumDelayed(dummy_eip7702_empty_authorization_list_tx()),
         };
 
-        store_blueprints::<_, EvmChainConfig>(
+        store_blueprints::<_, TezosXChainConfig>(
             &mut host,
             vec![blueprint(vec![poison_tx])],
         );
@@ -2741,7 +2764,7 @@ mod tests {
         // The block must be produced despite the poison transaction.
         produce(
             &mut host,
-            &dummy_evm_config(SpecId::default()),
+            &dummy_tezosx_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -2805,7 +2828,10 @@ mod tests {
 
         let transactions: Vec<Transaction> =
             vec![valid_tx, valid_tx_eip1559, valid_tx_eip2930];
-        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(transactions)]);
+        store_blueprints::<_, TezosXChainConfig>(
+            &mut host,
+            vec![blueprint(transactions)],
+        );
 
         let sender = dummy_eth_caller();
         set_balance(&mut host, &sender, U256::from(1_000_000_000_000_000_000u64));
@@ -2813,7 +2839,7 @@ mod tests {
 
         produce(
             &mut host,
-            &dummy_evm_config(SpecId::default()),
+            &dummy_tezosx_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -2844,7 +2870,7 @@ mod tests {
 
         let mut host = MockKernelHost::default();
 
-        let chain_config = dummy_evm_config_with_tezos_runtime(&mut host);
+        let chain_config = dummy_tezosx_config_with_tezos_runtime(&mut host);
         let mut config = dummy_configuration();
 
         let previous_protocol = Protocol::S023;
@@ -2861,7 +2887,7 @@ mod tests {
 
         // First block: protocol = previous (from stored header),
         // next_protocol = current (TARGET_TEZOS_PROTOCOL)
-        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(vec![])]);
+        store_blueprints::<_, TezosXChainConfig>(&mut host, vec![blueprint(vec![])]);
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
         produce(&mut host, &chain_config, &mut config, None, None)
@@ -2894,7 +2920,7 @@ mod tests {
     #[test]
     fn test_can_fit_in_reboot_tezos_operation() {
         // Test that can_fit_in_reboot accounts for the gas of Tezos
-        // operations.  Before the fix, EvmChainConfig::can_fit_in_reboot
+        // operations.  Before the fix, TezosXChainConfig::can_fit_in_reboot
         // returned Ok(true) for all Tezos operations regardless of gas,
         // so this test would see Finished instead of RebootNeeded.
 
@@ -2927,7 +2953,7 @@ mod tests {
         let cumulative_gas_in_run = max_gas_per_reboot(&limits) - 1;
         host.add_execution_gas(cumulative_gas_in_run);
 
-        let chain_config = dummy_evm_config_with_tezos_runtime(&mut host);
+        let chain_config = dummy_tezosx_config_with_tezos_runtime(&mut host);
 
         let result = compute(
             &mut host,

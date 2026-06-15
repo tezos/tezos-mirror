@@ -14,11 +14,11 @@ use crate::{
     block_in_progress::BlockInProgress,
     block_storage,
     chains::{
-        ChainConfigTrait, EvmChainConfig, TezlinkBlockConstants, TezosXBlockConstants,
+        ChainConfigTrait, TezlinkBlockConstants, TezosXBlockConstants, TezosXChainConfig,
         TezosXTransaction, TransactionTrait, ETHERLINK_SAFE_STORAGE_ROOT_PATH,
         TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
     },
-    configuration::{fetch_configuration, fetch_pure_evm_config},
+    configuration::{fetch_chain_configuration, fetch_configuration},
     error::{Error, StorageError},
     fees::DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER,
     gas_price::base_fee_per_gas,
@@ -144,17 +144,17 @@ pub fn read_single_tx_execution_input(
     }
 }
 
-fn get_evm_config<Host>(host: &mut Host) -> Result<EvmChainConfig, Error>
+fn get_chain_config<Host>(host: &mut Host) -> Result<TezosXChainConfig, Error>
 where
     Host: StorageV1,
 {
     let chain_id = retrieve_chain_id(host)?;
-    Ok(fetch_pure_evm_config(host, chain_id))
+    Ok(fetch_chain_configuration(host, chain_id))
 }
 
 fn block_constants<Host>(
     host: &mut Host,
-    config: &EvmChainConfig,
+    config: &TezosXChainConfig,
     timestamp: Timestamp,
     number: U256,
 ) -> Result<TezosXBlockConstants, Error>
@@ -193,7 +193,7 @@ where
             gas_limit: GAS_LIMIT,
             tezos_experimental_features: config.is_tezos_runtime_enabled(number),
             block_fees,
-            chain_id: config.get_chain_id(),
+            chain_id: config.get_evm_chain_id(),
             prevrandao: None,
         },
         michelson_runtime_block_constants,
@@ -229,7 +229,7 @@ where
     ];
     __trace_kernel_add_attrs!(__attrs);
 
-    let config = get_evm_config(host)?;
+    let config = get_chain_config(host)?;
     let block_constants =
         block_constants(host, &config, input_data.timestamp, input_data.block_number)?;
     let sequencer_pool_address = (block_constants.evm_runtime_block_constants.coinbase
@@ -356,7 +356,7 @@ where
     ];
     __trace_kernel_add_attrs!(__attrs);
 
-    let config = get_evm_config(host)?;
+    let config = get_chain_config(host)?;
     let block_constants =
         block_constants(host, &config, input_data.timestamp, input_data.block_number)?;
 

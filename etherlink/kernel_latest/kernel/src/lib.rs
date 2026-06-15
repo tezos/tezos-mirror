@@ -122,14 +122,14 @@ where
 pub fn stage_one<Host>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
-    chain_config: &chains::ChainConfig,
+    chain_config: &chains::TezosXChainConfig,
     configuration: &mut Configuration,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
     Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
 {
     log!(Debug, "Entering stage one.");
-    log!(Debug, "Chain Configuration: {}", chain_config);
+    log!(Debug, "Chain Configuration: {chain_config:?}");
     log!(Debug, "Configuration: {}", configuration);
 
     fetch_blueprints(host, smart_rollup_address, chain_config, configuration)
@@ -299,9 +299,7 @@ where
     let sequencer_pool_address = read_sequencer_pool_address(host);
 
     // Initialize custom precompile
-    let tezosx_enabled = match &chain_configuration {
-        chains::ChainConfig::Evm(config) => config.tezos_runtime_feature_flag(),
-    };
+    let tezosx_enabled = chain_configuration.tezos_runtime_feature_flag();
     init_precompile_bytecodes(host, tezosx_enabled)
         .map_err(|_| Error::RevmPrecompileInitError)?;
 
@@ -328,15 +326,13 @@ where
     #[cfg(not(feature = "benchmark-bypass-stage2"))]
     {
         log!(Debug, "Entering stage two.");
-        if let block::ComputationResult::RebootNeeded = match chain_configuration {
-            chains::ChainConfig::Evm(chain_configuration) => block::produce(
-                host,
-                &*chain_configuration,
-                &mut configuration,
-                sequencer_pool_address,
-                trace_input,
-            ),
-        }
+        if let block::ComputationResult::RebootNeeded = block::produce(
+            host,
+            &chain_configuration,
+            &mut configuration,
+            sequencer_pool_address,
+            trace_input,
+        )
         .context("Failed during stage 2")?
         {
             host.mark_for_reboot()?;

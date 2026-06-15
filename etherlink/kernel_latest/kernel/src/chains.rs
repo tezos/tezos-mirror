@@ -31,7 +31,7 @@ use revm_etherlink::{
 };
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 use tezos_crypto_rs::hash::{BlockHash, ChainId, UnknownSignature};
 use tezos_data_encoding::nom::NomReader;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
@@ -53,9 +53,8 @@ use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{OwnedPath, Path, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
-use tezos_tezlink::protocol::TARGET_TEZOS_PROTOCOL;
 use tezos_tezlink::{
-    block::{AppliedOperation, TezBlock},
+    block::AppliedOperation,
     enc_wrappers::BlockNumber,
     operation::{ManagerOperation, ManagerOperationContent, Operation},
     operation_result::{
@@ -89,28 +88,6 @@ pub const TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH: RefPath =
 /// and deduplicated bytecode.
 pub const EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH: RefPath =
     RefPath::assert_from(b"/evm/eth_accounts");
-
-#[derive(Clone, Copy, Debug)]
-pub enum ChainFamily {
-    Evm,
-    Michelson,
-}
-
-impl Default for ChainFamily {
-    fn default() -> Self {
-        Self::Evm
-    }
-}
-
-impl From<String> for ChainFamily {
-    fn from(value: String) -> Self {
-        match value.as_str() {
-            "Michelson" => Self::Michelson,
-            "Evm" => Self::Evm,
-            _ => Self::default(),
-        }
-    }
-}
 
 #[derive(Debug, Default)]
 pub struct ExperimentalFeatures {
@@ -159,32 +136,18 @@ impl ExperimentalFeatures {
 }
 
 #[derive(Debug)]
-pub struct EvmChainConfig {
-    chain_id: U256,
+pub struct TezosXChainConfig {
+    evm_chain_id: U256,
     pub limits: EvmLimits,
     pub spec_id: SpecId,
     pub experimental_features: ExperimentalFeatures,
-    michelson_chain_config: MichelsonChainConfig,
+    michelson_chain_id: ChainId,
 }
 
-impl EvmChainConfig {
-    pub fn is_tezos_runtime_enabled(&self, current_level: U256) -> bool {
-        self.experimental_features
-            .is_tezos_runtime_enabled(current_level)
-    }
-
+impl TezosXChainConfig {
     pub fn tezos_runtime_feature_flag(&self) -> bool {
         self.experimental_features.tezos_runtime_feature_flag()
     }
-}
-
-#[derive(Debug)]
-pub struct MichelsonChainConfig {
-    pub chain_id: ChainId,
-}
-
-pub enum ChainConfig {
-    Evm(Box<EvmChainConfig>),
 }
 
 const TEZOS_OP_TAG: u8 = 1;
@@ -358,29 +321,14 @@ impl ChainHeaderTrait for crate::blueprint_storage::EVMBlockHeader {
     }
 }
 
-impl ChainHeaderTrait for crate::blueprint_storage::TezBlockHeader {
-    fn hash(&self) -> H256 {
-        self.hash
-    }
-
-    fn genesis_header() -> Self {
-        Self {
-            hash: H256(*TezBlock::genesis_block_hash()),
-            next_protocol: TARGET_TEZOS_PROTOCOL,
-        }
-    }
-}
-
 pub trait ChainConfigTrait: Debug {
     type BlockConstants;
 
     type ChainHeader: ChainHeaderTrait + Decodable;
 
-    fn get_chain_id(&self) -> U256;
+    fn get_evm_chain_id(&self) -> U256;
 
     fn init_registry(&self) -> RegistryImpl;
-
-    fn get_chain_family(&self) -> ChainFamily;
 
     fn is_tezos_runtime_enabled(&self, current_level: U256) -> bool;
 
@@ -395,11 +343,6 @@ pub trait ChainConfigTrait: Debug {
     ) -> anyhow::Result<Self::BlockConstants>;
 
     fn michelson_to_evm_gas_multiplier(&self, constants: &Self::BlockConstants) -> u64;
-
-    fn fmt_with_family(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let chain_family = self.get_chain_family();
-        write!(f, "{{Chain family: {chain_family}, {self:?}}}")
-    }
 
     fn fetch_hashes_from_delayed_inbox<Host>(
         host: &mut Host,
@@ -567,13 +510,13 @@ fn read_or_init_michelson_to_evm_gas_multiplier(host: &mut impl StorageV1) -> u6
     }
 }
 
-impl ChainConfigTrait for EvmChainConfig {
+impl ChainConfigTrait for TezosXChainConfig {
     type BlockConstants = TezosXBlockConstants;
 
     type ChainHeader = crate::blueprint_storage::EVMBlockHeader;
 
-    fn get_chain_id(&self) -> U256 {
-        self.chain_id
+    fn get_evm_chain_id(&self) -> U256 {
+        self.evm_chain_id
     }
 
     fn is_tezos_runtime_enabled(&self, current_level: U256) -> bool {
@@ -582,11 +525,7 @@ impl ChainConfigTrait for EvmChainConfig {
     }
 
     fn init_registry(&self) -> RegistryImpl {
-        RegistryImpl::new(self.chain_id, self.michelson_chain_config.chain_id.clone())
-    }
-
-    fn get_chain_family(&self) -> ChainFamily {
-        ChainFamily::Evm
+        RegistryImpl::new(self.evm_chain_id, self.michelson_chain_id.clone())
     }
 
     fn constants(
@@ -610,7 +549,7 @@ impl ChainConfigTrait for EvmChainConfig {
             .collect();
         Ok(TezosXBlockConstants {
             evm_runtime_block_constants: block_in_progress.constants(
-                self.chain_id,
+                self.evm_chain_id,
                 self.limits.minimum_base_fee_per_gas,
                 da_fee_per_byte,
                 crate::block::GAS_LIMIT,
@@ -789,7 +728,7 @@ impl ChainConfigTrait for EvmChainConfig {
                 // the two nonce universes stay disjoint.
                 let operation_hash = TezosXJournal::synthetic_operation_hash(
                     &crac_id,
-                    self.chain_id.low_u64(),
+                    self.evm_chain_id.low_u64(),
                     block_in_progress.number.low_u64(),
                 );
                 // Seed the journal with this block's EVM environment so any
@@ -802,7 +741,7 @@ impl ChainConfigTrait for EvmChainConfig {
                     block_constants.evm_runtime_block_constants.clone(),
                 );
                 let result = apply_tezos_operation(
-                    &self.michelson_chain_config.chain_id,
+                    &self.michelson_chain_id,
                     block_in_progress,
                     host,
                     registry,
@@ -886,22 +825,20 @@ impl ChainConfigTrait for EvmChainConfig {
     }
 }
 
-impl EvmChainConfig {
+impl TezosXChainConfig {
     pub fn create_config(
-        chain_id: U256,
+        evm_chain_id: U256,
         limits: EvmLimits,
         spec_id: SpecId,
         experimental_features: ExperimentalFeatures,
-        michelson_runtime_chain_id: ChainId,
+        michelson_chain_id: ChainId,
     ) -> Self {
         Self {
-            chain_id,
+            evm_chain_id,
             limits,
             spec_id,
             experimental_features,
-            michelson_chain_config: MichelsonChainConfig::create_config(
-                michelson_runtime_chain_id,
-            ),
+            michelson_chain_id,
         }
     }
 
@@ -917,8 +854,8 @@ impl EvmChainConfig {
         &self.spec_id
     }
 
-    pub fn michelson_chain_config(&self) -> &MichelsonChainConfig {
-        &self.michelson_chain_config
+    pub fn michelson_chain_id(&self) -> &ChainId {
+        &self.michelson_chain_id
     }
 }
 
@@ -1292,51 +1229,6 @@ where
     }
 }
 
-impl MichelsonChainConfig {
-    pub fn create_config(chain_id: ChainId) -> Self {
-        Self { chain_id }
-    }
-}
-
-impl ChainConfig {
-    pub fn new_evm_config(
-        chain_id: U256,
-        limits: EvmLimits,
-        spec_id: SpecId,
-        experimental_features: ExperimentalFeatures,
-        michelson_runtime_chain_id: ChainId,
-    ) -> Self {
-        ChainConfig::Evm(Box::new(EvmChainConfig::create_config(
-            chain_id,
-            limits,
-            spec_id,
-            experimental_features,
-            michelson_runtime_chain_id,
-        )))
-    }
-
-    pub fn get_chain_family(&self) -> ChainFamily {
-        match self {
-            ChainConfig::Evm(_) => ChainFamily::Evm,
-        }
-    }
-
-    pub fn get_chain_id(&self) -> U256 {
-        match self {
-            ChainConfig::Evm(evm_chain_config) => evm_chain_config.get_chain_id(),
-        }
-    }
-}
-
-impl Display for ChainFamily {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Evm => write!(f, "EVM"),
-            Self::Michelson => write!(f, "Michelson"),
-        }
-    }
-}
-
 #[derive(Clone, Copy, Debug)]
 pub struct EvmLimits {
     pub maximum_gas_limit: u64,
@@ -1352,21 +1244,7 @@ impl Default for EvmLimits {
     }
 }
 
-impl Default for ChainConfig {
-    fn default() -> Self {
-        ChainConfig::Evm(Box::default())
-    }
-}
-
-impl Display for ChainConfig {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ChainConfig::Evm(evm_chain_config) => evm_chain_config.fmt_with_family(f),
-        }
-    }
-}
-
-impl Default for EvmChainConfig {
+impl Default for TezosXChainConfig {
     fn default() -> Self {
         Self::create_config(
             U256::from(CHAIN_ID),
@@ -1379,19 +1257,14 @@ impl Default for EvmChainConfig {
 }
 
 #[cfg(test)]
-pub fn test_evm_chain_config() -> EvmChainConfig {
-    EvmChainConfig::create_config(
+pub fn test_tezosx_chain_config() -> TezosXChainConfig {
+    TezosXChainConfig::create_config(
         U256::from(CHAIN_ID),
         EvmLimits::default(),
         SpecId::default(),
         ExperimentalFeatures::default(),
         ChainId::from(CHAIN_ID.to_le_bytes()),
     )
-}
-
-#[cfg(test)]
-pub fn test_chain_config() -> ChainConfig {
-    ChainConfig::Evm(Box::new(test_evm_chain_config()))
 }
 
 /// Reveal operation bytes from protocol encoding regression tests.

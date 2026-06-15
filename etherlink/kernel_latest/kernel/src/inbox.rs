@@ -8,7 +8,7 @@
 use crate::blueprint_storage::store_sequencer_blueprint;
 use crate::bridge::Deposit;
 use crate::chains::{
-    ChainConfigTrait, EvmChainConfig, ExperimentalFeatures, TezosXTransaction,
+    ChainConfigTrait, ExperimentalFeatures, TezosXChainConfig, TezosXTransaction,
 };
 use crate::configuration::{DalConfiguration, TezosContracts};
 use crate::dal::fetch_and_parse_sequencer_blueprint_from_dal;
@@ -590,7 +590,7 @@ pub fn read_proxy_inbox<Host>(
     smart_rollup_address: [u8; 20],
     tezos_contracts: &TezosContracts,
     enable_fa_bridge: bool,
-    chain_configuration: &EvmChainConfig,
+    chain_configuration: &TezosXChainConfig,
 ) -> Result<Option<ProxyInboxContent>, anyhow::Error>
 where
     Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
@@ -604,7 +604,7 @@ where
     // during this kernel run.
     let mut inbox_is_empty = true;
     loop {
-        match read_and_dispatch_input::<Host, ProxyInput, EvmChainConfig>(
+        match read_and_dispatch_input::<Host, ProxyInput, TezosXChainConfig>(
             host,
             smart_rollup_address,
             tezos_contracts,
@@ -747,7 +747,7 @@ mod tests {
         blueprint_path, store_current_block_header, BlockHeader, BlueprintHeader,
         ChainHeader, EVMBlockHeader,
     };
-    use crate::chains::test_evm_chain_config;
+    use crate::chains::test_tezosx_chain_config;
     use crate::configuration::TezosContracts;
     use crate::dal_slot_import_signal::{
         DalSlotIndicesList, DalSlotIndicesOfLevel, UnsignedDalSlotSignals,
@@ -902,7 +902,7 @@ mod tests {
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
             false,
-            &test_evm_chain_config(),
+            &test_tezosx_chain_config(),
         )
         .unwrap()
         .unwrap();
@@ -934,7 +934,7 @@ mod tests {
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
             false,
-            &test_evm_chain_config(),
+            &test_tezosx_chain_config(),
         )
         .unwrap()
         .unwrap();
@@ -991,7 +991,7 @@ mod tests {
                 kernel_security_governance: None,
             },
             false,
-            &test_evm_chain_config(),
+            &test_tezosx_chain_config(),
         )
         .unwrap()
         .unwrap();
@@ -1037,7 +1037,7 @@ mod tests {
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
             false,
-            &test_evm_chain_config(),
+            &test_tezosx_chain_config(),
         )
         .unwrap();
 
@@ -1088,7 +1088,7 @@ mod tests {
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
             false,
-            &test_evm_chain_config(),
+            &test_tezosx_chain_config(),
         )
         .unwrap();
 
@@ -1127,7 +1127,7 @@ mod tests {
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
             false,
-            &test_evm_chain_config(),
+            &test_tezosx_chain_config(),
         )
         .unwrap();
 
@@ -1183,7 +1183,7 @@ mod tests {
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
             false,
-            &test_evm_chain_config(),
+            &test_tezosx_chain_config(),
         )
         .unwrap()
         .unwrap();
@@ -1204,7 +1204,7 @@ mod tests {
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
             false,
-            &test_evm_chain_config(),
+            &test_tezosx_chain_config(),
         )
         .unwrap()
         .unwrap();
@@ -1267,7 +1267,7 @@ mod tests {
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
             false,
-            &test_evm_chain_config(),
+            &test_tezosx_chain_config(),
         )
         .unwrap()
         .unwrap();
@@ -1292,7 +1292,7 @@ mod tests {
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
             false,
-            &test_evm_chain_config(),
+            &test_tezosx_chain_config(),
         )
         .unwrap();
         assert!(inbox_content.is_some());
@@ -1303,7 +1303,7 @@ mod tests {
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
             false,
-            &test_evm_chain_config(),
+            &test_tezosx_chain_config(),
         )
         .unwrap();
         assert!(inbox_content.is_none());
@@ -1409,7 +1409,7 @@ mod tests {
             false,
             MAX_ALLOWED_TICKS,
             None,
-            &test_evm_chain_config(),
+            &test_tezosx_chain_config(),
         )
         .unwrap();
 

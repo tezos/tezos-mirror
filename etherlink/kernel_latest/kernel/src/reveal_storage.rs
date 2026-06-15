@@ -113,6 +113,6 @@ pub fn reveal_storage<Host>(
     let chain_id = read_chain_id(host).unwrap_or(U256::from(CHAIN_ID));
     let chain_config = fetch_chain_configuration(host, chain_id);
     let configuration = fetch_configuration(host);
-    log!(Info, "Chain Configuration {}", chain_config);
+    log!(Info, "Chain Configuration {chain_config:?}");
     log!(Info, "Configuration {}", configuration);
 }

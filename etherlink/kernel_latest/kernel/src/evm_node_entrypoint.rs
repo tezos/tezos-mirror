@@ -15,9 +15,10 @@ use crate::{
     blueprint::Blueprint,
     blueprint_storage::read_current_blueprint_header,
     chains::{
-        self, ChainConfigTrait, EvmChainConfig, TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
+        self, ChainConfigTrait, TezosXChainConfig,
+        TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
     },
-    configuration::fetch_pure_evm_config,
+    configuration::fetch_chain_configuration,
     delayed_inbox::DelayedInbox,
     storage::read_chain_id,
     sub_block,
@@ -215,7 +216,7 @@ where
     );
 
     // Build context: chain config, block constants, outbox queue.
-    let eth_chain_id = match read_chain_id(&host) {
+    let chain_id = match read_chain_id(&host) {
         Ok(id) => id,
         Err(err) => {
             log!(
@@ -226,7 +227,7 @@ where
             return;
         }
     };
-    let evm_config = fetch_pure_evm_config(&mut host, eth_chain_id);
+    let chain_config = fetch_chain_configuration(&mut host, chain_id);
     let blueprint_header = match read_current_blueprint_header(&host) {
         Ok(h) => h,
         Err(err) => {
@@ -238,26 +239,26 @@ where
             return;
         }
     };
-    let registry = evm_config.init_registry();
+    let registry = chain_config.init_registry();
 
     // Parse the transaction bytes as a Tezos X transaction (blueprint
     // version 1 format: tag byte + raw bytes).
-    let transaction = match EvmChainConfig::transaction_from_bytes(&transaction_bytes, 1)
-    {
-        Ok(tx) => tx,
-        Err(err) => {
-            log!(
-                Error,
-                "Tezos X simulation: failed to parse transaction: {:?}",
-                err
-            );
-            return;
-        }
-    };
+    let transaction =
+        match TezosXChainConfig::transaction_from_bytes(&transaction_bytes, 1) {
+            Ok(tx) => tx,
+            Err(err) => {
+                log!(
+                    Error,
+                    "Tezos X simulation: failed to parse transaction: {:?}",
+                    err
+                );
+                return;
+            }
+        };
 
     let block_in_progress = bip_from_blueprint(
         &host,
-        &evm_config,
+        &chain_config,
         blueprint_header.number,
         H256::zero(),
         H256::zero(),
@@ -267,7 +268,7 @@ where
         },
     );
 
-    let block_constants = match evm_config.constants(
+    let block_constants = match chain_config.constants(
         &mut host,
         &block_in_progress,
         U256::zero(),
@@ -313,7 +314,7 @@ where
     // keeps the two nonce universes disjoint.
     let trace_operation_hash = tezosx_journal::TezosXJournal::synthetic_operation_hash(
         &trace_crac_id,
-        eth_chain_id.low_u64(),
+        chain_id.low_u64(),
         block_in_progress.number.low_u64(),
     );
     // Seed the journal with the live simulation block (built above from
@@ -331,11 +332,11 @@ where
     );
     let execution_result = match transaction {
         chains::TezosXTransaction::Tezos(operation) => {
-            let enable_gas_refund = evm_config
+            let enable_gas_refund = chain_config
                 .experimental_features
                 .is_michelson_gas_refund_enabled();
             chains::apply_tezos_operation(
-                &evm_config.michelson_chain_config().chain_id,
+                chain_config.michelson_chain_id(),
                 &block_in_progress,
                 &mut host,
                 &registry,
@@ -350,7 +351,7 @@ where
                 enable_gas_refund,
             )
         }
-        _ => evm_config.apply_transaction(
+        _ => chain_config.apply_transaction(
             &block_in_progress,
             &mut host,
             &registry,
