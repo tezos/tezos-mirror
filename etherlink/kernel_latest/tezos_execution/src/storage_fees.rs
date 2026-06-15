@@ -21,8 +21,8 @@ use tezos_tezlink::operation_result::{
 use crate::account_storage::TezlinkAccount;
 use crate::burn_tez;
 
+pub const COST_PER_BYTES: u64 = 1;
 // Values from src/proto_023_PtSeouLo/lib_parameters/default_parameters.ml.
-pub const COST_PER_BYTES: u64 = 250;
 pub const ORIGINATION_SIZE: u64 = 257;
 pub const HARD_STORAGE_LIMIT_PER_OPERATION: u64 = 60_000;
 
