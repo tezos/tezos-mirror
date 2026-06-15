@@ -97,6 +97,10 @@ type t = {
           The default is [Enabled{time_interval=100}]. *)
   publish_slots_regularly : publish_slots_regularly option;
   profiling : Tezos_profiler.Profiler.profiling_config option;
+  rpc_acl_policy : Tezos_rpc_http_server.RPC_server.Acl.policy;
+      (** Per-bind-address ACL overrides for the RPC server. When a configured
+          entry matches the bind address, its ACL replaces the default
+          [dal_secure] (public) / [allow_all] (loopback) policy. *)
 }
 
 (** [default] is the default configuration. *)

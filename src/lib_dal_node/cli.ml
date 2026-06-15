@@ -225,7 +225,7 @@ module Term = struct
     let open Cmdliner in
     Arg.(value & flag & info ~docs ~doc (long :: extra_long))
 
-  let p2p_point_format ~default_port =
+  let p2p_point_format ~default_addr ~default_port =
     let decoder str =
       match P2p_point.Id.of_string ~default_port str with
       | Ok x -> Ok x
@@ -233,12 +233,7 @@ module Term = struct
           (* Let's check if the user has entered a port *)
           match String.split_on_char ':' str with
           | [""; port] -> (
-              try
-                let port = int_of_string port in
-                let default =
-                  (fst Configuration_file.default.public_addr, port)
-                in
-                Ok default
+              try Ok (default_addr, int_of_string port)
               with Failure _ ->
                 Error
                   (Format.asprintf "The port provided: '%s' is invalid" port))
@@ -271,13 +266,17 @@ module Term = struct
   let config_file = arg_to_cmdliner config_file_arg
 
   let rpc_addr_arg =
-    let default_port = Configuration_file.default.rpc_addr |> snd in
-    let parse, pp = p2p_point_format ~default_port in
+    let default_addr, default_port = Configuration_file.default.rpc_addr in
+    let parse, pp = p2p_point_format ~default_addr ~default_port in
     make_arg
       ~doc:
-        "The TCP address and optionally the port at which the RPC server of \
-         this instance can be reached. The default address is 0.0.0.0. The \
-         default port is 10732."
+        (Format.asprintf
+           "The TCP address and optionally the port at which the RPC server of \
+            this instance can be reached. The default address is %a. The \
+            default port is %d."
+           P2p_addr.pp
+           default_addr
+           default_port)
       ~parse
       ~placeholder:"ADDR[:PORT]"
       ~pp
@@ -297,14 +296,18 @@ module Term = struct
   let expected_pow = arg_to_cmdliner expected_pow_arg
 
   let net_addr_arg =
-    let default_port = Configuration_file.default.listen_addr |> snd in
-    let parse, pp = p2p_point_format ~default_port in
+    let default_addr, default_port = Configuration_file.default.listen_addr in
+    let parse, pp = p2p_point_format ~default_addr ~default_port in
     make_arg
       ~doc:
-        "The TCP address and optionally the port bound by the DAL node. If \
-         --public-addr is not provided, this is also the address and port at \
-         which this instance can be reached by other P2P nodes. The default \
-         address is 0.0.0.0. The default port is 11732."
+        (Format.asprintf
+           "The TCP address and optionally the port bound by the DAL node. If \
+            --public-addr is not provided, this is also the address and port \
+            at which this instance can be reached by other P2P nodes. The \
+            default address is %a. The default port is %d."
+           P2p_addr.pp
+           default_addr
+           default_port)
       ~parse
       ~placeholder:"ADDR[:PORT]"
       ~pp
@@ -313,15 +316,19 @@ module Term = struct
   let net_addr = arg_to_cmdliner net_addr_arg
 
   let public_addr_arg =
-    let default_port = Configuration_file.default.public_addr |> snd in
-    let parse, pp = p2p_point_format ~default_port in
+    let default_addr, default_port = Configuration_file.default.public_addr in
+    let parse, pp = p2p_point_format ~default_addr ~default_port in
     make_arg
       ~doc:
-        "The TCP address and optionally the port at which this instance can be \
-         reached by other P2P nodes. By default, the point is \
-         '127.0.0.1:11732'. You can override the port using the syntax \
-         ':2222'. If the IP address is detected as a special address (such as \
-         a localhost one) it won't be advertised, only the port will."
+        (Format.asprintf
+           "The TCP address and optionally the port at which this instance can \
+            be reached by other P2P nodes. By default, the point is '%a:%d'. \
+            You can override the port using the syntax ':2222'. If the IP \
+            address is detected as a special address (such as a localhost one) \
+            it won't be advertised, only the port will."
+           P2p_addr.pp
+           default_addr
+           default_port)
       ~parse
       ~placeholder:"ADDR[:PORT]"
       ~pp
@@ -513,12 +520,17 @@ module Term = struct
   let peers = arg_to_cmdliner peers_arg
 
   let metrics_addr_arg =
+    let default_addr, _ = Configuration_file.default.listen_addr in
     let default_port = Configuration_file.default_metrics_port in
-    let parse, pp = p2p_point_format ~default_port in
+    let parse, pp = p2p_point_format ~default_addr ~default_port in
     make_arg
       ~doc:
-        "The TCP address and optionally the port of the node's metrics server. \
-         The default address is 0.0.0.0. The default port is 11733."
+        (Format.asprintf
+           "The TCP address and optionally the port of the node's metrics \
+            server. The default address is %a. The default port is %d."
+           P2p_addr.pp
+           default_addr
+           default_port)
       ~placeholder:"ADDR[:PORT]"
       ~pp
       ~parse
