@@ -21,6 +21,16 @@ for cmd in npm jq git; do
   fi
 done
 
+# Vendored third-party sources. Their npm packages are neither built nor
+# deployed by this repository, so they are not audited; they still appear
+# as SKIP entries in the summary to keep the exclusion visible.
+is_vendored() {
+  case "$1" in
+  src/rust_deps/wasmer-3.3.0/*) return 0 ;;
+  *) return 1 ;;
+  esac
+}
+
 # Extract vulnerability counts from npm audit --json output.
 # Input:  JSON string from npm audit --json
 # Output: "critical=N high=N moderate=N low=N"
@@ -40,6 +50,7 @@ if [ "${1:-}" = "--all" ]; then
   echo "Auditing all directories containing package-lock.json files."
   dirs=$(find . -name package-lock.json \
     -not -path './_build/*' -not -path './_opam/*' \
+    -not -path '*/node_modules/*' \
     -exec dirname {} \; | sed 's|^\./||')
   if [ -z "$dirs" ]; then
     echo "No directories with package-lock.json found. Nothing to audit."
@@ -55,6 +66,7 @@ else
   echo "Auditing directories with changed package-lock.json files."
   dirs=$(git diff --name-only "${merge_base}" "${TEZOS_CI_MR_HEAD}" \
     -- '**/package-lock.json' |
+    grep -v '/node_modules/' |
     while IFS= read -r f; do dirname "$f"; done)
 
   if [ -z "$dirs" ]; then
@@ -66,6 +78,13 @@ fi
 results=""
 has_failure=0
 for dir in $dirs; do
+  if is_vendored "$dir"; then
+    echo "--- skipping vendored directory: ${dir} ---"
+    results="${results}
+SKIP ${dir} (vendored third-party code, not built nor deployed)"
+    continue
+  fi
+
   if [ ! -f "${dir}/package-lock.json" ]; then
     echo "WARNING: ${dir} has no package-lock.json — this should not happen."
     results="${results}
