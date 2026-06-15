@@ -174,7 +174,7 @@ let slack_jobs = List.map job_container_scanning_slack_notification build_images
    Cacio pulls in the scan jobs automatically via the transitive closure
    of the dependency graph. This reflects the intent: the scans are an
    implementation detail of producing the reports. *)
-let () =
+let register () =
   Cacio.register_jobs
     Schedule_security_scans
     (List.map

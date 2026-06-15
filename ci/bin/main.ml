@@ -121,6 +121,8 @@ let () = Tezos_ci_jobs.Installation.register ()
 
 let () = Tezos_ci_jobs.Docker.register ()
 
+let () = Tezos_ci_jobs.Security_scans.register ()
+
 (** {3 General pipelines} *)
 
 let () =
