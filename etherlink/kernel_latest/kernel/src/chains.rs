@@ -5,10 +5,7 @@
 use crate::{
     apply::{extract_cross_runtime_effects, RuntimeExecutionInfo},
     block_in_progress::BlockInProgress,
-    blueprint_storage::{
-        read_current_blueprint_header, BlueprintHeader, DelayedTransactionFetchingResult,
-        EVMBlockHeader, TezBlockHeader,
-    },
+    blueprint_storage::{DelayedTransactionFetchingResult, EVMBlockHeader},
     bridge::{execute_tezlink_deposit, Deposit, TEZLINK_DEPOSITOR},
     delayed_inbox::DelayedInbox,
     error,
@@ -23,7 +20,6 @@ use crate::{
     transaction::TransactionContent,
     CHAIN_ID,
 };
-use anyhow::Context;
 use mir::ast::PublicKeyHash;
 use num_traits::ToPrimitive;
 use primitive_types::{H160, H256, U256};
@@ -37,7 +33,7 @@ use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
 use std::fmt::{Debug, Display};
 use tezos_crypto_rs::hash::{BlockHash, ChainId, UnknownSignature};
-use tezos_data_encoding::{enc::BinWriter, nom::NomReader};
+use tezos_data_encoding::nom::NomReader;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::{
     rlp_helpers::{decode_field, decode_tx_hash, next},
@@ -48,7 +44,7 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_tezlink::operation::ManagerOperationField;
 
 use tezos_execution::{
-    context::{self, Context as _, TezlinkContext},
+    context::{self, Context as _},
     get_required_da_fees,
     mir_ctx::BlockCtx,
     FeeRefundConfig, ProcessedOperation,
@@ -189,7 +185,6 @@ pub struct MichelsonChainConfig {
 
 pub enum ChainConfig {
     Evm(Box<EvmChainConfig>),
-    Michelson(MichelsonChainConfig),
 }
 
 const TEZOS_OP_TAG: u8 = 1;
@@ -927,9 +922,6 @@ impl EvmChainConfig {
     }
 }
 
-const TEZLINK_SIMULATION_RESULT_PATH: RefPath =
-    RefPath::assert_from(b"/base/tez_simulation_result");
-
 fn tezos_operation_from_bytes(bytes: &[u8]) -> anyhow::Result<TezlinkOperation> {
     let operation = Operation::nom_read_exact(bytes).map_err(|decode_error| {
         error::Error::NomReadError(format!("{decode_error:?}"))
@@ -1300,403 +1292,6 @@ where
     }
 }
 
-impl ChainConfigTrait for MichelsonChainConfig {
-    type BlockConstants = TezlinkBlockConstants<TezlinkContext>;
-    type ChainHeader = TezBlockHeader;
-
-    fn get_chain_id(&self) -> U256 {
-        self.chain_id.as_ref().into()
-    }
-
-    fn is_tezos_runtime_enabled(&self, _current_level: U256) -> bool {
-        true
-    }
-
-    fn init_registry(&self) -> RegistryImpl {
-        RegistryImpl::new(self.get_chain_id(), self.chain_id.clone())
-    }
-
-    fn get_chain_family(&self) -> ChainFamily {
-        ChainFamily::Michelson
-    }
-
-    fn constants(
-        &self,
-        host: &mut impl StorageV1,
-        block_in_progress: &BlockInProgress,
-        da_fee_per_byte: U256,
-        _coinbase: H160,
-    ) -> anyhow::Result<Self::BlockConstants> {
-        let level: BlockNumber = block_in_progress.number.try_into()?;
-        let context =
-            context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)?;
-        let da_fee_per_byte_mutez = mutez_from_wei(da_fee_per_byte)
-            .map_err(|_| crate::Error::InvalidConversion)?;
-        let michelson_to_evm_gas_multiplier =
-            read_or_init_michelson_to_evm_gas_multiplier(host);
-        let safe_roots = self
-            .storage_root_paths(level.into())
-            .iter()
-            .map(OwnedPath::from)
-            .collect();
-        Ok(TezlinkBlockConstants {
-            level,
-            context,
-            da_fee_per_byte_mutez,
-            michelson_to_evm_gas_multiplier,
-            safe_roots,
-        })
-    }
-
-    fn michelson_to_evm_gas_multiplier(&self, constants: &Self::BlockConstants) -> u64 {
-        constants.michelson_to_evm_gas_multiplier
-    }
-
-    // Tezlink (pure Michelson chain) does not use dynamic, EIP-1559-style
-    // pricing — its fee model follows Tezos L1 (flat mutez-per-gas-unit
-    // declared by the operation). Returning zero here disables the
-    // Etherlink-style dynamic base_fee and keeps fee computation in
-    // strict Tezos semantics.
-    //
-    // Tezos X (EVM primary with embedded Michelson runtime) uses
-    // `EvmChainConfig::base_fee_per_gas` instead, which does return the
-    // dynamic Etherlink base fee.
-    fn base_fee_per_gas(&self, _host: &impl StorageV1, _timestamp: Timestamp) -> U256 {
-        U256::zero()
-    }
-
-    fn fetch_hashes_from_delayed_inbox<Host>(
-        host: &mut Host,
-        delayed_hashes: Vec<crate::delayed_inbox::Hash>,
-        delayed_inbox: &mut DelayedInbox,
-        current_blueprint_size: usize,
-        block_number: U256,
-    ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
-    where
-        Host: StorageV1,
-    {
-        // By reusing 'fetch_hashes_from_delayed_inbox', Tezlink don't have to implement
-        // the logic to retrieve delayed_inbox items.
-        //
-        // However, it still needs to do the conversion as the returned items are EthTxs
-        let (delayed, total_size) =
-            crate::blueprint_storage::fetch_hashes_from_delayed_inbox(
-                host,
-                delayed_hashes,
-                delayed_inbox,
-                current_blueprint_size,
-                block_number,
-            )?;
-        Ok((
-            match delayed {
-                DelayedTransactionFetchingResult::Ok(txs) => {
-                    let mut ops = vec![];
-                    for tx in txs.into_iter() {
-                        if let TezosXTransaction::Ethereum(tx) = tx {
-                            if let TransactionContent::Deposit(deposit) = tx.content {
-                                let operation = TezlinkOperation {
-                                    tx_hash: tx.tx_hash,
-                                    content: TezlinkContent::Deposit(deposit),
-                                };
-                                ops.push(TezosXTransaction::Tezos(operation))
-                            }
-                        }
-                    }
-                    DelayedTransactionFetchingResult::Ok(ops)
-                }
-                DelayedTransactionFetchingResult::BlueprintTooLarge => {
-                    DelayedTransactionFetchingResult::BlueprintTooLarge
-                }
-                DelayedTransactionFetchingResult::DelayedHashMissing(hash) => {
-                    DelayedTransactionFetchingResult::DelayedHashMissing(hash)
-                }
-            },
-            total_size,
-        ))
-    }
-
-    fn transaction_from_bytes(
-        bytes: &[u8],
-        _version: u8,
-    ) -> anyhow::Result<TezosXTransaction> {
-        let operation = tezos_operation_from_bytes(bytes)?;
-        Ok(operation.into())
-    }
-
-    fn can_fit_in_reboot(
-        &self,
-        _executed_gas: U256,
-        _tx: &TezosXTransaction,
-        _block_constants: &Self::BlockConstants,
-    ) -> anyhow::Result<bool> {
-        Ok(true)
-    }
-
-    fn apply_transaction<Host>(
-        &self,
-        block_in_progress: &BlockInProgress,
-        host: &mut Host,
-        registry: &impl Registry,
-        _outbox_queue: &OutboxQueue<'_, impl Path>,
-        block_constants: &Self::BlockConstants,
-        transaction: TezosXTransaction,
-        _index: u32,
-        sequencer_pool_address: Option<H160>,
-        _tracer_input: Option<TracerInput>,
-        skip_signature_check: bool,
-        skip_fees_check: bool,
-        http_trace_enabled: bool,
-    ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
-    where
-        Host: StorageV1,
-    {
-        match transaction {
-            TezosXTransaction::Ethereum(_transaction) => {
-                anyhow::bail!("Unexpected Ethereum transaction in Michelson chain family")
-            }
-            TezosXTransaction::Tezos(operation) => {
-                let tx_hash = operation.tx_hash;
-                let crac_id =
-                    tezosx_journal::CracId::new(0, block_in_progress.michelson_index);
-                // The seed must NOT be the operation's real hash: the
-                // normal Michelson path inside `apply_tezos_operation`
-                // builds its own `OriginationNonce::initial(real_hash)`
-                // starting at index 0, and if the journal's CRAC nonce
-                // shared the same seed both nonces would derive
-                // colliding KT1s at index 1.  Use a synthetic seed so
-                // the two nonce universes stay disjoint.
-                let operation_hash = TezosXJournal::synthetic_operation_hash(
-                    &crac_id,
-                    self.get_chain_id().low_u64(),
-                    block_in_progress.number.low_u64(),
-                );
-                let mut journal = TezosXJournal::new(
-                    crac_id,
-                    operation_hash,
-                    tezos_ethereum::block::BlockConstants::dummy(),
-                );
-                // Not supported in standalone Tezlink (no ExperimentalFeatures).
-                let enable_gas_refund = false;
-                let result = apply_tezos_operation(
-                    &self.chain_id,
-                    block_in_progress,
-                    host,
-                    registry,
-                    block_constants,
-                    operation,
-                    sequencer_pool_address,
-                    skip_signature_check,
-                    skip_fees_check,
-                    None::<&OutboxQueue<'_, RefPath>>,
-                    None,
-                    &mut journal,
-                    enable_gas_refund,
-                );
-                crate::storage::maybe_store_http_traces_for_tx(
-                    host,
-                    http_trace_enabled,
-                    &tx_hash,
-                    &journal,
-                );
-                result
-            }
-        }
-    }
-
-    fn finalize_and_store<Host>(
-        &self,
-        host: &mut Host,
-        mut block_in_progress: BlockInProgress,
-        block_constants: &Self::BlockConstants,
-        chain_header: Self::ChainHeader,
-    ) -> anyhow::Result<L2Block>
-    where
-        Host: StorageV1,
-    {
-        // After a protocol upgrade, the first block has
-        // chain_header.next_protocol != TARGET_TEZOS_PROTOCOL (it still
-        // reflects the old protocol). In that case the block must be empty
-        // since we cannot execute transactions from the previous protocol.
-        anyhow::ensure!(
-            chain_header.next_protocol == TARGET_TEZOS_PROTOCOL
-                || block_in_progress
-                    .cumulative_tezos_operation_receipts
-                    .list
-                    .is_empty(),
-            "Non-empty block with mismatched protocol: expected {:?} or empty block, \
-             got protocol {:?} with {} operations",
-            TARGET_TEZOS_PROTOCOL,
-            chain_header.next_protocol,
-            block_in_progress
-                .cumulative_tezos_operation_receipts
-                .list
-                .len()
-        );
-
-        // Assign block-sequential nonces to all internal operations.
-        // Each operation uses 0-based local nonces during execution;
-        // this final pass makes them L1-compliant (sequential across
-        // the entire block).
-        crate::apply::renumber_nonces(
-            &mut block_in_progress.cumulative_tezos_operation_receipts.list,
-        );
-        // Standalone Tezlink has no EVM txs, so `blueprint_hash` only
-        // commits to the Michelson ops and the timestamp. Kept in the
-        // same shape as the TezosX path so a future extension (e.g.
-        // delayed Tezlink ops) only needs to fill the empty vectors.
-        let michelson_commitment = crate::state_hash::michelson_ops_commitment(
-            &block_in_progress.cumulative_tezos_operation_receipts.list,
-        );
-        let blueprint_hash = crate::state_hash::blueprint_hash(
-            &[],
-            &[],
-            &michelson_commitment,
-            block_in_progress.timestamp,
-        );
-        let state_root =
-            crate::state_hash::tez_accounts_state_hash(host, &blueprint_hash)
-                .try_into()
-                .expect("tez_accounts_state_hash must be 32 bytes");
-        let tezblock = TezBlock::new(
-            chain_header.next_protocol,
-            TARGET_TEZOS_PROTOCOL,
-            block_constants.level,
-            block_in_progress.timestamp,
-            block_in_progress.ethereum_parent_hash,
-            block_in_progress.cumulative_tezos_operation_receipts.list,
-            state_root,
-        )?;
-        let new_block = L2Block::Tezlink(tezblock);
-        crate::block_storage::store_current(host, &TEZ_BLOCKS_PATH, &new_block)
-            .context("Failed to store the current block")?;
-        Ok(new_block)
-    }
-
-    fn start_simulation_mode<Host>(
-        &self,
-        host: &mut Host,
-        registry: &impl Registry,
-    ) -> anyhow::Result<()>
-    where
-        Host: StorageV1 + WasmHost,
-    {
-        fn read_inbox_message(
-            host: &mut impl WasmHost,
-        ) -> anyhow::Result<tezos_smart_rollup_host::input::Message> {
-            match host.read_input()? {
-                Some(input) => Ok(input),
-                None => {
-                    Err(crate::error::TezlinkSimulationError::UnexpectedEndOfInbox.into())
-                }
-            }
-        }
-
-        // We expect the inbox to contain exactly two messages; the
-        // first message is a single byte indicating if signature must
-        // be checked (0x01) or not (0x00); the second message is the
-        // operation to simulate.
-        let skip_signature_check = {
-            let input = read_inbox_message(host)?;
-            match input.as_ref() {
-                &[0x00] => true,
-                &[0x01] => false,
-                input => {
-                    return Err(
-                        crate::error::TezlinkSimulationError::UnexpectedSkipSigTag(
-                            input.to_vec(),
-                        )
-                        .into(),
-                    );
-                }
-            }
-        };
-
-        let nb_chunks =
-            u16::from_le_bytes(read_inbox_message(host)?.as_ref().try_into()?);
-
-        let mut operation_bytes = vec![];
-        for _chunk in 0..nb_chunks {
-            operation_bytes.extend(read_inbox_message(host)?.as_ref())
-        }
-
-        let operation = {
-            Operation::nom_read_exact(&operation_bytes)
-                .map_err(|_| crate::error::Error::InvalidConversion)?
-        };
-        let hash = operation.hash()?;
-        log!(Debug,
-            "Tezlink simulation starts for operation hash {hash:?}, skip signature flag: {skip_signature_check:?}, operation length: {:?}, number of chunks: {nb_chunks:?}",
-            operation_bytes.len()
-        );
-        let context =
-            context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)?;
-
-        let BlueprintHeader { number, timestamp } = read_current_blueprint_header(host)?;
-        let block_ctx = BlockCtx {
-            level: &number.as_u32().into(),
-            now: &timestamp,
-            chain_id: &self.chain_id,
-        };
-        let branch = operation.branch.clone();
-        let signature = operation.signature.clone();
-        // During simulation, skip the fee check: the client sends fee=0
-        // because it doesn't know the fees yet (that's what simulation computes).
-        // The OCaml node-side prevalidation also skips fees during simulation.
-        //
-        // Build the journal with an explicit Tezos-origin CracId, mirroring the
-        // applied Michelson path (`CracId::new(0, michelson_index)` above). A
-        // simulated Tezos operation that crosses into the EVM must resolve its
-        // originator back to the Tezos PKH and emit `X-Tezos-CRAC-ID` as
-        // `0-<index>`; tagging it Ethereum (as a universal default would) keeps
-        // the EVM-form source address and diverges from on-chain execution.
-        // There is no `BlockInProgress` in simulation, so the tx index is a
-        // placeholder; simulated KT1s are non-authoritative regardless.
-        let mut tezosx_journal = TezosXJournal::mock(RuntimeId::Tezos);
-        let safe_roots: Vec<OwnedPath> = self
-            .storage_root_paths(number)
-            .iter()
-            .map(OwnedPath::from)
-            .collect();
-        let processed_operations = tezos_execution::validate_and_apply_operation(
-            host,
-            registry,
-            &mut tezosx_journal,
-            &context,
-            hash.clone(),
-            operation.clone(),
-            &block_ctx,
-            skip_signature_check,
-            None,
-            None, // No fee refund in Tezlink
-            &safe_roots,
-        )?;
-        let operations = ProcessedOperation::into_receipts(processed_operations);
-        let result = AppliedOperation {
-            hash,
-            branch,
-            op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
-                OperationBatchWithMetadata {
-                    operations,
-                    signature,
-                },
-            ),
-        };
-
-        log!(Debug, "Tezlink simulation finished, result: {:?}", result);
-        host.store_write_all(&TEZLINK_SIMULATION_RESULT_PATH, &result.to_bytes()?)?;
-        Ok(())
-    }
-
-    fn storage_root_paths(&self, _block_number: U256) -> Vec<RefPath> {
-        vec![
-            ETHERLINK_SAFE_STORAGE_ROOT_PATH,
-            EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
-            TEZ_SAFE_STORAGE_ROOT_PATH,
-            TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
-        ]
-    }
-}
-
 impl MichelsonChainConfig {
     pub fn create_config(chain_id: ChainId) -> Self {
         Self { chain_id }
@@ -1720,23 +1315,15 @@ impl ChainConfig {
         )))
     }
 
-    pub fn new_michelson_config(chain_id: ChainId) -> Self {
-        ChainConfig::Michelson(MichelsonChainConfig::create_config(chain_id))
-    }
-
     pub fn get_chain_family(&self) -> ChainFamily {
         match self {
             ChainConfig::Evm(_) => ChainFamily::Evm,
-            ChainConfig::Michelson(_) => ChainFamily::Michelson,
         }
     }
 
     pub fn get_chain_id(&self) -> U256 {
         match self {
             ChainConfig::Evm(evm_chain_config) => evm_chain_config.get_chain_id(),
-            ChainConfig::Michelson(michelson_chain_config) => {
-                michelson_chain_config.get_chain_id()
-            }
         }
     }
 }
@@ -1775,9 +1362,6 @@ impl Display for ChainConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ChainConfig::Evm(evm_chain_config) => evm_chain_config.fmt_with_family(f),
-            ChainConfig::Michelson(michelson_chain_config) => {
-                michelson_chain_config.fmt_with_family(f)
-            }
         }
     }
 }

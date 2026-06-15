@@ -22,7 +22,7 @@ use primitive_types::U256;
 use revm_etherlink::storage::{read_ticketer, version::read_evm_version};
 use tezos_crypto_rs::{
     blake2b,
-    hash::{ChainId, ContractKt1Hash, HashTrait},
+    hash::{ChainId, ContractKt1Hash},
 };
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::IsEvmNode;
@@ -250,52 +250,16 @@ where
     )
 }
 
-fn fetch_michelson_chain_configuration(
-    _host: &mut impl StorageV1,
-    chain_id: ChainId,
-) -> ChainConfig {
-    ChainConfig::new_michelson_config(chain_id)
-}
-
-fn try_chain_id_from_u256(chain_id: U256) -> Option<ChainId> {
-    // Tezos-compatible chain ids have only 4 bytes.
-    let chain_id_low_bytes = chain_id.low_u32();
-
-    if chain_id != chain_id_low_bytes.into() {
-        log!(
-            Error,
-            "Configured chain family is Michelson but chain id does not fit on 4 bytes."
-        );
-        return None;
-    }
-
-    match ChainId::try_from_bytes(&chain_id_low_bytes.to_le_bytes()) {
-        Err(_) => {
-            // This is unexpected, any u32 should be decodable as a chain id
-            log!(Error,
-                "Configured chain family is Michelson and the chain id fits on 4 bytes but converting to ChainId failed."
-            );
-            None
-        }
-        Ok(chain_id) => Some(chain_id),
-    }
-}
-
 pub fn fetch_chain_configuration<Host>(host: &mut Host, chain_id: U256) -> ChainConfig
 where
     Host: StorageV1,
 {
-    // if the info is not in durable storage, we must not fail, but treat it as EVM
-    let chain_family = read_chain_family(host, chain_id).unwrap_or_default();
-    match chain_family {
-        ChainFamily::Evm => fetch_evm_chain_configuration(host, chain_id),
-        ChainFamily::Michelson => {
-            if let Some(chain_id) = try_chain_id_from_u256(chain_id) {
-                fetch_michelson_chain_configuration(host, chain_id)
-            } else {
-                log!(Error, "Falling back to EVM chain family.");
-                fetch_evm_chain_configuration(host, chain_id)
-            }
+    // The standalone Michelson chain family has been removed: the Michelson
+    // runtime is now embedded in the (EVM) TezosX chain configuration, so any
+    // configured chain family resolves to the EVM chain configuration.
+    match read_chain_family(host, chain_id).unwrap_or_default() {
+        ChainFamily::Evm | ChainFamily::Michelson => {
+            fetch_evm_chain_configuration(host, chain_id)
         }
     }
 }

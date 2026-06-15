@@ -301,7 +301,6 @@ where
     // Initialize custom precompile
     let tezosx_enabled = match &chain_configuration {
         chains::ChainConfig::Evm(config) => config.tezos_runtime_feature_flag(),
-        chains::ChainConfig::Michelson(_) => false,
     };
     init_precompile_bytecodes(host, tezosx_enabled)
         .map_err(|_| Error::RevmPrecompileInitError)?;
@@ -333,13 +332,6 @@ where
             chains::ChainConfig::Evm(chain_configuration) => block::produce(
                 host,
                 &*chain_configuration,
-                &mut configuration,
-                sequencer_pool_address,
-                trace_input,
-            ),
-            chains::ChainConfig::Michelson(chain_configuration) => block::produce(
-                host,
-                &chain_configuration,
                 &mut configuration,
                 sequencer_pool_address,
                 trace_input,

@@ -9,6 +9,8 @@
   per-committed-contract `/origin` reads introduced with the address
   classification, restoring the transfer hot path to its previous
   host-call count. (!22126)
+- The standalone Michelson chain family is no longer supported: the
+  Michelson runtime is only available embedded in the Tezos X chain. (!22204)
 
 ## Version 6 (Farfadet)
 

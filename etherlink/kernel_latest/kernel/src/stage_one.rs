@@ -196,28 +196,6 @@ where
             config.enable_fa_bridge,
             &**chain_config,
         ),
-        (
-            ChainConfig::Michelson(chain_config),
-            ConfigurationMode::Sequencer {
-                delayed_bridge,
-                delayed_inbox,
-                sequencer,
-                dal,
-                evm_node_flag: _,
-                max_blueprint_lookahead_in_seconds: _,
-            },
-        ) => fetch_sequencer_blueprints(
-            host,
-            smart_rollup_address,
-            &config.tezos_contracts,
-            delayed_bridge.clone(),
-            delayed_inbox,
-            sequencer.clone(),
-            dal.clone(),
-            config.maximum_allowed_ticks,
-            config.enable_fa_bridge,
-            chain_config,
-        ),
         (ChainConfig::Evm(chain_config), ConfigurationMode::Proxy) => {
             fetch_proxy_blueprints(
                 host,
@@ -226,10 +204,6 @@ where
                 config.enable_fa_bridge,
                 chain_config,
             )
-        }
-        (ChainConfig::Michelson(_), ConfigurationMode::Proxy) => {
-            // Proxy mode is only available for the EVM chain.
-            Ok(StageOneStatus::Done)
         }
     }
 }
