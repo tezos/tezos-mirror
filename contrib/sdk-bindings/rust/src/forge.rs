@@ -45,7 +45,12 @@ pub enum ForgingError {
 /// always succeed.
 #[uniffi::export]
 pub fn forge_message(msg: &str) -> Result<Vec<u8>, ForgingError> {
-    Ok(mir::ast::Micheline::String(msg.to_owned()).encode_for_pack()?)
+    match mir::ast::Micheline::String(msg.to_owned()).encode_for_pack() {
+        Ok(res) => Ok(res?),
+        Err(mir::gas::OutOfGas) => {
+            unreachable!("encode_for_pack does not charge gas - OutOfGas never occurs")
+        }
+    }
 }
 
 #[uniffi::export]
