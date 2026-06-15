@@ -28,6 +28,7 @@ import sys
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 # Exit codes.
 EXIT_OK = 0
@@ -238,6 +239,39 @@ def scenario_eta(head_timestamp, blocks, avg_seconds):
     return eta, total_seconds / 86400.0
 
 
+def _display_zones():
+    """The time zones shown for activation times: UTC, plus Paris and London.
+
+    UTC is always present; Paris/London are added when the tz database is
+    available (skipped otherwise).
+    """
+    zones = [("UTC", timezone.utc)]
+    try:
+        zones += [("Paris", ZoneInfo("Europe/Paris")),
+                  ("London", ZoneInfo("Europe/London"))]
+    except (ZoneInfoNotFoundError, OSError):  # pragma: no cover
+        pass
+    return zones
+
+
+# Single source of the activation time zones, reused by the sibling scripts.
+DISPLAY_ZONES = _display_zones()
+_TZ_COL = 24
+
+
+def activation_header():
+    """Column header for the activation time zones, e.g. 'activation (Paris) ...'."""
+    return "  ".join(f"{'activation (' + name + ')':<{_TZ_COL}}"
+                     for name, _ in DISPLAY_ZONES)
+
+
+def format_activation(eta):
+    """Render an activation datetime as one aligned column per display zone."""
+    return "  ".join(
+        f"{eta.astimezone(zone).strftime('%Y-%m-%d %H:%M %Z'):<{_TZ_COL}}"
+        for _, zone in DISPLAY_ZONES)
+
+
 # --------------------------------------------------------------------------- #
 # CLI argument handling
 # --------------------------------------------------------------------------- #
@@ -374,6 +408,13 @@ def selftest():
             raise AssertionError(f"expected ValueError for {bad!r}")
         except ValueError:
             pass
+
+    # Activation formatting renders one column per display zone (incl. the date).
+    sample = datetime(2026, 6, 29, 21, 26, 4, tzinfo=timezone.utc)
+    assert len(DISPLAY_ZONES) >= 1
+    row = format_activation(sample)
+    assert "2026-06-29" in row, row
+    assert row.count("2026-06-29") == len(DISPLAY_ZONES), row
     print("selftest: OK")
     return EXIT_OK
 
@@ -433,12 +474,13 @@ def report(constants, head, voting, candidate, activation, scenarios):
     print()
     print("Scenarios:")
     print(
-        f"  {'scenario':<22} {'avg block':>10} {'days':>7}   activation (UTC)"
+        f"  {'scenario':<22} {'avg block':>10} {'days':>7}   "
+        f"{activation_header()}"
     )
     for label, avg, eta, days in scenarios:
         print(
             f"  {label:<22} {avg:>9.3f}s {days:>7.2f}   "
-            f"{eta.strftime('%Y-%m-%d %H:%M:%S UTC')}"
+            f"{format_activation(eta)}"
         )
 
 

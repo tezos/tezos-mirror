@@ -40,6 +40,9 @@ EXIT_DATA_ERROR = 3
 
 DEFAULT_ENDPOINT = "http://localhost:8732"
 
+# Activation times are shown in Paris and London local time via npa's shared
+# DISPLAY_ZONES / format_activation helpers (single source).
+
 # load_constants/head/voting raise npa.NodeError; resolve_tzkt_base raises
 # rd.NodeError; tally_rounds raises rd.TzktError. Treat all as data errors.
 NODE_ERRORS = (npa.NodeError, rd.NodeError)
@@ -107,13 +110,14 @@ def report(chain_id, tzkt_base, voting, candidate, activation, head, best,
 
     print()
     print("Scenarios (horizon = blocks-to-activation):")
-    print(f"  {'scenario':<22} {'avg block':>10} {'days':>7}   activation (UTC)")
+    print(f"  {'scenario':<22} {'avg block':>10} {'days':>7}   "
+          f"{npa.activation_header()}")
     rows = [("best case", *best)]
     rows += [(f"empirical ({m['short']})", m["avg"], m["eta"], m["days"])
              for m in measurements]
     for label, avg, eta, days in rows:
         print(f"  {label:<22} {avg:>9.3f}s {days:>7.2f}   "
-              f"{eta.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+              f"{npa.format_activation(eta)}")
 
 
 # --------------------------------------------------------------------------- #
