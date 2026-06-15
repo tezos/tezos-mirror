@@ -56,6 +56,17 @@ pub const STORE_NOT_A_NODE: i32 = -10;
 /// The outbox is full an cannot accept new messages at this level.
 pub const FULL_OUTBOX: i32 = -11;
 
+/// NDS-only: a registry operation referenced a database index past the
+/// current registry length.
+pub const NDS_DATABASE_OUT_OF_BOUNDS: i32 = -14;
+
+/// NDS-only: the registry can only be resized by one database at a time, up to a limit of `i32::MAX` databases.
+pub const NDS_RESIZE_INVALID: i32 = -15;
+
+/// NDS-only: an NDS host function was invoked while the runtime
+/// `nds_host_functions_enabled` flag is off.
+pub const NDS_NOT_ENABLED: i32 = -16;
+
 /// None ValueType discriminant.
 pub const VALUE_TYPE_NONE: i32 = 0;
 
