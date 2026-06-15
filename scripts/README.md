@@ -23,6 +23,8 @@ In particular, this includes scripts for:
 * patch the protocols to add profiling (`patch-profiler-proto.sh`)
 * estimating when the next protocol activation will occur, in the best case and
   under block-time drift assumptions (`next_protocol_activation.py`)
+* listing the bakers assigned to rounds [0; n] of a block with their name and the
+  Octez version each currently runs (`baker_round_versions.py`)
 
 This directory also includes an example docker-compose file to run a
 node with a baker and an accuser (`docker/docker-compose-generic.yml`)
@@ -44,6 +46,9 @@ Information about using some of the scripts above can be found as follows:
 * `next_protocol_activation.py`: run `python3 scripts/next_protocol_activation.py --help`;
   it queries a node (default `http://localhost:8732`, read-only) and prints the best-case
   and drift-adjusted activation date/time.
+* `baker_round_versions.py`: run `python3 scripts/baker_round_versions.py --help`;
+  it queries a node (read-only) for the bakers assigned to rounds [0; n] of a block and
+  annotates each with its name and Octez version from tzkt (network auto-detected).
 
 ## Profiler patches for the protocols
 
