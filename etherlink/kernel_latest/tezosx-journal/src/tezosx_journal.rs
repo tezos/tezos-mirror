@@ -7,6 +7,8 @@ use std::fmt;
 use crate::{EvmJournal, MichelsonJournal};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 use tezos_ethereum::block::BlockConstants;
+use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_types::{OriginalSource, RuntimeId};
 
 /// Unique identifier for a cross-runtime call chain within a block.
@@ -249,6 +251,49 @@ impl TezosXJournal {
             tezos_crypto_rs::hash::OperationHash::default(),
             BlockConstants::dummy(),
         )
+    }
+
+    /// Open a Tezos X *global* checkpoint: one cross-runtime unit of
+    /// execution spanning every runtime's durable-overlay state. It
+    /// bundles the per-runtime opens — the Michelson world-state frame
+    /// marker and the EVM precompile layered-state checkpoint — behind a
+    /// single call so a caller (e.g. the EVM `JournalTr` impl driving a
+    /// call/create frame) can checkpoint the whole Tezos X state without
+    /// reaching into, or naming, any individual runtime's sub-journal.
+    /// New runtimes plug in here rather than at each call site.
+    #[inline]
+    pub fn global_checkpoint(&mut self) {
+        self.michelson.push_external_checkpoint();
+        self.evm.layered_state.checkpoint();
+    }
+
+    /// Commit the innermost global checkpoint opened by
+    /// [`Self::global_checkpoint`]: keep this frame's durable-overlay
+    /// changes across every runtime. The michelson commit is fallible
+    /// (it touches durable storage); the EVM layered-state commit is an
+    /// in-memory pop, so the two are independent and their order is
+    /// immaterial.
+    #[inline]
+    pub fn global_commit<Host: StorageV1>(
+        &mut self,
+        host: &mut Host,
+    ) -> Result<(), RuntimeError> {
+        self.evm.layered_state.checkpoint_commit();
+        self.michelson.commit_frame(host)
+    }
+
+    /// Revert the innermost global checkpoint opened by
+    /// [`Self::global_checkpoint`]: roll back this frame's
+    /// durable-overlay changes across every runtime. The michelson and
+    /// EVM reverts touch disjoint state (Michelson durable storage vs the
+    /// in-memory EVM overlay), so their order is immaterial.
+    #[inline]
+    pub fn global_revert<Host: StorageV1>(
+        &mut self,
+        host: &mut Host,
+    ) -> Result<(), RuntimeError> {
+        self.evm.layered_state.checkpoint_revert();
+        self.michelson.revert_frame(host)
     }
 
     /// Canonical derivation for the synthetic operation hash that
