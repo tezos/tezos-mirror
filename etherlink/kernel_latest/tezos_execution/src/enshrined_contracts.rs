@@ -474,22 +474,37 @@ fn extract_callback(
     }
 }
 
-/// Tag used by the synthetic CRAC-ID event built in
+/// Tag used by the synthetic CRAC begin event built in
 /// `tezosx-tezos-runtime/src/lib.rs::build_(failed_)crac_receipt`.
 /// Imported by the receipt builder so both producer and consumer
 /// agree on the tag.
 pub const SYNTHETIC_CRAC_EVENT_TAG: &str = "crac";
 
-/// Returns `true` if `iop` is the synthetic CRAC-ID event prepended to a
-/// CRAC receipt by `build_crac_receipt` / `build_failed_crac_receipt`.
+/// Tag used by the synthetic CRAC end event built in
+/// `tezosx-tezos-runtime/src/lib.rs::build_(failed_)crac_receipt`.
+/// Imported by the receipt builder so both producer and consumer
+/// agree on the tag.
+pub const SYNTHETIC_CRAC_END_EVENT_TAG: &str = "crac_end";
+
+/// Returns the tag string of a synthetic CRAC frame marker, or `None` if
+/// `iop` is not one.
+///
+/// Returns `Some(SYNTHETIC_CRAC_EVENT_TAG)` for begin markers and
+/// `Some(SYNTHETIC_CRAC_END_EVENT_TAG)` for end markers; `None` for
+/// everything else.
+///
 /// User-issued Michelson `EMIT` ops also reify as
-/// `InternalOperationSum::Event` but the kernel stamps the synthetic
-/// event with the null implicit sender (`crate::NULL_PKH`, set by
-/// `build_crac_receipt`) on top of the canonical `"crac"` tag — both
-/// must match.  A Michelson contract cannot impersonate the null
-/// implicit sender, since user EMITs always carry the executing
-/// contract's originated (KT1) sender via `sender_account.contract()`.
-pub fn is_synthetic_crac_event(iop: &InternalOperationSum) -> bool {
+/// `InternalOperationSum::Event`, but the kernel stamps the synthetic
+/// markers with the null implicit sender (`crate::NULL_PKH`) — user EMITs
+/// always carry the executing contract's originated (KT1) sender via
+/// `sender_account.contract()`.  A Michelson contract cannot impersonate
+/// the null implicit sender.
+///
+/// The null sender alone is NOT sufficient: bridge deposit events also
+/// carry the null sender with tag `"deposit"`, so the tag conjunction is
+/// load-bearing — deposit-style null-sender events return `None` because
+/// of the tag conjunct.
+pub fn synthetic_crac_marker_tag(iop: &InternalOperationSum) -> Option<&str> {
     use tezos_protocol::contract::Contract;
     match iop {
         InternalOperationSum::Event(e) => {
@@ -497,25 +512,28 @@ pub fn is_synthetic_crac_event(iop: &InternalOperationSum) -> bool {
                 &e.sender,
                 Contract::Implicit(pkh) if pkh.to_b58check() == crate::NULL_PKH
             );
-            sender_is_null
-                && e.content
-                    .tag
-                    .as_ref()
-                    .is_some_and(|t| t.as_str() == Some(SYNTHETIC_CRAC_EVENT_TAG))
+            if !sender_is_null {
+                return None;
+            }
+            e.content.tag.as_ref().and_then(|t| match t.as_str() {
+                Some(SYNTHETIC_CRAC_EVENT_TAG) => Some(SYNTHETIC_CRAC_EVENT_TAG),
+                Some(SYNTHETIC_CRAC_END_EVENT_TAG) => Some(SYNTHETIC_CRAC_END_EVENT_TAG),
+                _ => None,
+            })
         }
-        _ => false,
+        _ => None,
     }
 }
 
 /// Drain re-entrant CRAC receipts that accumulated since the per-list
-/// watermarks.
+/// watermarks and splice their internal ops into the caller's flat list.
 ///
 /// After each internal operation that may have triggered a cross-runtime
 /// call (e.g. a gateway call that re-entered Michelson), this function
 /// drains the CRAC receipts that were pushed since the watermarks —
-/// across all three lists (pending, failed, backtracked) — and splices
-/// their internal operation results into the parent op's flat list,
-/// preserving DFS execution order (RFC Example 8).
+/// across all three lists (pending, failed, backtracked) — and returns
+/// all their internal operation results in execution order, preserving
+/// DFS order for nested frames.
 ///
 /// Draining all three lists matters because a re-entrant inner CRAC
 /// can land in any of them depending on its outcome and the EVM frame
@@ -524,18 +542,19 @@ pub fn is_synthetic_crac_event(iop: &InternalOperationSum) -> bool {
 ///   - Failed inner caught by an upstream EVM frame: pushed to
 ///     `failed_crac_receipts`, must still nest under its outer parent
 ///     in the receipt rather than reach the top-level merge with a
-///     smaller seq than the outer (would invert DFS order — L2-1300).
+///     smaller seq than the outer (would invert DFS order).
 ///   - Applied inner whose enclosing EVM frame later reverted but was
 ///     caught above: migrated to `backtracked_crac_receipts` by
-///     `revert_frame` (L2-1304); same nesting requirement.
+///     `revert_frame`; same nesting requirement.
 ///
 /// Receipts are sorted by their shared sequence number before splicing
 /// so cross-list interleavings of inner CRACs at the same depth come
 /// out in execution order.
 ///
-/// Synthetic CRAC-ID events are dropped from each spliced receipt
-/// (only the outermost CRAC carries one per RFC principle 6); user-
-/// issued `EMIT` ops are preserved.
+/// Frame markers (begin/end events) are preserved: each inner frame
+/// is self-bracketed so indexers can identify nested frames without
+/// any special treatment at the drain site.  User-issued `EMIT` ops
+/// were always preserved and continue to be.
 pub(crate) fn drain_reentrant_crac_ops(
     journal: &mut TezosXJournal,
     pending_watermark: usize,
@@ -570,12 +589,7 @@ pub(crate) fn drain_reentrant_crac_ops(
             receipt.op_and_receipt;
         for op in batch.operations {
             if let OperationResultSum::Transfer(result) = op.receipt {
-                ops.extend(
-                    result
-                        .internal_operation_results
-                        .into_iter()
-                        .filter(|iop| !is_synthetic_crac_event(iop)),
-                );
+                ops.extend(result.internal_operation_results);
             }
         }
     }
@@ -5137,6 +5151,105 @@ pub(crate) mod tests {
                     && msg.contains("42")
             ),
             "expected GatewayError with storage-cost not-yet-supported message, got: {result:?}"
+        );
+    }
+
+    // ── Synthetic CRAC marker predicate tests ──────────────────────────
+
+    fn make_marker_event(tag: &str, null_sender: bool) -> InternalOperationSum {
+        use mir::ast::annotations::NO_ANNS;
+        use mir::lexer;
+        use tezos_protocol::contract::Contract;
+        use tezos_smart_rollup::types::PublicKeyHash;
+        use tezos_tezlink::operation_result::{
+            EventContent, EventSuccess, InternalContentWithMetadata,
+        };
+
+        let ty = Micheline::App(lexer::Prim::string, &[], NO_ANNS)
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+        let payload = Micheline::from("1-0".to_string())
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+
+        let sender = if null_sender {
+            Contract::Implicit(PublicKeyHash::from_b58check(crate::NULL_PKH).unwrap())
+        } else {
+            Contract::Originated(
+                ContractKt1Hash::from_base58_check(
+                    "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",
+                )
+                .unwrap(),
+            )
+        };
+
+        InternalOperationSum::Event(InternalContentWithMetadata {
+            content: EventContent {
+                tag: Some(mir::ast::Entrypoint::from_string_unchecked(tag.into())),
+                payload: Some(payload.into()),
+                ty: ty.into(),
+            },
+            sender,
+            nonce: 0,
+            result: ContentResult::Applied(EventSuccess {
+                consumed_milligas: tezos_data_encoding::types::Narith(0u64.into()),
+            }),
+        })
+    }
+
+    #[test]
+    fn synthetic_crac_marker_tag_begin_null_sender() {
+        let iop = make_marker_event(SYNTHETIC_CRAC_EVENT_TAG, true);
+        assert_eq!(
+            synthetic_crac_marker_tag(&iop),
+            Some(SYNTHETIC_CRAC_EVENT_TAG),
+            "null sender + tag 'crac' must return Some(SYNTHETIC_CRAC_EVENT_TAG)"
+        );
+    }
+
+    #[test]
+    fn synthetic_crac_marker_tag_end_null_sender() {
+        let iop = make_marker_event(SYNTHETIC_CRAC_END_EVENT_TAG, true);
+        assert_eq!(
+            synthetic_crac_marker_tag(&iop),
+            Some(SYNTHETIC_CRAC_END_EVENT_TAG),
+            "null sender + tag 'crac_end' must return Some(SYNTHETIC_CRAC_END_EVENT_TAG)"
+        );
+    }
+
+    #[test]
+    fn synthetic_crac_marker_tag_deposit_null_sender_returns_none() {
+        // Tag conjunction: null sender with tag "deposit" (bridge event)
+        // must return None — the tag conjunct is load-bearing.
+        let iop = make_marker_event("deposit", true);
+        assert_eq!(
+            synthetic_crac_marker_tag(&iop),
+            None,
+            "null sender + tag 'deposit' must return None (tag conjunction is load-bearing)"
+        );
+    }
+
+    #[test]
+    fn synthetic_crac_marker_tag_begin_kt1_sender_returns_none() {
+        // User EMIT with tag "crac" but non-null sender must return None.
+        let iop = make_marker_event(SYNTHETIC_CRAC_EVENT_TAG, false);
+        assert_eq!(
+            synthetic_crac_marker_tag(&iop),
+            None,
+            "KT1 sender + tag 'crac' must return None (sender must be null)"
+        );
+    }
+
+    #[test]
+    fn synthetic_crac_marker_tag_end_kt1_sender_returns_none() {
+        // Forged user EMIT with tag "crac_end" from a KT1 must return None.
+        let iop = make_marker_event(SYNTHETIC_CRAC_END_EVENT_TAG, false);
+        assert_eq!(
+            synthetic_crac_marker_tag(&iop),
+            None,
+            "KT1 sender + tag 'crac_end' must return None (sender must be null)"
         );
     }
 }

@@ -320,15 +320,16 @@ pub fn extract_cross_runtime_effects(
 /// Drain CRAC receipts from the journal, merging all CRACs from the same
 /// EVM transaction into a single manager operation.
 ///
-/// Per RFC principle 6 ("CRAC-ID per top-level transaction"), all CRAC
-/// sub-calls within one EVM transaction share one CRAC-ID and therefore
-/// produce a single top-level Michelson operation with all internal
-/// transactions merged and one CRAC event (RFC Example 5).
+/// All CRAC sub-calls within one EVM transaction share one CRAC-ID and
+/// therefore produce a single top-level Michelson operation with all
+/// internal operations merged.  Each frame retains its own begin/end
+/// marker pair so indexers can bracket individual frames inside the
+/// merged op.
 ///
 /// Both successful and failed receipts must be merged: failed receipts
 /// alone (e.g. several `try { CRAC(); } catch {}` blocks all reverting on
 /// the Michelson side) are otherwise emitted as separate top-level
-/// operations, violating principle 6.
+/// operations, breaking the one-top-level-per-crac_id invariant.
 ///
 /// Receipts carry a monotonic sequence number assigned at push time
 /// (shared across the pending and failed lists), so sorting by that
@@ -467,26 +468,20 @@ pub fn renumber_nonces(operations: &mut [AppliedOperation]) {
     }
 }
 
-/// Merge `other`'s internal operations into `target`.
-/// The synthetic CRAC-ID event stays as the first internal operation
-/// in `target`.  Non-synthetic-event operations from `other` (regular
-/// transfers, originations, AND user `EMIT` events) are appended
-/// after `target`'s existing operations.  If `target` has no synthetic
-/// CRAC-ID event but `other` does, the event is prepended.  Duplicate
-/// synthetic CRAC-ID events from `other` are dropped — but user EMITs
-/// always pass through.
-/// Nonces are left as-is; renumber_nonces() fixes them at block finalization.
+/// Merge `other`'s internal operations into `target` by appending them
+/// after `target`'s existing operations.
+///
+/// Each CRAC receipt carries its own complete bracket pair (begin/end
+/// markers) so inner frames are self-describing; no marker manipulation
+/// is needed here.  User EMITs and all other internal ops are preserved
+/// in execution order.
+///
+/// Nonces are left as-is; `renumber_nonces` reassigns them block-wide
+/// at finalization.  The shell discarding, seq-sorting at drain time,
+/// and top-level status reconciliation are handled by the caller.
 fn merge_crac_internals(target: &mut AppliedOperation, other: AppliedOperation) {
-    use tezos_execution::enshrined_contracts::is_synthetic_crac_event;
     use tezos_tezlink::operation_result::{OperationDataAndMetadata, OperationResultSum};
-    // Partition `other`'s internals into non-synthetic-event and
-    // synthetic-event entries.  User EMITs (Event variants with a
-    // non-`crac` tag) join the non-synthetic bucket so they are
-    // appended after `target`'s existing operations rather than being
-    // mistakenly treated as duplicates of the synthetic CRAC-ID event.
-    let (other_non_synthetic, other_synthetic_events): (Vec<_>, Vec<_>) = match other
-        .op_and_receipt
-    {
+    let other_internals: Vec<_> = match other.op_and_receipt {
         OperationDataAndMetadata::OperationWithMetadata(batch) => batch
             .operations
             .into_iter()
@@ -494,11 +489,8 @@ fn merge_crac_internals(target: &mut AppliedOperation, other: AppliedOperation) 
                 OperationResultSum::Transfer(result) => result.internal_operation_results,
                 _ => vec![],
             })
-            .partition(|iop| !is_synthetic_crac_event(iop)),
+            .collect(),
     };
-    // Append to `target`'s internal operations, before the CRAC event.
-    // CRAC receipts are built by build_crac_receipt which guarantees exactly
-    // one operation (a Transfer).  Assert this so violations are caught early.
     let OperationDataAndMetadata::OperationWithMetadata(ref mut batch) =
         target.op_and_receipt;
     {
@@ -512,27 +504,7 @@ fn merge_crac_internals(target: &mut AppliedOperation, other: AppliedOperation) 
                 "CRAC receipt operation must be a Transfer"
             );
             if let OperationResultSum::Transfer(ref mut result) = op.receipt {
-                let has_synthetic_event = result
-                    .internal_operation_results
-                    .iter()
-                    .any(is_synthetic_crac_event);
-                if !has_synthetic_event && !other_synthetic_events.is_empty() {
-                    // Target has no synthetic CRAC-ID event — prepend
-                    // other's first one, then re-append existing
-                    // operations.  Duplicate synthetic events past the
-                    // first one are dropped.
-                    let existing = std::mem::take(&mut result.internal_operation_results);
-                    result
-                        .internal_operation_results
-                        .extend(other_synthetic_events.into_iter().take(1));
-                    result.internal_operation_results.extend(existing);
-                }
-                // Append other's non-synthetic-event entries after
-                // existing operations, preserving execution order.
-                // User EMITs flow through here unchanged.
-                result
-                    .internal_operation_results
-                    .extend(other_non_synthetic);
+                result.internal_operation_results.extend(other_internals);
             }
         }
     }
@@ -2138,14 +2110,13 @@ mod tests {
         );
     }
 
-    /// Merging two CRAC receipts preserves block-global nonces.
+    /// Merging two CRAC receipts appends all ops and preserves nonces.
     ///
     /// Receipt 1: [Event("crac", nonce=0), Transfer(M_1, nonce=1, amount=100)]
     /// Receipt 2: [Event("crac", nonce=2), Transfer(M_2, nonce=3, amount=200)]
-    /// Expected:  [Event("crac", nonce=0), Transfer(M_1, nonce=1), Transfer(M_2, nonce=3)]
     ///
-    /// The duplicate event (nonce=2) is dropped.  Nonces are block-global
-    /// (assigned at creation time, matching L1 semantics) so no renumbering.
+    /// Each frame keeps its own marker pair; merge just appends.
+    /// Nonces are block-global (assigned at creation time) so no renumbering.
     #[test]
     fn test_merge_crac_internals_preserves_nonces() {
         let receipt_1 =
@@ -2160,12 +2131,11 @@ mod tests {
             super::merge_crac_internals(target, other);
         }
 
-        // Nonces are preserved from creation time (block-global counter).
-        // Event nonce=2 from receipt_2 is dropped (duplicate), so: 0, 1, 3.
+        // All ops from both receipts are present in order: 0, 1, 2, 3.
         assert_eq!(
             extract_nonces(target),
-            vec![0, 1, 3],
-            "nonces must be preserved from creation time"
+            vec![0, 1, 2, 3],
+            "nonces must be preserved from creation time, all ops present"
         );
 
         // Transfer ordering: M_1 (100), then M_2 (200)
@@ -2175,7 +2145,7 @@ mod tests {
             "transfers must be in receipt order"
         );
 
-        // First op is the single CRAC event (duplicate filtered)
+        // Both frames' begin markers are retained.
         use tezos_tezlink::operation_result::{
             InternalOperationSum, OperationDataAndMetadata, OperationResultSum,
         };
@@ -2186,15 +2156,22 @@ mod tests {
         };
         assert_eq!(
             result.internal_operation_results.len(),
-            3,
-            "1 event + 2 transfers"
+            4,
+            "2 events + 2 transfers, no deduplication"
         );
         assert!(
             matches!(
                 result.internal_operation_results[0],
                 InternalOperationSum::Event(_)
             ),
-            "first internal op must be the CRAC event"
+            "first internal op is the begin marker of frame 1"
+        );
+        assert!(
+            matches!(
+                result.internal_operation_results[2],
+                InternalOperationSum::Event(_)
+            ),
+            "third internal op is the begin marker of frame 2"
         );
     }
 }
