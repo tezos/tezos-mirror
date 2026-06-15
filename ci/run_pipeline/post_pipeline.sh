@@ -15,9 +15,12 @@ You can override those values by setting the corresponding environment variables
 
 EOF
 
-if [ -n "${GITLAB_PRIVATE_TOKEN:-}" ]; then
+# Read the GitLab API token from GITLAB_TOKEN, the variable used by glab
+# (https://docs.gitlab.com/cli/#environment-variables), so that a single token
+# works for both glab and these scripts.
+if [ -n "${GITLAB_TOKEN:-}" ]; then
   cat << EOF
-WARNING: GitLab private token was read from GITLAB_PRIVATE_TOKEN.
+WARNING: GitLab API token was read from GITLAB_TOKEN.
 Please double check that this environment variable was not stored
 in your shell history file (e.g. ~/.bash_history or ~/.histfile).
 Note that it may only be written there after you close your terminal.
@@ -26,7 +29,7 @@ else
   # Ask for the API token without echoing it.
   stty -echo
   printf "Confirm by entering your GitLab API token: "
-  read -r GITLAB_PRIVATE_TOKEN
+  read -r GITLAB_TOKEN
   stty echo
   printf "\n"
 fi
@@ -34,7 +37,7 @@ fi
 # Perform the API request.
 RESPONSE="$(curl --silent --request POST \
   --header 'Content-Type: application/json' \
-  --header "Private-Token: $GITLAB_PRIVATE_TOKEN" \
+  --header "Private-Token: $GITLAB_TOKEN" \
   --data "$DATA" \
   "https://gitlab.com/api/v4/projects/$PROJECT_ID/pipeline")"
 
