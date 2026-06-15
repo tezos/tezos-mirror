@@ -10,7 +10,6 @@
 
 open Gitlab_ci.Util
 module Images = Tezos_ci.Images
-module Pipeline = Tezos_ci.Pipeline
 module CI = Cacio.Shared
 
 let build_images =
@@ -180,15 +179,3 @@ let register () =
     (List.map
        (fun j -> (Cacio.Auto, j))
        (job_container_scanning_merge_reports :: slack_jobs))
-
-let child_pipeline =
-  Pipeline.register_child
-    "security-scans-master"
-    ~description:
-      "A child pipeline of 'before_merging' to launch the security scans for \
-       the images on the master branch"
-    ~jobs:
-      (if Tezos_ci.container_scanning_flag then
-         Tezos_ci.job_datadog_pipeline_trace
-         :: Cacio.get_jobs Schedule_security_scans
-       else [Tezos_ci.job_datadog_pipeline_trace])
