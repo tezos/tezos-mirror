@@ -125,7 +125,7 @@ pub fn parse_u64_opt(
 pub fn check_crac_depth(depth: u32) -> Result<(), TezosXRuntimeError> {
     if depth > MAX_CRAC_DEPTH {
         return Err(TezosXRuntimeError::BadRequest(format!(
-            "CRAC chain depth {depth} exceeds maximum {MAX_CRAC_DEPTH}"
+            "cross-runtime call chain depth {depth} exceeds maximum {MAX_CRAC_DEPTH}"
         )));
     }
     Ok(())

@@ -3434,7 +3434,7 @@ mod test {
             precompiles::{
                 constants::RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
                 runtime_gateway::{
-                    CracSent,
+                    CrossRuntimeCallSent,
                     RuntimeGateway::{
                         callCall, callMichelsonCall, callMichelsonViewCall,
                         RuntimeGatewayCalls,
@@ -3641,7 +3641,7 @@ mod test {
         // --- STATICCALL on state-mutating selectors --------------------------
 
         /// STATICCALL on `callMichelson` must revert: the precompile
-        /// would otherwise persist alias entries, emit a `CracSent`
+        /// would otherwise persist alias entries, emit a `CrossRuntimeCallSent`
         /// log, and potentially burn precompile residual balance — all
         /// state-mutating effects forbidden under STATICCALL.
         #[test]
@@ -3670,7 +3670,7 @@ mod test {
         }
 
         /// `call(POST)` is the mutating branch of the `call` entry —
-        /// it persists alias state, emits `CracSent`, and runs
+        /// it persists alias state, emits `CrossRuntimeCallSent`, and runs
         /// `burn_gateway_residual`. STATICCALL must revert.
         #[test]
         fn runtime_gateway_rejects_static_call_on_call_post() {
@@ -3967,9 +3967,9 @@ mod test {
             );
         }
 
-        // --- CracSent.targetAddress normalization (L2-1456) ------------------
+        // --- CrossRuntimeCallSent.targetAddress normalization (L2-1456) ------------------
 
-        /// Decode the single `CracSent` event emitted by the gateway
+        /// Decode the single `CrossRuntimeCallSent` event emitted by the gateway
         /// precompile in `outcome` and return its `targetAddress`.
         fn cracsent_target_address(outcome: &ExecutionOutcome) -> String {
             let log = outcome
@@ -3977,13 +3977,15 @@ mod test {
                 .logs()
                 .iter()
                 .find(|l| l.address == RUNTIME_GATEWAY_PRECOMPILE_ADDRESS)
-                .expect("expected a CracSent log from the gateway precompile");
-            CracSent::decode_log_data(&log.data)
-                .expect("gateway log must decode as CracSent")
+                .expect(
+                    "expected a CrossRuntimeCallSent log from the gateway precompile",
+                );
+            CrossRuntimeCallSent::decode_log_data(&log.data)
+                .expect("gateway log must decode as CrossRuntimeCallSent")
                 .targetAddress
         }
 
-        /// `CracSent.targetAddress` must identify the *contract*, not the
+        /// `CrossRuntimeCallSent.targetAddress` must identify the *contract*, not the
         /// contract+entrypoint, and must be identical across the typed
         /// `callMichelson` and the generic `call(POST)` surfaces for the
         /// same target. Before the L2-1456 fix the generic POST reported

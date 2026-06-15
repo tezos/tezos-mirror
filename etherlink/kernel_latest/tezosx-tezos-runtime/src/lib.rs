@@ -201,14 +201,16 @@ fn build_synthetic_crac_marker(
         .encode(&mut sponsored_event_gas)
         .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
         .map_err(|e| {
-            TezosXRuntimeError::Custom(format!("Failed to encode CRAC marker type: {e}"))
+            TezosXRuntimeError::Custom(format!(
+                "Failed to encode cross-runtime call marker type: {e}"
+            ))
         })?;
     let payload = Micheline::from(crac_id.to_string())
         .encode(&mut sponsored_event_gas)
         .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
         .map_err(|e| {
             TezosXRuntimeError::Custom(format!(
-                "Failed to encode CRAC marker payload: {e}"
+                "Failed to encode cross-runtime call marker payload: {e}"
             ))
         })?;
     let result = if applied {
@@ -641,9 +643,9 @@ where
     // Verify the incoming CRAC ID matches the journal's (set by the
     // block builder).  This ensures consistency across runtime boundaries.
     if let Some(ref crac_id) = hdrs.crac_id {
-        journal
-            .verify_crac_id(crac_id)
-            .map_err(|e| TezosXRuntimeError::Custom(format!("CRAC-ID mismatch: {e}")))?;
+        journal.verify_crac_id(crac_id).map_err(|e| {
+            TezosXRuntimeError::Custom(format!("cross-runtime call ID mismatch: {e}"))
+        })?;
     }
 
     // SOURCE is always the null implicit account.  Michelson requires
@@ -874,7 +876,7 @@ where
                             journal.michelson.push_failed_crac_receipt(receipt);
                         }
                         Err(e) => {
-                            log!(Error, "Failed to build failed CRAC receipt: {e:?}");
+                            log!(Error, "Failed to build failed cross-runtime call receipt: {e:?}");
                         }
                     }
                 }
@@ -896,7 +898,10 @@ where
     // which already removes any temp big-maps written during the
     // reverted execution.
     if let Err(e) = clear_temporary_big_maps(host, &context, &mut next_temp_id) {
-        log!(Error, "Failed to clear temporary big-maps after CRAC: {e}");
+        log!(
+            Error,
+            "Failed to clear temporary big-maps after cross-runtime call: {e}"
+        );
     }
 
     // For cross-runtime calls (CRAC), build the two-step receipt
@@ -963,7 +968,7 @@ where
 ///
 /// Steps through `internal_operation_results` using
 /// [`tezos_execution::enshrined_contracts::synthetic_crac_marker_tag`] to
-/// identify null-sender events with tag `"crac"` (push) or `"crac_end"`
+/// identify null-sender events with tag `"cross_runtime_call"` (push) or `"cross_runtime_call_end"`
 /// (pop).  Asserts depth never goes negative and that the final depth is
 /// zero.  Events with the null sender but a different tag (e.g. `"deposit"`)
 /// return `None` from the helper and do not affect the walk.
@@ -990,12 +995,15 @@ fn assert_receipt_markers_balanced(receipt: &tezos_tezlink::block::AppliedOperat
                 depth -= 1;
                 debug_assert!(
                     depth >= 0,
-                    "CRAC marker imbalance: end marker without matching begin"
+                    "cross-runtime call marker imbalance: end marker without matching begin"
                 );
             }
         }
     }
-    debug_assert_eq!(depth, 0, "CRAC marker imbalance: unmatched begin markers");
+    debug_assert_eq!(
+        depth, 0,
+        "cross-runtime call marker imbalance: unmatched begin markers"
+    );
 }
 
 // --- Alias generation gas constants (milligas) ---
@@ -2114,7 +2122,7 @@ mod tests {
         };
         assert_eq!(
             event.content.tag.as_ref().and_then(|e| e.as_str()),
-            Some("crac"),
+            Some("cross_runtime_call"),
             "event tag must be 'crac'"
         );
         assert_eq!(
@@ -2153,17 +2161,17 @@ mod tests {
         };
         assert_eq!(
             end_event.content.tag.as_ref().and_then(|e| e.as_str()),
-            Some("crac_end"),
-            "last internal op tag must be 'crac_end'"
+            Some("cross_runtime_call_end"),
+            "last internal op tag must be 'cross_runtime_call_end'"
         );
         assert_eq!(
             end_event.sender,
             Contract::Implicit(null_pkh.clone()),
-            "crac_end sender must be the handler implicit account"
+            "cross_runtime_call_end sender must be the handler implicit account"
         );
         assert!(
             matches!(end_event.result, ContentResult::Applied(_)),
-            "crac_end must be Applied on the success path"
+            "cross_runtime_call_end must be Applied on the success path"
         );
         // Payload must equal the CRAC-ID string encoded as Micheline string bytes.
         let expected_payload = {
@@ -2178,7 +2186,7 @@ mod tests {
         assert_eq!(
             end_event.content.payload,
             Some(expected_payload),
-            "crac_end payload must equal the CRAC-ID string encoded as Micheline"
+            "cross_runtime_call_end payload must equal the CRAC-ID string encoded as Micheline"
         );
 
         // Round-trip: serialize and read back
@@ -2305,17 +2313,17 @@ mod tests {
         };
         assert_eq!(
             end_event.content.tag.as_ref().and_then(|e| e.as_str()),
-            Some("crac_end"),
-            "last internal op tag must be 'crac_end'"
+            Some("cross_runtime_call_end"),
+            "last internal op tag must be 'cross_runtime_call_end'"
         );
         assert_eq!(
             end_event.sender,
             Contract::Implicit(null_pkh.clone()),
-            "crac_end sender must be the handler implicit account (null)"
+            "cross_runtime_call_end sender must be the handler implicit account (null)"
         );
         assert!(
             matches!(end_event.result, ContentResult::Applied(_)),
-            "crac_end must be Applied on the success path"
+            "cross_runtime_call_end must be Applied on the success path"
         );
     }
 
@@ -2405,17 +2413,17 @@ mod tests {
         };
         assert_eq!(
             end_event.content.tag.as_ref().and_then(|e| e.as_str()),
-            Some("crac_end"),
-            "last internal op tag must be 'crac_end'"
+            Some("cross_runtime_call_end"),
+            "last internal op tag must be 'cross_runtime_call_end'"
         );
         assert_eq!(
             end_event.sender,
             Contract::Implicit(null_pkh.clone()),
-            "crac_end sender must be the handler implicit account (null)"
+            "cross_runtime_call_end sender must be the handler implicit account (null)"
         );
         assert!(
             matches!(end_event.result, ContentResult::BackTracked(_)),
-            "crac_end must be BackTracked when the frame failed"
+            "cross_runtime_call_end must be BackTracked when the frame failed"
         );
     }
 
@@ -2583,7 +2591,7 @@ mod tests {
         };
         assert_eq!(
             event.content.tag.as_ref().and_then(|e| e.as_str()),
-            Some("crac"),
+            Some("cross_runtime_call"),
             "first internal op must be the synthetic CRAC-ID event"
         );
     }

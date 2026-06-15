@@ -25,7 +25,7 @@ use crate::LayeredState;
 /// single EVM transaction has no honest single-valued representation
 /// for N distinct crossings, and summing the amounts onto a tx whose
 /// `from` is the originator would falsely attribute value the senders
-/// actually hold. Those per-crossing facts live in the `CracReceived`
+/// actually hold. Those per-crossing facts live in the `CrossRuntimeCallReceived`
 /// logs instead (and, eventually, in the call trace). See L2-1408.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CracTransactionInfo {

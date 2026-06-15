@@ -44,14 +44,14 @@ contract CracHttpCallEvm {
         count++;
         (bool ok, ) = GATEWAY.call{value: msg.value}(_buildCalldata());
         if (!ok) {
-            revert("CRAC call reverted");
+            revert("cross-runtime call reverted");
         }
         count++;
     }
 
     function _doCall() external payable {
         (bool ok, ) = GATEWAY.call{value: msg.value}(_buildCalldata());
-        require(ok, "CRAC call failed");
+        require(ok, "cross-runtime call failed");
     }
 
     function runCatch() external payable {

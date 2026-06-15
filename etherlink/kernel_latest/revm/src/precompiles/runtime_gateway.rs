@@ -87,10 +87,10 @@ sol! {
     }
 
     /// Emitted on every outgoing CRAC (EVM -> other runtime).
-    /// `cracId` allows indexers to correlate operations across
+    /// `crossRuntimeCallId` allows indexers to correlate operations across
     /// derived blocks.
-    event CracSent(
-        string cracId,
+    event CrossRuntimeCallSent(
+        string crossRuntimeCallId,
         string targetRuntime,
         string targetAddress,
         uint256 amount
@@ -241,7 +241,7 @@ fn classify_and_charge_crac_response(
     if response.status().is_success() {
         if callee_gas.is_none() {
             return Err(CustomPrecompileError::Revert(
-                "X-Tezos-Gas-Consumed header missing or invalid in CRAC response".into(),
+                "X-Tezos-Gas-Consumed header missing or invalid in cross-runtime call response".into(),
                 *gas,
             ));
         }
@@ -548,7 +548,7 @@ where
     Ok(())
 }
 
-/// Emit a `CracSent` log for an outgoing CRAC.
+/// Emit a `CrossRuntimeCallSent` log for an outgoing CRAC.
 ///
 /// Shared by the state-mutating gateway entries (`callMichelson`,
 /// generic `call(POST)`) so the event schema and the
@@ -568,8 +568,8 @@ fn emit_crac_sent<'j, CTX, Host, R>(
 {
     let crac_log = Log {
         address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
-        data: CracSent {
-            cracId: crac_id,
+        data: CrossRuntimeCallSent {
+            crossRuntimeCallId: crac_id,
             targetRuntime: target_runtime.to_string(),
             targetAddress: target_address,
             amount,
@@ -910,7 +910,7 @@ where
     // `target_address != bytecode_address` guard above already covers
     // DELEGATECALL/CALLCODE; this complements it by rejecting
     // STATICCALL on the entries that would write to the journal —
-    // alias persistence, `CracSent` log emission, residual balance
+    // alias persistence, `CrossRuntimeCallSent` log emission, residual balance
     // burn. REVM commits a custom precompile's journal writes
     // unconditionally on `Ok` return (`revm-handler::frame::Frame::
     // make_call_frame`), so the static-call contract is not enforced
@@ -1240,7 +1240,7 @@ where
             )?;
 
             // POST-only state effects: burn any residual precompile
-            // balance from a bridged value, and emit the CracSent
+            // balance from a bridged value, and emit the CrossRuntimeCallSent
             // event. Both are incompatible with STATICCALL and
             // intentionally skipped on GET — for which the entry is
             // read-only end-to-end.

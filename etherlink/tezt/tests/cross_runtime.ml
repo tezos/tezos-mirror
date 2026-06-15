@@ -1508,7 +1508,7 @@ module TezEmitter = struct
       protocol
 end
 
-(** Michelson contract that emits with tag [%crac] from a KT1.  Used
+(** Michelson contract that emits with tag [%cross_runtime_call] from a KT1.  Used
     to verify that user-contract [EMIT] ops with the same tag as kernel
     frame markers are excluded from the CRAC bracket walk by the sender
     filter (source must be the null implicit account). *)
@@ -3393,7 +3393,7 @@ let test_crac_tez_to_evm_fake_tx_in_block () =
     ~tags:["crac_tx"]
   @@ fun (module Wrapper) ->
   let open Wrapper in
-  let prefix = "CRAC-TX" in
+  let prefix = "CROSS-RUNTIME-CALL-TX" in
   Log.debug ~prefix "Deploy EVM runner" ;
   let* evm_runner = EvmMultiRunCaller.deploy_and_init () in
   Log.debug ~prefix "Originate TEZ bridge to EVM runner" ;
@@ -3457,15 +3457,15 @@ let test_crac_tez_to_evm_fake_tx_unique_hash_across_blocks () =
  *  Pre-fix, the kernel built the synthetic CRAC tx receipt by reading
  *  [journal.evm.inner.logs] AFTER [JournalInner::finalize] (called by
  *  [commit_evm_journal_from_external]) had cleared it.  Both the
- *  precompile's [CracReceived] log and any LOG0..LOG4 from the inner
- *  EVM call were lost; only the [CracIdEvent] survived because it is
+ *  precompile's [CrossRuntimeCallReceived] log and any LOG0..LOG4 from the inner
+ *  EVM call were lost; only the [CrossRuntimeCallIdEvent] survived because it is
  *  constructed by the receipt builder itself.
  *
  *  This test deploys [events.sol], invokes [emitBoth(uint256)] via the
  *  gateway's [%call_evm], and asserts that:
  *    - the synthetic CRAC tx receipt carries the contract's two events
  *      ([EventA] + [EventB]) plus precompile bookkeeping events
- *      ([CracIdEvent] + [CracReceived]);
+ *      ([CrossRuntimeCallIdEvent] + [CrossRuntimeCallReceived]);
  *    - [eth_getLogs] filtered by the contract address returns those
  *      events, restoring parity with a regular EVM-EOA call.
  *)
@@ -3593,24 +3593,26 @@ let test_crac_tez_to_evm_inner_logs_in_receipt () =
     (List.length precompile_logs = 2)
       int
       ~error_msg:
-        "Expected 2 precompile logs (CracIdEvent + CracReceived) on the \
-         synthetic CRAC tx receipt, got %L") ;
+        "Expected 2 precompile logs (CrossRuntimeCallIdEvent + \
+         CrossRuntimeCallReceived) on the synthetic CRAC tx receipt, got %L") ;
   let crac_id_event_topic =
-    "0x7c61c77057c7568c0d0f2350fa7ab90f164008888ba00c9105b5ef6988d0255d"
+    "0x61df1a226f0cb85d398505b17329bf903b0da0bd0daa31c054680ba2da2724e8"
   in
   let crac_received_topic =
-    "0x6242e34f6b48040ca8499afa39bbd1ed3fb356241249ba0be45fcb08eda0b2c9"
+    "0xfed9a84c1a0b3f03a08e089ccd124decdf96e24756f1963dbcef903c803d5b09"
   in
   Check.(
     (count_with_topic0 precompile_logs crac_id_event_topic = 1)
       int
       ~error_msg:
-        "Expected exactly 1 CracIdEvent log on the CRAC receipt, got %L") ;
+        "Expected exactly 1 CrossRuntimeCallIdEvent log on the CRAC receipt, \
+         got %L") ;
   Check.(
     (count_with_topic0 precompile_logs crac_received_topic = 1)
       int
       ~error_msg:
-        "Expected exactly 1 CracReceived log on the CRAC receipt, got %L") ;
+        "Expected exactly 1 CrossRuntimeCallReceived log on the CRAC receipt, \
+         got %L") ;
   Log.debug
     ~prefix
     "Verify eth_getLogs returns the contract events when filtered by address" ;
@@ -4274,14 +4276,17 @@ let read_crac_depth_header trace =
     List.find_opt
       (fun pair ->
         let key = JSON.(pair |=> 0 |> as_string) in
-        String.equal (String.lowercase_ascii key) "x-tezos-crac-depth")
+        String.equal
+          (String.lowercase_ascii key)
+          "x-tezos-cross-runtime-call-depth")
       headers
   in
   match pair with
   | Some pair -> JSON.(pair |=> 1 |> as_string) |> int_of_string
   | None ->
       Test.fail
-        "X-Tezos-CRAC-Depth header missing on CRAC trace: %s"
+        "X-Tezos-Cross-Runtime-Call-Depth header missing on cross-runtime call \
+         trace: %s"
         (JSON.encode trace)
 
 (** [http_traceTransaction] surfaces [X-Tezos-CRAC-Depth] on every
@@ -6097,7 +6102,7 @@ let check_evm_block_tx_count ~prefix ~expected_tx_count sequencer =
 
 (** Compute the expected fake CRAC transaction hash for a given [crac_id]
     and [block_number], then verify it is present in the block's tx hashes.
-    The kernel computes: hash = keccak256("CRAC-TX" || block_number_be256 || crac_id). *)
+    The kernel computes: hash = keccak256("CROSS-RUNTIME-CALL-TX" || block_number_be256 || crac_id). *)
 let check_fake_crac_tx_hash ~prefix ~expected_crac_id (block : Block.t) =
   let block_number_be256 =
     let buf = Bytes.make 32 '\000' in
@@ -6107,7 +6112,9 @@ let check_fake_crac_tx_hash ~prefix ~expected_crac_id (block : Block.t) =
   let expected_hash_bytes =
     Tezos_crypto.Hacl.Hash.Keccak_256.digest
       (Bytes.cat
-         (Bytes.cat (Bytes.of_string "CRAC-TX") block_number_be256)
+         (Bytes.cat
+            (Bytes.of_string "CROSS-RUNTIME-CALL-TX")
+            block_number_be256)
          (Bytes.of_string expected_crac_id))
   in
   let expected_hash = "0x" ^ (Hex.of_bytes expected_hash_bytes |> Hex.show) in
@@ -6189,7 +6196,7 @@ let check_crac_top_level ~prefix ~expected_destination ~expected_status top =
   JSON.(metadata |-> "internal_operation_results" |> as_list)
 
 (** Verify that [iop] is a valid CRAC event with the given [expected_crac_id].
-    Checks kind = "event", source = handler, tag = "crac",
+    Checks kind = "event", source = handler, tag = "cross_runtime_call",
     payload = expected_crac_id.  When [expected_status] is provided,
     also checks the event result status (omit for failed CRACs where
     the event may be backtracked). *)
@@ -6204,7 +6211,7 @@ let check_crac_event ~prefix ~expected_crac_id ?expected_status iop =
       ~error_msg:
         (sf "%s: Expected event source = handler (%%R), got %%L" prefix)) ;
   Check.(
-    (JSON.(iop |-> "tag" |> as_string) = "crac")
+    (JSON.(iop |-> "tag" |> as_string) = "cross_runtime_call")
       string
       ~error_msg:(sf "%s: Expected event tag %%R, got %%L" prefix)) ;
   let payload = JSON.(iop |-> "payload" |-> "string" |> as_string) in
@@ -6222,7 +6229,7 @@ let check_crac_event ~prefix ~expected_crac_id ?expected_status iop =
   | None -> ()
 
 (** Verify that [iop] is a valid CRAC end event.
-    Checks kind = "event", source = handler, tag = "crac_end",
+    Checks kind = "event", source = handler, tag = "cross_runtime_call_end",
     payload = expected_crac_id.  When [expected_status] is provided,
     also checks the event result status (omit for failed CRACs where
     the event may be backtracked). *)
@@ -6237,7 +6244,7 @@ let check_crac_end_event ~prefix ~expected_crac_id ?expected_status iop =
       ~error_msg:
         (sf "%s: Expected end-event source = handler (%%R), got %%L" prefix)) ;
   Check.(
-    (JSON.(iop |-> "tag" |> as_string) = "crac_end")
+    (JSON.(iop |-> "tag" |> as_string) = "cross_runtime_call_end")
       string
       ~error_msg:(sf "%s: Expected end-event tag %%R, got %%L" prefix)) ;
   let payload = JSON.(iop |-> "payload" |-> "string" |> as_string) in
@@ -6321,11 +6328,11 @@ let check_crac_internal_transaction ~prefix ~expected_nonce ~expected_source
     checking that the CRAC frame markers form a balanced forest.
 
     Step 0: filter to ops with kind "event", source = [handler_address]
-    (null implicit sender), and tag in \{"crac","crac_end"\}.  Bridge deposit
+    (null implicit sender), and tag in \{"cross_runtime_call","cross_runtime_call_end"\}.  Bridge deposit
     events share the null sender but carry tag "deposit" and are excluded
     by the tag filter.
 
-    Step 1: stack walk in list order — push on "crac", pop on "crac_end".
+    Step 1: stack walk in list order — push on "cross_runtime_call", pop on "cross_runtime_call_end".
     Asserts depth never goes negative (stray end) and ends at zero
     (unmatched begins). *)
 let check_crac_brackets ~prefix internals =
@@ -6338,7 +6345,7 @@ let check_crac_brackets ~prefix internals =
         match JSON.(iop |-> "tag" |> as_opt) with
         | Some t ->
             let tag = JSON.as_string t in
-            tag = "crac" || tag = "crac_end"
+            tag = "cross_runtime_call" || tag = "cross_runtime_call_end"
         | None -> false)
       internals
   in
@@ -6349,7 +6356,7 @@ let check_crac_brackets ~prefix internals =
         let tag =
           JSON.(iop |-> "tag" |> as_opt |> Option.fold ~none:"" ~some:as_string)
         in
-        if tag = "crac" then (
+        if tag = "cross_runtime_call" then (
           let new_depth = depth + 1 in
           Log.info "%s:   begin marker (depth -> %d)" prefix new_depth ;
           new_depth)
@@ -6397,7 +6404,7 @@ let make_event_iop ?(payload = "") ~source ~tag () =
     Builds hand-crafted internals lists and verifies:
     (a) A balanced pair (begin + end) surrounding an irrelevant deposit
         event from the null sender passes the walk.
-    (b) A KT1-sourced "crac" and "crac_end" (forged) among the null-sender
+    (b) A KT1-sourced "cross_runtime_call" and "cross_runtime_call_end" (forged) among the null-sender
         events does not perturb the walk (sender filter excludes them).
     (c) An unbalanced list (begin without matching end) raises a Check
         failure — the test catches it and verifies the error message
@@ -6415,11 +6422,11 @@ let test_check_crac_brackets_unit () =
   let kt1 = "KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN" in
   let balanced =
     [
-      make_event_iop ~source:handler_address ~tag:"crac" ();
+      make_event_iop ~source:handler_address ~tag:"cross_runtime_call" ();
       make_event_iop ~source:handler_address ~tag:"deposit" ();
-      make_event_iop ~source:kt1 ~tag:"crac" ();
-      make_event_iop ~source:kt1 ~tag:"crac_end" ();
-      make_event_iop ~source:handler_address ~tag:"crac_end" ();
+      make_event_iop ~source:kt1 ~tag:"cross_runtime_call" ();
+      make_event_iop ~source:kt1 ~tag:"cross_runtime_call_end" ();
+      make_event_iop ~source:handler_address ~tag:"cross_runtime_call_end" ();
     ]
   in
   check_crac_brackets ~prefix balanced ;
@@ -6440,9 +6447,9 @@ let test_check_crac_brackets_unit () =
      list. *)
   let unbalanced =
     [
-      make_event_iop ~source:handler_address ~tag:"crac" ();
-      make_event_iop ~source:handler_address ~tag:"crac" ();
-      make_event_iop ~source:handler_address ~tag:"crac_end" ();
+      make_event_iop ~source:handler_address ~tag:"cross_runtime_call" ();
+      make_event_iop ~source:handler_address ~tag:"cross_runtime_call" ();
+      make_event_iop ~source:handler_address ~tag:"cross_runtime_call_end" ();
     ]
   in
   let rejected =
@@ -6463,7 +6470,7 @@ let test_check_crac_brackets_unit () =
  *
  *  Per the RFC the Michelson runtime block contains a manager operation with:
  *   - Top-level: handler → alias(E_0), synthetic fields = 0, applied
- *   - Internal #0 (event): gateway emits "crac" tag with CRAC-ID payload
+ *   - Internal #0 (event): gateway emits "cross_runtime_call" tag with CRAC-ID payload
  *   - Internal #1 (transaction): alias(E_1) → tez_runner, applied
  *   - Further internal ops from Michelson contract execution
  *
@@ -6568,33 +6575,35 @@ let test_crac_evm_to_tez_receipt () =
   unit
 
 (** Acceptance criterion for the CRAC frame marker contract: user [EMIT]s
-    with tags [%crac] and [%crac_end] from a [KT1] contract reached via CRAC
+    with tags [%cross_runtime_call] and [%cross_runtime_call_end] from a [KT1] contract reached via CRAC
     must not perturb the bracket walk.  The sender filter in
     [check_crac_brackets] excludes any event whose source is not the
     null implicit account (handler_address), so the forged tags are
     invisible to the walk regardless of their payloads.
 
-    The forged [%crac_end] is the critical case: if the sender filter
+    The forged [%cross_runtime_call_end] is the critical case: if the sender filter
     regressed, a stray end marker would drive the walk's depth negative
     (no matching begin from the null sender), and [check_crac_brackets]
     would fail.
 
     Asserts:
-     (a) Exactly one KT1-sourced event with tag "crac" and payload
+     (a) Exactly one KT1-sourced event with tag "cross_runtime_call" and payload
          "forged-crac-marker" surfaces on the receipt.
-     (b) Exactly one KT1-sourced event with tag "crac_end" and payload
+     (b) Exactly one KT1-sourced event with tag "cross_runtime_call_end" and payload
          "forged-crac-end-marker" surfaces on the receipt.
      (c) [check_crac_brackets] passes — neither forged tag perturbs the
          null-sender depth counter.
 
     Call tree:
       EOA → EVM_bridge ~CRAC~> Mich CracForgedEmitter
-                                  emits %crac   string "forged-crac-marker"
-                                  emits %crac_end string "forged-crac-end-marker"
+                                  emits %cross_runtime_call   string "forged-crac-marker"
+                                  emits %cross_runtime_call_end string "forged-crac-end-marker"
                                   from KT1 (not null PKH), succeeds *)
 let test_crac_forged_marker_excluded_by_sender_filter () =
   register_crac_runner_test
-    ~title:"CRAC: user EMIT %crac/%crac_end from KT1 excluded from bracket walk"
+    ~title:
+      "CRAC: user EMIT %cross_runtime_call/%cross_runtime_call_end from KT1 \
+       excluded from bracket walk"
     ~tags:["crac_receipt"; "emit"]
   @@ fun (module Wrapper) ->
   let open Wrapper in
@@ -6625,7 +6634,7 @@ let test_crac_forged_marker_excluded_by_sender_filter () =
     "%s: %d internal op(s) on the synthetic CRAC tx receipt"
     prefix
     (List.length internals) ;
-  (* (a) The user EMIT with tag "crac" must be present with the KT1 sender. *)
+  (* (a) The user EMIT with tag "cross_runtime_call" must be present with the KT1 sender. *)
   let kt1_events_by_tag tag =
     List.filter
       (fun iop ->
@@ -6637,7 +6646,7 @@ let test_crac_forged_marker_excluded_by_sender_filter () =
         | None -> false)
       internals
   in
-  let user_forged_crac = kt1_events_by_tag "crac" in
+  let user_forged_crac = kt1_events_by_tag "cross_runtime_call" in
   Log.info
     "%s: found %d KT1 event(s) with tag \"crac\""
     prefix
@@ -6661,8 +6670,8 @@ let test_crac_forged_marker_excluded_by_sender_filter () =
     = "forged-crac-marker")
       string
       ~error_msg:(sf "%s: Expected forged-crac payload %%R, got %%L" prefix)) ;
-  (* (b) The user EMIT with tag "crac_end" must be present with the KT1 sender. *)
-  let user_forged_crac_end = kt1_events_by_tag "crac_end" in
+  (* (b) The user EMIT with tag "cross_runtime_call_end" must be present with the KT1 sender. *)
+  let user_forged_crac_end = kt1_events_by_tag "cross_runtime_call_end" in
   Log.info
     "%s: found %d KT1 event(s) with tag \"crac_end\""
     prefix
@@ -6672,8 +6681,8 @@ let test_crac_forged_marker_excluded_by_sender_filter () =
       int
       ~error_msg:
         "Expected exactly 1 KT1-forged event with tag=crac_end, got %L. A \
-         forged %crac_end would drive the bracket walk negative if the sender \
-         filter regressed.") ;
+         forged %cross_runtime_call_end would drive the bracket walk negative \
+         if the sender filter regressed.") ;
   let user_crac_end_event = List.hd user_forged_crac_end in
   Check.(
     (JSON.(user_crac_end_event |-> "source" |> as_string) = forged_emitter_kt1)
@@ -6689,7 +6698,7 @@ let test_crac_forged_marker_excluded_by_sender_filter () =
       string
       ~error_msg:(sf "%s: Expected forged-crac_end payload %%R, got %%L" prefix)) ;
   (* (c) The bracket walk must not be perturbed by either forged event.
-     A forged %crac_end would drive the walk's depth negative if the
+     A forged %cross_runtime_call_end would drive the walk's depth negative if the
      sender filter regressed (no matching begin from the null sender). *)
   check_crac_brackets ~prefix internals ;
   unit
@@ -6811,7 +6820,7 @@ let test_crac_user_emit_in_reentrant_inner_crac () =
         "Expected user EMIT status %R (the inner CRAC succeeded so its EMIT is \
          Applied), got %L") ;
   (* Each frame (outer CRAC #1 and inner CRAC #2) must be bracketed:
-     begin and end markers with tag "crac" / "crac_end" and null sender
+     begin and end markers with tag "cross_runtime_call" / "cross_runtime_call_end" and null sender
      must form a balanced forest.  check_crac_brackets verifies balance
      but passes vacuously if a whole pair is missing, so assert marker
      presence explicitly: 2 frames → 2 begin + 2 end markers. *)
@@ -6827,11 +6836,11 @@ let test_crac_user_emit_in_reentrant_inner_crac () =
          internals)
   in
   Check.(
-    (count_markers "crac" = 2)
+    (count_markers "cross_runtime_call" = 2)
       int
       ~error_msg:"Expected 2 crac begin markers (one per frame), got %L") ;
   Check.(
-    (count_markers "crac_end" = 2)
+    (count_markers "cross_runtime_call_end" = 2)
       int
       ~error_msg:"Expected 2 crac_end markers (one per frame), got %L") ;
   check_crac_brackets ~prefix internals ;
@@ -6988,13 +6997,15 @@ let test_crac_synthetic_event_survives_failed_inner_with_emit () =
          internals)
   in
   Check.(
-    (count_markers "crac" = 2)
+    (count_markers "cross_runtime_call" = 2)
       int
-      ~error_msg:"Expected 2 crac begin markers (one per frame), got %L") ;
+      ~error_msg:
+        "Expected 2 cross_runtime_call begin markers (one per frame), got %L") ;
   Check.(
-    (count_markers "crac_end" = 2)
+    (count_markers "cross_runtime_call_end" = 2)
       int
-      ~error_msg:"Expected 2 crac_end markers (one per frame), got %L") ;
+      ~error_msg:
+        "Expected 2 cross_runtime_call_end markers (one per frame), got %L") ;
   check_crac_brackets ~prefix internals ;
   (* Sanity assertion: the user EMIT is still in the receipt as
      Backtracked, proving the failed inner CRAC's body reached the
@@ -7211,7 +7222,7 @@ let test_crac_synthetic_event_present_when_applied_crac_reverted_out () =
         JSON.(iop |-> "kind" |> as_string) = "event"
         &&
         match JSON.(iop |-> "tag" |> as_opt) with
-        | Some t -> JSON.as_string t = "crac"
+        | Some t -> JSON.as_string t = "cross_runtime_call"
         | None -> false)
       internals
   in
@@ -7440,7 +7451,7 @@ let test_crac_applied_body_preserved_as_backtracked_on_evm_revert () =
         JSON.(iop |-> "kind" |> as_string) = "event"
         &&
         match JSON.(iop |-> "tag" |> as_opt) with
-        | Some t -> JSON.as_string t = "crac"
+        | Some t -> JSON.as_string t = "cross_runtime_call"
         | None -> false)
       internals
   in
@@ -7463,7 +7474,7 @@ let test_crac_applied_body_preserved_as_backtracked_on_evm_revert () =
         match JSON.(iop |-> "tag" |> as_opt) with
         | Some t ->
             let tag = JSON.as_string t in
-            tag = "crac" || tag = "crac_end"
+            tag = "cross_runtime_call" || tag = "cross_runtime_call_end"
         | None -> false)
       internals
   in
@@ -7608,7 +7619,7 @@ let test_crac_receipt_two_independent () =
   (* ── CRAC #2 frame (indices 6-10) ────────────────────────────── *)
   (* ── Internal #6: CRAC begin event ─────────────────────────── *)
   Check.(
-    (JSON.(List.nth internals 6 |-> "tag" |> as_string) = "crac")
+    (JSON.(List.nth internals 6 |-> "tag" |> as_string) = "cross_runtime_call")
       string
       ~error_msg:(sf "%s: Expected crac at #6, got %%L" prefix)) ;
   (* ── Internal #7: origination of alias(bridge_2). The EOA
@@ -8049,11 +8060,11 @@ let test_crac_receipt_tez_evm_tez () =
      #1: tez_main → tez_outer_bridge (%run)
      #2: tez_outer_bridge → tez_outer_bridge (%_incrementWitness) (pre)
      #3: tez_outer_bridge → GW_M (%call_evm)
-     #4: Event "crac" (begin marker for re-entrant EVM→TEZ frame)
+     #4: Event "cross_runtime_call" (begin marker for re-entrant EVM→TEZ frame)
      #5: origination alias(evm_bridge)                  (re-entrant)
      #6: alias(evm_bridge) → tez_inner (%run)           (re-entrant)
      #7: tez_inner → tez_inner (%_incrementWitness)     (re-entrant)
-     #8: Event "crac_end" (end marker for re-entrant frame)
+     #8: Event "cross_runtime_call_end" (end marker for re-entrant frame)
      #9: tez_outer_bridge → tez_outer_bridge (%_incrementWitness) (post)
      #10: tez_main → tez_main (%_incrementWitness) (final) *)
   Check.(
@@ -8219,11 +8230,11 @@ let test_crac_receipt_tez_gateway_direct_evm_tez () =
   Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
   (* The nested EVM->Michelson leg is folded into the gateway op's internals
      as a balanced re-entrant frame:
-       #0: Event "crac" (begin marker for re-entrant EVM→TEZ frame)
+       #0: Event "cross_runtime_call" (begin marker for re-entrant EVM→TEZ frame)
        #1: origination alias(evm_bridge)
        #2: alias(evm_bridge) -> tez_inner (%run)
        #3: tez_inner -> tez_inner (%_incrementWitness)
-       #4: Event "crac_end" (end marker) *)
+       #4: Event "cross_runtime_call_end" (end marker) *)
   Check.(
     (List.length internals = 5)
       int
@@ -8317,11 +8328,11 @@ let test_crac_receipt_tez_gateway_direct_evm_tez_revert () =
   (* The failed nested EVM->Michelson leg is folded into the gateway op's
      internals as a balanced re-entrant frame.  The frame failed, so the
      markers and alias carry backtracked/failed statuses:
-       #0: Event "crac" (begin marker) -- backtracked
+       #0: Event "cross_runtime_call" (begin marker) -- backtracked
        #1: origination alias(evm_bridge) -- backtracked
        #2: alias(evm_bridge) -> tez_reverter (%run) -- failed
        #3: tez_reverter -> tez_reverter (%_revert) -- failed
-       #4: Event "crac_end" (end marker) -- backtracked
+       #4: Event "cross_runtime_call_end" (end marker) -- backtracked
      The alias materialization is backtracked (applied then rolled back
      when the leg reverts); the top-level gateway op fails. *)
   Check.(
@@ -8379,7 +8390,7 @@ let test_crac_receipt_tez_gateway_direct_evm_tez_revert () =
  *   - Michelson runtime block: 1 manager op with 1 content item,
  *     handler source, KT1 alias destination, synthetic fields = 0,
  *     internal transaction(s) all "applied", CRAC event with
- *     tag "crac" and CRAC-ID "1-0", event status "applied"
+ *     tag "cross_runtime_call" and CRAC-ID "1-0", event status "applied"
  *   - EVM block: 1 transaction (original tx; re-entrant TEZ→EVM leg
  *     is internal per RFC principle 6)
  *)
@@ -8798,7 +8809,7 @@ let test_crac_receipt_two_failed_independent () =
   (* ── CRAC #2 frame (indices 6-11) ────────────────────────────── *)
   (* ── Internal #6: CRAC #2 begin event (backtracked: CRAC failed) *)
   Check.(
-    (JSON.(List.nth internals 6 |-> "tag" |> as_string) = "crac")
+    (JSON.(List.nth internals 6 |-> "tag" |> as_string) = "cross_runtime_call")
       string
       ~error_msg:(sf "%s: Expected crac at #6, got %%L" prefix)) ;
   Check.(
@@ -9165,8 +9176,8 @@ let test_crac_receipt_evm_not_first_tx () =
  * CRAC-ID = "0-1".
  *
  * The kernel computes the fake EVM transaction hash as:
- *   keccak256("CRAC-TX" || block_number_be256 || crac_id_string)
- * Since there is no "crac" event on the Michelson runtime side for TEZ-originated
+ *   keccak256("CROSS-RUNTIME-CALL-TX" || block_number_be256 || crac_id_string)
+ * Since there is no "cross_runtime_call" event on the Michelson runtime side for TEZ-originated
  * CRACs (origin_runtime = 0), we verify the CRAC-ID by matching the
  * fake transaction hash in the EVM block.
  *
@@ -9492,13 +9503,13 @@ let test_crac_receipt_tez_evm_tez_evm () =
      #1:  tez_main → tez_outer_bridge (%run)
      #2:  tez_outer_bridge → tez_outer_bridge (%_incrementWitness) (pre)
      #3:  tez_outer_bridge → GW_M (%call_evm)
-     #4:  EVENT "crac" (re-entrant begin: evm_bridge→tez_inner_bridge)
+     #4:  EVENT "cross_runtime_call" (re-entrant begin: evm_bridge→tez_inner_bridge)
      #5:  origination alias(evm_bridge)
      #6:  alias(evm_bridge) → tez_inner_bridge (%run)
      #7:  tez_inner_bridge → tez_inner_bridge (%_incrementWitness) (pre)
      #8:  tez_inner_bridge → GW_M (%call_evm)
      #9:  tez_inner_bridge → tez_inner_bridge (%_incrementWitness) (post)
-     #10: EVENT "crac_end" (re-entrant end)
+     #10: EVENT "cross_runtime_call_end" (re-entrant end)
      #11: tez_outer_bridge → tez_outer_bridge (%_incrementWitness) (post)
      #12: tez_main → tez_main (%_incrementWitness) (final) *)
   Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
@@ -9685,26 +9696,26 @@ let test_crac_receipt_evm_5_crossing_chain () =
   (* 20 internal ops: each of the 3 CRAC frames carries its own begin/end
      pair.  Aliases for evm_a + EOA are materialized by the outermost frame;
      each re-entrant frame materializes only its own EVM-sender alias.
-     #0:  EVENT "crac" (outermost begin, CRAC-ID "1-0")
+     #0:  EVENT "cross_runtime_call" (outermost begin, CRAC-ID "1-0")
      #1:  origination alias(evm_a)
      #2:  origination alias(EOA = sender)
      #3:  alias(evm_a) → tez_b (%run)              [outermost CRAC]
      #4:  tez_b → tez_b (%_incrementWitness) [pre]
      #5:  tez_b → GW_M (%call_evm)                  [outgoing → evm_c]
-     #6:  EVENT "crac" (middle begin)
+     #6:  EVENT "cross_runtime_call" (middle begin)
      #7:  origination alias(evm_c)
      #8:  alias(evm_c) → tez_d (%run)              [middle CRAC]
      #9:  tez_d → tez_d (%_incrementWitness) [pre]
      #10: tez_d → GW_M (%call_evm)                  [outgoing → evm_e]
-     #11: EVENT "crac" (deepest begin)
+     #11: EVENT "cross_runtime_call" (deepest begin)
      #12: origination alias(evm_e)
      #13: alias(evm_e) → tez_leaf (%run)           [deepest CRAC]
      #14: tez_leaf → tez_leaf (%_incrementWitness)
-     #15: EVENT "crac_end" (deepest end)
+     #15: EVENT "cross_runtime_call_end" (deepest end)
      #16: tez_d → tez_d (%_incrementWitness) [post]
-     #17: EVENT "crac_end" (middle end)
+     #17: EVENT "cross_runtime_call_end" (middle end)
      #18: tez_b → tez_b (%_incrementWitness) [post]
-     #19: EVENT "crac_end" (outermost end) *)
+     #19: EVENT "cross_runtime_call_end" (outermost end) *)
   Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
   Check.(
     (List.length internals = 20)
@@ -9931,11 +9942,11 @@ let test_crac_receipt_tez_mixed_calls_with_crac () =
      #4:  tez_main → tez_bridge (%run) [2nd callee call]
      #5:  tez_bridge → tez_bridge (%_incrementWitness) [sub-op: pre]
      #6:  tez_bridge → GW_M (%call_evm) [sub-op: outgoing CRAC]
-     #7:  EVENT "crac" (re-entrant begin: evm_bridge → tez_inner)
+     #7:  EVENT "cross_runtime_call" (re-entrant begin: evm_bridge → tez_inner)
      #8:  origination alias(evm_bridge)
      #9:  alias(evm_bridge) → tez_inner (%run) [re-entrant CRAC]
      #10: tez_inner → tez_inner (%_incrementWitness) [re-entrant sub-op]
-     #11: EVENT "crac_end" (re-entrant end)
+     #11: EVENT "cross_runtime_call_end" (re-entrant end)
      #12: tez_bridge → tez_bridge (%_incrementWitness) [sub-op: post]
      #13: tez_main → tez_main (%_incrementWitness) [before 3rd callee]
      #14: tez_main → tez_inner (%run) [3rd callee call]

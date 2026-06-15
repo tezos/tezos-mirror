@@ -231,7 +231,9 @@ mod tests {
 
         let event_internal = InternalOperationSum::Event(InternalContentWithMetadata {
             content: EventContent {
-                tag: Some(Entrypoint::from_string_unchecked("crac".into())),
+                tag: Some(Entrypoint::from_string_unchecked(
+                    "cross_runtime_call".into(),
+                )),
                 payload: Some(payload.into()),
                 ty: ty.into(),
             },
@@ -520,7 +522,9 @@ mod tests {
 
         let event_internal = InternalOperationSum::Event(InternalContentWithMetadata {
             content: EventContent {
-                tag: Some(Entrypoint::from_string_unchecked("crac".into())),
+                tag: Some(Entrypoint::from_string_unchecked(
+                    "cross_runtime_call".into(),
+                )),
                 payload: Some(payload.into()),
                 ty: ty.into(),
             },

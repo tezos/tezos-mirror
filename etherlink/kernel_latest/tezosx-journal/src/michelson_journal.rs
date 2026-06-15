@@ -207,7 +207,7 @@ impl MichelsonJournal {
         self.next_receipt_seq = self
             .next_receipt_seq
             .checked_add(1)
-            .expect("CRAC receipt sequence counter overflowed u64");
+            .expect("cross-runtime call receipt sequence counter overflowed u64");
         seq
     }
 

@@ -322,7 +322,7 @@ impl TezosXJournal {
         chain_id: u64,
         block_number: u64,
     ) -> tezos_crypto_rs::hash::OperationHash {
-        let seed = format!("crac:{chain_id}:{block_number}:{crac_id}");
+        let seed = format!("cross-runtime-call:{chain_id}:{block_number}:{crac_id}");
         tezos_crypto_rs::hash::OperationHash::from(tezos_crypto_rs::blake2b::digest_256(
             seed.as_bytes(),
         ))
@@ -394,7 +394,7 @@ impl TezosXJournal {
             Ok(())
         } else {
             Err(anyhow::anyhow!(
-                "CRAC-ID mismatch: expected '{}', received '{}'",
+                "cross-runtime call ID mismatch: expected '{}', received '{}'",
                 expected,
                 received
             ))
@@ -486,11 +486,11 @@ mod tests {
             /* chain_id = */ 1,
             /* block_number = */ 2,
         );
-        // blake2b-256(b"crac:1:2:3-4")
+        // blake2b-256(b"cross-runtime-call:1:2:3-4")
         let expected = tezos_crypto_rs::hash::OperationHash::from([
-            0xbe, 0x50, 0x3b, 0x8c, 0x52, 0x5d, 0x46, 0x29, 0x82, 0x75, 0x82, 0x6d, 0x4c,
-            0x53, 0x1f, 0xcb, 0x21, 0x7d, 0x3e, 0xf3, 0xc3, 0xc0, 0xd3, 0x94, 0xb8, 0x5a,
-            0xf6, 0xad, 0xc9, 0xc3, 0x2c, 0x7e,
+            0x6d, 0xfd, 0xd4, 0xf4, 0x11, 0x20, 0xf9, 0x8c, 0x2a, 0xfd, 0x88, 0x87, 0x40,
+            0x4d, 0x44, 0xd4, 0xa0, 0x28, 0x65, 0x3c, 0xba, 0x0f, 0xdf, 0xde, 0xb7, 0x4e,
+            0xfb, 0x3c, 0x20, 0x5e, 0x42, 0xbf,
         ]);
         assert_eq!(
             hash,

@@ -263,6 +263,24 @@
 
 ### Native Atomic Composability
 
+- **Breaking change for integrators:** the user-facing names of a
+  cross-runtime call were renamed; internal kernel symbols are unchanged.
+  - HTTP context headers `X-Tezos-CRAC-ID` and `X-Tezos-CRAC-Depth` are now
+    `X-Tezos-Cross-Runtime-Call-ID` and `X-Tezos-Cross-Runtime-Call-Depth`.
+  - The EVM events `CracSent`, `CracReceived` and `CracIdEvent` are now
+    `CrossRuntimeCallSent`, `CrossRuntimeCallReceived` and
+    `CrossRuntimeCallIdEvent`, and their `cracId` field is now
+    `crossRuntimeCallId`. Each event's `topic0` signature hash changes
+    accordingly, so log indexers must update both the signature and the
+    field name.
+  - The Michelson synthetic event tags `crac` and `crac_end` (the paired
+    cross-runtime-call frame markers) are now `cross_runtime_call` and
+    `cross_runtime_call_end`.
+  - The synthetic transaction hash mirroring a cross-runtime call changed
+    (its hash domain separators were renamed), so the hashes reported in
+    receipts and traces differ.
+  - Operator-visible error, abort and log messages now read "cross-runtime
+    call" instead of "CRAC". (!22198)
 - EVM alias creation is now tied to the transaction outcome: the forwarder
   code and classification are staged in the journal and flushed only when
   the enclosing operation commits, so a revert leaves no durable alias. (!22046)

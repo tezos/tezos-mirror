@@ -13,7 +13,7 @@ use thiserror::Error;
 pub enum CustomPrecompileAbort {
     #[error("Runtime error: {0}")]
     Runtime(RuntimeError),
-    #[error("CRAC block abort: {0}")]
+    #[error("cross-runtime call block abort: {0}")]
     Crac(String),
 }
 
