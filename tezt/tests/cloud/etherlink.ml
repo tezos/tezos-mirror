@@ -235,7 +235,7 @@ let send_sampled_benchmark_metrics (module Cli : Scenarios_cli.Etherlink)
   |> Datadog.send |> Runnable.run
 
 let export_datadog_metrics (module Cli : Scenarios_cli.Etherlink)
-    {median : float; p90 : float; wall : float; gasometer} =
+    {median : float; p90 : float; wall : float; gasometer; _} =
   let* () =
     send_capacity_metric
       (module Cli)

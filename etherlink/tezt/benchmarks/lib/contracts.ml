@@ -24,6 +24,8 @@ module Michelson = struct
 
   let stress_DIPN = file "michelson/stress_DIPN.tz"
 
+  let fa = file "michelson/fa.tz"
+
   (* Map a contract alias to its bundled Michelson source, for the generic
      [--contract] benchmark flag. Every contract here has storage [unit] and
      a default entrypoint taking [unit]. *)
