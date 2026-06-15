@@ -146,6 +146,12 @@
   used/paid storage watermarks are now kept in a single durable-storage
   record, read and written together instead of as four separate keys.
   (!22139)
+- Dropped the per-account `/origin` classification record for implicit
+  accounts in the Michelson runtime: a `tz1`/`tz2`/`tz3` is Tezos-native by
+  construction (it can never be a cross-runtime alias), so its classification
+  no longer touches durable storage. Reveal now performs one durable write
+  instead of two, and cross-runtime classification of an implicit address
+  needs no read. (!22170)
 - Expose a contract's storage-space watermarks through two read-only
   RPCs, `GET .../contracts/<id>/storage/used_space` and `.../paid_space`,
   mirroring L1's `get_used_storage_space` / `get_paid_storage_space`

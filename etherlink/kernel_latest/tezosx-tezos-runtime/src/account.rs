@@ -28,10 +28,12 @@ pub(crate) const TEZOS_ACCOUNTS_PATH: RefPath =
 // This path must contains balance, nonce and optionally a revealed public key.
 const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
 
-/// Sibling path that holds the classification record. Used by both implicit and
-/// originated KT1 accounts: the segment is appended to whichever account prefix
-/// the caller already has, and the resulting path lives next to the rest of the
-/// account state.
+/// Sibling path that holds the classification record of an originated KT1
+/// account: the segment is appended to the account prefix and the resulting
+/// path lives next to the rest of the account state. Implicit accounts carry
+/// no `/origin` record — a tz1/2/3 is Tezos-native by construction (see
+/// [`crate::context`]), so only KT1 accounts (which may be `Native` or an
+/// `Alias` forwarder) store a classification.
 ///
 /// Re-exported from `tezos_execution` rather than redeclared, so the runtime
 /// (writer) and the execution layer (reader) share a single source of truth.
@@ -169,10 +171,9 @@ pub fn set_tezos_account_info(
 }
 
 /// Read the classification record stored at the origin path under the
-/// given account path. The same shape applies to implicit and to
-/// originated KT1 accounts: the classification sits next to whatever
-/// state belongs to that account kind. A convenience wrapper for
-/// implicit accounts is `get_origin_for_implicit`.
+/// given KT1 account path. Only originated accounts store a classification:
+/// the record sits next to the rest of the contract's state. Implicit
+/// accounts are `Native` by construction and keep no `/origin` record.
 pub fn get_origin_at(
     host: &impl StorageV1,
     account_path: &OwnedPath,
@@ -207,27 +208,6 @@ pub fn set_origin_at(
         TezosXRuntimeError::ConversionError(format!("encoding Origin failed: {e}"))
     })?;
     Ok(host.store_write(&path, &buf, 0)?)
-}
-
-/// Read the classification record for an implicit account. Returns
-/// None when the path is absent, which is the unrecorded state from
-/// the RFC.
-pub fn get_origin_for_implicit(
-    host: &impl StorageV1,
-    pub_key_hash: &PublicKeyHash,
-) -> Result<Option<Origin>, TezosXRuntimeError> {
-    let prefix = path_to_implicit_account_prefix(pub_key_hash)?;
-    get_origin_at(host, &prefix)
-}
-
-/// Write the classification record for an implicit account.
-pub fn set_origin_for_implicit(
-    host: &mut impl StorageV1,
-    pub_key_hash: &PublicKeyHash,
-    origin: &Origin,
-) -> Result<(), TezosXRuntimeError> {
-    let prefix = path_to_implicit_account_prefix(pub_key_hash)?;
-    set_origin_at(host, &prefix, origin)
 }
 
 /// Seed the shared alias implementation with the canonical forwarder code if
@@ -369,10 +349,6 @@ impl TezosImplicitAccountTrait for TezosImplicitAccount {
         info.pub_key = Some(public_key.clone());
         set_tezos_account_info(host, &self.pkh, info)
             .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))?;
-        // Reveal is the sole writer here, and the protocol rejects a
-        // second reveal on the same account. Write unconditionally.
-        set_origin_for_implicit(host, &self.pkh, &Origin::Native)
-            .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))?;
         Ok(())
     }
 
@@ -483,51 +459,13 @@ mod tests {
     }
 
     #[test]
-    fn origin_for_implicit_roundtrip() {
-        use crate::account::{
-            get_origin_for_implicit, get_tezos_account_info, set_origin_for_implicit,
-            set_tezos_account_info, TezosAccountInfo,
-        };
-        use tezos_crypto_rs::public_key_hash::PublicKeyHash;
-        use tezos_evm_runtime::runtime::MockKernelHost;
-        use tezosx_interfaces::Origin;
-
-        let mut host = MockKernelHost::default();
-        let pkh =
-            PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
-
-        // An account that has not been touched has no origin and no info.
-        assert!(get_origin_for_implicit(&host, &pkh).unwrap().is_none());
-
-        // A write to the origin path must leave the info path empty.
-        set_origin_for_implicit(&mut host, &pkh, &Origin::Native).unwrap();
-        assert_eq!(
-            get_origin_for_implicit(&host, &pkh).unwrap(),
-            Some(Origin::Native)
-        );
-        assert!(get_tezos_account_info(&host, &pkh).unwrap().is_none());
-
-        // A write to the info path must leave the origin path untouched.
-        let info = TezosAccountInfo {
-            balance: U256::from(1),
-            nonce: 2,
-            pub_key: None,
-        };
-        set_tezos_account_info(&mut host, &pkh, info.clone()).unwrap();
-        assert_eq!(get_tezos_account_info(&host, &pkh).unwrap(), Some(info));
-        assert_eq!(
-            get_origin_for_implicit(&host, &pkh).unwrap(),
-            Some(Origin::Native)
-        );
-    }
-
-    #[test]
-    fn set_manager_public_key_marks_native_on_first_reveal() {
-        use crate::account::{get_origin_for_implicit, TezosImplicitAccount};
+    fn set_manager_public_key_reveals_manager() {
+        use crate::account::TezosImplicitAccount;
         use tezos_crypto_rs::{public_key::PublicKey, public_key_hash::PublicKeyHash};
         use tezos_evm_runtime::runtime::MockKernelHost;
-        use tezos_execution::account_storage::TezosImplicitAccount as TezosImplicitAccountTrait;
-        use tezosx_interfaces::Origin;
+        use tezos_execution::account_storage::{
+            Manager, TezosImplicitAccount as TezosImplicitAccountTrait,
+        };
 
         let mut host = MockKernelHost::default();
         let pkh =
@@ -542,17 +480,14 @@ mod tests {
             path,
         };
 
-        // Before reveal, no classification.
-        assert!(get_origin_for_implicit(&host, &pkh).unwrap().is_none());
-
+        // Reveal records the public key as the account's manager. It writes no
+        // `/origin` record — an implicit account is Native by construction.
         account
             .set_manager_public_key(&mut host, &public_key)
             .unwrap();
-
-        // After reveal the classification is Native.
         assert_eq!(
-            get_origin_for_implicit(&host, &pkh).unwrap(),
-            Some(Origin::Native)
+            account.manager(&host).unwrap(),
+            Manager::Revealed(public_key)
         );
     }
 }
