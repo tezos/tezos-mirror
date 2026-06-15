@@ -10,8 +10,10 @@ period and the candidate protocol on track to activate (even if voting is not
 finished), and projects the activation date/time:
 
   * best case  -- every block produced at round 0 (minimal block delay), and
-  * with drift -- a configurable fraction of higher-round (slower) blocks,
-                  e.g. 5% of blocks at round 1.
+  * with drift -- a configurable share of higher-round (slower) blocks, given as
+                  a round-probability list via --drift, e.g.
+                  '[1 : 5, 2 : 2, 3 : 0.1, 5 : 0.001]' (5% of blocks at round 1,
+                  2% at round 2, 0.1% at round 3, 0.001% at round 5).
 
 "Best case" assumes the candidate passes every remaining governance vote; the
 tool projects timing, it does not predict the vote outcome.
@@ -239,39 +241,58 @@ def scenario_eta(head_timestamp, blocks, avg_seconds):
 # --------------------------------------------------------------------------- #
 # CLI argument handling
 # --------------------------------------------------------------------------- #
-def parse_round_pcts(round1_pct, round_pct_args):
-    """Build {round -> fraction} from --round1-pct and repeated --round-pct R:PCT.
+def parse_drift_list(raw):
+    """Parse a round-probability list into a {round -> fraction} dict.
 
-    Percentages are validated to be in [0, 100] and to sum to <= 100. Returns a
-    dict of fractions (0..1) for rounds >= 1. Raises ValueError on bad input.
+    Accepts pairs `round : percentage` separated by commas, with optional
+    surrounding square brackets and arbitrary whitespace, e.g.
+    `[1 : 5, 2 : 2, 3 : 0.1, 5 : 0.001]` or `1:5,2:2`. A percentage means the
+    share of all blocks produced at that round; the remainder is round 0.
+
+    Returns fractions (0..1) for rounds >= 1, dropping zero-percentage entries.
+    Raises ValueError (naming the offending entry) when a round is not an
+    integer >= 1, a percentage is outside [0, 100], the listed percentages sum
+    to more than 100, a round is repeated, or an item is malformed.
     """
-    pcts = {}
-    if round1_pct is not None:
-        pcts[1] = float(round1_pct)
-    for spec in round_pct_args or []:
-        if ":" not in spec:
-            raise ValueError(f"--round-pct expects R:PCT, got {spec!r}")
-        r_str, pct_str = spec.split(":", 1)
-        try:
-            r = int(r_str)
-            pct = float(pct_str)
-        except ValueError as exc:
-            raise ValueError(f"--round-pct {spec!r}: {exc}") from exc
-        if r < 1:
-            raise ValueError(f"--round-pct round must be >= 1, got {r}")
-        pcts[r] = pct  # explicit --round-pct overrides --round1-pct for round 1
-
+    if raw is None:
+        return {}
+    body = raw.strip()
+    if body.startswith("[") and body.endswith("]"):
+        body = body[1:-1]
     fractions = {}
     total = 0.0
-    for r, pct in pcts.items():
+    for item in body.split(","):
+        item = item.strip()
+        if not item:
+            continue  # tolerate trailing/empty separators
+        if item.count(":") != 1:
+            raise ValueError(f"malformed drift entry {item!r}: expected 'round : pct'")
+        r_str, pct_str = item.split(":")
+        r_str, pct_str = r_str.strip(), pct_str.strip()
+        try:
+            r = int(r_str)
+        except ValueError as exc:
+            raise ValueError(f"drift entry {item!r}: round must be an integer "
+                             f"({exc})") from exc
+        try:
+            pct = float(pct_str)
+        except ValueError as exc:
+            raise ValueError(f"drift entry {item!r}: percentage must be a number "
+                             f"({exc})") from exc
+        if r < 1:
+            raise ValueError(f"drift entry {item!r}: round must be >= 1 "
+                             f"(round 0 is the implicit remainder)")
+        if r in fractions:
+            raise ValueError(f"duplicate round {r} in drift list")
         if pct < 0 or pct > 100:
-            raise ValueError(f"round-{r} percentage {pct} out of range [0, 100]")
+            raise ValueError(f"drift entry {item!r}: percentage {pct} out of "
+                             f"range [0, 100]")
         total += pct
-        if pct > 0:
-            fractions[r] = pct / 100.0
+        # Record even zero-pct rounds for duplicate detection, then drop below.
+        fractions[r] = pct / 100.0
     if total > 100.0 + 1e-9:
-        raise ValueError(f"round percentages sum to {total} > 100")
-    return fractions
+        raise ValueError(f"drift percentages sum to {total:g} > 100")
+    return {r: f for r, f in fractions.items() if f > 0}
 
 
 def drift_label(round_pcts):
@@ -295,16 +316,12 @@ def build_parser():
         help="Base RPC URL of the Octez node",
     )
     p.add_argument(
-        "--round1-pct",
-        type=float,
-        default=5.0,
-        help="Percentage of blocks assumed produced at round 1 (drift)",
-    )
-    p.add_argument(
-        "--round-pct",
-        action="append",
-        metavar="R:PCT",
-        help="Assume PCT%% of blocks at round R (R>=1); repeatable for higher rounds",
+        "--drift",
+        default="[1 : 5]",
+        metavar="LIST",
+        help="Block-time drift as a round-probability list, e.g. "
+        "'[1 : 5, 2 : 2, 3 : 0.1, 5 : 0.001]' (5%% of blocks at round 1, etc.). "
+        "Brackets optional; '[]' means no drift",
     )
     p.add_argument(
         "--selftest",
@@ -332,8 +349,31 @@ def selftest():
     assert res["blocks"] == 7682 + 201600
     assert res["last_adoption_level"] == 100 + 7682 + 201600
     assert res["new_protocol_level"] == res["last_adoption_level"] + 1
-    # 0% drift equals best case (SC-004).
-    assert avg_block_time({}, 6, 3) == avg_block_time(parse_round_pcts(0, None), 6, 3)
+    # 0% drift equals best case (SC-004): an empty drift list yields {}.
+    assert avg_block_time({}, 6, 3) == avg_block_time(parse_drift_list("[]"), 6, 3)
+
+    # Drift-list parsing.
+    assert parse_drift_list("[]") == {}
+    assert parse_drift_list("   ") == {}
+    assert parse_drift_list("[1 : 5]") == {1: 0.05}
+    # Bracket/whitespace tolerance: same distribution regardless of spacing.
+    assert parse_drift_list("1:5,2:2") == parse_drift_list("[1 : 5, 2 : 2]")
+    # Worked example (SC-002), level_offset = {1:6, 2:15, 3:27, 5:60}:
+    # 6 + .05*6 + .02*15 + .001*27 + .00001*60 = 6.6276.
+    avg = avg_block_time(
+        parse_drift_list("[1 : 5, 2 : 2, 3 : 0.1, 5 : 0.001]"), 6, 3
+    )
+    assert abs(avg - 6.6276) < 1e-9, avg
+    # Small fractions still count (SC-005).
+    assert avg_block_time(parse_drift_list("[5 : 0.001]"), 6, 3) > 6
+    # Rejections (SC-004).
+    for bad in ("[0 : 5]", "[1 : 150]", "[1 : 60, 2 : 50]", "[1 : 5, 1 : 2]",
+                "[1 5]"):
+        try:
+            parse_drift_list(bad)
+            raise AssertionError(f"expected ValueError for {bad!r}")
+        except ValueError:
+            pass
     print("selftest: OK")
     return EXIT_OK
 
@@ -412,7 +452,7 @@ def main(argv=None):
         return selftest()
 
     try:
-        round_pcts = parse_round_pcts(args.round1_pct, args.round_pct)
+        round_pcts = parse_drift_list(args.drift)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_BAD_ARGS
