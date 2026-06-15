@@ -443,6 +443,18 @@ def report(constants, head, voting, candidate, activation, scenarios):
 
 
 # --------------------------------------------------------------------------- #
+# Candidate resolution
+# --------------------------------------------------------------------------- #
+def resolve_candidate(voting):
+    """The protocol on track to activate: current_proposal, else the first
+    submitted proposal (Proposal period), else None."""
+    candidate = voting["current_proposal"]
+    if not candidate and voting["proposals"]:
+        candidate = voting["proposals"][0]
+    return candidate
+
+
+# --------------------------------------------------------------------------- #
 # Main
 # --------------------------------------------------------------------------- #
 def main(argv=None):
@@ -465,11 +477,7 @@ def main(argv=None):
         print(f"node error: {exc}", file=sys.stderr)
         return EXIT_NODE_ERROR
 
-    # Candidate resolution: current_proposal (during/after Exploration) or the
-    # first submitted proposal (during the Proposal period).
-    candidate = voting["current_proposal"]
-    if not candidate and voting["proposals"]:
-        candidate = voting["proposals"][0]
+    candidate = resolve_candidate(voting)
     if not candidate:
         print(
             f"No protocol is currently on track to activate "

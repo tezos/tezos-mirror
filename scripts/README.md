@@ -27,6 +27,9 @@ In particular, this includes scripts for:
   Octez version each currently runs (`baker_round_versions.py`)
 * measuring the per-round block distribution over a recent window (from tzkt) and
   emitting a `--drift` list for `next_protocol_activation.py` (`round_distribution.py`)
+* estimating the next protocol activation using the round distribution measured over
+  the last N blocks (N = blocks-to-activation), combining the two tools above
+  (`activation_empirical_drift.py`)
 
 This directory also includes an example docker-compose file to run a
 node with a baker and an accuser (`docker/docker-compose-generic.yml`)
@@ -55,6 +58,11 @@ Information about using some of the scripts above can be found as follows:
   the per-round block distribution over a window (default last two weeks) from tzkt and
   prints a `--drift` list for `next_protocol_activation.py`. Network auto-detected from a
   node's chain id; `--list-only` is pipeable.
+* `activation_empirical_drift.py`: run `python3 scripts/activation_empirical_drift.py --help`;
+  it combines the two scripts above — measuring the round distribution over the last
+  blocks-to-activation blocks and feeding it as the drift for the activation estimate.
+  `--anchor previous-activation` instead measures the same-length window ending at the
+  previous protocol activation.
 
 ## Profiler patches for the protocols
 
