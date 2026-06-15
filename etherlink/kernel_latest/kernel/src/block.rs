@@ -149,9 +149,9 @@ where
 
         let skip_signature_check = false;
         let skip_fees_check = false;
-        // If `apply_transaction` returns `None`, the transaction should be
-        // ignored, i.e. invalid signature or nonce.
-        match __trace_kernel!(
+        // If `apply_transaction` returns `ExecutionResult::Invalid`, the
+        // transaction should be ignored, i.e. invalid signature or nonce.
+        let apply_result = __trace_kernel!(
             "apply_transaction",
             chain_config.apply_transaction(
                 block_in_progress,
@@ -166,8 +166,40 @@ where
                 skip_signature_check,
                 skip_fees_check,
                 http_trace_enabled,
-            )?
-        ) {
+            )
+        );
+
+        // Invariant: a delayed (forced-inclusion) transaction must NEVER revert
+        // the blueprint. The sequencer cannot drop a delayed transaction, so if
+        // applying one returned an error and we propagated it with `?`, the
+        // whole block computation would abort, the blueprint would be reverted
+        // (see [revert_block]), and the offending transaction would remain in
+        // the delayed inbox to be force-included again on the next reboot --
+        // halting the chain. We therefore demote any application error for a
+        // delayed transaction to `Invalid`: it is skipped and, through
+        // [on_invalid_transaction] -> [register_delayed_transaction], removed
+        // from the delayed inbox when the block is promoted.
+        //
+        // This cannot swallow a legitimate reboot request: reboots are raised
+        // before [apply_transaction] is called (see [can_fit_in_reboot] above
+        // and [Error::Reboot] on the [pop_tx] path), never from within it. In
+        // practice such errors are raised before any state is committed, so
+        // skipping leaves no partial writes behind.
+        let apply_result = match apply_result {
+            Err(err) if is_delayed => {
+                log!(
+                    Error,
+                    "Delayed transaction {} failed to apply with '{:?}'; \
+                     skipping it to keep the blueprint valid.",
+                    hex::encode(tx_hash),
+                    err
+                );
+                ExecutionResult::Invalid
+            }
+            result => result?,
+        };
+
+        match apply_result {
             ExecutionResult::Valid(execution_info) => {
                 if is_delayed {
                     block_in_progress.register_delayed_transaction(tx_hash);
@@ -967,6 +999,33 @@ mod tests {
         type_: TransactionType,
     ) -> EthereumTransactionCommon {
         let tx = dummy_eth_gen_transaction(nonce, type_);
+        sign_transaction(tx)
+    }
+
+    // A type-4 (EIP-7702) transaction whose authorization list is present but
+    // empty. REVM rejects this shape with "Authorization list cannot be empty
+    // per EIP-7702" while building the transaction environment, before any
+    // state is touched (see `revm/src/lib.rs`). Signed with the same key as the
+    // other dummy transactions, so the caller is `dummy_eth_caller()`.
+    fn dummy_eip7702_empty_authorization_list_tx() -> EthereumTransactionCommon {
+        let gas_price = U256::from(DUMMY_BASE_FEE_PER_GAS);
+        let to = address_from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea");
+        let tx = EthereumTransactionCommon::new(
+            TransactionType::Eip7702,
+            Some(DUMMY_CHAIN_ID),
+            0,
+            gas_price,
+            gas_price,
+            100_000u64,
+            to,
+            U256::zero(),
+            vec![],
+            vec![],
+            // The poison shape: an EIP-7702 authorization list that is present
+            // but empty.
+            Some(vec![]),
+            None,
+        );
         sign_transaction(tx)
     }
 
@@ -2622,6 +2681,59 @@ mod tests {
             .expect("Should have found receipt");
         assert_eq!(TransactionStatus::Success, receipt.status);
         assert_eq!(Some(expected_created_contract), receipt.contract_address);
+    }
+
+    #[test]
+    // Regression test for L2-1407 / F-1357: a forced-inclusion (delayed) type-4
+    // transaction whose authorization list is present but empty must NOT abort
+    // block production. REVM rejects the shape with "Authorization list cannot
+    // be empty per EIP-7702"; because the transaction is delayed and cannot be
+    // dropped by the sequencer, that error is demoted to an invalid transaction
+    // and skipped, keeping the forced blueprint valid. Before this was
+    // hardened, the error propagated as a block-level failure and the whole
+    // forced blueprint was reverted, halting the chain.
+    fn test_delayed_empty_eip7702_authorization_list_does_not_abort_block() {
+        let mut host = MockKernelHost::default();
+        crate::storage::store_minimum_base_fee_per_gas(
+            &mut host,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .unwrap();
+
+        let tx_hash = [0; TRANSACTION_HASH_SIZE];
+
+        // Injected through the delayed inbox: a delayed transaction cannot be
+        // dropped by the sequencer, so its failure must never revert the
+        // blueprint.
+        let poison_tx = Transaction {
+            tx_hash,
+            content: EthereumDelayed(dummy_eip7702_empty_authorization_list_tx()),
+        };
+
+        store_blueprints::<_, EvmChainConfig>(
+            &mut host,
+            vec![blueprint(vec![poison_tx])],
+        );
+
+        let sender = dummy_eth_caller();
+        set_balance(&mut host, &sender, U256::from(1_000_000_000_000_000_000u64));
+        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
+
+        // The block must be produced despite the poison transaction.
+        produce(
+            &mut host,
+            &dummy_evm_config(SpecId::default()),
+            &mut dummy_configuration(),
+            None,
+            None,
+        )
+        .expect("Block production must not be aborted by a delayed transaction");
+
+        // The poison transaction is skipped as invalid: it leaves no receipt.
+        assert!(
+            read_transaction_receipt_status(&mut host, &tx_hash).is_err(),
+            "The poison delayed transaction must be skipped without a receipt"
+        );
     }
 
     // Comment out `ignore` when resigning the dummy transactions

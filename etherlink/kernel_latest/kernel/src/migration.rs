@@ -773,6 +773,18 @@ where
             }
         }
         StorageVersion::V47 => {
+            if is_etherlink_network(host, MAINNET_CHAIN_ID)? {
+                const SEQUENCER_GOVERNANCE_KT: &[u8] =
+                    b"KT1DkQFmACvsUtnx8B4jirnp2CRi1cWSiELw";
+
+                host.store_write_all(&SEQUENCER_GOVERNANCE, SEQUENCER_GOVERNANCE_KT)?;
+
+                Ok(MigrationStatus::Done)
+            } else {
+                Ok(MigrationStatus::None)
+            }
+        }
+        StorageVersion::V48 => {
             // Clean remaining leftover block indexes from V41.
             if let Ok(current_number) =
                 read_current_number(host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH)
@@ -809,19 +821,19 @@ where
             }
             Ok(MigrationStatus::Done)
         }
-        StorageVersion::V48 => {
-            // Starting version 48, blueprints from the sequencer can
+        StorageVersion::V49 => {
+            // Starting version 49, blueprints from the sequencer can
             // have a version field
             Ok(MigrationStatus::Done)
         }
-        StorageVersion::V49 => {
-            // Starting version 49, the kernel produce blocks for Michelson Runtime
+        StorageVersion::V50 => {
+            // Starting version 50, the kernel produce blocks for Michelson Runtime
             // when TezosX feature is activated.
 
             Ok(MigrationStatus::Done)
         }
-        StorageVersion::V50 => {
-            // Starting version 50, the sequencer upgrade is stored in the world state, and the sequencer key
+        StorageVersion::V51 => {
+            // Starting version 51, the sequencer upgrade is stored in the world state, and the sequencer key
             // is also stored in the world state. We move them from their legacy location to the new one.
             let legacy_sequencer_upgrade =
                 RefPath::assert_from(b"/evm/sequencer_upgrade");
@@ -841,7 +853,7 @@ where
 
             Ok(MigrationStatus::Done)
         }
-        StorageVersion::V51 => {
+        StorageVersion::V52 => {
             // Phase 1 of the durable storage reorganization: move IPC
             // paths from root-level locations to /base/ prefix.
             // Note: tezosx paths (__simulation, tezosx_entrypoints) are
@@ -868,12 +880,12 @@ where
 
             Ok(MigrationStatus::Done)
         }
-        StorageVersion::V52 => {
-            // Starting version 52, the EVM node uses the TezosX
+        StorageVersion::V53 => {
+            // Starting version 53, the EVM node uses the TezosX
             // envelope format (List [runtime_id, inner_transaction]).
             Ok(MigrationStatus::Done)
         }
-        StorageVersion::V53 => {
+        StorageVersion::V54 => {
             // Phase 2 of the durable storage reorganization: move
             // governance / sequencing / config paths from /evm/ to
             // /base/.
@@ -943,7 +955,7 @@ where
 
             Ok(MigrationStatus::Done)
         }
-        StorageVersion::V54 => {
+        StorageVersion::V55 => {
             // Phase 3 of the durable storage reorganization: consolidate
             // all feature flags under /base/feature_flags/.
             //
@@ -974,7 +986,7 @@ where
 
             Ok(MigrationStatus::Done)
         }
-        StorageVersion::V55 => {
+        StorageVersion::V56 => {
             // L2-1296: clear the persisted balance of TEZOSX_CALLER_ADDRESS
             // (0x7e20580000000000000000000000000000000001) on networks that
             // run the Michelson runtime.
@@ -1017,71 +1029,6 @@ where
                     "/evm/world_state/eth_accounts/{TEZOSX_CALLER_ADDRESS:x}/balance"
                 ))?;
                 allow_path_not_found(host.store_delete(&legacy_balance_path))?;
-                Ok(MigrationStatus::Done)
-            } else {
-                Ok(MigrationStatus::None)
-            }
-        }
-        StorageVersion::V56 => {
-            // NB:
-            // * Required for Previewnet, this migration will be a no-op
-            // on Mainnet.
-            // * Although the node does not key off the storage
-            // version, the kernel bump to V56 coincides with the
-            // `TezBlock` RLP layout switching to VERSION = 2 (see
-            // `tezos/src/block.rs`), which adds the `state_root`
-            // field. New blocks produced after this migration are
-            // encoded with the V2 layout.
-
-            // Phase 5 of the durable storage reorganization: unify all
-            // Tezos account state under /tez/tez_accounts/, with a flat
-            // layout (no intermediate `tezlink/` segment).
-            //
-            // - Michelson contract state:
-            //     /tezlink/context/contracts/* -> /tez/tez_accounts/contracts/*
-            //     /tezlink/context/big_map/*   -> /tez/tez_accounts/big_map/*
-            // - TezosX projected accounts (info, aliases, native/ethereum):
-            //     /evm/world_state/eth_accounts/tezos/*
-            //                                  -> /tez/tez_accounts/tezosx/*
-            //
-            // SafeStorage root set changes from
-            //   [/evm/world_state, /tezlink, /tez/world_state]
-            // to
-            //   [/evm/world_state, /tez/world_state, /tez/tez_accounts]
-            // (see chains.rs::storage_root_paths). The /tezlink root is
-            // removed.
-            //
-            // The moves use store_move on the raw host (migration runs
-            // outside the SafeStorage wrapper), so crossing safe-root
-            // boundaries is fine. allow_path_not_found makes each step
-            // idempotent: on a network that never wrote at the legacy
-            // locations the moves are no-ops and the migration still
-            // completes. Only `contracts/` and `big_map/` ever lived
-            // under `/tezlink/context/` so moving those two children
-            // covers the whole subtree.
-            if crate::storage::enable_tezos_runtime(host) {
-                allow_path_not_found(host.store_move(
-                    &RefPath::assert_from(b"/tezlink/context/contracts"),
-                    &RefPath::assert_from(b"/tez/tez_accounts/contracts"),
-                ))?;
-                allow_path_not_found(host.store_move(
-                    &RefPath::assert_from(b"/tezlink/context/big_map"),
-                    &RefPath::assert_from(b"/tez/tez_accounts/big_map"),
-                ))?;
-                allow_path_not_found(host.store_move(
-                    &RefPath::assert_from(b"/evm/world_state/eth_accounts/tezos"),
-                    &RefPath::assert_from(b"/tez/tez_accounts/tezosx"),
-                ))?;
-
-                // /tezlink is no longer a SafeStorage root and has no active
-                // readers after the moves above. Drop the leftover subtree
-                // (including any bootstrap placeholder written at /tezlink
-                // by pre-Phase-5 kernels when /tezlink was a safe root) so
-                // we don't leak dead state.
-                allow_path_not_found(
-                    host.store_delete(&RefPath::assert_from(b"/tezlink")),
-                )?;
-
                 Ok(MigrationStatus::Done)
             } else {
                 Ok(MigrationStatus::None)
@@ -1293,11 +1240,11 @@ mod tests {
     use revm_etherlink::storage::world_state_handler::{AccountInfo, StorageAccount};
     use tezos_evm_runtime::runtime::MockKernelHost;
 
-    /// L2-1296: the V55 migration must drop the persisted balance of
+    /// L2-1296: the V56 migration must drop the persisted balance of
     /// [`TEZOSX_CALLER_ADDRESS`] on networks where the Michelson runtime
     /// has been enabled.
     #[test]
-    fn v55_migration_clears_tezosx_caller_balance_on_tezosx_networks() {
+    fn v56_migration_clears_tezosx_caller_balance_on_tezosx_networks() {
         let mut host = MockKernelHost::default();
 
         // Mark this host as a TezosX network — the migration is gated on
@@ -1325,10 +1272,10 @@ mod tests {
         let info_before = account.info(&mut host).unwrap();
         assert_eq!(info_before.balance, AlloyU256::MAX);
 
-        // Run the V55 step directly. We dispatch via `migrate_to` rather
+        // Run the V56 step directly. We dispatch via `migrate_to` rather
         // than the full `migration` pipeline so the assertion is scoped
-        // to V55's behaviour and is not affected by other version steps.
-        let status = migrate_to(&mut host, StorageVersion::V55).unwrap();
+        // to V56's behaviour and is not affected by other version steps.
+        let status = migrate_to(&mut host, StorageVersion::V56).unwrap();
         assert!(matches!(status, MigrationStatus::Done));
 
         // After migration the `info` path is gone: reading it must fall
@@ -1340,16 +1287,16 @@ mod tests {
         assert_eq!(info_after.nonce, 0);
     }
 
-    /// L2-1296: the V55 migration must be a no-op on non-TezosX networks
+    /// L2-1296: the V56 migration must be a no-op on non-TezosX networks
     /// (TEZOSX_CALLER_ADDRESS is only ever written by code that runs
     /// under `enable_tezos_runtime`, so there is nothing to clean up
     /// elsewhere — and we don't want to touch unrelated state).
     #[test]
-    fn v55_migration_is_a_no_op_on_non_tezosx_networks() {
+    fn v56_migration_is_a_no_op_on_non_tezosx_networks() {
         let mut host = MockKernelHost::default();
         // Do NOT set ENABLE_TEZOS_RUNTIME.
 
-        let status = migrate_to(&mut host, StorageVersion::V55).unwrap();
+        let status = migrate_to(&mut host, StorageVersion::V56).unwrap();
         assert!(matches!(status, MigrationStatus::None));
 
         // The caller account info path must remain absent (the migration
@@ -1416,7 +1363,7 @@ mod tests {
     /// Sanity: the cleanup is safe even if the bug state was never
     /// imprinted (fresh TezosX network that activated post-fix).
     #[test]
-    fn v55_migration_is_safe_when_no_bug_state_exists() {
+    fn v56_migration_is_safe_when_no_bug_state_exists() {
         let mut host = MockKernelHost::default();
         host.store_write_all(&crate::storage::ENABLE_TEZOS_RUNTIME, &[1u8])
             .unwrap();
@@ -1426,7 +1373,7 @@ mod tests {
         let account = StorageAccount::from_address(&TEZOSX_CALLER_ADDRESS).unwrap();
         assert!(account.info_without_migration(&host).unwrap().is_none());
 
-        let status = migrate_to(&mut host, StorageVersion::V55).unwrap();
+        let status = migrate_to(&mut host, StorageVersion::V56).unwrap();
         assert!(matches!(status, MigrationStatus::Done));
 
         // Still no info path — `delete_info`'s PathNotFound is swallowed
@@ -1484,7 +1431,7 @@ mod tests {
         assert_eq!(host.store_read_all(&new_sunrise).unwrap(), sunrise_bytes);
     }
 
-    /// Phase 1 of the durable-storage reorg: V51 must move the EVM-node
+    /// Phase 1 of the durable-storage reorg: V52 must move the EVM-node
     /// flag from [/__evm_node] to [/base/__evm_node].
     ///
     /// This is only testable at the unit level: seeding [/__evm_node] in
@@ -1493,14 +1440,14 @@ mod tests {
     /// [evm_node_flag] in runtime/src/runtime.rs).  The mock host has no
     /// such side effect, so we can seed and verify freely here.
     #[test]
-    fn v51_migration_moves_evm_node_flag() {
+    fn v52_migration_moves_evm_node_flag() {
         let mut host = MockKernelHost::default();
         let legacy = RefPath::assert_from(b"/__evm_node");
         let new = RefPath::assert_from(b"/base/__evm_node");
 
         host.store_write_all(&legacy, b"evm_node_sentinel").unwrap();
 
-        let status = migrate_to(&mut host, StorageVersion::V51).unwrap();
+        let status = migrate_to(&mut host, StorageVersion::V52).unwrap();
         assert!(matches!(status, MigrationStatus::Done));
 
         // Source must be gone.
@@ -1509,14 +1456,14 @@ mod tests {
         assert_eq!(host.store_read_all(&new).unwrap(), b"evm_node_sentinel");
     }
 
-    /// V51 must tolerate a missing [/__evm_node] (the path is absent on
+    /// V52 must tolerate a missing [/__evm_node] (the path is absent on
     /// rollup-node sequencers that never set the flag) — the
     /// [allow_path_not_found] wrapper must not propagate the error.
     #[test]
-    fn v51_migration_is_safe_when_evm_node_flag_absent() {
+    fn v52_migration_is_safe_when_evm_node_flag_absent() {
         let mut host = MockKernelHost::default();
 
-        let status = migrate_to(&mut host, StorageVersion::V51).unwrap();
+        let status = migrate_to(&mut host, StorageVersion::V52).unwrap();
         assert!(matches!(status, MigrationStatus::Done));
 
         // Nothing created as a side-effect.
