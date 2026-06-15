@@ -86,20 +86,9 @@
                   ]
                 },
                 {
-                  "prim": "or",
-                  "args": [
-                    {
-                      "prim": "bytes",
-                      "annots": [
-                        "%collect_result"
-                      ]
-                    },
-                    {
-                      "prim": "string",
-                      "annots": [
-                        "%default"
-                      ]
-                    }
+                  "prim": "bytes",
+                  "annots": [
+                    "%collect_result"
                   ]
                 }
               ]

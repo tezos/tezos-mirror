@@ -7,7 +7,8 @@
 //! When an EVM address receives a Tezos alias (KT1), this Michelson
 //! contract is deployed at that KT1 so that any tez sent to it is
 //! automatically forwarded to the original EVM address via the
-//! TezosXGateway enshrined contract.
+//! TezosXGateway enshrined contract's generic `%call` entrypoint
+//! (an HTTP POST to `http://ethereum/<address>` with an empty body).
 //!
 //! The contract:
 //! ```michelson
@@ -15,11 +16,24 @@
 //! storage string ;   # native EVM address (e.g. "0x...")
 //! code { CDR ;
 //!        DUP ;
+//!        PUSH string "http://ethereum/" ;
+//!        CONCAT ;
+//!        NONE (contract bytes) ;
+//!        PUSH nat 1 ;
+//!        PAIR ;
+//!        PUSH bytes 0x ;
+//!        PAIR ;
+//!        NIL (pair string string) ;
+//!        PAIR ;
+//!        SWAP ;
+//!        PAIR ;
 //!        PUSH address "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw" ;
-//!        CONTRACT string ;
+//!        CONTRACT %call (pair string (pair (list (pair string string))
+//!                       (pair bytes (pair nat (option (contract bytes)))))) ;
 //!        IF_NONE { PUSH string "gateway" ; FAILWITH } {} ;
+//!        SWAP ;
 //!        BALANCE ;
-//!        DIG 2 ;
+//!        SWAP ;
 //!        TRANSFER_TOKENS ;
 //!        NIL operation ;
 //!        SWAP ;
@@ -36,14 +50,19 @@ use mir::gas::{Gas, OutOfGas};
 /// ```sh
 /// octez-client --mode mockup convert script \
 ///   'parameter unit ; storage string ; code { CDR ; DUP ; \
+///    PUSH string "http://ethereum/" ; CONCAT ; \
+///    NONE (contract bytes) ; PUSH nat 1 ; PAIR ; \
+///    PUSH bytes 0x ; PAIR ; NIL (pair string string) ; PAIR ; \
+///    SWAP ; PAIR ; \
 ///    PUSH address "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw" ; \
-///    CONTRACT string ; \
+///    CONTRACT %call (pair string (pair (list (pair string string)) \
+///                   (pair bytes (pair nat (option (contract bytes)))))) ; \
 ///    IF_NONE { PUSH string "gateway" ; FAILWITH } {} ; \
-///    BALANCE ; DIG 2 ; TRANSFER_TOKENS ; \
+///    SWAP ; BALANCE ; SWAP ; TRANSFER_TOKENS ; \
 ///    NIL operation ; SWAP ; CONS ; PAIR }' \
 ///   from michelson to binary
 /// ```
-const FORWARDER_CODE_HEX: &str = "02000000740500036c0501036805020200000065031703210743036e01000000244b5431386f444a4a4b584d4b68664531625375415047703932705963775644697173507705550368072f02000000120743036801000000076761746577617903270200000000031505700002034d053d036d034c031b0342";
+const FORWARDER_CODE_HEX: &str = "02000000d90500036c05010368050202000000ca03170321074303680100000010687474703a2f2f657468657265756d2f031a053e055a03690743036200010342074303690a000000000342053d0765036803680342034c03420743036e01000000244b5431386f444a4a4b584d4b6866453162537541504770393270596377564469717350770655076503680765055f07650368036807650369076503620563055a0369000000052563616c6c072f02000000120743036801000000076761746577617903270200000000034c0315034c034d053d036d034c031b0342";
 
 /// Returns the Micheline-encoded forwarding contract code.
 pub fn forwarder_code() -> Result<Vec<u8>, hex::FromHexError> {

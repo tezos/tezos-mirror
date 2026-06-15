@@ -37,6 +37,13 @@ contract AliasForwarder {
     error NotAuthorized();
     error TransferFailed();
 
+    /// @dev HTTP header shape of the RuntimeGateway's generic `call`
+    ///      entrypoint; encodes as `(string,string)`.
+    struct Header {
+        string name;
+        string value;
+    }
+
     /// @notice Initialize the alias with its native address and public key
     /// @dev Can only be called once by the TezosX internal address
     /// @param _nativeAddress The Tezos address (e.g., "tz1...") to forward funds to
@@ -109,9 +116,17 @@ contract AliasForwarder {
             return;
         }
 
-        // Call the RuntimeGateway to transfer to the native Tezos address
+        // Call the RuntimeGateway to transfer to the native Tezos address:
+        // a POST to the bare address with an empty body through the
+        // generic `call` entrypoint.
         (bool success, ) = RUNTIME_GATEWAY.call{value: amount}(
-            abi.encodeWithSignature("transfer(string)", nativeAddress)
+            abi.encodeWithSignature(
+                "call(string,(string,string)[],bytes,uint8)",
+                string.concat("http://tezos/", nativeAddress),
+                new Header[](0),
+                bytes(""),
+                uint8(1)
+            )
         );
 
         if (!success) {

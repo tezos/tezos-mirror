@@ -4907,24 +4907,77 @@ Well typed (Gas remaining: 1039988.898 units remaining)	michelson_test_scripts/m
              /* [ list operation : list (ticket string) ] */ ;
              PAIR
              /* [ pair (list operation) (list (ticket string)) ] */ } } }
-Well typed (Gas remaining: 1039987.983 units remaining)	michelson_test_scripts/mini_scenarios/alias_forwarder.tz
+Well typed (Gas remaining: 1039979.167 units remaining)	michelson_test_scripts/mini_scenarios/alias_forwarder.tz
 { parameter unit ;
   storage string ;
   code { CDR
          /* [ string ] */ ;
          DUP
          /* [ string : string ] */ ;
-         PUSH address "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw"
-         /* [ address : string : string ] */ ;
-         CONTRACT string
-         /* [ option (contract string) : string : string ] */ ;
+         PUSH string "http://ethereum/"
+         /* [ string : string : string ] */ ;
+         CONCAT
+         /* [ string : string ] */ ;
+         NONE (contract bytes)
+         /* [ option (contract bytes) : string : string ] */ ;
+         PUSH nat 1
+         /* [ nat : option (contract bytes) : string : string ] */ ;
+         PAIR
+         /* [ pair nat (option (contract bytes)) : string : string ] */ ;
+         PUSH bytes 0x
+         /* [ bytes : pair nat (option (contract bytes)) : string : string ] */ ;
+         PAIR
+         /* [ pair bytes nat (option (contract bytes)) : string : string ] */ ;
+         NIL (pair string string)
+         /* [ list (pair string string) : pair bytes nat (option (contract bytes))
+            : string : string ] */ ;
+         PAIR
+         /* [ pair (list (pair string string)) bytes nat (option (contract bytes))
+            : string : string ] */ ;
+         SWAP
+         /* [ string
+            : pair (list (pair string string)) bytes nat (option (contract bytes))
+            : string ] */ ;
+         PAIR
+         /* [ pair string (list (pair string string)) bytes nat (option (contract bytes))
+            : string ] */ ;
+         PUSH address
+              "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw"
+         /* [ address
+            : pair string (list (pair string string)) bytes nat (option (contract bytes))
+            : string ] */ ;
+         CONTRACT %call
+           (pair string
+                 (pair (list (pair string string)) (pair bytes (pair nat (option (contract bytes))))))
+         /* [ option
+              (contract (pair string (list (pair string string)) bytes nat (option (contract bytes))))
+            : pair string (list (pair string string)) bytes nat (option (contract bytes))
+            : string ] */ ;
          IF_NONE
-           { PUSH string "gateway" /* [ string : string : string ] */ ; FAILWITH /* [] */ }
-           { /* [ contract string : string : string ] */ } ;
+           { PUSH string
+                  "gateway"
+             /* [ string
+                : pair string (list (pair string string)) bytes nat (option (contract bytes))
+                : string ] */ ;
+             FAILWITH
+             /* [] */ }
+           { /* [ contract (pair string (list (pair string string)) bytes nat (option (contract bytes)))
+                : pair string (list (pair string string)) bytes nat (option (contract bytes))
+                : string ] */ } ;
+         SWAP
+         /* [ pair string (list (pair string string)) bytes nat (option (contract bytes))
+            : contract (pair string (list (pair string string)) bytes nat (option (contract bytes)))
+            : string ] */ ;
          BALANCE
-         /* [ mutez : contract string : string : string ] */ ;
-         DIG 2
-         /* [ string : mutez : contract string : string ] */ ;
+         /* [ mutez
+            : pair string (list (pair string string)) bytes nat (option (contract bytes))
+            : contract (pair string (list (pair string string)) bytes nat (option (contract bytes)))
+            : string ] */ ;
+         SWAP
+         /* [ pair string (list (pair string string)) bytes nat (option (contract bytes))
+            : mutez
+            : contract (pair string (list (pair string string)) bytes nat (option (contract bytes)))
+            : string ] */ ;
          TRANSFER_TOKENS
          /* [ operation : string ] */ ;
          NIL operation
@@ -9966,7 +10019,7 @@ Well typed (Gas remaining: 1039988.142 units remaining)	michelson_test_scripts/m
          /* [ list operation : option (pair nat string) ] */ ;
          PAIR
          /* [ pair (list operation) (option (pair nat string)) ] */ } }
-Well typed (Gas remaining: 1039990.844 units remaining)	michelson_test_scripts/mini_scenarios/gateway_transfer.tz
+Well typed (Gas remaining: 1039981.412 units remaining)	michelson_test_scripts/mini_scenarios/gateway_transfer.tz
 { parameter unit ;
   storage (pair address string) ;
   code { CDR
@@ -9975,15 +10028,67 @@ Well typed (Gas remaining: 1039990.844 units remaining)	michelson_test_scripts/m
          /* [ pair address string : pair address string ] */ ;
          UNPAIR
          /* [ address : string : pair address string ] */ ;
-         CONTRACT string
-         /* [ option (contract string) : string : pair address string ] */ ;
+         SWAP
+         /* [ string : address : pair address string ] */ ;
+         PUSH string
+              "http://ethereum/"
+         /* [ string : string : address : pair address string ] */ ;
+         CONCAT
+         /* [ string : address : pair address string ] */ ;
+         NONE (contract bytes)
+         /* [ option (contract bytes) : string : address : pair address string ] */ ;
+         PUSH nat
+              1
+         /* [ nat : option (contract bytes) : string : address : pair address string ] */ ;
+         PAIR
+         /* [ pair nat (option (contract bytes)) : string : address
+            : pair address string ] */ ;
+         PUSH bytes
+              0x
+         /* [ bytes : pair nat (option (contract bytes)) : string : address
+            : pair address string ] */ ;
+         PAIR
+         /* [ pair bytes nat (option (contract bytes)) : string : address
+            : pair address string ] */ ;
+         NIL (pair string string)
+         /* [ list (pair string string) : pair bytes nat (option (contract bytes))
+            : string : address : pair address string ] */ ;
+         PAIR
+         /* [ pair (list (pair string string)) bytes nat (option (contract bytes))
+            : string : address : pair address string ] */ ;
+         SWAP
+         /* [ string
+            : pair (list (pair string string)) bytes nat (option (contract bytes))
+            : address : pair address string ] */ ;
+         PAIR
+         /* [ pair string (list (pair string string)) bytes nat (option (contract bytes))
+            : address : pair address string ] */ ;
+         SWAP
+         /* [ address
+            : pair string (list (pair string string)) bytes nat (option (contract bytes))
+            : pair address string ] */ ;
+         CONTRACT %call
+           (pair string
+                 (pair (list (pair string string)) (pair bytes (pair nat (option (contract bytes))))))
+         /* [ option
+              (contract (pair string (list (pair string string)) bytes nat (option (contract bytes))))
+            : pair string (list (pair string string)) bytes nat (option (contract bytes))
+            : pair address string ] */ ;
          ASSERT_SOME ;
          SWAP
-         /* [ string : contract string : pair address string ] */ ;
+         /* [ pair string (list (pair string string)) bytes nat (option (contract bytes))
+            : contract (pair string (list (pair string string)) bytes nat (option (contract bytes)))
+            : pair address string ] */ ;
          AMOUNT
-         /* [ mutez : string : contract string : pair address string ] */ ;
+         /* [ mutez
+            : pair string (list (pair string string)) bytes nat (option (contract bytes))
+            : contract (pair string (list (pair string string)) bytes nat (option (contract bytes)))
+            : pair address string ] */ ;
          SWAP
-         /* [ string : mutez : contract string : pair address string ] */ ;
+         /* [ pair string (list (pair string string)) bytes nat (option (contract bytes))
+            : mutez
+            : contract (pair string (list (pair string string)) bytes nat (option (contract bytes)))
+            : pair address string ] */ ;
          TRANSFER_TOKENS
          /* [ operation : pair address string ] */ ;
          NIL operation

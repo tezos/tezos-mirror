@@ -41,10 +41,6 @@ use tezosx_journal::OriginalSource;
 
 sol! {
     contract RuntimeGateway {
-        function transfer(
-            string implicitAddress,
-        ) external;
-
         function callMichelson(
             string destination,
             string entrypoint,
@@ -125,10 +121,9 @@ fn charge_payload(gas: &mut Gas, bytes: usize) -> Result<(), CustomPrecompileErr
 /// Charge the gateway's flat base cost plus the per-word payload
 /// surcharge on the inbound calldata and the outgoing request body.
 ///
-/// Shared by every CRAC entrypoint (`transfer`, `callMichelson`,
+/// Shared by every CRAC entrypoint (`callMichelson`,
 /// `callMichelsonView`, `call`) so the upfront gas model stays identical
-/// across them. `body_len` is `0` for `transfer` (empty body); the
-/// per-word helper then charges nothing for it.
+/// across them. The per-word helper charges nothing for an empty body.
 fn charge_gateway_request(
     gas: &mut Gas,
     calldata_len: usize,
@@ -146,7 +141,7 @@ fn charge_gateway_request(
 ///
 /// Shared by the entrypoints that surface the response body to the
 /// caller (`callMichelsonView`, `call`). Entrypoints that discard the
-/// body (`transfer`, `callMichelson`) call
+/// body (`callMichelson`) call
 /// [`classify_and_charge_crac_response`] directly instead.
 fn charge_and_encode_crac_response(
     response: http::Response<Vec<u8>>,
@@ -555,8 +550,8 @@ where
 
 /// Emit a `CracSent` log for an outgoing CRAC.
 ///
-/// Shared by the three state-mutating gateway entries (`transfer`,
-/// `callMichelson`, generic `call(POST)`) so the event schema and the
+/// Shared by the state-mutating gateway entries (`callMichelson`,
+/// generic `call(POST)`) so the event schema and the
 /// meaning of each field stay identical across surfaces. `target_address`
 /// is always the bare target *contract* — callers strip any
 /// entrypoint/view segment before passing it (L2-1456).
@@ -885,10 +880,10 @@ where
     // resolution, repurpose the caller's `msg.value` for value
     // transfers, and more generally break the assumption that the
     // gateway speaks on behalf of its direct caller. For the
-    // state-mutating entries (`transfer`, `callMichelson`, `call`)
+    // state-mutating entries (`callMichelson`, `call`)
     // the confusion is around identity and value; for the read-only
     // `callMichelsonView` it's the same plus it sidesteps the
-    // STATICCALL guarantees of the typed entry. In all four cases
+    // STATICCALL guarantees of the typed entry. In all three cases
     // there is no legitimate reason to reach the gateway through a
     // delegated frame — callers should use `CALL` or `STATICCALL`.
     //
@@ -926,73 +921,6 @@ where
     // through the read-only journal API, refuse value transfer, and
     // never emit a log.
     match function_call {
-        RuntimeGatewayCalls::transfer(call) => {
-            if inputs.is_static {
-                return Err(CustomPrecompileError::Revert(
-                    "runtime gateway: STATICCALL not allowed on transfer".into(),
-                    gas,
-                ));
-            }
-            charge_gateway_request(&mut gas, calldata.len(), 0)?;
-
-            let implicit_address = call.implicitAddress;
-            let amount = inputs.value.get();
-
-            // Build HTTP request targeting the Tezos runtime (no entrypoint)
-            let url = format!("http://tezos/{implicit_address}");
-            let mut request = http::Request::builder()
-                .method(http::Method::POST)
-                .uri(&url)
-                .body(Vec::new())
-                .map_err(|e| {
-                    CustomPrecompileError::Revert(
-                        format!("failed to build HTTP request: {e}"),
-                        gas,
-                    )
-                })?;
-
-            let source = resolve_original_source(context, gas.remaining())?;
-            let source_addr =
-                original_source_evm_address(&source, context.db().registry, gas)?;
-            let (sender_alias, source_alias) = resolve_aliases(
-                context,
-                &mut gas,
-                RuntimeId::Tezos,
-                inputs.caller,
-                source_addr,
-            )?;
-
-            // Convert remaining EVM gas to Tezos milligas for the target runtime
-            let gas_limit =
-                gas::convert(RuntimeId::Ethereum, RuntimeId::Tezos, gas.remaining())
-                    .ok_or_else(|| {
-                        CustomPrecompileError::Revert(
-                            "transfer: EVM gas limit overflows Tezos milligas".into(),
-                            gas,
-                        )
-                    })?;
-            let crac_id = context.journal().crac_id();
-            inject_tezos_headers_from_context(
-                context,
-                request.headers_mut(),
-                &sender_alias,
-                &source_alias,
-                source.runtime(),
-                amount,
-                gas_limit,
-                gas,
-            )?;
-
-            let response = context.journal_mut().tezosx_call_http(request);
-            let _body = classify_and_charge_crac_response(
-                response,
-                RuntimeId::Tezos,
-                &mut gas,
-                context.block().basefee(),
-            )?;
-
-            emit_crac_sent(context, crac_id, "tezos", implicit_address, amount);
-        }
         RuntimeGatewayCalls::callMichelson(call) => {
             if inputs.is_static {
                 return Err(CustomPrecompileError::Revert(
@@ -1291,7 +1219,7 @@ where
             // URI is `http://<runtime>/<address>[/<entrypoint-or-view>]`,
             // so keep only the first path segment — the address — and
             // drop any trailing entrypoint/view. This matches the typed
-            // `callMichelson` / `transfer` entries, which emit the bare
+            // `callMichelson` entry, which emits the bare
             // destination; reporting the full path here would split one
             // contract into two indexer identities depending on the ABI
             // surface used (L2-1456).
@@ -2376,24 +2304,6 @@ mod tests {
     }
 
     // --- ABI decoding edge cases ---
-
-    #[test]
-    fn test_transfer_abi_decode() {
-        use alloy_sol_types::SolCall;
-
-        let call = RuntimeGateway::transferCall {
-            implicitAddress: "tz1abc123".to_string(),
-        };
-        let encoded = call.abi_encode();
-
-        let decoded = RuntimeGatewayCalls::abi_decode(&encoded).unwrap();
-        match decoded {
-            RuntimeGatewayCalls::transfer(decoded_call) => {
-                assert_eq!(decoded_call.implicitAddress, "tz1abc123");
-            }
-            _ => panic!("expected transfer variant"),
-        }
-    }
 
     #[test]
     fn test_call_michelson_abi_decode() {
