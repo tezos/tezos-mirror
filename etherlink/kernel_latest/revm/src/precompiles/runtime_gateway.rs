@@ -2656,7 +2656,7 @@ mod tests {
     #[test]
     fn test_classify_and_charge_crac_response_no_storage_cost_header() {
         // 2xx without `X-Tezos-Storage-Cost` → only the callee gas is
-        // charged (1000 Tezos milligas / 100 = 10 EVM gas), no storage.
+        // charged (1000 Tezos milligas = 1 Tezos gas = 45 EVM gas), no storage.
         let response = http::Response::builder()
             .status(http::status::StatusCode::OK)
             .header(X_TEZOS_GAS_CONSUMED, "1000")
@@ -2673,7 +2673,7 @@ mod tests {
         .expect("should succeed");
         assert_eq!(
             gas.remaining(),
-            gas_limit - 10,
+            gas_limit - 45,
             "an absent storage-cost header must not deduct any storage gas"
         );
     }

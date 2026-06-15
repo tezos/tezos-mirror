@@ -1755,7 +1755,7 @@ let test_michelson_origin_of_invalid_runtime_id () =
       ~dest:kt1_address
       ~arg_data:(sf {|Pair "%s" %s|} addr invalid_runtime_id)
       ~force:true
-      ~gas_limit:1_000_000
+      ~gas_limit:660_000
       ~storage_limit:1000
       ()
   in
@@ -1836,7 +1836,7 @@ let test_michelson_resolve_address_invalid_runtime_id () =
       ~arg_data:
         (sf {|Pair "%s" (Pair %s %s)|} addr invalid_runtime_id runtime_id_tezos)
       ~force:true
-      ~gas_limit:1_000_000
+      ~gas_limit:660_000
       ~storage_limit:1000
       ()
   in

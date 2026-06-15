@@ -32,12 +32,13 @@ pub const EVM_MAX_GAS_PER_TRANSACTION: u64 = 30_000_000;
 
 /// EVM gas → Michelson milligas conversion factor.
 ///
-/// 1 EVM gas unit corresponds to 100 Tezos milligas. The cross-runtime
-/// gateway uses this when forwarding `remaining_evm_gas` as
+/// 1 Tezos gas is 45 EVM gas according to the kernel. So 1 EVM gas unit
+/// corresponds to 1/45 Tezos gas = 1000/45 Tezos milligas = ~22.
+/// The cross-runtime gateway uses this when forwarding `remaining_evm_gas` as
 /// `X-Tezos-Gas-Limit`, and the Michelson per-operation hard cap is
 /// derived from [`EVM_MAX_GAS_PER_TRANSACTION`] via this factor so the
 /// two sides agree on the budget envelope.
-pub const EVM_GAS_TO_MILLIGAS: u64 = 100;
+pub const EVM_GAS_TO_MILLIGAS: u64 = 22;
 
 /// Maximum gas (in milligas) for a single Michelson operation in
 /// Tezos X.
@@ -47,7 +48,7 @@ pub const EVM_GAS_TO_MILLIGAS: u64 = 100;
 /// full remaining gas budget through `X-Tezos-Gas-Limit` without the
 /// Michelson runtime rejecting it for exceeding its per-op cap.
 ///
-/// 30_000_000 × 100 = 3_000_000_000 milligas. The Tezlink parametric
+/// 30_000_000 × 22 = 660_000_000 milligas. The Tezlink parametric
 /// constants override `hard_gas_limit_per_operation` to the gas-unit
 /// equivalent (3_000_000) — see
 /// `etherlink/bin_node/lib_dev/tezlink/tezlink_constants.ml`.

@@ -736,6 +736,9 @@ module EvmGasBurner = struct
   include EvmRunner
 
   let deploy = deploy_solidity_contract ~contract:Solidity_contracts.gas_burner
+
+  let deploy_large =
+    deploy_solidity_contract ~contract:Solidity_contracts.gas_burner_large
 end
 
 (** Common [%run] caller for Tezos contracts. *)
@@ -1729,6 +1732,11 @@ module CracRunnerWrapper = struct
 
     module EvmGasBurner : sig
       val deploy : unit -> evm_runner Lwt.t
+
+      (** Like {!deploy} but originates the larger {!GasBurnerLarge}
+          variant (480 slots, ~2.5M warm gas).  Callers must pass a high
+          gas limit: the first, cold call writes ~22,100 gas per slot. *)
+      val deploy_large : unit -> evm_runner Lwt.t
     end
 
     module TezRunner : sig
@@ -2218,6 +2226,17 @@ module CracRunnerWrapper = struct
         let deploy () =
           let* addr =
             EvmGasBurner.deploy
+              ~evm_version
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ()
+          in
+          return (`Evm_runner addr)
+
+        let deploy_large () =
+          let* addr =
+            EvmGasBurner.deploy_large
               ~evm_version
               ~sequencer
               ~sender
@@ -7681,7 +7700,7 @@ let test_crac_receipt_separate_tx_two_cracs () =
       ~source_private_key:sender.private_key
       ~chain_id:1337
       ~nonce:(evm_nonce ())
-      ~gas:300_000
+      ~gas:3_000_000
       ~gas_price:1_000_000_000
       ~value:Wei.zero
       ~address:runner_1_addr
@@ -7695,7 +7714,7 @@ let test_crac_receipt_separate_tx_two_cracs () =
       ~source_private_key:sender.private_key
       ~chain_id:1337
       ~nonce:(evm_nonce ())
-      ~gas:300_000
+      ~gas:3_000_000
       ~gas_price:1_000_000_000
       ~value:Wei.zero
       ~address:runner_2_addr
@@ -10495,6 +10514,7 @@ let test_l1_vs_tezosx_nested_failwith_receipt =
     ~kernel:Latest
     ~with_runtimes
     ~enable_dal:false
+    ~minimum_base_fee_per_gas:crac_minimum_base_fee_per_gas
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
   @@ fun sequencer_setup protocol ->
   let client = sequencer_setup.client in
@@ -10968,7 +10988,7 @@ let test_crac_gas_header_michelson_burner () =
   let* g_baseline = EvmRunner.call_run runner_baseline in
   let* g_burner = EvmRunner.call_run runner_burner in
 
-  let g_expected = Int64.of_int (mg_direct / 100) in
+  let g_expected = Int64.of_int (mg_direct / 22) in
   let delta = Int64.sub g_burner g_baseline in
   Log.info
     ~prefix
@@ -10981,7 +11001,7 @@ let test_crac_gas_header_michelson_burner () =
 
   (* delta = G_burner - G_baseline isolates the Michelson gas
      contribution by subtracting the CRAC overhead.  g_expected
-     = mg_direct / 100 is the true Michelson gas cost measured
+     = mg_direct / 22 is the true Michelson gas cost measured
      independently via a direct TEZ call.
 
      The 4/5 lower bound allows for the small discrepancy between
@@ -11152,7 +11172,7 @@ let test_crac_gas_model_callee_gas_in_receipt () =
   let* () = TezRunner.call_run ~gas_limit:200_000 tez_bridge in
   let* gateway_milligas = TezRunner.get_gateway_consumed_milligas () in
 
-  let mg_expected = Int64.to_int g_direct * 100 in
+  let mg_expected = Int64.to_int g_direct * 22 in
   let mg_delta = gateway_milligas - mg_overhead in
   Log.info
     ~prefix
@@ -11166,7 +11186,7 @@ let test_crac_gas_model_callee_gas_in_receipt () =
 
   (* mg_delta = gateway_milligas - mg_overhead isolates the inner EVM
      gas contribution (in milligas) by subtracting the gateway
-     overhead.  mg_expected = G_direct * 100 is the expected inner
+     overhead.  mg_expected = G_direct * 22 is the expected inner
      EVM cost converted to milligas. *)
 
   (* Lower bound: the delta must include the inner EVM gas. *)
@@ -11248,7 +11268,7 @@ let test_crac_gas_accounting_investigation () =
 
   (* --- Deploy contracts ------------------------------------------------- *)
   Log.debug ~prefix "Deploy GasBurner" ;
-  let* gas_burner = EvmGasBurner.deploy () in
+  let* gas_burner = EvmGasBurner.deploy_large () in
 
   (* Scenario A: direct EVM call to GasBurner (no CRAC) *)
 
@@ -11290,17 +11310,17 @@ let test_crac_gas_accounting_investigation () =
 
   (* --- Warmup calls (alias generation) ---------------------------------- *)
   Log.debug ~prefix "Warmup calls (generate aliases)" ;
-  let* _warmup_a = EvmRunner.call_run ~gas:5000000 gas_burner in
-  let* _warmup_b = EvmRunner.call_run runner_b in
-  let* _warmup_c = EvmRunner.call_run runner_c in
-  let* _warmup_d = EvmRunner.call_run runner_d in
+  let* _warmup_a = EvmRunner.call_run ~gas:12_000_000 gas_burner in
+  let* _warmup_b = EvmRunner.call_run ~gas:12_000_000 runner_b in
+  let* _warmup_c = EvmRunner.call_run ~gas:12_000_000 runner_c in
+  let* _warmup_d = EvmRunner.call_run ~gas:12_000_000 runner_d in
 
   (* --- Measurement calls ------------------------------------------------ *)
   Log.debug ~prefix "Measurement calls (aliases cached)" ;
-  let* g_direct = EvmRunner.call_run gas_burner in
-  let* g_overhead = EvmRunner.call_run runner_b in
-  let* g_call_evm = EvmRunner.call_run runner_c in
-  let* g_call = EvmRunner.call_run runner_d in
+  let* g_direct = EvmRunner.call_run ~gas:12_000_000 gas_burner in
+  let* g_overhead = EvmRunner.call_run ~gas:12_000_000 runner_b in
+  let* g_call_evm = EvmRunner.call_run ~gas:12_000_000 runner_c in
+  let* g_call = EvmRunner.call_run ~gas:12_000_000 runner_d in
 
   (* --- Analysis & Assertions -------------------------------------------- *)
   let delta_c_b = Int64.sub g_call_evm g_overhead in
@@ -11391,27 +11411,27 @@ let test_crac_gas_accounting_investigation () =
 
   (* -- TEZ milligas: lower bound --
      The gateway's consumed_milligas must include the inner EVM gas
-     converted to milligas (1 EVM gas = 100 milligas).  We use 80x
-     instead of 100x as the lower bound to allow for differences
+     converted to milligas (1 EVM gas = 22 milligas).  We use 18x
+     instead of 22x as the lower bound to allow for differences
      between the direct EVM call (G_direct) and the CRAC inner call
      (which may have slightly different intrinsic gas treatment). *)
   let mg_ref = Int64.to_int g_direct in
   Check.(
-    (mg_call_evm > mg_ref * 80)
+    (mg_call_evm > mg_ref * 18)
       int
       ~error_msg:
-        "%%call_evm milligas (%L) should exceed G_direct*80 (%R): inner EVM \
+        "%%call_evm milligas (%L) should exceed G_direct*18 (%R): inner EVM \
          gas must be charged") ;
 
   (* -- TEZ milligas: upper bound (double-counting) --
      Same logic as the EVM-side upper bound.  If the inner EVM gas
-     were counted twice in milligas, the value would be ~200x G_direct.
-     The 150x bound catches this while leaving room for TEZ overhead. *)
+     were counted twice in milligas, the value would be ~44x G_direct.
+     The 33x bound catches this while leaving room for TEZ overhead. *)
   Check.(
-    (mg_call_evm < mg_ref * 150)
+    (mg_call_evm < mg_ref * 33)
       int
       ~error_msg:
-        "%%call_evm milligas (%L) should be < G_direct*150 (%R): possible \
+        "%%call_evm milligas (%L) should be < G_direct*33 (%R): possible \
          double-counting") ;
 
   (* -- TEZ path consistency --

@@ -3305,7 +3305,7 @@ let test_validation_gas_limit =
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
   @@ fun {sequencer; _} _protocol ->
   let* client_tezlink = tezlink_client_from_evm_node sequencer () in
-  let hard_gas_limit_per_block = 3_000_000 in
+  let hard_gas_limit_per_block = 660_000 in
 
   (* make sure there are no transactions in the queue *)
   let* () = produce_block_and_wait_for ~sequencer 3 in
@@ -3314,8 +3314,8 @@ let test_validation_gas_limit =
   let almost_half_block = (hard_gas_limit_per_block / 2) - 1 in
 
   (* Sanity check: can fit two op in a blueprint *)
-  (* fee = 20_000 mutez covers execution gas fee (gas_limit * 10 * base_fee / 10^12
-     ≤ 1_499_999 * 10 * 10^9 / 10^12 ≈ 15_000 mutez) so operations are not
+  (* fee = 20_000 mutez covers execution gas fee (gas_limit * 45 * base_fee / 10^12
+     ≤ 329_999 * 45 * 10^9 / 10^12 ≈ 14_850 mutez) so operations are not
      rejected for insufficient fees before the gas limit check. *)
   let fee = 20_000 in
   let* (`OpHash op1) =
@@ -3867,12 +3867,12 @@ let test_michelson_gas_backlog_on_failed_op =
   unit
 
 (** Tests that Michelson operations in TezosX validate execution gas fees.
-    With base_fee_per_gas = 10^9 (1 Gwei) and MICHELSON_TO_EVM_GAS_MULTIPLIER = 10,
+    With base_fee_per_gas = 10^9 (1 Gwei) and MICHELSON_TO_EVM_GAS_MULTIPLIER = 45,
     gas_limit = 500_000 requires execution gas fee =
-    500_000 * 10 * 10^9 / 10^12 = 5_000 mutez.
+    500_000 * 45 * 10^9 / 10^12 = 22_500 mutez.
 
     A fee of 1_000 mutez does not cover execution gas.
-    A fee of 10_000 mutez covers execution gas: the operation is included. *)
+    A fee of 30_000 mutez covers execution gas: the operation is included. *)
 let test_michelson_execution_gas_fee =
   register_tezosx_test
     ~title:"Michelson transfer validates execution gas fee"
@@ -3899,13 +3899,13 @@ let test_michelson_execution_gas_fee =
   let* () =
     check_operations ~__LOC__ ~client ~endpoint ~block:"3" ~expected:[] ()
   in
-  (* Fee = 10_000 mutez: covers execution gas → included. *)
+  (* Fee = 30_000 mutez: covers execution gas → included. *)
   let* () =
     Client.transfer
       ~amount:Tez.one
       ~giver:Constant.bootstrap2.alias
       ~receiver:Constant.bootstrap1.alias
-      ~fee:(Tez.of_mutez_int 10_000)
+      ~fee:(Tez.of_mutez_int 30_000)
       ~gas_limit:500_000
       ~endpoint
       client
@@ -4427,12 +4427,16 @@ let test_gas_refund_in_run_operation ~enable_refund =
   let expected_refund =
     if enable_refund then
       (* refund = fee - da_fees - consumed_gas_fees.
-         da_fees = 0 in simulation, consumed_gas_fees = ceil(consumed_milligas/1000) / 100. *)
+         da_fees = 0 in simulation. The kernel computes
+         consumed_gas_fees = michelson_gas_to_mutez(base_fee, multiplier, gas)
+         = base_fee_per_gas * multiplier * consumed_gas / 10^12. With the
+         default base fee (1 Gwei = 10^9 wei) and the Michelson->EVM gas
+         multiplier of 45, this simplifies to 45 * consumed_gas / 1000. *)
       let consumed_milligas =
         JSON.(metadata |-> "operation_result" |-> "consumed_milligas" |> as_int)
       in
       let consumed_gas = (consumed_milligas + 999) / 1000 in
-      let consumed_gas_fees = consumed_gas / 100 in
+      let consumed_gas_fees = 45 * consumed_gas / 1000 in
       Some (fee - consumed_gas_fees)
     else None
   in
@@ -4512,11 +4516,15 @@ let test_gas_refund_in_preapply ~enable_refund =
   Check.((status = "applied") string ~error_msg:"Expected %R but got %L") ;
   let expected_refund =
     if enable_refund then
+      (* consumed_gas_fees = michelson_gas_to_mutez(base_fee, multiplier, gas)
+         = base_fee_per_gas * multiplier * consumed_gas / 10^12. With the
+         default base fee (1 Gwei = 10^9 wei) and the Michelson->EVM gas
+         multiplier of 45, this simplifies to 45 * consumed_gas / 1000. *)
       let consumed_milligas =
         JSON.(metadata |-> "operation_result" |-> "consumed_milligas" |> as_int)
       in
       let consumed_gas = (consumed_milligas + 999) / 1000 in
-      let consumed_gas_fees = consumed_gas / 100 in
+      let consumed_gas_fees = 45 * consumed_gas / 1000 in
       Some (fee - consumed_gas_fees)
     else None
   in
