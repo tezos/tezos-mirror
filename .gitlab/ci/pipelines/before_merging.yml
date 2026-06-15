@@ -1743,6 +1743,7 @@ sanity_ci:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/*.yml
     - opam/**/*
+    - script-inputs/**/*
     when: on_success
   needs: []
   dependencies: []
