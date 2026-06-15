@@ -21,6 +21,8 @@ In particular, this includes scripts for:
 * setting user-activated upgrades (`user_activated_upgrade.sh`)
 * generating commitments (initial accounts) for test networks (`create_genesis/create_genesis_info.py`)
 * patch the protocols to add profiling (`patch-profiler-proto.sh`)
+* estimating when the next protocol activation will occur, in the best case and
+  under block-time drift assumptions (`next_protocol_activation.py`)
 
 This directory also includes an example docker-compose file to run a
 node with a baker and an accuser (`docker/docker-compose-generic.yml`)
@@ -39,6 +41,9 @@ Information about using some of the scripts above can be found as follows:
 * `version.sh`: see <https://tezos.gitlab.io/introduction/howtoget.html> and <https://tezos.gitlab.io/developer/contributing-adding-a-new-opam-dependency.html>
 * `yes-wallet/`: see <http://tezos.gitlab.io/developer/proposal_testing.html>
 * `user_activated_upgrade.sh`: see <http://tezos.gitlab.io/developer/proposal_testing.html>
+* `next_protocol_activation.py`: run `python3 scripts/next_protocol_activation.py --help`;
+  it queries a node (default `http://localhost:8732`, read-only) and prints the best-case
+  and drift-adjusted activation date/time.
 
 ## Profiler patches for the protocols
 
