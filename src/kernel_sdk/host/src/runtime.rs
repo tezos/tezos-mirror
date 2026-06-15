@@ -523,6 +523,27 @@ mod tests {
     }
 
     #[test]
+    fn store_read_all_empty_value_falls_back_to_size() {
+        // Arrange: an existing but empty value. Hosts that reject a read whose
+        // offset is at the end of the value (here offset 0 of a 0-byte value)
+        // make the single-chunk fast path fail; `store_read_all` must fall back
+        // to the size-based path and return an empty vector rather than the
+        // host error.
+        const PATH: RefPath<'static> = RefPath::assert_from("/empty/value".as_bytes());
+
+        let mut mock = mock_path_exists(PATH.as_bytes());
+        mock.expect_store_read()
+            .returning(|_, _, _, _, _| Error::StoreInvalidAccess as i32);
+        mock.expect_store_value_size().return_const(0i32);
+
+        // Act
+        let result = StorageV1::store_read_all(&mock, &PATH);
+
+        // Assert
+        assert_eq!(Ok(Vec::<u8>::new()), result);
+    }
+
+    #[test]
     fn store_write_ok() {
         // Arrange
         const PATH: RefPath<'static> = RefPath::assert_from("/a/simple/path".as_bytes());
