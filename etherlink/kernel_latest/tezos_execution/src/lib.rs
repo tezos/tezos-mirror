@@ -7783,39 +7783,14 @@ mod tests {
         arena: &'a Arena<Micheline<'a>>,
         eth_destination: &str,
     ) -> Micheline<'a> {
-        let mut gas = Gas::default();
-        let method_callback = Micheline::prim2(
+        use crate::enshrined_contracts::tests::build_http_call_micheline;
+        build_http_call_micheline(
             arena,
-            mir::lexer::Prim::Pair,
-            num_bigint::BigInt::from(1).into(),
-            Micheline::prim0(mir::lexer::Prim::None, &mut gas).unwrap(),
-            &mut gas,
+            &format!("http://ethereum/{eth_destination}"),
+            &[],
+            &[],
+            1,
         )
-        .unwrap();
-        let body_method_callback = Micheline::prim2(
-            arena,
-            mir::lexer::Prim::Pair,
-            Micheline::Bytes(vec![]),
-            method_callback,
-            &mut gas,
-        )
-        .unwrap();
-        let headers_rest = Micheline::prim2(
-            arena,
-            mir::lexer::Prim::Pair,
-            Micheline::Seq(&[]),
-            body_method_callback,
-            &mut gas,
-        )
-        .unwrap();
-        Micheline::prim2(
-            arena,
-            mir::lexer::Prim::Pair,
-            Micheline::String(format!("http://ethereum/{eth_destination}")),
-            headers_rest,
-            &mut gas,
-        )
-        .unwrap()
     }
 
     /// Test a successful transfer from a tz1 address to an Ethereum address via the gateway.

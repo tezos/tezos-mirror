@@ -2031,7 +2031,7 @@ pub(crate) fn get_enshrined_contract_entrypoint(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use mir::ast::{AddressHash, Micheline};
     use mir::gas::Gas;
     use mir::lexer::Prim;
@@ -2371,7 +2371,7 @@ mod tests {
 
     /// Helper to build a Micheline call value:
     /// Pair(String(url), Pair(Seq(headers), Pair(Bytes(body), Int(method))))
-    fn build_http_call_micheline<'a>(
+    pub(crate) fn build_http_call_micheline<'a>(
         arena: &'a typed_arena::Arena<Micheline<'a>>,
         url: &str,
         headers: &[(&str, &str)],
