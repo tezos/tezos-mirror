@@ -1546,7 +1546,7 @@ let test_raw_json_cycle =
 let test_transfer =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
   (* Slot burn for crediting an unallocated implicit account. *)
-  let allocation_burn = 64250 in
+  let allocation_burn = 257 in
   register_tezosx_test
     ~title:"Test michelson runtime transfer"
     ~tags:["kernel"; "transfer"]
@@ -1585,7 +1585,7 @@ let test_transfer =
 let test_observer_transfer =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
   (* Slot burn for crediting an unallocated implicit account. *)
-  let allocation_burn = 64250 in
+  let allocation_burn = 257 in
   register_tezosx_test
     ~title:"Test michelson runtime transfer via an observer"
     ~tags:["observer"; "transfer"]
@@ -1630,7 +1630,7 @@ let test_observer_transfer =
 let test_transfer_and_wait =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
   (* Slot burn for crediting an unallocated implicit account. *)
-  let allocation_burn = 64250 in
+  let allocation_burn = 257 in
   register_tezosx_test
     ~title:"Test michelson runtime transfer and wait for inclusion"
     ~tags:["kernel"; "transfer"; "wait"]
@@ -2097,7 +2097,7 @@ let test_run_operation =
 let test_reveal_transfer_batch =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
   (* Slot burn for crediting an unallocated implicit account. *)
-  let allocation_burn = 64250 in
+  let allocation_burn = 257 in
   register_tezosx_test
     ~title:"Test michelson runtime reveal+transfer batch"
     ~tags:["kernel"; "reveal"; "transfer"; "batch"]
@@ -2186,7 +2186,7 @@ let test_reveal_transfer_batch =
 
 let test_batch =
   (* Slot burn for crediting an unallocated implicit account. *)
-  let allocation_burn = 64250 in
+  let allocation_burn = 257 in
   register_tezosx_test
     ~title:"Test of tezlink batches"
     ~tags:["batch"; "multiple_transfers"]

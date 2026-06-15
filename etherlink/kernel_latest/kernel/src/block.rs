@@ -1465,14 +1465,14 @@ mod tests {
             .expect("Account interface should be correct");
 
         // Allocate bootstrap 1 and give some mutez for a transfer.
-        // bootstrap 1 needs: 2 fees + 35 transfer + 64_250 slot burn.
-        // With 64_300, 13 will remain.
+        // bootstrap 1 needs: 2 fees + 35 transfer + 257 slot burn.
+        // With 307, 13 will remain.
         bootstrap1
             .allocate(&mut host)
             .expect("Contract initialization should have succeed");
 
         bootstrap1
-            .set_balance(&mut host, &64_300_u64.into())
+            .set_balance(&mut host, &307_u64.into())
             .expect("Set balance should have succeed");
 
         let manager = bootstrap1
@@ -1551,8 +1551,8 @@ mod tests {
         let bootstrap1_balance = bootstrap1.balance(&host).unwrap();
 
         // bootstrap 1 paid: 2 fees (reveal + transfer) + 35 transfer +
-        // 64_250 slot burn (fresh implicit allocation of bootstrap 2).
-        // Final: 64_300 - 2 - 35 - 64_250 = 13.
+        // 257 slot burn (fresh implicit allocation of bootstrap 2).
+        // Final: 307 - 2 - 35 - 257 = 13.
         assert_eq!(bootstrap1_balance, 13_u64.into());
 
         let bootstrap2_balance = bootstrap2.balance(&host).unwrap();

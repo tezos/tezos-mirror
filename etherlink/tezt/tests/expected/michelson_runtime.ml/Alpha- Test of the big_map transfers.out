@@ -93,8 +93,8 @@ This sequence of operations was run:
           Paid storage size diff: 70 bytes
           Consumed gas: 1706.141
           Balance updates:
-            [PUBLIC_KEY_HASH] ... -ꜩ0.0175
-            storage fees ........................... +ꜩ0.0175
+            [PUBLIC_KEY_HASH] ... -ꜩ0.00007
+            storage fees ........................... +ꜩ0.00007
 
 The operation has only been included 0 blocks ago.
 We recommend to wait more.
@@ -150,8 +150,8 @@ This sequence of operations was run:
           Paid storage size diff: 72 bytes
           Consumed gas: 1712.475
           Balance updates:
-            [PUBLIC_KEY_HASH] ... -ꜩ0.018
-            storage fees ........................... +ꜩ0.018
+            [PUBLIC_KEY_HASH] ... -ꜩ0.000072
+            storage fees ........................... +ꜩ0.000072
 
 The operation has only been included 0 blocks ago.
 We recommend to wait more.
@@ -251,8 +251,8 @@ This sequence of operations was run:
           Paid storage size diff: 70 bytes
           Consumed gas: 1706.141
           Balance updates:
-            [PUBLIC_KEY_HASH] ... -ꜩ0.0175
-            storage fees ........................... +ꜩ0.0175
+            [PUBLIC_KEY_HASH] ... -ꜩ0.00007
+            storage fees ........................... +ꜩ0.00007
 
 The operation has only been included 0 blocks ago.
 We recommend to wait more.
@@ -307,8 +307,8 @@ This sequence of operations was run:
           Paid storage size diff: 72 bytes
           Consumed gas: 1712.475
           Balance updates:
-            [PUBLIC_KEY_HASH] ... -ꜩ0.018
-            storage fees ........................... +ꜩ0.018
+            [PUBLIC_KEY_HASH] ... -ꜩ0.000072
+            storage fees ........................... +ꜩ0.000072
 
 The operation has only been included 0 blocks ago.
 We recommend to wait more.
@@ -412,8 +412,8 @@ This sequence of operations was run:
           Paid storage size diff: 142 bytes
           Consumed gas: 1706.141
           Balance updates:
-            [PUBLIC_KEY_HASH] ... -ꜩ0.0355
-            storage fees ........................... +ꜩ0.0355
+            [PUBLIC_KEY_HASH] ... -ꜩ0.000142
+            storage fees ........................... +ꜩ0.000142
 
 The operation has only been included 0 blocks ago.
 We recommend to wait more.
@@ -470,8 +470,8 @@ This sequence of operations was run:
           Paid storage size diff: 144 bytes
           Consumed gas: 1712.475
           Balance updates:
-            [PUBLIC_KEY_HASH] ... -ꜩ0.036
-            storage fees ........................... +ꜩ0.036
+            [PUBLIC_KEY_HASH] ... -ꜩ0.000144
+            storage fees ........................... +ꜩ0.000144
 
 The operation has only been included 0 blocks ago.
 We recommend to wait more.
