@@ -32,6 +32,7 @@ let job_sanity_ci =
         "**/ci/**/*";
         ".gitlab-ci.yml";
         ".gitlab/ci/pipelines/*.yml";
+        "script-inputs/**/*";
       ]
     ~script:
       [
