@@ -61,8 +61,8 @@ Information about using some of the scripts above can be found as follows:
 * `activation_empirical_drift.py`: run `python3 scripts/activation_empirical_drift.py --help`;
   it combines the two scripts above — measuring the round distribution over the last
   blocks-to-activation blocks and feeding it as the drift for the activation estimate.
-  `--anchor previous-activation` instead measures the same-length window ending at the
-  previous protocol activation.
+  By default it reports both the head-anchored and previous-activation-anchored empirical
+  results (`--anchor` restricts to one).
 
 ## Profiler patches for the protocols
 

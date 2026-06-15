@@ -78,37 +78,41 @@ def fetch_previous_activation(tzkt_base):
 # --------------------------------------------------------------------------- #
 # Reporting
 # --------------------------------------------------------------------------- #
-def report(chain_id, tzkt_base, voting, candidate, activation, head, window,
-           anchor_label, counts, drift_text, scenarios):
-    start, end, total, clamped = window
+def report(chain_id, tzkt_base, voting, candidate, activation, head, best,
+           measurements):
     print("Activation estimate with empirical round drift")
     print("=" * 72)
     net = chain_id if chain_id else "(via --tzkt-base)"
     print(f"Network  : {net}  |  tzkt: {tzkt_base}")
     print(f"Period   : {voting['kind']} (index {voting['index']})")
     print(f"Candidate: {candidate}")
-    print("  NOTE: best/empirical both assume the candidate passes all votes.")
+    print("  NOTE: best/empirical all assume the candidate passes all votes.")
     print(f"Head     : level {head['level']} at {head['timestamp'].isoformat()}")
     print(f"Blocks until activation : {activation['blocks']}")
     print(f"  Last Adoption block level    : {activation['last_adoption_level']}")
     print(f"  New protocol first block lvl : {activation['new_protocol_level']}")
-    print()
-    clamp_note = "  (clamped to earliest available)" if clamped else ""
-    print(f"Measurement window : levels {start}..{end}  ({total} blocks){clamp_note}")
-    print(f"  window ends at : {anchor_label}")
-    print(f"  {'round':>5}  {'count':>10}  {'percent':>10}")
-    print("  " + "-" * 29)
-    for rnd in sorted(counts):
-        n = counts[rnd]
-        pct = rd.fmt_sig(100.0 * n / total) if total else "0"
-        print(f"  {rnd:>5}  {n:>10}  {pct:>9}%")
-    print()
-    print(f"Measured drift : --drift '{drift_text}'")
+
+    for m in measurements:
+        print()
+        clamp_note = "  (clamped to earliest available)" if m["clamped"] else ""
+        print(f"Window @ {m['label']}")
+        print(f"  levels {m['start']}..{m['end']}  ({m['total']} blocks){clamp_note}")
+        print(f"  {'round':>5}  {'count':>10}  {'percent':>10}")
+        print("  " + "-" * 29)
+        for rnd in sorted(m["counts"]):
+            n = m["counts"][rnd]
+            pct = rd.fmt_sig(100.0 * n / m["total"]) if m["total"] else "0"
+            print(f"  {rnd:>5}  {n:>10}  {pct:>9}%")
+        print(f"  Measured drift : --drift '{m['drift_text']}'")
+
     print()
     print("Scenarios (horizon = blocks-to-activation):")
-    print(f"  {'scenario':<12} {'avg block':>10} {'days':>7}   activation (UTC)")
-    for label, avg, eta, days in scenarios:
-        print(f"  {label:<12} {avg:>9.3f}s {days:>7.2f}   "
+    print(f"  {'scenario':<22} {'avg block':>10} {'days':>7}   activation (UTC)")
+    rows = [("best case", *best)]
+    rows += [(f"empirical ({m['short']})", m["avg"], m["eta"], m["days"])
+             for m in measurements]
+    for label, avg, eta, days in rows:
+        print(f"  {label:<22} {avg:>9.3f}s {days:>7.2f}   "
               f"{eta.strftime('%Y-%m-%d %H:%M:%S UTC')}")
 
 
@@ -150,11 +154,12 @@ def build_parser():
     p.add_argument("--window-blocks", type=int, default=None,
                    help="Trailing window length in blocks "
                         "(default: blocks-to-activation)")
-    p.add_argument("--anchor", choices=["head", "previous-activation"],
-                   default="head",
-                   help="Where the measurement window ends: the current head "
-                        "(default), or the previous protocol activation block "
-                        "(its first level, from tzkt)")
+    p.add_argument("--anchor", choices=["both", "head", "previous-activation"],
+                   default="both",
+                   help="Which measurement window(s) to report: both the current "
+                        "head and the previous protocol activation block (default), "
+                        "or just one. Each window has length N and ends at the "
+                        "chosen anchor")
     p.add_argument("--selftest", action="store_true",
                    help="Run inline checks on the new logic and exit")
     return p
@@ -197,40 +202,47 @@ def main(argv=None):
         print(f"node error: {exc}", file=sys.stderr)
         return EXIT_DATA_ERROR
 
-    # The window ends at the head (default) or the previous activation block;
-    # the ETA still projects from now over the horizon N -- only the drift
-    # source window moves.
+    mbd = constants["minimal_block_delay"]
+    incr = constants["delay_increment_per_round"]
+
+    # Each window has length N and ends at the chosen anchor (head and/or the
+    # previous activation block). The ETA always projects from now over the
+    # horizon N -- only the drift-source window moves.
+    wanted = (["head", "previous-activation"] if args.anchor == "both"
+              else [args.anchor])
+    measurements = []
     try:
-        if args.anchor == "previous-activation":
-            end, proto_hash = fetch_previous_activation(tzkt_base)
-            anchor_label = f"previous activation ({proto_hash}, level {end})"
-        else:
-            end = head["level"]
-            anchor_label = f"current head (level {end})"
-        start, total, clamped = window_range(end, length)
-        counts = rd.tally_rounds(tzkt_base, start, end, total)
+        for mode in wanted:
+            if mode == "previous-activation":
+                end, proto_hash = fetch_previous_activation(tzkt_base)
+                label = f"previous activation ({proto_hash}, level {end})"
+                short = "prev-act"
+            else:
+                end = head["level"]
+                label = f"current head (level {end})"
+                short = "head"
+            start, total, clamped = window_range(end, length)
+            counts = rd.tally_rounds(tzkt_base, start, end, total)
+            # Build the drift list (rounded) and parse it back, so the displayed
+            # list and the empirical ETA use identical numbers (reproducibility).
+            drift_text = rd.build_drift_list(counts, total)
+            round_pcts = npa.parse_drift_list(drift_text)
+            avg = npa.avg_block_time(round_pcts, mbd, incr)
+            eta, days = npa.scenario_eta(head["timestamp"], horizon, avg)
+            measurements.append({
+                "short": short, "label": label, "start": start, "end": end,
+                "total": total, "clamped": clamped, "counts": counts,
+                "drift_text": drift_text, "avg": avg, "eta": eta, "days": days,
+            })
     except rd.TzktError as exc:
         print(f"tzkt error: {exc}", file=sys.stderr)
         return EXIT_DATA_ERROR
 
-    # Build the drift list (rounded) and parse it back, so the displayed list
-    # and the empirical ETA use identical numbers (reproducibility).
-    drift_text = rd.build_drift_list(counts, total)
-    round_pcts = npa.parse_drift_list(drift_text)
-
-    mbd = constants["minimal_block_delay"]
-    incr = constants["delay_increment_per_round"]
-    scenarios = []
     best_avg = npa.avg_block_time({}, mbd, incr)
-    best_eta, best_days = npa.scenario_eta(head["timestamp"], horizon, best_avg)
-    scenarios.append(("best case", best_avg, best_eta, best_days))
-    emp_avg = npa.avg_block_time(round_pcts, mbd, incr)
-    emp_eta, emp_days = npa.scenario_eta(head["timestamp"], horizon, emp_avg)
-    scenarios.append(("empirical", emp_avg, emp_eta, emp_days))
+    best = (best_avg, *npa.scenario_eta(head["timestamp"], horizon, best_avg))
 
-    report(chain_id, tzkt_base, voting, candidate, activation, head,
-           (start, end, total, clamped), anchor_label, counts, drift_text,
-           scenarios)
+    report(chain_id, tzkt_base, voting, candidate, activation, head, best,
+           measurements)
     return EXIT_OK
 
 
