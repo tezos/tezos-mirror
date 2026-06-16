@@ -347,8 +347,25 @@ pub fn read_optional_nom_value_bounded<T: for<'a> NomReader<'a>>(
     path: &impl Path,
     max_bytes: usize,
 ) -> Result<Option<T>, Error> {
+    Ok(
+        read_optional_nom_value_bounded_with_len(host, path, max_bytes)?
+            .map(|(value, _len)| value),
+    )
+}
+
+/// Like [`read_optional_nom_value_bounded`], but also returns the number
+/// of bytes actually read from the store alongside the decoded value, so
+/// callers that need to size gas by the read length do not have to
+/// re-encode the value to recover it. A missing path yields `Ok(None)`.
+///
+/// See [`read_nom_value_bounded`] for the `max_bytes` contract.
+pub fn read_optional_nom_value_bounded_with_len<T: for<'a> NomReader<'a>>(
+    host: &impl StorageV1,
+    path: &impl Path,
+    max_bytes: usize,
+) -> Result<Option<(T, usize)>, Error> {
     match host.store_read(path, 0, max_bytes) {
-        Ok(bytes) => decode_nom_value(&bytes).map(Some),
+        Ok(bytes) => decode_nom_value(&bytes).map(|value| Some((value, bytes.len()))),
         Err(RuntimeError::PathNotFound) => Ok(None),
         Err(err) => Err(err.into()),
     }

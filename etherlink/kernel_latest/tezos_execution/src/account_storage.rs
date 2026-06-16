@@ -26,7 +26,7 @@ use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_storage::{
     read_nom_value_bounded, read_optional_nom_value, read_optional_nom_value_bounded,
-    store_bin,
+    read_optional_nom_value_bounded_with_len, store_bin,
 };
 use tezosx_interfaces::Origin;
 
@@ -373,6 +373,86 @@ pub struct OriginatedContractInfo {
     pub paid_bytes: Zarith,
 }
 
+impl OriginatedContractInfo {
+    /// The aggregated record of a freshly originated contract: its
+    /// `used_bytes` is the code, storage and initial lazy-storage bytes it
+    /// occupies, and `paid_bytes` starts at that same value. Single source of
+    /// truth for both [`TezosOriginatedAccount::init`] (which persists it) and
+    /// the origination gas charge (which sizes it before the write).
+    pub(crate) fn for_new_contract(
+        code_size: u64,
+        storage_size: u64,
+        lazy_storage_size_diff: Zarith,
+    ) -> Self {
+        let used_bytes = Zarith(
+            BigInt::from(code_size)
+                + BigInt::from(storage_size)
+                + lazy_storage_size_diff.0,
+        );
+        OriginatedContractInfo {
+            code_size: code_size.into(),
+            storage_size: storage_size.into(),
+            used_bytes: used_bytes.clone(),
+            paid_bytes: used_bytes,
+        }
+    }
+
+    /// Set `storage_size` to `new_storage_size`, fold the resulting
+    /// storage-size delta together with `lazy_storage_size_diff` into
+    /// `used_bytes`, and raise the `paid_bytes` watermark when the new
+    /// size exceeds it. Returns the updated record and the [StorageSpace]
+    /// (new `used_bytes` plus the freshly allocated bytes). Pure: no host
+    /// access, so callers can size the record for gas before committing
+    /// the write. The pure core of a transfer's storage update, shared by
+    /// the gas-sizing and the write.
+    pub(crate) fn with_storage_size(
+        mut self,
+        new_storage_size: u64,
+        lazy_storage_size_diff: Zarith,
+    ) -> (Self, StorageSpace) {
+        let storage_size_diff =
+            BigInt::from(new_storage_size) - Zarith::from(self.storage_size.clone()).0;
+        self.storage_size = new_storage_size.into();
+
+        let used_bytes = Zarith(
+            self.used_bytes.0.clone() + storage_size_diff + lazy_storage_size_diff.0,
+        );
+        let already_paid = self.paid_bytes.0.clone();
+        let allocated_bytes = if used_bytes.0 > already_paid {
+            let diff = Zarith(&used_bytes.0 - &already_paid);
+            self.paid_bytes = used_bytes.clone();
+            diff
+        } else {
+            Zarith::from(0u64)
+        };
+        self.used_bytes = used_bytes.clone();
+        (
+            self,
+            StorageSpace {
+                used_bytes,
+                allocated_bytes,
+            },
+        )
+    }
+
+    /// Encoded byte length of this record (`tup4 n n z z`). Used to charge
+    /// gas for the exact number of bytes written to the `/info` key, rather
+    /// than a fixed bound — the encoding is self-delimiting, so the length
+    /// depends on the counter magnitudes. The read side does not call this:
+    /// it sizes the read from the length the store returned (see
+    /// [TezosOriginatedAccount::read_info_with_len]), so this only runs once
+    /// per write, on the post-update record that has not been persisted yet.
+    pub(crate) fn encoded_len(&self) -> Result<u64, tezos_storage::error::Error> {
+        // `BinWriter` has no length-only path, so we serialise into a
+        // throwaway buffer and read its length. The record is four small
+        // counters (bounded by `INFO_MAX_BYTES`), so the allocation is
+        // negligible; don't "optimise" it away without such a path existing.
+        let mut buffer = vec![];
+        self.bin_write(&mut buffer)?;
+        Ok(buffer.len() as u64)
+    }
+}
+
 pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
     fn kt1(&self) -> &ContractKt1Hash;
 
@@ -468,15 +548,35 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
         &self,
         host: &impl StorageV1,
     ) -> Result<OriginatedContractInfo, tezos_storage::error::Error> {
+        Ok(self.read_info_with_len(host)?.0)
+    }
+
+    /// Like [Self::read_info], but also returns the number of bytes read
+    /// from the `/info` key, so the transfer path can charge the read at
+    /// the exact bytes the store returned instead of re-encoding the
+    /// record. A contract with no record yet reads as an all-zero record
+    /// of length `0`.
+    fn read_info_with_len(
+        &self,
+        host: &impl StorageV1,
+    ) -> Result<(OriginatedContractInfo, u64), tezos_storage::error::Error> {
         let info_path = context::code::info_path(self)?;
         Ok(
-            read_optional_nom_value_bounded(host, &info_path, INFO_MAX_BYTES)?
-                .unwrap_or_else(|| OriginatedContractInfo {
-                    code_size: 0u64.into(),
-                    storage_size: 0u64.into(),
-                    used_bytes: Zarith::from(0u64),
-                    paid_bytes: Zarith::from(0u64),
-                }),
+            read_optional_nom_value_bounded_with_len(host, &info_path, INFO_MAX_BYTES)?
+                .map_or_else(
+                    || {
+                        (
+                            OriginatedContractInfo {
+                                code_size: 0u64.into(),
+                                storage_size: 0u64.into(),
+                                used_bytes: Zarith::from(0u64),
+                                paid_bytes: Zarith::from(0u64),
+                            },
+                            0,
+                        )
+                    },
+                    |(info, len)| (info, len as u64),
+                ),
         )
     }
 
@@ -562,10 +662,10 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
     /// sync with the blob), so this no longer needs a separate
     /// `store_value_size` call on the storage blob.
     ///
-    /// Test-only: the transfer path uses
-    /// [Self::set_storage_and_update_space], which folds the storage write
-    /// and the accounting update into one read-modify-write. Gated to
-    /// `test` so it doesn't masquerade as production API.
+    /// Test-only: the transfer path computes the updated record with the
+    /// pure [OriginatedContractInfo::with_storage_size] and commits it via
+    /// [Self::write_storage_and_info]. Gated to `test` so it doesn't
+    /// masquerade as production API.
     #[cfg(test)]
     fn set_storage(
         &self,
@@ -626,21 +726,15 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
         let storage_path = context::code::storage_path(self)?;
         host.store_write_all(&storage_path, storage)?;
         let storage_size = storage.len() as u64;
-        let used_bytes = Zarith(
-            BigInt::from(code_size)
-                + BigInt::from(storage_size)
-                + lazy_storage_size_diff.0,
+        let info = OriginatedContractInfo::for_new_contract(
+            code_size,
+            storage_size,
+            lazy_storage_size_diff,
         );
-        let info = OriginatedContractInfo {
-            code_size: code_size.into(),
-            storage_size: storage_size.into(),
-            used_bytes: used_bytes.clone(),
-            paid_bytes: used_bytes.clone(),
-        };
         self.write_info(host, &info)?;
         Ok(StorageSpace {
-            allocated_bytes: used_bytes.clone(),
-            used_bytes,
+            used_bytes: info.used_bytes.clone(),
+            allocated_bytes: info.used_bytes,
         })
     }
 
@@ -648,10 +742,15 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
     /// of `storage_size_diff` and `lazy_storage_size_diff`, persisting the
     /// updated record in a single write. No-op on enshrined contracts.
     ///
-    /// Test-only: production code reaches [Self::apply_storage_deltas]
-    /// through [Self::set_storage_and_update_space] (transfer) or builds
-    /// the record directly in [Self::init] (origination). Gated to `test`
-    /// so it doesn't masquerade as production API.
+    /// Test-only: production reaches the same accounting through the pure
+    /// [OriginatedContractInfo::with_storage_size] (transfer) or builds the
+    /// record directly in [Self::init] (origination). Gated to `test` so it
+    /// doesn't masquerade as production API.
+    ///
+    /// This bumps `used_bytes` by the raw signed delta and leaves
+    /// `storage_size` alone (the test sequences [Self::set_storage] first,
+    /// which already refreshes it), so it intentionally does not route
+    /// through `with_storage_size` — that would re-apply the storage delta.
     #[cfg(test)]
     fn update_storage_space(
         &self,
@@ -665,58 +764,9 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
                 allocated_bytes: 0.into(),
             });
         }
-        let info = self.read_info(host)?;
-        self.apply_storage_deltas(
-            host,
-            info,
-            storage_size_diff.0 .0,
-            lazy_storage_size_diff,
-        )
-    }
-
-    /// Persists `data` as the contract's storage and folds the resulting
-    /// storage-size delta together with `lazy_storage_size_diff` into the
-    /// accounting record in a single read-modify-write. Combines
-    /// [Self::set_storage] and [Self::update_storage_space] so the transfer
-    /// path touches the aggregated record once instead of twice. No-op
-    /// (zeroed [StorageSpace]) on enshrined contracts.
-    fn set_storage_and_update_space(
-        &self,
-        host: &mut impl StorageV1,
-        data: &[u8],
-        lazy_storage_size_diff: Zarith,
-    ) -> Result<StorageSpace, tezos_storage::error::Error> {
-        if enshrined_contracts::is_enshrined(self.kt1()) {
-            return Ok(StorageSpace {
-                used_bytes: 0.into(),
-                allocated_bytes: 0.into(),
-            });
-        }
-        let path = context::code::storage_path(self)?;
-        host.store_write_all(&path, data)?;
         let mut info = self.read_info(host)?;
-        let new_storage_size = data.len() as u64;
-        let storage_size_diff =
-            BigInt::from(new_storage_size) - Zarith::from(info.storage_size.clone()).0;
-        info.storage_size = new_storage_size.into();
-        self.apply_storage_deltas(host, info, storage_size_diff, lazy_storage_size_diff)
-    }
-
-    /// Add `storage_size_diff + lazy_storage_size_diff` to
-    /// `info.used_bytes`, raise the `paid_bytes` watermark when the new
-    /// size exceeds it, and persist the record once. Shared core of
-    /// [Self::update_storage_space] and [Self::set_storage_and_update_space];
-    /// `info` is the record read by the caller (its `storage_size` reflects
-    /// any storage write the caller just performed).
-    fn apply_storage_deltas(
-        &self,
-        host: &mut impl StorageV1,
-        mut info: OriginatedContractInfo,
-        storage_size_diff: BigInt,
-        lazy_storage_size_diff: Zarith,
-    ) -> Result<StorageSpace, tezos_storage::error::Error> {
         let used_bytes = Zarith(
-            info.used_bytes.0.clone() + storage_size_diff + lazy_storage_size_diff.0,
+            info.used_bytes.0.clone() + storage_size_diff.0 .0 + lazy_storage_size_diff.0,
         );
         let already_paid = info.paid_bytes.0.clone();
         let allocated_bytes = if used_bytes.0 > already_paid {
@@ -732,6 +782,28 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
             used_bytes,
             allocated_bytes,
         })
+    }
+
+    /// Persist `data` as the contract's storage blob and `info` as its
+    /// aggregated accounting record, in that order. No-op on enshrined
+    /// contracts (their storage is synthetic and not accounted).
+    ///
+    /// The caller computes `info` from the pre-update record via
+    /// [OriginatedContractInfo::with_storage_size] and charges gas for the
+    /// blob and the record *before* calling this, so the durable writes
+    /// happen only once their cost is secured.
+    fn write_storage_and_info(
+        &self,
+        host: &mut impl StorageV1,
+        data: &[u8],
+        info: &OriginatedContractInfo,
+    ) -> Result<(), tezos_storage::error::Error> {
+        if enshrined_contracts::is_enshrined(self.kt1()) {
+            return Ok(());
+        }
+        let path = context::code::storage_path(self)?;
+        host.store_write_all(&path, data)?;
+        self.write_info(host, info)
     }
 }
 

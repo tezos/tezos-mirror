@@ -11819,9 +11819,19 @@ let test_crac_collect_result_revert_discards_bytes () =
     Per-internal-op the apply loop charges [Cost::manager_operation] =
     100_000 mgas; MIR then charges [VALUE_STEP] = 100 mgas for the
     bytes typecheck, then 125 mgas + 10 mgas/byte for conversion to
-    Micheline; then 125 mgas + 10 mgas/byte for serialization; 1_400_192
-    mgas for IO work on the storage, finally the handler adds the
-    size-dependent term [460 + 1.5 * size]. *)
+    Micheline; then 125 mgas + 10 mgas/byte for serialization; 200_000
+    mgas (one [STORAGE_WRITE_BASE]) for the single durable write that
+    actually happens on the gateway path, finally the handler adds the
+    size-dependent term [460 + 1.5 * size].
+
+    The gateway that fields [%collect_result] is an enshrined contract:
+    its storage is synthetic and persists no per-contract accounting
+    record, so it no longer pays the L1-mirrored per-counter storage
+    accounting (two counter writes + three counter reads + a zero-byte
+    blob write, ~1_200_192 mgas) the model used to charge here. That
+    charge priced durable writes the enshrined write path already
+    skipped; pricing storage accounting by the bytes actually written
+    drops it. *)
 let test_crac_collect_result_size_sweep_matches_model () =
   register_crac_runner_test
     ~title:"CRAC: %collect_result size sweep matches model"
@@ -11843,7 +11853,7 @@ let test_crac_collect_result_size_sweep_matches_model () =
   let expected_mgas n =
     100_000 + 100 + 460
     + (3 * n / 2)
-    + 125 + (10 * n) + 125 + (10 * n) + 1_400_192
+    + 125 + (10 * n) + 125 + (10 * n) + 200_000
   in
   Log.debug ~prefix "Warmup each reader (alias + storage)" ;
   let* () =

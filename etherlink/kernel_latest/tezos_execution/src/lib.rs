@@ -52,7 +52,7 @@ use tezosx_interfaces::{Origin, Registry};
 use tezosx_journal::TezosXJournal;
 
 use crate::account_storage::{
-    StorageSpace, TezosImplicitAccount, TezosOriginatedAccount,
+    OriginatedContractInfo, StorageSpace, TezosImplicitAccount, TezosOriginatedAccount,
 };
 pub use crate::address::OriginationNonce;
 use crate::context::Context;
@@ -966,25 +966,6 @@ where
                 result
             };
 
-            // Charge gas for the logical storage operations, mirroring L1's
-            // storage cost model. The counts are unchanged by the on-disk
-            // record aggregation — the gas model prices the logical
-            // operations independently of how many physical host calls the
-            // kernel makes (the aggregated record now folds these into a
-            // single read and a single write): the storage blob write, two
-            // counter-sized writes (storage size, then used bytes), and three
-            // counter-sized reads (code size, storage size, paid bytes).
-            consume_storage_write_milligas(
-                tc_ctx.operation_gas,
-                1,
-                new_storage.len() as u64,
-            )
-            .map_err(TransferError::OutOfGas)?;
-            consume_storage_write_milligas(tc_ctx.operation_gas, 2, COUNTER_SIZE)
-                .map_err(TransferError::OutOfGas)?;
-            consume_storage_read_milligas(tc_ctx.operation_gas, 3, COUNTER_SIZE)
-                .map_err(TransferError::OutOfGas)?;
-
             // `interpret_context` holds this operation's lazy-storage size
             // delta, accumulated by the `LazyStorage` hooks during execution.
             // Like `big_map_diff`, it is a per-operation value carried on the
@@ -996,6 +977,58 @@ where
             let lazy_storage_size_diff =
                 tc_ctx.interpret_context.take_lazy_storage_size_diff();
 
+            // Read the contract's current accounting record and compute the
+            // post-update record, folding the storage-size delta and the
+            // lazy-storage delta into `used_bytes`. Then charge gas for the
+            // durable-storage operations this transfer performs — the storage
+            // blob write plus the single read-modify-write of the aggregated
+            // `/info` record, each at the exact number of bytes moved. The
+            // record is only persisted (further below) once its cost has been
+            // charged. Enshrined contracts have synthetic storage that is not
+            // accounted: they read, charge, and write nothing here.
+            let (storage_space, info_to_write) =
+                if enshrined_contracts::is_enshrined(dest_account.kt1()) {
+                    (
+                        StorageSpace {
+                            used_bytes: 0.into(),
+                            allocated_bytes: 0.into(),
+                        },
+                        None,
+                    )
+                } else {
+                    let (prev_info, info_bytes_read) = dest_account
+                        .read_info_with_len(tc_ctx.host)
+                        .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
+                    let (new_info, space) = prev_info.with_storage_size(
+                        new_storage.len() as u64,
+                        lazy_storage_size_diff,
+                    );
+                    let info_bytes_written = new_info
+                        .encoded_len()
+                        .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
+
+                    consume_storage_write_milligas(
+                        tc_ctx.operation_gas,
+                        1,
+                        new_storage.len() as u64,
+                    )
+                    .map_err(TransferError::OutOfGas)?;
+                    consume_storage_read_milligas(
+                        tc_ctx.operation_gas,
+                        1,
+                        info_bytes_read,
+                    )
+                    .map_err(TransferError::OutOfGas)?;
+                    consume_storage_write_milligas(
+                        tc_ctx.operation_gas,
+                        1,
+                        info_bytes_written,
+                    )
+                    .map_err(TransferError::OutOfGas)?;
+
+                    (space, Some(new_info))
+                };
+
             // In L1, the receipt of an operation only shows its own gas
             // consumption, i.e. it does not include that of its internal
             // operations.
@@ -1006,19 +1039,17 @@ where
             let lazy_storage_diff =
                 convert_big_map_diff(std::mem::take(&mut tc_ctx.big_map_diff));
 
-            // Persist the new storage and fold both the storage-size delta and
-            // the lazy-storage delta into the contract's accounting record in
-            // a single read-modify-write.
+            // Persist the storage blob and the accounting record now that
+            // their gas has been charged (no-op for enshrined contracts).
+            if let Some(info) = &info_to_write {
+                dest_account
+                    .write_storage_and_info(tc_ctx.host, &new_storage, info)
+                    .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
+            }
             let StorageSpace {
                 used_bytes,
                 allocated_bytes: paid_storage_size_diff,
-            } = dest_account
-                .set_storage_and_update_space(
-                    tc_ctx.host,
-                    &new_storage,
-                    lazy_storage_size_diff,
-                )
-                .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
+            } = storage_space;
 
             match execute_internal_operations(
                 tc_ctx,
@@ -1536,23 +1567,33 @@ where
         .originated_from_kt1(&contract)
         .map_err(|_| OriginationError::FailedToFetchOriginated)?;
 
-    // Charge gas for the 4 durable writes performed by `smart_contract.init`.
-    // The code and storage have their own size.
-    // And then three small counters: code size and storage size are combined for
-    // used bytes, and paid bytes.
+    // Charge gas for the durable writes `smart_contract.init` performs: the
+    // code and storage blobs (their own size), plus a single write of the
+    // aggregated `/info` accounting record, charged at the exact number of
+    // bytes written. `init` builds the record from the blob lengths without
+    // reading it back — origination always targets a fresh KT1 — so no read is
+    // charged. The charge precedes the write inside `init`.
     //
-    // A code-less origination (`script_code = None`, Tezos X alias) writes no
-    // `/data/code`, so only the storage payload is charged here.
-    let init_payload_bytes = (script_code.map_or(0, |c| c.len()) as u64)
-        .saturating_add(new_storage.len() as u64);
-    consume_storage_write_milligas(ctx.operation_gas, 1, init_payload_bytes)
+    // `init` writes the code and storage blobs as two separate durable
+    // writes (`store_write_all` each), so a code-bearing origination is
+    // billed two write bases over the combined blob payload — one base per
+    // physical write, matching the transfer path. A code-less origination
+    // (`script_code = None`, Tezos X alias) writes no `/data/code`, so only
+    // the storage blob is written and a single base is billed.
+    let code_size = script_code.map_or(0, |c| c.len()) as u64;
+    let storage_size = new_storage.len() as u64;
+    let blob_writes = if script_code.is_some() { 2 } else { 1 };
+    let init_payload_bytes = code_size.saturating_add(storage_size);
+    let info_bytes_written = OriginatedContractInfo::for_new_contract(
+        code_size,
+        storage_size,
+        lazy_storage_size_diff.clone(),
+    )
+    .encoded_len()
+    .map_err(|_| OriginationError::CantInitContract)?;
+    consume_storage_write_milligas(ctx.operation_gas, blob_writes, init_payload_bytes)
         .map_err(OriginationError::OutOfGas)?;
-    consume_storage_write_milligas(ctx.operation_gas, 2, COUNTER_SIZE)
-        .map_err(OriginationError::OutOfGas)?;
-
-    // Charge gas for the three small counter reads (code size, storage size,
-    // paid bytes) performed by `update_storage_space` inside `account.init`.
-    consume_storage_read_milligas(ctx.operation_gas, 3, COUNTER_SIZE)
+    consume_storage_write_milligas(ctx.operation_gas, 1, info_bytes_written)
         .map_err(OriginationError::OutOfGas)?;
 
     let StorageSpace {
@@ -3632,7 +3673,7 @@ mod tests {
                             balance_updates: vec![],
                             ticket_receipt: vec![],
                             originated_contracts: vec![],
-                            consumed_milligas: 1759070_u64.into(),
+                            consumed_milligas: 1158914_u64.into(),
                             storage_size: 69_u64.into(), // code (67) + unit (2)
                             paid_storage_size_diff: 0_u64.into(), // unit unchanged
                             allocated_destination_contract: false,
@@ -3903,7 +3944,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 1753261_u64.into(),
+                        consumed_milligas: 1153093_u64.into(),
                         storage_size: 44_u64.into(), // code (33) + "Hello world" (11)
                         paid_storage_size_diff: 4_u64.into(), // "Hello world" (11) − "initial" (7)
                         allocated_destination_contract: false,
@@ -4102,7 +4143,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 1753261_u64.into(),
+                        consumed_milligas: 1153093_u64.into(),
                         storage_size: 44_u64.into(), // code (33) + "Hello world" (11)
                         paid_storage_size_diff: 4_u64.into(), // "Hello world" (11) − "initial" (7)
                         allocated_destination_contract: false,
@@ -5158,7 +5199,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_kt1.clone(),
                     }],
-                    consumed_milligas: 2_952_559_u64.into(),
+                    consumed_milligas: 2_352_383_u64.into(),
                     storage_size: 38u64.into(),
                     paid_storage_size_diff: 38u64.into(),
                     lazy_storage_diff: None,
@@ -5777,7 +5818,7 @@ mod tests {
                         originated_contracts: vec![Originated {
                             contract: expected_kt1.clone(),
                         }],
-                        consumed_milligas: 2_952_559_u64.into(),
+                        consumed_milligas: 2_352_383_u64.into(),
                         storage_size: 38_u64.into(),
                         paid_storage_size_diff: 38_u64.into(),
                         lazy_storage_diff: None,
@@ -5972,7 +6013,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_address.clone(),
                     }],
-                    consumed_milligas: 2_902_379_u64.into(),
+                    consumed_milligas: 2_302_203_u64.into(),
                     storage_size: 30_u64.into(),
                     paid_storage_size_diff: 30_u64.into(),
                     lazy_storage_diff: None,
@@ -6180,7 +6221,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_address_3,
                     },],
-                    consumed_milligas: 2_902_391_u64.into(),
+                    consumed_milligas: 2_302_215_u64.into(),
                     storage_size: 33_u64.into(),
                     paid_storage_size_diff: 33_u64.into(),
                     lazy_storage_diff: None,
@@ -6240,7 +6281,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_address_2,
                     }],
-                    consumed_milligas: 2_902_479_u64.into(),
+                    consumed_milligas: 2_302_303_u64.into(),
                     storage_size: 30_u64.into(),
                     paid_storage_size_diff: 30_u64.into(),
                     lazy_storage_diff: None,
@@ -6459,7 +6500,7 @@ mod tests {
                             originated_contracts: vec![Originated {
                                 contract: expected_kt1_1.clone(),
                             }],
-                            consumed_milligas: 2_903_754_u64.into(),
+                            consumed_milligas: 2_303_578_u64.into(),
                             storage_size: 30.into(),
                             paid_storage_size_diff: 30.into(),
                             lazy_storage_diff: None,
@@ -6529,7 +6570,7 @@ mod tests {
                             originated_contracts: vec![Originated {
                                 contract: expected_kt1_2.clone(),
                             }],
-                            consumed_milligas: 2_903_754_u64.into(),
+                            consumed_milligas: 2_303_578_u64.into(),
                             storage_size: 30.into(),
                             paid_storage_size_diff: 30.into(),
                             lazy_storage_diff: None,
