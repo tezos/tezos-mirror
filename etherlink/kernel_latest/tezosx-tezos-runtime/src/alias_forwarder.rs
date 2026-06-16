@@ -43,6 +43,8 @@
 
 use mir::ast::micheline::Micheline;
 use mir::gas::{Gas, OutOfGas};
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezosx_interfaces::TezosXRuntimeError;
 
 /// Micheline-encoded forwarding contract code.
 ///
@@ -80,6 +82,33 @@ pub fn forwarder_storage(
     Micheline::from(native_evm_address).encode(gas)
 }
 
+/// Seed the shared alias implementation slot with the canonical forwarder code
+/// if the slot is empty, leaving an already-populated slot untouched.
+///
+/// Idempotent, so it is safe to call from both seeding points: the Michelson
+/// runtime activation (fresh networks) and the storage migration
+/// (already-deployed networks). The slot itself lives in `tezos_execution`
+/// ([`tezos_execution::account_storage::read_alias_implementation`]); this
+/// wrapper supplies the Michelson-runtime-specific forwarder code, which is why
+/// it lives next to it here rather than in the generic execution layer.
+pub fn init_alias_implementation(
+    host: &mut impl StorageV1,
+) -> Result<(), TezosXRuntimeError> {
+    use tezos_execution::account_storage::{
+        read_alias_implementation, write_alias_implementation,
+    };
+    let seeded = read_alias_implementation(host)?;
+    if seeded.is_none() {
+        let code = forwarder_code().map_err(|e| {
+            TezosXRuntimeError::Custom(format!(
+                "decoding forwarder code from hex failed: {e}"
+            ))
+        })?;
+        write_alias_implementation(host, &code)?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -108,5 +137,38 @@ mod tests {
     fn forwarder_storage_empty_address() {
         let storage = forwarder_storage("", &mut Gas::default()).unwrap().unwrap();
         assert_eq!(storage, vec![0x01, 0x00, 0x00, 0x00, 0x00]);
+    }
+
+    #[test]
+    fn alias_implementation_seed_and_roundtrip() {
+        use tezos_evm_runtime::runtime::MockKernelHost;
+        use tezos_execution::account_storage::{
+            read_alias_implementation, write_alias_implementation,
+        };
+
+        let mut host = MockKernelHost::default();
+
+        // Absent before seeding.
+        assert!(read_alias_implementation(&host).unwrap().is_none());
+
+        // Seeding installs the canonical forwarder code.
+        init_alias_implementation(&mut host).unwrap();
+        let forwarder = forwarder_code().unwrap();
+        assert_eq!(
+            read_alias_implementation(&host).unwrap(),
+            Some(forwarder.clone())
+        );
+
+        // Seeding again is a no-op: an already-populated slot is untouched.
+        write_alias_implementation(&mut host, b"already here").unwrap();
+        init_alias_implementation(&mut host).unwrap();
+        assert_eq!(
+            read_alias_implementation(&host).unwrap(),
+            Some(b"already here".to_vec())
+        );
+
+        // An explicit write overwrites: the O(1) upgrade primitive.
+        write_alias_implementation(&mut host, &forwarder).unwrap();
+        assert_eq!(read_alias_implementation(&host).unwrap(), Some(forwarder));
     }
 }

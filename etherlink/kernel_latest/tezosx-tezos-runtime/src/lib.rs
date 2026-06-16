@@ -1260,7 +1260,7 @@ impl RuntimeInterface for TezosRuntime {
         // resolution fail). Idempotent — a no-op once the slot exists (seeded
         // at runtime activation / migration). This makes "seed precedes alias"
         // hold by construction, on every network.
-        crate::account::init_alias_implementation(host)?;
+        crate::alias_forwarder::init_alias_implementation(host)?;
 
         let code = alias_forwarder::forwarder_code().map_err(|e| {
             TezosXRuntimeError::Custom(format!(
@@ -1964,7 +1964,7 @@ mod tests {
             get_origin_at(&host, &account.path().clone()).unwrap(),
             Some(Origin::Alias(_))
         ));
-        crate::account::init_alias_implementation(&mut host).unwrap();
+        crate::alias_forwarder::init_alias_implementation(&mut host).unwrap();
         match account.code(&host).unwrap() {
             tezos_execution::account_storage::Code::Code(bytes) => assert_eq!(
                 bytes,

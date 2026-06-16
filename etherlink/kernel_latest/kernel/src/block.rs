@@ -619,10 +619,12 @@ where
                 // the *next* block's Michelson state_root (its content is
                 // rooted under /tez/tez_accounts). It is identical across all
                 // replicas and idempotent.
-                tezosx_tezos_runtime::account::init_alias_implementation(safe_host.host)
-                    .map_err(|e| {
-                        anyhow::anyhow!("seeding alias implementation failed: {e}")
-                    })?;
+                tezosx_tezos_runtime::alias_forwarder::init_alias_implementation(
+                    safe_host.host,
+                )
+                .map_err(|e| {
+                    anyhow::anyhow!("seeding alias implementation failed: {e}")
+                })?;
             }
             upgrade::possible_sequencer_key_change(safe_host.host, timestamp)?;
 
