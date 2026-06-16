@@ -50,6 +50,7 @@ use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{OwnedPath, Path, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezos_tezlink::{
     block::{AppliedOperation, TezBlock},
     enc_wrappers::BlockNumber,
@@ -721,7 +722,7 @@ impl TezosXChainConfig {
         registry: &impl Registry,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + WasmHost,
+        Host: StorageV1 + WasmHost + KeySpaceLoader,
     {
         start_simulation_mode(host, registry, &self.spec_id)
     }

@@ -23,6 +23,7 @@ use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezos_storage::read_u16_le_default;
 use tezos_tezlink::operation::Operation;
 
@@ -366,7 +367,7 @@ impl DelayedInbox {
     /// Returns whether the oldest tx in the delayed inbox has timed out.
     pub fn first_has_timed_out<Host>(&mut self, host: &mut Host) -> Result<bool>
     where
-        Host: StorageV1,
+        Host: StorageV1 + KeySpaceLoader,
     {
         let now = read_last_info_per_level_timestamp(host)?;
         let timeout = storage::delayed_inbox_timeout(host)?;
@@ -498,7 +499,7 @@ mod tests {
         let tx: Transaction = dummy_transaction(0);
 
         let timestamp: Timestamp =
-            read_last_info_per_level_timestamp(&host).unwrap_or(Timestamp::from(0));
+            read_last_info_per_level_timestamp(&mut host).unwrap_or(Timestamp::from(0));
         delayed_inbox
             .save_transaction(&mut host, tx.clone().into(), timestamp, 0)
             .expect("Tx should be saved in the delayed inbox");
@@ -533,7 +534,7 @@ mod tests {
         };
 
         let timestamp =
-            read_last_info_per_level_timestamp(&host).unwrap_or(Timestamp::from(0));
+            read_last_info_per_level_timestamp(&mut host).unwrap_or(Timestamp::from(0));
         delayed_inbox
             .save_transaction(&mut host, tx.clone().into(), timestamp, 0)
             .expect("Tezos operation should be saved in the delayed inbox");
@@ -564,7 +565,7 @@ mod tests {
         };
 
         let timestamp =
-            read_last_info_per_level_timestamp(&host).unwrap_or(Timestamp::from(0));
+            read_last_info_per_level_timestamp(&mut host).unwrap_or(Timestamp::from(0));
         // Dropping is not an error: the call succeeds but nothing is stored.
         delayed_inbox
             .save_transaction(&mut host, tx.clone().into(), timestamp, 0)
@@ -593,7 +594,7 @@ mod tests {
         };
 
         let timestamp: Timestamp =
-            read_last_info_per_level_timestamp(&host).unwrap_or(Timestamp::from(0));
+            read_last_info_per_level_timestamp(&mut host).unwrap_or(Timestamp::from(0));
         let res = delayed_inbox.save_transaction(&mut host, tx.into(), timestamp, 0);
 
         assert!(res.is_err());

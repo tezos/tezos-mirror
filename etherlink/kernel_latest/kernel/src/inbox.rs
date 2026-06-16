@@ -92,7 +92,7 @@ where
         inbox_content: &mut Self::Inbox,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal + IsEvmNode;
+        Host: StorageV1 + HostReveal + IsEvmNode + KeySpaceLoader;
 
     fn handle_deposit<Host>(
         host: &mut Host,
@@ -101,7 +101,7 @@ where
         inbox_content: &mut Self::Inbox,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal + IsEvmNode;
+        Host: StorageV1 + HostReveal + IsEvmNode + KeySpaceLoader;
 
     fn handle_fa_deposit<Host>(
         host: &mut Host,
@@ -110,7 +110,7 @@ where
         inbox_content: &mut Self::Inbox,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal + IsEvmNode;
+        Host: StorageV1 + HostReveal + IsEvmNode + KeySpaceLoader;
 }
 
 impl InputHandler for ProxyInput {
@@ -206,7 +206,7 @@ impl InputHandler for SequencerInput {
         delayed_inbox: &mut Self::Inbox,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal + IsEvmNode,
+        Host: StorageV1 + HostReveal + IsEvmNode + KeySpaceLoader,
     {
         log!(Debug, "Handling input in sequencer mode: {:?}", input);
         match input {
@@ -283,7 +283,7 @@ impl InputHandler for SequencerInput {
         delayed_inbox: &mut Self::Inbox,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal + IsEvmNode,
+        Host: StorageV1 + HostReveal + IsEvmNode + KeySpaceLoader,
     {
         let previous_timestamp = read_last_info_per_level_timestamp(host)?;
         let level = read_l1_level(host)?;
@@ -299,7 +299,7 @@ impl InputHandler for SequencerInput {
         delayed_inbox: &mut Self::Inbox,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal + IsEvmNode,
+        Host: StorageV1 + HostReveal + IsEvmNode + KeySpaceLoader,
     {
         let previous_timestamp = read_last_info_per_level_timestamp(host)?;
         let level = read_l1_level(host)?;
@@ -390,7 +390,7 @@ fn handle_fa_deposit(
 
 fn force_kernel_upgrade<Host>(host: &mut Host) -> anyhow::Result<()>
 where
-    Host: StorageV1 + HostReveal + WasmHost,
+    Host: StorageV1 + HostReveal + WasmHost + KeySpaceLoader,
 {
     match upgrade::read_kernel_upgrade(host)? {
         Some(kernel_upgrade) => {
@@ -482,7 +482,7 @@ pub fn handle_input<Host, Mode>(
     inbox_content: &mut Mode::Inbox,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode + KeySpaceLoader,
     Mode: Parsable + InputHandler,
 {
     match input {
@@ -541,7 +541,7 @@ fn read_and_dispatch_input<Host, Mode>(
     chain_configuration: &TezosXChainConfig,
 ) -> anyhow::Result<ReadStatus>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode + KeySpaceLoader,
     Mode: Parsable + InputHandler,
 {
     let input: InputResult<Mode> = read_input(
@@ -591,7 +591,7 @@ pub fn read_proxy_inbox<Host>(
     chain_configuration: &TezosXChainConfig,
 ) -> Result<Option<ProxyInboxContent>, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode + KeySpaceLoader,
 {
     let mut res = ProxyInboxContent {
         transactions: vec![],

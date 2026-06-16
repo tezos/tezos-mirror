@@ -39,7 +39,7 @@ pub fn fetch_proxy_blueprints<Host>(
     chain_configuration: &TezosXChainConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode + KeySpaceLoader,
 {
     if let Some(ProxyInboxContent { transactions }) = read_proxy_inbox(
         host,
@@ -67,7 +67,7 @@ fn fetch_delayed_transactions<Host>(
     delayed_inbox: &mut DelayedInbox,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + IsEvmNode,
+    Host: StorageV1 + IsEvmNode + KeySpaceLoader,
 {
     let timestamp = read_last_info_per_level_timestamp(host)?;
     // Number and minimal timestamp for the first forced blueprint
@@ -1145,7 +1145,7 @@ mod tests {
 
         // Read back the timestamp that fetch_blueprints stored from
         // the info-per-level message.
-        let stored_ts = read_last_info_per_level_timestamp(&host)
+        let stored_ts = read_last_info_per_level_timestamp(&mut host)
             .expect("timestamp should be readable after fetch");
 
         match read_next_blueprint(&mut host, &mut conf)

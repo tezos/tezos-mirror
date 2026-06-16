@@ -43,6 +43,7 @@ use tezos_smart_rollup_host::path::{OwnedPath, Path};
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezos_tracing::trace_kernel;
 use tezosx_interfaces::Registry;
 
@@ -291,7 +292,7 @@ fn build_next_bip_from_blueprints<Host>(
     kernel_upgrade: &Option<KernelUpgrade>,
 ) -> anyhow::Result<BlueprintParsing<BlockInProgress>>
 where
-    Host: HostReveal + StorageV1 + WasmHost,
+    Host: HostReveal + StorageV1 + WasmHost + KeySpaceLoader,
 {
     log!(Debug, "Next blueprint number: {:?}", next_bip_number);
     let (blueprint, size) =
@@ -417,7 +418,7 @@ pub fn health_check<Host>(
     config: &mut Configuration,
 ) -> Result<(), anyhow::Error>
 where
-    Host: StorageV1 + WasmHost + IsEvmNode,
+    Host: StorageV1 + WasmHost + IsEvmNode + KeySpaceLoader,
 {
     if host.last_run_aborted()? {
         log!(Error, "Something went wrong during previous kernel_run");
@@ -505,7 +506,7 @@ pub fn promote_block<Host>(
     delayed_txs: Vec<TransactionHash>,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + WasmHost + IsEvmNode,
+    Host: StorageV1 + WasmHost + IsEvmNode + KeySpaceLoader,
 {
     if let BlockInProgressProvenance::Storage = block_in_progress_provenance {
         storage::delete_block_in_progress(safe_host)?;
@@ -541,7 +542,7 @@ pub fn produce<Host>(
     tracer_input: Option<TracerInput>,
 ) -> Result<ComputationResult, anyhow::Error>
 where
-    Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode,
+    Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode + KeySpaceLoader,
 {
     let da_fee_per_byte = crate::retrieve_da_fee(host)?;
 
@@ -1178,7 +1179,7 @@ mod tests {
 
     fn produce_block_with_several_valid_txs<Host>(host: &mut Host)
     where
-        Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode,
+        Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode + KeySpaceLoader,
     {
         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
         let tx_hash_1 = [1; TRANSACTION_HASH_SIZE];
@@ -2381,7 +2382,7 @@ mod tests {
 
     fn first_block<MockHost>(host: &mut MockHost) -> TezosXBlockConstants
     where
-        MockHost: StorageV1,
+        MockHost: StorageV1 + KeySpaceLoader,
     {
         let timestamp =
             read_last_info_per_level_timestamp(host).unwrap_or(Timestamp::from(0));

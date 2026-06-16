@@ -14,7 +14,9 @@
 
 use crate::error::Error;
 use crate::KT1_B58_SIZE;
+use rlp::{Decodable, Encodable};
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
+use tezos_ethereum::rlp_helpers::FromRlpBytes;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_keyspace::{Key, KeySpace};
 
@@ -28,6 +30,32 @@ pub fn read_u64_le(ks: &impl KeySpace, key: &Key) -> Result<u64, Error> {
     ks.read(key, 0, bytes.as_mut_slice())
         .ok_or(Error::Runtime(RuntimeError::PathNotFound))?;
     Ok(u64::from_le_bytes(bytes))
+}
+
+/// Return an unsigned 4 bytes value at the given `key`.
+///
+/// NB: The given bytes are interpreted in little endian order. The value
+/// must hold at least 4 bytes.
+pub fn read_u32_le(ks: &impl KeySpace, key: &Key) -> Result<u32, Error> {
+    let bytes = ks
+        .get_prefix_exact::<{ std::mem::size_of::<u32>() }>(key)
+        .ok_or(Error::Runtime(RuntimeError::PathNotFound))?;
+    Ok(u32::from_le_bytes(bytes))
+}
+
+/// Write an unsigned 4 bytes value at the given `key`.
+///
+/// NB: The value is stored in little endian order, byte-compatible with the
+/// root [`store_read_slice`](crate::store_read_slice)/`store_write` pair.
+pub fn write_u32_le(ks: &mut impl KeySpace, key: &Key, value: u32) -> Result<(), Error> {
+    ks.set(key, value.to_le_bytes()).map_err(Error::from)
+}
+
+/// Write a signed 8 bytes value at the given `key`.
+///
+/// NB: The value is stored in little endian order.
+pub fn write_i64_le(ks: &mut impl KeySpace, key: &Key, value: i64) -> Result<(), Error> {
+    ks.set(key, value.to_le_bytes()).map_err(Error::from)
 }
 
 /// Return a signed 8 bytes value at the given `key`.
@@ -47,6 +75,30 @@ pub fn read_b58_kt1(ks: &impl KeySpace, key: &Key) -> Option<ContractKt1Hash> {
     let read = ks.read(key, 0, buffer.as_mut_slice())?;
     let kt1_b58 = std::str::from_utf8(&buffer[..read]).ok()?;
     ContractKt1Hash::from_b58check(kt1_b58).ok()
+}
+
+/// Store `src` (which must be encodable) as rlp bytes at the given `key`.
+///
+/// Mirrors the root [`store_rlp`](crate::store_rlp): the same encoded bytes
+/// are written, so a value migrated to a keyspace key resolving to the same
+/// durable path round-trips unchanged.
+pub fn store_rlp<T: Encodable>(
+    src: &T,
+    ks: &mut impl KeySpace,
+    key: &Key,
+) -> Result<(), Error> {
+    ks.set(key, src.rlp_bytes()).map_err(Error::from)
+}
+
+/// Return a decodable value stored as rlp bytes at the given `key`.
+///
+/// Mirrors the root [`read_rlp`](crate::read_rlp), returning
+/// [`RuntimeError::PathNotFound`] when the key is absent.
+pub fn read_rlp<T: Decodable>(ks: &impl KeySpace, key: &Key) -> Result<T, Error> {
+    let bytes = ks
+        .get(key)
+        .ok_or(Error::Runtime(RuntimeError::PathNotFound))?;
+    FromRlpBytes::from_rlp_bytes(&bytes).map_err(Error::from)
 }
 
 #[cfg(test)]
@@ -124,5 +176,66 @@ mod tests {
         let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
         assert_eq!(read_b58_kt1(&ks, &key(b"/garbage")), None);
         assert_eq!(read_b58_kt1(&ks, &key(b"/missing")), None);
+    }
+
+    // The write helpers must land their bytes at the absolute path the
+    // relative key resolves to, so a value migrated to a keyspace writer
+    // stays readable at its historical durable location.
+
+    #[test]
+    fn write_u32_le_lands_at_absolute_path_and_round_trips() {
+        let mut host = MockKernelHost::default();
+        {
+            let mut ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+            write_u32_le(&mut ks, &key(b"/level"), 7).unwrap();
+        }
+        assert_eq!(
+            host.store_read_all(&RefPath::assert_from(b"/ks/level"))
+                .unwrap(),
+            7u32.to_le_bytes()
+        );
+        let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+        assert_eq!(read_u32_le(&ks, &key(b"/level")), Ok(7));
+    }
+
+    #[test]
+    fn write_i64_le_lands_at_absolute_path_and_round_trips() {
+        let mut host = MockKernelHost::default();
+        {
+            let mut ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+            write_i64_le(&mut ks, &key(b"/ts"), -42).unwrap();
+        }
+        assert_eq!(
+            host.store_read_all(&RefPath::assert_from(b"/ks/ts"))
+                .unwrap(),
+            (-42i64).to_le_bytes()
+        );
+        let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+        assert_eq!(read_i64_le(&ks, &key(b"/ts")), Ok(-42));
+    }
+
+    #[test]
+    fn store_rlp_byte_compatible_with_absolute_helper() {
+        // Same value, same resolved path, written through the keyspace helper
+        // vs the root `store_rlp`: the durable bytes must be identical.
+        let mut ks_host = MockKernelHost::default();
+        {
+            let mut ks = ks_host.load_or_create("/ks".parse().unwrap()).unwrap();
+            store_rlp(&1234u64, &mut ks, &key(b"/blob")).unwrap();
+        }
+        let mut raw_host = MockKernelHost::default();
+        crate::store_rlp(&1234u64, &mut raw_host, &RefPath::assert_from(b"/ks/blob"))
+            .unwrap();
+
+        assert_eq!(
+            ks_host
+                .store_read_all(&RefPath::assert_from(b"/ks/blob"))
+                .unwrap(),
+            raw_host
+                .store_read_all(&RefPath::assert_from(b"/ks/blob"))
+                .unwrap()
+        );
+        let ks = ks_host.load_or_create("/ks".parse().unwrap()).unwrap();
+        assert_eq!(read_rlp::<u64>(&ks, &key(b"/blob")), Ok(1234));
     }
 }

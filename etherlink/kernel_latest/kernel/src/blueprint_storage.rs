@@ -31,7 +31,8 @@ use tezos_smart_rollup_core::MAX_INPUT_MESSAGE_SIZE;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_storage::{read_rlp, store_read_slice, store_rlp};
+use tezos_smart_rollup_keyspace::{Key, KeySpaceLoader};
+use tezos_storage::{keyspace, read_rlp, store_read_slice, store_rlp};
 use tezos_tezlink::block::TezBlock;
 use tezos_tezlink::protocol::{Protocol, INITIAL_PROTOCOL};
 
@@ -46,8 +47,11 @@ const EVM_BLUEPRINT_NB_CHUNKS: RefPath = RefPath::assert_from(b"/nb_chunks");
 // the current one.
 const EVM_BLUEPRINT_GENERATION: RefPath = RefPath::assert_from(b"/generation");
 
+// Absolute form kept for the raw reader; the steady-state writer goes through
+// the `/base` keyspace at the relative key, resolving to this same path.
 const EVM_CURRENT_BLOCK_HEADER: RefPath =
     RefPath::assert_from(b"/base/current_block_header");
+const EVM_CURRENT_BLOCK_HEADER_KEY: Key = Key::from_static(b"/current_block_header");
 
 const TEZ_CURRENT_BLOCK_HEADER: RefPath =
     RefPath::assert_from(b"/tez/world_state/current_chain_header");
@@ -498,9 +502,15 @@ pub fn store_current_block_header<Host>(
     current_block_header: &BlockHeader<ChainHeader>,
 ) -> Result<(), Error>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
-    store_rlp(current_block_header, host, &EVM_CURRENT_BLOCK_HEADER).map_err(Error::from)
+    let mut base = crate::storage::load_base_keyspace(host)?;
+    keyspace::store_rlp(
+        current_block_header,
+        &mut base,
+        &EVM_CURRENT_BLOCK_HEADER_KEY,
+    )
+    .map_err(Error::from)
 }
 
 pub fn read_current_block_header<Host, H: Decodable>(
@@ -706,7 +716,7 @@ fn parse_and_validate_blueprint<Host>(
     block_number: U256,
 ) -> anyhow::Result<(BlueprintValidity, usize)>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     // Decode
     match rlp::decode::<BlueprintWithDelayedHashes>(bytes) {
@@ -814,7 +824,7 @@ fn read_all_chunks_and_validate<Host>(
     block_number: U256,
 ) -> anyhow::Result<(Option<Blueprint>, usize)>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     let mut chunks = vec![];
     let mut size = 0;
@@ -891,7 +901,7 @@ pub fn read_blueprint<Host>(
     previous_chain_header: &EVMBlockHeader,
 ) -> anyhow::Result<(Option<Blueprint>, usize)>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     let blueprint_path = blueprint_path(number)?;
     let exists = blueprint_exists(host, &blueprint_path)?;
@@ -934,7 +944,7 @@ pub fn read_next_blueprint<Host>(
     config: &mut Configuration,
 ) -> anyhow::Result<(Option<Blueprint>, usize)>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     let (number, previous_timestamp, block_header) =
         match read_current_block_header::<_, EVMBlockHeader>(host) {
@@ -1199,6 +1209,34 @@ mod tests {
     #[test]
     fn test_invalid_sequencer_blueprint_is_removed_with_dal() {
         test_invalid_sequencer_blueprint_is_removed(true)
+    }
+
+    // The current-block-header writer now goes through the `/base` keyspace
+    // while its reader still reads the raw absolute path: writing then reading
+    // back proves both halves resolve to the same durable location.
+    #[test]
+    fn store_current_block_header_resolves_to_absolute_path() {
+        let mut host = MockKernelHost::default();
+        let block_header = BlockHeader {
+            blueprint_header: BlueprintHeader {
+                number: 7.into(),
+                timestamp: Timestamp::from(10),
+            },
+            chain_header: ChainHeader::Eth(EVMBlockHeader {
+                hash: H256::from([42u8; 32]),
+                receipts_root: vec![23; 5],
+                transactions_root: vec![18; 5],
+            }),
+        };
+
+        store_current_block_header(&mut host, &block_header).unwrap();
+
+        // The keyspace write must land at the historical absolute path...
+        assert!(host.store_read_all(&EVM_CURRENT_BLOCK_HEADER).is_ok());
+        // ...and the raw reader must decode the same blueprint header back.
+        let read = read_current_block_header::<_, EVMBlockHeader>(&host).unwrap();
+        assert_eq!(read.blueprint_header.number, 7.into());
+        assert_eq!(read.blueprint_header.timestamp, Timestamp::from(10));
     }
 
     #[test]

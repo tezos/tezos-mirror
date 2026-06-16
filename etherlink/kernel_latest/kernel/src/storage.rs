@@ -226,14 +226,15 @@ const BACKLOG_TIMESTAMP_PATH: RefPath =
 pub const SEQUENCER_POOL_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state/sequencer_pool_address");
 
-/// Path to the last L1 level seen.
-const EVM_L1_LEVEL: RefPath = RefPath::assert_from(b"/base/l1_level");
+/// Key to the last L1 level seen, inside the `/base` keyspace. Resolves to
+/// the durable path `/base/l1_level`.
+const L1_LEVEL_KEY: Key = Key::from_static(b"/l1_level");
 
 const EVM_BURNED_FEES: RefPath = RefPath::assert_from(b"/evm/world_state/fees/burned");
 
-/// Path to the last info per level timestamp seen.
-const EVM_INFO_PER_LEVEL_TIMESTAMP: RefPath =
-    RefPath::assert_from(b"/base/info_per_level/timestamp");
+/// Key to the last info per level timestamp seen, inside the `/base`
+/// keyspace. Resolves to the durable path `/base/info_per_level/timestamp`.
+const INFO_PER_LEVEL_TIMESTAMP_KEY: Key = Key::from_static(b"/info_per_level/timestamp");
 
 pub const SIMULATION_RESULT: RefPath =
     RefPath::assert_from(b"/base/evm_simulation_result");
@@ -768,49 +769,36 @@ pub fn store_sequencer_pool_address(
     Ok(())
 }
 
-pub fn store_timestamp_path(
-    host: &mut impl StorageV1,
-    path: &OwnedPath,
-    timestamp: &Timestamp,
-) -> Result<(), Error> {
-    host.store_write(path, &timestamp.i64().to_le_bytes(), 0)?;
-    Ok(())
-}
-
 #[allow(dead_code)]
-pub fn read_l1_level(host: &mut impl StorageV1) -> Result<u32, Error> {
-    let mut buffer = [0u8; 4];
-    store_read_slice(host, &EVM_L1_LEVEL, &mut buffer, 4)?;
-    let level = u32::from_le_bytes(buffer);
-    Ok(level)
+pub fn read_l1_level(host: &mut (impl StorageV1 + KeySpaceLoader)) -> Result<u32, Error> {
+    let base = load_base_keyspace(host)?;
+    Ok(keyspace::read_u32_le(&base, &L1_LEVEL_KEY)?)
 }
 
-pub fn store_l1_level(host: &mut impl StorageV1, level: u32) -> Result<(), Error> {
-    host.store_write(&EVM_L1_LEVEL, &level.to_le_bytes(), 0)?;
+pub fn store_l1_level(
+    host: &mut (impl StorageV1 + KeySpaceLoader),
+    level: u32,
+) -> Result<(), Error> {
+    let mut base = load_base_keyspace(host)?;
+    keyspace::write_u32_le(&mut base, &L1_LEVEL_KEY, level)?;
     Ok(())
 }
 
 pub fn store_last_info_per_level_timestamp(
-    host: &mut impl StorageV1,
+    host: &mut (impl StorageV1 + KeySpaceLoader),
     timestamp: Timestamp,
 ) -> Result<(), Error> {
-    store_timestamp_path(host, &EVM_INFO_PER_LEVEL_TIMESTAMP.into(), &timestamp)
-}
-
-pub fn read_timestamp_path(
-    host: &impl StorageV1,
-    path: &OwnedPath,
-) -> Result<Timestamp, Error> {
-    let mut buffer = [0u8; 8];
-    store_read_slice(host, path, &mut buffer, 8)?;
-    let timestamp_as_i64 = i64::from_le_bytes(buffer);
-    Ok(timestamp_as_i64.into())
+    let mut base = load_base_keyspace(host)?;
+    keyspace::write_i64_le(&mut base, &INFO_PER_LEVEL_TIMESTAMP_KEY, timestamp.i64())?;
+    Ok(())
 }
 
 pub fn read_last_info_per_level_timestamp(
-    host: &impl StorageV1,
+    host: &mut (impl StorageV1 + KeySpaceLoader),
 ) -> Result<Timestamp, Error> {
-    read_timestamp_path(host, &EVM_INFO_PER_LEVEL_TIMESTAMP.into())
+    let base = load_base_keyspace(host)?;
+    let timestamp = keyspace::read_i64_le(&base, &INFO_PER_LEVEL_TIMESTAMP_KEY)?;
+    Ok(timestamp.into())
 }
 
 pub fn read_admin(base: &impl KeySpace) -> Option<ContractKt1Hash> {
@@ -1354,6 +1342,37 @@ mod tests {
         assert!(super::read_dal_publishers_whitelist(&base)
             .unwrap()
             .is_empty());
+    }
+
+    // The steady-state scalars now go through the `/base` keyspace on both
+    // sides. This round-trip proves keyspace writer and reader agree and that
+    // the value still lands at the historical absolute path.
+    #[test]
+    fn base_keyspace_scalar_writers_resolve_to_absolute_paths() {
+        use tezos_smart_rollup_encoding::timestamp::Timestamp;
+
+        let mut host = MockKernelHost::default();
+
+        super::store_l1_level(&mut host, 99).unwrap();
+        assert_eq!(super::read_l1_level(&mut host).unwrap(), 99);
+        // The keyspace writer must land at the historical absolute path.
+        assert_eq!(
+            host.store_read_all(&RefPath::assert_from(b"/base/l1_level"))
+                .unwrap(),
+            99u32.to_le_bytes()
+        );
+
+        super::store_last_info_per_level_timestamp(&mut host, Timestamp::from(123))
+            .unwrap();
+        assert_eq!(
+            super::read_last_info_per_level_timestamp(&mut host).unwrap(),
+            Timestamp::from(123)
+        );
+        assert_eq!(
+            host.store_read_all(&RefPath::assert_from(b"/base/info_per_level/timestamp"))
+                .unwrap(),
+            123i64.to_le_bytes()
+        );
     }
 
     // The DAL writers (migration-only) now go through the `/base` keyspace,
