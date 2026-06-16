@@ -164,7 +164,10 @@ mod validate;
 /// Where an internal operation entered the current frame's tree.
 enum InternalOpOrigin {
     /// Operation directly emitted by the current frame.
-    Own,
+    Own {
+        /// Storage cost delegated to the operation.
+        delegated_storage_cost: u64,
+    },
     /// Operation surfaced by the CRAC drain mechanism.
     Crac,
 }
@@ -178,10 +181,12 @@ struct TaggedInternalOp {
 }
 
 impl TaggedInternalOp {
-    fn own(op: InternalOperationSum) -> Self {
+    fn own(op: InternalOperationSum, delegated_storage_cost: u64) -> Self {
         Self {
             op,
-            origin: InternalOpOrigin::Own,
+            origin: InternalOpOrigin::Own {
+                delegated_storage_cost,
+            },
         }
     }
 
@@ -190,6 +195,11 @@ impl TaggedInternalOp {
             op,
             origin: InternalOpOrigin::Crac,
         }
+    }
+
+    #[inline]
+    fn is_own(&self) -> bool {
+        matches!(self.origin, InternalOpOrigin::Own { .. })
     }
 }
 
@@ -278,13 +288,23 @@ where
             .iter()
             .map(|tagged_op| {
                 let mut op = tagged_op.op.clone();
-                if matches!(tagged_op.origin, InternalOpOrigin::Own) {
-                    storage_fees::burn_internal_op_storage_fees(
-                        host,
-                        payer,
-                        storage_limit_remaining,
-                        &mut op,
-                    )?;
+                match &tagged_op.origin {
+                    InternalOpOrigin::Own {
+                        delegated_storage_cost,
+                    } => {
+                        storage_fees::burn_internal_op_storage_fees(
+                            host,
+                            payer,
+                            storage_limit_remaining,
+                            &mut op,
+                        )?;
+                        storage_fees::add_delegated_storage_fee_balance_updates(
+                            payer,
+                            &mut op,
+                            *delegated_storage_cost,
+                        )?;
+                    }
+                    InternalOpOrigin::Crac => {}
                 }
                 Ok(op)
             })
@@ -303,12 +323,14 @@ where
 /// A burn-level failure demotes the parent (and every Applied
 /// internal) to `BackTracked`, with the burn errors attached to
 /// the parent.
+#[allow(clippy::too_many_arguments)]
 fn finalize_and_burn<Host, M, A>(
     host: &mut Host,
     payer: &A,
     storage_limit: &Narith,
     balance_updates: Vec<BalanceUpdate>,
     delegated_storage_cost: u64,
+    top_level_delegated_delta: u64,
     result: Result<M::Success, ApplyOperationError>,
     mut internal_operation_results: Vec<TaggedInternalOp>,
 ) -> OperationResult<M>
@@ -326,13 +348,17 @@ where
         &mut content,
         internal_operation_results,
     );
-    // TODO(L2-1520): render the dedicated balance-updates for the delegated cost.
     let burn_outcome = burn_outcome.and_then(|()| {
         storage_fees::burn_storage_cost(
             host,
             payer,
             &mut storage_limit_remaining,
             delegated_storage_cost,
+        )?;
+        storage_fees::add_delegated_storage_fee_balance_updates_to_content(
+            payer,
+            &mut content,
+            top_level_delegated_delta,
         )
     });
     if let Err(errors) = burn_outcome {
@@ -600,7 +626,7 @@ where
         let failed_crac_receipts_before = journal.michelson.failed_crac_receipts.len();
         let backtracked_crac_receipts_before =
             journal.michelson.backtracked_crac_receipts.len();
-        let internal_receipt = match operation {
+        let (internal_receipt, delegated_storage_cost_delta) = match operation {
             mir::ast::Operation::TransferTokens(TransferTokens {
                 param,
                 destination_address,
@@ -626,12 +652,15 @@ where
                     },
                 };
                 if failed.is_some() {
-                    InternalOperationSum::Transfer(InternalContentWithMetadata {
-                        content,
-                        sender: sender_account.contract(),
-                        nonce,
-                        result: ContentResult::Skipped,
-                    })
+                    (
+                        InternalOperationSum::Transfer(InternalContentWithMetadata {
+                            content,
+                            sender: sender_account.contract(),
+                            nonce,
+                            result: ContentResult::Skipped,
+                        }),
+                        0,
+                    )
                 } else {
                     let receipt = transfer(
                         tc_ctx,
@@ -648,38 +677,44 @@ where
                         false,
                         nonce_counter,
                     );
-                    InternalOperationSum::Transfer(InternalContentWithMetadata {
-                        content,
-                        sender: sender_account.contract(),
-                        nonce,
-                        result: match receipt {
-                            Ok(success) => {
-                                let sub_ops_succeeded = all_internal_receipts
-                                    .get(receipts_before..)
-                                    .and_then(|s| s.last())
-                                    .is_none_or(|t| t.op.is_applied());
-                                if sub_ops_succeeded {
-                                    ContentResult::Applied(success.into())
-                                } else {
-                                    failed = Some(index);
-                                    ContentResult::BackTracked(BacktrackedResult {
-                                        errors: None,
-                                        result: success.into(),
-                                    })
+                    let delegated_storage_cost_delta = match &receipt {
+                        Ok((_, delta)) => *delta,
+                        Err(_) => 0,
+                    };
+                    let internal_op =
+                        InternalOperationSum::Transfer(InternalContentWithMetadata {
+                            content,
+                            sender: sender_account.contract(),
+                            nonce,
+                            result: match receipt {
+                                Ok((success, _)) => {
+                                    let sub_ops_succeeded = all_internal_receipts
+                                        .get(receipts_before..)
+                                        .and_then(|s| s.last())
+                                        .is_none_or(|t| t.op.is_applied());
+                                    if sub_ops_succeeded {
+                                        ContentResult::Applied(success.into())
+                                    } else {
+                                        failed = Some(index);
+                                        ContentResult::BackTracked(BacktrackedResult {
+                                            errors: None,
+                                            result: success.into(),
+                                        })
+                                    }
                                 }
-                            }
-                            Err(CracError::BlockAbort(msg)) => {
-                                return Err(ApplyOperationError::BlockAbort(msg));
-                            }
-                            Err(CracError::Operation(err)) => {
-                                failed = Some(index);
-                                log!(Error, "Internal transfer failed: {err:?}");
-                                ContentResult::Failed(
-                                    ApplyOperationError::from(err).into(),
-                                )
-                            }
-                        },
-                    })
+                                Err(CracError::BlockAbort(msg)) => {
+                                    return Err(ApplyOperationError::BlockAbort(msg));
+                                }
+                                Err(CracError::Operation(err)) => {
+                                    failed = Some(index);
+                                    log!(Error, "Internal transfer failed: {err:?}");
+                                    ContentResult::Failed(
+                                        ApplyOperationError::from(err).into(),
+                                    )
+                                }
+                            },
+                        });
+                    (internal_op, delegated_storage_cost_delta)
                 }
             }
             mir::ast::Operation::CreateContract(mir::ast::CreateContract {
@@ -705,16 +740,19 @@ where
                         .map_err(encode_err)?,
                 };
                 if failed.is_some() {
-                    InternalOperationSum::Origination(InternalContentWithMetadata {
-                        content: OriginationContent {
-                            balance: amount,
-                            delegate,
-                            script,
-                        },
-                        sender: sender_account.contract(),
-                        nonce,
-                        result: ContentResult::Skipped,
-                    })
+                    (
+                        InternalOperationSum::Origination(InternalContentWithMetadata {
+                            content: OriginationContent {
+                                balance: amount,
+                                delegate,
+                                script,
+                            },
+                            sender: sender_account.contract(),
+                            nonce,
+                            result: ContentResult::Skipped,
+                        }),
+                        0,
+                    )
                 } else {
                     let receipt = originate_contract(
                         tc_ctx,
@@ -725,25 +763,28 @@ where
                         storage,
                         &Origin::Native,
                     );
-                    InternalOperationSum::Origination(InternalContentWithMetadata {
-                        content: OriginationContent {
-                            balance: amount,
-                            delegate,
-                            script,
-                        },
-                        sender: sender_account.contract(),
-                        nonce,
-                        result: match receipt {
-                            Ok(success) => ContentResult::Applied(success),
-                            Err(err) => {
-                                failed = Some(index);
-                                log!(Error, "Internal origination failed: {err:?}");
-                                ContentResult::Failed(
-                                    ApplyOperationError::from(err).into(),
-                                )
-                            }
-                        },
-                    })
+                    (
+                        InternalOperationSum::Origination(InternalContentWithMetadata {
+                            content: OriginationContent {
+                                balance: amount,
+                                delegate,
+                                script,
+                            },
+                            sender: sender_account.contract(),
+                            nonce,
+                            result: match receipt {
+                                Ok(success) => ContentResult::Applied(success),
+                                Err(err) => {
+                                    failed = Some(index);
+                                    log!(Error, "Internal origination failed: {err:?}");
+                                    ContentResult::Failed(
+                                        ApplyOperationError::from(err).into(),
+                                    )
+                                }
+                            },
+                        }),
+                        0,
+                    )
                 }
             }
             mir::ast::Operation::SetDelegate(set_delegate) => {
@@ -793,12 +834,15 @@ where
                         .map_err(TransferError::OutOfGas)?;
                     ContentResult::Applied(EventSuccess { consumed_milligas })
                 };
-                InternalOperationSum::Event(InternalContentWithMetadata {
-                    content: EventContent { tag, payload, ty },
-                    sender: sender_account.contract(),
-                    nonce,
-                    result,
-                })
+                (
+                    InternalOperationSum::Event(InternalContentWithMetadata {
+                        content: EventContent { tag, payload, ty },
+                        sender: sender_account.contract(),
+                        nonce,
+                        result,
+                    }),
+                    0,
+                )
             }
         };
         log!(Debug, "Internal operation executed successfully");
@@ -807,8 +851,10 @@ where
         // `receipts_before` was captured before `transfer()` added the
         // child receipts, so inserting at that index puts the parent
         // receipt in the correct position.
-        all_internal_receipts
-            .insert(receipts_before, TaggedInternalOp::own(internal_receipt));
+        all_internal_receipts.insert(
+            receipts_before,
+            TaggedInternalOp::own(internal_receipt, delegated_storage_cost_delta),
+        );
         // Drain any re-entrant CRAC ops that accumulated during this
         // operation's execution (e.g. a gateway call that re-entered
         // Michelson).  Placing the drain here — right after the gateway
@@ -845,7 +891,7 @@ fn transfer<'a, Host, C: Context>(
     all_internal_receipts: &mut Vec<TaggedInternalOp>,
     skip_sender_debit: bool,
     nonce_counter: &mut u16,
-) -> Result<TransferSuccess, CracError>
+) -> Result<(TransferSuccess, u64), CracError>
 where
     Host: StorageV1,
 {
@@ -880,14 +926,17 @@ where
             } else {
                 transfer_tez(tc_ctx.host, sender_account, amount, &dest_account)?
             };
-            Ok(TransferSuccess {
-                allocated_destination_contract: !already_allocated,
-                consumed_milligas: tc_ctx
-                    .operation_gas
-                    .get_and_reset_milligas_consumed()
-                    .map_err(TransferError::OutOfGas)?,
-                ..receipt
-            })
+            Ok((
+                TransferSuccess {
+                    allocated_destination_contract: !already_allocated,
+                    consumed_milligas: tc_ctx
+                        .operation_gas
+                        .get_and_reset_milligas_consumed()
+                        .map_err(TransferError::OutOfGas)?,
+                    ..receipt
+                },
+                0,
+            ))
         }
         Contract::Originated(kt1) => {
             let dest_account = tc_ctx
@@ -940,6 +989,7 @@ where
             let exec_ctx =
                 ExecCtx::create(tc_ctx.host, sender_account, &dest_account, amount)?;
 
+            let delegated_storage_cost_before = operation_ctx.delegated_storage_cost;
             let (internal_operations, new_storage): (Vec<OperationInfo<'a>>, Vec<u8>) = {
                 let mut ctx = Ctx {
                     tc_ctx: &mut *tc_ctx,
@@ -965,6 +1015,8 @@ where
                 drop(ctx);
                 result
             };
+            let delegated_storage_cost =
+                operation_ctx.delegated_storage_cost - delegated_storage_cost_before;
 
             // `interpret_context` holds this operation's lazy-storage size
             // delta, accumulated by the `LazyStorage` hooks during execution.
@@ -1075,18 +1127,21 @@ where
                 }
             }
             log!(Debug, "Transfer operation succeeded");
-            Ok(TransferSuccess {
-                storage: if new_storage.is_empty() {
-                    None
-                } else {
-                    Some(new_storage.into())
+            Ok((
+                TransferSuccess {
+                    storage: if new_storage.is_empty() {
+                        None
+                    } else {
+                        Some(new_storage.into())
+                    },
+                    lazy_storage_diff,
+                    consumed_milligas,
+                    storage_size: used_bytes,
+                    paid_storage_size_diff,
+                    ..receipt
                 },
-                lazy_storage_diff,
-                consumed_milligas,
-                storage_size: used_bytes,
-                paid_storage_size_diff,
-                ..receipt
-            })
+                delegated_storage_cost,
+            ))
         }
     }
 }
@@ -1283,7 +1338,7 @@ fn transfer_external<'a, Host, C: Context>(
     all_internal_receipts: &mut Vec<TaggedInternalOp>,
     parser: &'a Parser<'a>,
     nonce_counter: &mut u16,
-) -> Result<TransferTarget, CracError>
+) -> Result<(TransferTarget, u64), CracError>
 where
     Host: StorageV1,
 {
@@ -1311,7 +1366,7 @@ where
         false, // external operations always debit the sender
         nonce_counter,
     )
-    .map(Into::into)
+    .map(|(success, delegated)| (success.into(), delegated))
 }
 
 fn gw<E: ToString>(e: E) -> TransferError {
@@ -1407,7 +1462,7 @@ where
         true, // skip_sender_debit: the calling runtime already debited the sender
         nonce_counter,
     ) {
-        Ok(success) => {
+        Ok((success, _)) => {
             // transfer() returns Ok even when internal operations FAILWITH,
             // because execute_internal_operations records failures only in
             // receipts. We must inspect the receipts to detect this case,
@@ -1427,7 +1482,7 @@ where
                     storage_fees::compute_storage_fees::<TransferContent>(&target)?;
                 let own_storage_cost: BigUint = internal_receipts
                     .iter()
-                    .filter(|t| matches!(t.origin, InternalOpOrigin::Own))
+                    .filter(|t| t.is_own())
                     .try_fold(own_storage_cost, |acc, t| {
                         let fee = storage_fees::compute_internal_op_storage_fees(&t.op)?;
                         Ok::<BigUint, TransferError>(acc + fee)
@@ -2094,6 +2149,7 @@ where
                 storage_limit,
                 balance_updates,
                 0,
+                0,
                 reveal_result.map_err(Into::into),
                 internal_operations_receipts,
             ))
@@ -2130,7 +2186,7 @@ where
                 journal.michelson.failed_crac_receipts.len();
             let backtracked_crac_receipts_before =
                 journal.michelson.backtracked_crac_receipts.len();
-            let transfer_result = transfer_external(
+            let (transfer_result, top_level_delegated_delta) = match transfer_external(
                 &mut tc_ctx,
                 &mut operation_ctx,
                 registry,
@@ -2141,7 +2197,10 @@ where
                 &mut internal_operations_receipts,
                 &parser,
                 nonce_counter,
-            );
+            ) {
+                Ok((target, delta)) => (Ok(target), delta),
+                Err(e) => (Err(e), 0),
+            };
             // Drain any re-entrant CRAC ops that accumulated during the
             // top-level gateway call, mirroring `execute_internal_operations`.
             let reentrant_ops = crate::enshrined_contracts::drain_reentrant_crac_ops(
@@ -2172,6 +2231,7 @@ where
                 storage_limit,
                 balance_updates,
                 operation_ctx.delegated_storage_cost,
+                top_level_delegated_delta,
                 transfer_result.map_err(Into::into),
                 internal_operations_receipts,
             ))
@@ -2203,6 +2263,7 @@ where
                     source_account,
                     storage_limit,
                     balance_updates,
+                    0,
                     0,
                     origination_result.map_err(|e| e.into()),
                     internal_operations_receipts,
@@ -9377,7 +9438,7 @@ mod tests {
             &payer,
             &mut storage_limit_remaining,
             &mut content,
-            vec![TaggedInternalOp::own(internal)],
+            vec![TaggedInternalOp::own(internal, 0)],
         );
         assert_eq!(outcome, Err(ApplyOperationError::OperationQuotaExceeded));
 
@@ -9408,8 +9469,8 @@ mod tests {
         let pkh = PublicKeyHash::from_b58check(PAYER_PKH).unwrap();
         let payer = init_account(&mut host, &pkh, 10_000_000);
         let make_internal = || {
-            TaggedInternalOp::own(InternalOperationSum::Transfer(
-                InternalContentWithMetadata {
+            TaggedInternalOp::own(
+                InternalOperationSum::Transfer(InternalContentWithMetadata {
                     sender: payer.contract(),
                     nonce: 0,
                     content: TransferContent {
@@ -9423,8 +9484,9 @@ mod tests {
                             ..Default::default()
                         },
                     )),
-                },
-            ))
+                }),
+                0,
+            )
         };
         let mut content: ContentResult<TransferContent> =
             ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess::default()));
@@ -9503,7 +9565,7 @@ mod tests {
             })),
         });
         let tagged = vec![
-            TaggedInternalOp::own(own_op),
+            TaggedInternalOp::own(own_op, 0),
             TaggedInternalOp::from_crac(crac_op),
         ];
         let mut content: ContentResult<TransferContent> =
