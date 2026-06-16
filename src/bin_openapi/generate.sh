@@ -19,9 +19,12 @@ smart_rollup_node=./octez-smart-rollup-node
 dal_node=./octez-dal-node
 
 # Protocol configuration.
-protocol_hash=ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-protocol_parameters=src/proto_alpha/parameters/sandbox-parameters.json
+protocol_dir=src/proto_alpha
+protocol_parameters=$protocol_dir/parameters/sandbox-parameters.json
 protocol_name=alpha
+
+# Read the protocol hash from the protocol sources
+protocol_hash=$(jq -r .hash "${protocol_dir}/lib_protocol/TEZOS_PROTOCOL")
 
 # Secret key to activate the protocol.
 activator_secret_key="unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
@@ -70,7 +73,7 @@ sleep 3
 # Activate the protocol.
 mkdir $client_dir
 $tezos_client --base-dir $client_dir --endpoint http://localhost:$rpc_port --block genesis activate protocol \
-  $protocol_hash with fitness 1 and key $activator_secret_key and parameters $protocol_parameters
+  "$protocol_hash" with fitness 1 and key $activator_secret_key and parameters $protocol_parameters
 # Wait a bit again...
 sleep 1
 
@@ -128,7 +131,7 @@ dune exec src/bin_openapi/rpc_openapi.exe -- \
 echo "Generated OpenAPI specification: $dal_node_openapi_json"
 
 # Gernerate openapi file for rollup node
-$smart_rollup_node generate openapi -P $protocol_hash > $smart_rollup_node_openapi_json
+$smart_rollup_node generate openapi -P "$protocol_hash" > $smart_rollup_node_openapi_json
 echo "Generated OpenAPI specification: $smart_rollup_node_openapi_json"
 
 echo "You can now clean up with: rm -rf $tmp"
