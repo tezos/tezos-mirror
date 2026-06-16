@@ -274,7 +274,9 @@ impl<'a> ContractScript<'a> {
             ctx,
             parameter_allow_forged_lazy_storage_id,
         )?;
-        let mut storage = self.typecheck_storage(ctx, storage_in)?;
+        // The contract's own committed storage may reference big_maps it owns.
+        let mut storage =
+            self.typecheck_storage(ctx, storage_in, AllowForgedLazyStorageId::Yes)?;
         let mut started_with_map_ids = vec![];
         storage.view_big_map_ids(&mut started_with_map_ids);
 
@@ -425,6 +427,11 @@ impl<'a> ContractScript<'a> {
     ///
     /// * `ctx` - The context in which the typechecking is performed.
     /// * `storage` - The storage value to be typechecked.
+    /// * `allow_forged_lazy_storage_id` - Whether a forged lazy-storage id
+    ///   (a bare `big_map` id) is accepted. Use [AllowForgedLazyStorageId::Yes]
+    ///   for a contract's own committed storage and [AllowForgedLazyStorageId::No]
+    ///   for user-supplied origination storage (mirrors L1's
+    ///   `allow_forged_lazy_storage_id_in_storage`).
     ///
     /// # Returns
     ///
@@ -433,8 +440,14 @@ impl<'a> ContractScript<'a> {
         &self,
         ctx: &mut impl TypecheckingCtx<'a>,
         storage: &Micheline<'a>,
+        allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
     ) -> Result<TypedValue<'a>, TcError> {
-        self.typecheck_storage_with_views(ctx, storage, TypecheckViews::Disabled)
+        self.typecheck_storage_with_views(
+            ctx,
+            storage,
+            TypecheckViews::Disabled,
+            allow_forged_lazy_storage_id,
+        )
     }
 
     /// [Self::typecheck_storage] threading `typecheck_views`: validates a
@@ -444,15 +457,14 @@ impl<'a> ContractScript<'a> {
         ctx: &mut impl TypecheckingCtx<'a>,
         storage: &Micheline<'a>,
         typecheck_views: TypecheckViews,
+        allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
     ) -> Result<TypedValue<'a>, TcError> {
-        // This is the contract's own committed storage, which may legitimately
-        // reference the big_maps it owns by id.
         crate::typechecker::typecheck_value_with_views(
             storage,
             ctx,
             &self.storage,
             typecheck_views,
-            AllowForgedLazyStorageId::Yes,
+            allow_forged_lazy_storage_id,
         )
     }
 }

@@ -205,6 +205,14 @@
   contract's `big_map` by forging its id; such a parameter now fails to
   typecheck. Forged ids remain allowed for a contract's own committed
   storage and for internal-call parameters. (!22207)
+- **Security fix:** reject forged lazy-storage ids in the initial storage
+  of an external origination, mirroring L1's
+  `allow_forged_lazy_storage_id_in_storage`. Previously a contract could
+  be originated with a `big_map` it does not own (a forged id), gaining
+  read/write access to another contract's `big_map`; such an origination
+  now fails to typecheck. Internal `CREATE_CONTRACT` originations are
+  unaffected — their storage is already typechecked by the emitting
+  contract and may legitimately carry the big_maps it owns. (!22208)
 - Removed the legacy `%default` (simple transfer, `string`) entrypoint
   from the gateway contract. Use the generic `%call` entrypoint instead:
   a POST to `http://ethereum/<address>` with an empty body and the
