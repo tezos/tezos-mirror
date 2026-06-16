@@ -1729,6 +1729,73 @@ pub mod tests {
         );
     }
 
+    /// Regression for the `total_bytes` double-decrement bug (audit M2).
+    ///
+    /// On a big_map allocated before the `total_bytes` counter existed (counter
+    /// absent from storage, i.e. the migration target), the first key removal in
+    /// `big_map_update` reads `total_bytes()` AFTER `remove_key` has already
+    /// shrunk the `/keys` list. The lazy reconstruction
+    /// (`init_total_bytes_from_existing`) therefore already excludes the removed
+    /// entry, and the subsequent `-(65 + previous_value_size)` subtracts it a
+    /// second time. The persisted counter ends up too small (negative for the
+    /// last-key case).
+    ///
+    /// This test FAILS on the buggy code and passes once `total_bytes()` is read
+    /// before `/keys` is mutated.
+    #[test]
+    fn pre_counter_bigmap_delete_double_decrements_total_bytes() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(storage, &mut host, &context);
+
+        // 1. Allocate a big_map with a single entry. The Some-branch of
+        //    big_map_update writes the total_bytes counter alongside the key.
+        let map_id = storage
+            .big_map_new(&Type::Int, &Type::String, false)
+            .unwrap();
+        storage
+            .big_map_update(
+                &map_id,
+                TypedValue::int(1),
+                Some(TypedValue::String("a".into())),
+            )
+            .unwrap();
+
+        let counter_after_insert =
+            total_bytes(storage.host, storage.context, &map_id).unwrap();
+        assert!(
+            counter_after_insert.0 > BigInt::from(0),
+            "sanity: counter must be positive after one insert, got {counter_after_insert:?}"
+        );
+
+        // 2. Model a PRE-COUNTER big_map (the migration target): drop the
+        //    total_bytes counter while keeping the key in /keys and the value in
+        //    Contents. This is exactly the state a kernel predating the counter
+        //    leaves behind.
+        let tb_path = total_bytes_path(storage.context, &map_id).unwrap();
+        storage.host.store_delete(&tb_path).unwrap();
+        assert!(
+            storage.host.store_has(&tb_path).unwrap().is_none(),
+            "counter should be absent to model a pre-counter big_map"
+        );
+
+        // 3. Remove the only key.
+        storage
+            .big_map_update(&map_id, TypedValue::int(1), None)
+            .unwrap();
+
+        // 4. The big_map is now empty, so its total_bytes counter MUST be 0.
+        //    The buggy code persists -(65 + size("a")) instead.
+        let counter_after_delete =
+            total_bytes(storage.host, storage.context, &map_id).unwrap();
+        assert_eq!(
+            counter_after_delete.0,
+            BigInt::from(0),
+            "total_bytes must be 0 after removing the last key of a pre-counter \
+             big_map; a negative value reveals the double-decrement (audit M2)"
+        );
+    }
+
     #[test]
     fn test_remove_big_map() {
         // Setup the context and big_map for the test
