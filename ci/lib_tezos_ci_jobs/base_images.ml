@@ -188,423 +188,485 @@ end
    See https://gitlab.com/tezos/tezos/-/work_items/8205 *)
 let enable_rpm_images = false
 
-(* [start_job] used to add dependency to [trigger] in [before_merging] pipelines.
+(* This function can build docker images both in an emulated environment using
+   qemu or natively. The advantage of choosing emulated vs native depends on
+   the build time associated with the image. Small images are more efficiently
+   built in an emulated environment, while larger images are better build
+   natively.
 
-   [changeset] should be set to [true] for [before_merging]/[merge_train] parent pipelines only.
-   Changesets should be ignored for other pipelines:
-   - branch pipelines such as [base_images.daily] because they are then ignored by GitLab
-   - in the manually triggered base images child pipeline as we may want to trigger all base images jobs.
- *)
+   [name] is the name of the job.
+
+   [matrix] is a parallel/matrix gitlab construct. Here we use it with the
+   RELEASE variable to build multiple images for the same distribution, but
+   different releases. This parameter is optional: Some images do no need this.
+
+   [image_name] is the name of the final docker image.
+
+   [base_name] is the name of the image upon the newly created image is FROM.
+   It can be either the upstream image, or an image generated in this pipeline.
+
+   [compilation] determines the type of the image.
+   If [compilation] parameter is either set to [Emulated] or omitted then we
+   build for two different architectures using qemu. This handles both build
+   and merging the manifest of the images.
+
+   If [compilation] is either [ Amd64_only ] or [ Arm64_only ] we build the
+   images natively, but the arm64 image is going to be suffixed with "-arm64".
+
+   If [compilation] is set to [Native] we build for both architectures using
+   a native runner. In this case we also must add a merge manifest job.
+
+   [start_job] adds a dependency to [trigger] in [before_merging] pipelines.
+   [changeset] should be [true] for [before_merging]/[merge_train] only. *)
+let make_job_base_images ?start_job ?(changeset = false) ~__POS__ ?(matrix = [])
+    ~image_name ?(base_name = Upstream image_name)
+    ?(changes = Changeset.make []) ?(compilation = Emulated) ?(variables = [])
+    ?dependencies dockerfile =
+  let script = Printf.sprintf "scripts/ci/build-base-images.sh %s" dockerfile in
+  (* if provided, add [start_job] to the dependencies. *)
+  let dependencies =
+    match start_job with
+    | None -> dependencies
+    | Some job -> (
+        match dependencies with
+        | None -> Some (Dependent [Job job])
+        | Some (Dependent lst) -> Some (Dependent (Job job :: lst))
+        | Some (Staged _) ->
+            failwith
+              "Only job dependencies in base_image jobs. Stage dependencies \
+               are not allowed.")
+  in
+  (* cf. [scripts/ci/build-base-images.sh] for more details on the coupling between $PLATFORM and $TAGS *)
+  let platform, tags =
+    match compilation with
+    | Amd64_only -> ("linux/amd64", [])
+    | Arm64_only -> ("", [("TAGS", [Runner.Tag.show Gcp_arm64])])
+    | Emulated -> ("linux/amd64,linux/arm64", []) (* default *)
+    | Native ->
+        ( "",
+          [
+            ( "TAGS",
+              [Runner.Tag.show Gcp_very_high_cpu; Runner.Tag.show Gcp_arm64] );
+          ] )
+  in
+  let emulated = tags = [] in
+  let variables =
+    [
+      ("DISTRIBUTION", image_name);
+      (* if the base name is passed explicitely, then we assume is a
+         fully qualified image, otherwise we add the release component
+         to the image name *)
+      ( "IMAGE_PATH",
+        match base_name with
+        | Upstream name -> Format.asprintf "%s:$RELEASE" name
+        | Pipeline_dep name -> base_dep_img_name name );
+      ("PLATFORM", platform);
+    ]
+    @ variables
+  in
+  job_docker_authenticated
+    ~__POS__
+    ~name:("images." ^ image_name)
+    ~stage:Stages.build
+    ~variables
+    ~rules:
+      (if changeset then
+         [job_rule ~changes:(Changeset.encode changes) ~when_:On_success ()]
+       (* To force the run of the job. A bit hackish but simpler
+          than to have no rule and consistent with what is done in
+          [code_verification]. Will be done cleanly when migrated to
+          Cacio. *)
+         else [job_rule ~when_:On_success ()])
+    ~parallel:(Matrix [matrix @ tags])
+    ~tag:(if emulated then Gcp_very_high_cpu else Dynamic)
+    ?dependencies
+    [script]
+
+(* Specialisation of [make_job_base_images] for distribution images.
+   - [base_name] used only for Rockylinux.
+   - if [changes] is not provided, we use the base changeset of the
+   distribution. This applies to base images that are not a
+   dependency of other images.  *)
+let make_job_base_image_distribution ?start_job ?(changeset = false) ?base_name
+    ?changes distro =
+  make_job_base_images
+    ?start_job
+    ~changeset
+    ~__POS__
+    ~matrix:(Distribution.release_matrix distro)
+    ~image_name:(Distribution.name distro)
+    ?base_name
+    ~changes:
+      (* except for Debian, job changeset is the [Distribution.base_changeset] *)
+      (match changes with
+      | None -> Changeset.make @@ Distribution.base_changeset distro
+      | Some changes -> changes)
+    (Distribution.dockerfile distro)
+
+(* ── Base distribution jobs ─────────────────────────────────────────────── *)
+
+let make_job_debian_based_images ?start_job ?(changeset = false) () =
+  let changes =
+    (* we need the [debian] base job if we have jobs of
+       images based on top of it *)
+    Changeset.make
+      (Files.debian_base @ Files.debian_homebrew @ Files.debian_rust_build
+     @ Files.merge_script @ Files.debian_build @ Files.merge_script
+     @ Files.debian_systemd @ Files.debian_jsonnet @ Files.rust_sdk_bindings)
+  in
+  make_job_base_image_distribution
+    ?start_job
+    ~changeset
+    ~changes
+    Distribution.Debian
+
+let make_job_ubuntu_based_images ?start_job ?(changeset = false) () =
+  let changes =
+    Changeset.make
+      (Files.debian_base @ Files.debian_build @ Files.merge_script
+     @ Files.debian_systemd)
+  in
+  make_job_base_image_distribution
+    ?start_job
+    ~changeset
+    ~changes
+    Distribution.Ubuntu
+
+let make_job_fedora_based_images ?start_job ?(changeset = false) () =
+  make_job_base_image_distribution ?start_job ~changeset Distribution.Fedora
+
+let make_job_rockylinux_based_images ?start_job ?(changeset = false) () =
+  make_job_base_image_distribution
+    ?start_job
+    ~changeset
+    ~base_name:(Upstream "rockylinux/rockylinux")
+    Distribution.Rockylinux
+
+(* ── Standalone jobs (no job dependencies within this file) ─────────────── *)
+
+let make_job_ci_release_based_images ?start_job ?(changeset = false) () =
+  make_job_base_images
+    ?start_job
+    ~changeset
+    ~__POS__
+    ~image_name:"ci-release"
+    ~base_name:(Upstream "debian")
+    ~matrix:[("RELEASE", ["trixie"])]
+    ~compilation:Amd64_only
+    ~changes:(Changeset.make Files.(ci_releases @ debian_base))
+    "images/base-images/Dockerfile.debian-release"
+
+(* This base image differs from the others in its build process: it is
+   bootstrapped directly from the upstream Docker Hub [docker:<version>]
+   image (declared in {!Images_external.upstream_docker}) rather than from
+   another internal base image (e.g. [debian:<release>]).
+   The resulting image includes the Docker daemon, gcloud CLI, hadolint
+   and regctl — it is the standard Docker-in-Docker image for CI jobs.
+   The changeset is also different to ensure this image is always up-to-date *)
+let make_job_docker_ci_based_images ?start_job ?(changeset = false) () =
+  let docker_version = Images.Base_images.docker_version in
+  let variables =
+    [
+      ("RELEASE", docker_version);
+      ("DISTRIBUTION", "alpine-docker-ci");
+      ("IMAGE_PATH", "");
+      ("GCLOUD_VERSION", "543.0.0");
+      ("HADOLINT_VERSION", "2.10.0");
+      ("DOCKER_VERSION", docker_version);
+      ("REGCTL_VERSION", "v0.4.3");
+      ("PLATFORM", "linux/amd64,linux/arm64");
+      ("CI_DOCKER_HUB", "false");
+    ]
+  in
+  job
+    ~rules:
+      (if changeset then
+         [
+           job_rule
+             ~changes:Changeset.(encode (make Files.alpine_docker_ci))
+             ~when_:On_success
+             ();
+         ]
+       else [job_rule ~when_:On_success ()])
+    ~tag:Gcp_very_high_cpu
+    ~__POS__
+    ~image:Images.upstream_docker
+    ~variables
+    ~services:[{name = Images.Base_images.dind_service}]
+    ~stage:Stages.build
+    ?dependencies:(Option.map (fun j -> Dependent [Job j]) start_job)
+    ~name:"images.alpine-docker-ci"
+    [
+      (* minimal set of tools needed to bootstrap the docker-ci image *)
+      "images/scripts/install-gcloud-apk.sh";
+      "export PATH=$PATH:/google-cloud-sdk/bin";
+      "scripts/ci/docker_initialize.sh";
+      "scripts/ci/build-base-images.sh \
+       images/base-images/Dockerfile.alpine-docker-ci";
+    ]
+
+(* ── Rust family ────────────────────────────────────────────────────────── *)
+
+(* debian-rust: based on [debian:trixie]. *)
+let make_job_rust_based_images ?start_job ?(changeset = false) () =
+  (* dep is called with defaults just to get the job name for the dependency reference;
+     CIAO only uses the name *)
+  let dep_debian = make_job_debian_based_images () in
+  make_job_base_images
+    ?start_job
+    ~changeset
+    ~__POS__
+    ~image_name:"debian-rust"
+    ~base_name:(Pipeline_dep "debian")
+    ~matrix:[("RELEASE", ["trixie"])]
+    ~dependencies:(Dependent [Job dep_debian])
+    ~compilation:Native
+    ~changes:
+      (Changeset.make
+         (Files.debian_rust_build
+        (* Adding the changeset of debian job as we want to test the
+           build of [debian-rust] if [debian] is rebuild. *)
+        @ Files.debian_base
+         (* If we run [debian-rust] merge job, we need [debian-rust] build job *)
+         @ Files.merge_script))
+    "images/base-images/Dockerfile.rust"
+
+(* dedicated merge job exist because QEMU compilation takes too much
+   time. Build job reached timeout. *)
+let make_job_rust_based_images_merge ?(changeset = false) () =
+  (* dep is called with defaults just to get the job name for the dependency reference *)
+  let dep_rust = make_job_rust_based_images () in
+  job_docker_authenticated
+    ~__POS__
+    ~name:"images.debian-rust.merge"
+    ~stage:Stages.build
+    ~dependencies:(Dependent [Job dep_rust])
+    ~rules:
+      (if changeset then
+         [
+           job_rule
+             ~changes:
+               (Changeset.encode
+                  (Changeset.make
+                     (Files.merge_script
+                    (* Adding changesets of [debian] and
+                      [debian-rust] build jobs as if we rebuild one
+                      of these images, we want to test the
+                      [debian-rust] merge job *)
+                    @ Files.debian_rust_build
+                     @ Files.debian_base)))
+             ~when_:On_success
+             ();
+         ]
+       (* To force the run of the job. Similar to
+          [make_job_base_images] and cf. comment above.
+          Migration to Cacio will clean this hack. *)
+         else [job_rule ~when_:On_success ()])
+    ~variables:
+      [
+        ("RELEASE", "trixie");
+        ("IMAGE_NAME", "${GCP_REGISTRY}/tezos/tezos/debian-rust");
+      ]
+    ["scripts/ci/docker-merge-base-images.sh"]
+
+(* ── debian-homebrew ────────────────────────────────────────────────────── *)
+
+(* debian-homebrew: based on [debian:trixie] *)
+let make_job_debian_homebrew_base_images ?start_job ?(changeset = false) () =
+  let dep_debian = make_job_debian_based_images () in
+  make_job_base_images
+    ?start_job
+    ~changeset
+    ~__POS__
+    ~image_name:"debian-homebrew"
+    ~base_name:(Pipeline_dep "debian")
+    ~dependencies:(Dependent [Job dep_debian])
+    ~matrix:[("RELEASE", ["trixie"])]
+    ~compilation:Amd64_only
+      (* Adding the changeset of [debian] job as we want to test the
+       build of [debian-homebrew] if [debian] is rebuild. *)
+    ~changes:(Changeset.make (Files.debian_homebrew @ Files.debian_base))
+    "images/base-images/Dockerfile.debian-homebrew"
+
+(* ── debian-build and ubuntu-build families ─────────────────────────────── *)
+
+let make_job_debian_build_base_images ?start_job ?(changeset = false) () =
+  let dep_debian = make_job_debian_based_images () in
+  make_job_base_images
+    ?start_job
+    ~changeset
+    ~__POS__
+    ~image_name:"debian-build"
+    ~base_name:(Pipeline_dep "debian")
+    ~dependencies:(Dependent [Job dep_debian])
+    ~matrix:Distribution.(release_matrix Debian)
+    ~compilation:Native
+    ~changes:
+      (Changeset.make
+         (Files.debian_build @ Files.debian_base @ Files.merge_script))
+    "images/base-images/Dockerfile.debian-build"
+
+let make_job_debian_build_base_images_merge ?(changeset = false) () =
+  let dep_build = make_job_debian_build_base_images () in
+  job_docker_authenticated
+    ~__POS__
+    ~name:"images.debian-build.merge"
+    ~stage:Stages.build
+    ~dependencies:(Dependent [Job dep_build])
+    ~rules:
+      (if changeset then
+         [
+           job_rule
+             ~changes:
+               (Changeset.encode
+                  (Changeset.make
+                     (Files.merge_script @ Files.debian_build
+                    @ Files.debian_base)))
+             ~when_:On_success
+             ();
+         ]
+       else [job_rule ~when_:On_success ()])
+    ~parallel:(Matrix [Distribution.(release_matrix Debian)])
+    ~variables:[("IMAGE_NAME", "${GCP_REGISTRY}/tezos/tezos/debian-build")]
+    ["scripts/ci/docker-merge-base-images.sh"]
+
+let make_job_ubuntu_build_base_images ?start_job ?(changeset = false) () =
+  let dep_ubuntu = make_job_ubuntu_based_images () in
+  make_job_base_images
+    ?start_job
+    ~changeset
+    ~__POS__
+    ~image_name:"ubuntu-build"
+    ~base_name:(Pipeline_dep "ubuntu")
+    ~dependencies:(Dependent [Job dep_ubuntu])
+    ~matrix:Distribution.(release_matrix Ubuntu)
+    ~compilation:Native
+    ~changes:
+      (Changeset.make
+         (Files.debian_build @ Files.debian_base @ Files.merge_script))
+    "images/base-images/Dockerfile.debian-build"
+
+let make_job_ubuntu_build_base_images_merge ?(changeset = false) () =
+  let dep_build = make_job_ubuntu_build_base_images () in
+  job_docker_authenticated
+    ~__POS__
+    ~name:"images.ubuntu-build.merge"
+    ~stage:Stages.build
+    ~dependencies:(Dependent [Job dep_build])
+    ~rules:
+      (if changeset then
+         [
+           job_rule
+             ~changes:
+               (Changeset.encode
+                  (Changeset.make
+                     (Files.merge_script @ Files.debian_build
+                    @ Files.debian_base)))
+             ~when_:On_success
+             ();
+         ]
+       else [job_rule ~when_:On_success ()])
+    ~parallel:(Matrix [Distribution.(release_matrix Ubuntu)])
+    ~variables:[("IMAGE_NAME", "${GCP_REGISTRY}/tezos/tezos/ubuntu-build")]
+    ["scripts/ci/docker-merge-base-images.sh"]
+
+(* ── Systemd images ──────────────────────────────────────────────────────── *)
+
+let make_job_debian_systemd_base_images ?start_job ?(changeset = false) () =
+  let dep_debian = make_job_debian_based_images () in
+  make_job_base_images
+    ?start_job
+    ~changeset
+    ~__POS__
+    ~image_name:"debian-systemd"
+    ~base_name:(Pipeline_dep "debian")
+    ~dependencies:(Dependent [Job dep_debian])
+    ~matrix:Distribution.(release_matrix Debian)
+    ~compilation:Amd64_only
+    ~changes:(Changeset.make (Files.debian_systemd @ Files.debian_base))
+    "images/base-images/Dockerfile.debian-systemd"
+
+let make_job_ubuntu_systemd_base_images ?start_job ?(changeset = false) () =
+  let dep_ubuntu = make_job_ubuntu_based_images () in
+  make_job_base_images
+    ?start_job
+    ~changeset
+    ~__POS__
+    ~image_name:"ubuntu-systemd"
+    ~base_name:(Pipeline_dep "ubuntu")
+    ~dependencies:(Dependent [Job dep_ubuntu])
+    ~matrix:Distribution.(release_matrix Ubuntu)
+    ~compilation:Amd64_only
+    ~changes:(Changeset.make (Files.debian_systemd @ Files.debian_base))
+    "images/base-images/Dockerfile.debian-systemd"
+
+(* ── debian-jsonnet ──────────────────────────────────────────────────────── *)
+
+(* debian-jsonnet: based on [debian:trixie] *)
+let make_job_jsonnet_base_images ?start_job ?(changeset = false) () =
+  let dep_debian = make_job_debian_based_images () in
+  make_job_base_images
+    ?start_job
+    ~changeset
+    ~__POS__
+    ~image_name:"debian-jsonnet"
+    ~base_name:(Pipeline_dep "debian")
+    ~dependencies:(Dependent [Job dep_debian])
+    ~matrix:[("RELEASE", ["trixie"])]
+    ~compilation:Amd64_only
+    ~changes:(Changeset.make (Files.debian_jsonnet @ Files.debian_base))
+    "images/base-images/Dockerfile.debian-jsonnet"
+
+(* ── rust-sdk-bindings ───────────────────────────────────────────────────── *)
+
+(* rust-sdk-bindings: based on [debian:trixie] *)
+let make_job_rust_sdk_bindings_base_images ?start_job ?(changeset = false) () =
+  let dep_debian = make_job_debian_based_images () in
+  make_job_base_images
+    ?start_job
+    ~changeset
+    ~__POS__
+    ~image_name:"debian-rust-sdk-bindings"
+    ~base_name:(Pipeline_dep "debian")
+    ~dependencies:(Dependent [Job dep_debian])
+    ~matrix:[("RELEASE", ["trixie"])]
+    ~compilation:Amd64_only
+    ~changes:(Changeset.make (Files.rust_sdk_bindings @ Files.debian_base))
+    "images/base-images/Dockerfile.rust-sdk-bindings"
+
+(* ── Assembly ────────────────────────────────────────────────────────────── *)
+
+(* [start_job] adds a dependency to [trigger] in [before_merging] pipelines.
+   [changeset] should be set to [true] for [before_merging]/[merge_train]
+   parent pipelines only. Changesets should be ignored for other pipelines:
+   - branch pipelines such as [base_images.daily] because they are then
+     ignored by GitLab;
+   - in the manually triggered base images child pipeline as we may want to
+     trigger all base images jobs. *)
 let jobs ?start_job ?(changeset = false) () =
-  (* This function can build docker images both in an emulated environment using
-     qemu or natively. The advantage of choosing emulated vs native depends on
-     the build time associated with the image. Small images are more efficiently
-     built in an emulated environment, while larger images are better build
-     natively.
-
-     [name] is the name of the job.
-
-     [matrix] is a parallel/matrix gitlab construct. Here we use it with the
-     RELEASE variable to build multiple images for the same distribution, but
-     different releases. This parameter is optional: Some images do no need this.
-
-     [image_name] is the name of the final docker image.
-
-     [base_name] is the name of the image upon the newly created image is FROM.
-     It can be either the upstream image, or an image generated in this pipeline.
-
-     [compilation] determines the type of the image.
-     If [compilation] parameter is either set to [Emulated] or omitted then we
-     build for two different architectures using qemu. This handles both build
-     and merging the manifest of the images.
-
-     If [compilation] is either [ Amd64_only ] or [ Arm64_only ] we build the
-     images natively, but the arm64 image is going to be suffixed with "-arm64".
-
-     If [compilation] is set to [Native] we build for both architectures using
-     a native runner. In this case we also must add a merge manifest job.
-     *)
-  let make_job_base_images ~__POS__ ?(matrix = []) ~image_name
-      ?(base_name = Upstream image_name) ?(changes = Changeset.make [])
-      ?(compilation = Emulated) ?(variables = []) ?dependencies dockerfile =
-    let script =
-      Printf.sprintf "scripts/ci/build-base-images.sh %s" dockerfile
-    in
-    (* if provided, add [start_job] to the dependencies. *)
-    let dependencies =
-      match start_job with
-      | None -> dependencies
-      | Some job -> (
-          match dependencies with
-          | None -> Some (Dependent [Job job])
-          | Some (Dependent lst) -> Some (Dependent (Job job :: lst))
-          | Some (Staged _) ->
-              failwith
-                "Only job dependencies in base_image jobs. Stage dependencies \
-                 are not allowed.")
-    in
-    (* cf. [scripts/ci/build-base-images.sh] for more details on the coupling between $PLATFORM and $TAGS *)
-    let platform, tags =
-      match compilation with
-      | Amd64_only -> ("linux/amd64", [])
-      | Arm64_only -> ("", [("TAGS", [Runner.Tag.show Gcp_arm64])])
-      | Emulated -> ("linux/amd64,linux/arm64", []) (* default *)
-      | Native ->
-          ( "",
-            [
-              ( "TAGS",
-                [Runner.Tag.show Gcp_very_high_cpu; Runner.Tag.show Gcp_arm64]
-              );
-            ] )
-    in
-    let emulated = tags = [] in
-    let variables =
-      [
-        ("DISTRIBUTION", image_name);
-        (* if the base name is passed explicitely, then we assume is a
-           fully qualified image, otherwise we add the release component
-           to the image name *)
-        ( "IMAGE_PATH",
-          match base_name with
-          | Upstream name -> Format.asprintf "%s:$RELEASE" name
-          | Pipeline_dep name -> base_dep_img_name name );
-        ("PLATFORM", platform);
-      ]
-      @ variables
-    in
-    job_docker_authenticated
-      ~__POS__
-      ~name:("images." ^ image_name)
-      ~stage:Stages.build
-      ~variables
-      ~rules:
-        (if changeset then
-           [job_rule ~changes:(Changeset.encode changes) ~when_:On_success ()]
-         (* To force the run of the job. A bit hackish but simpler
-            than to have no rule and consistent with what is done in
-            [code_verification]. Will be done cleanly when migrated to
-            Cacio. *)
-           else [job_rule ~when_:On_success ()])
-      ~parallel:(Matrix [matrix @ tags])
-      ~tag:(if emulated then Gcp_very_high_cpu else Dynamic)
-      ?dependencies
-      [script]
-  in
-
-  (* specialisation of [make_job_base_images] for distribution images.
-     - [base_name] used only for Rockylinux.
-     - if [changes] is not provided, we use the base changeset of the
-     distribution. This applies to base images that are not a
-     dependency of other images.  *)
-  let make_job_base_image_distribution ?base_name ?changes distro =
-    make_job_base_images
-      ~__POS__
-      ~matrix:(Distribution.release_matrix distro)
-      ~image_name:(Distribution.name distro)
-      ?base_name
-      ~changes:
-        (* except for Debian, job changeset is the [Distribution.base_changeset] *)
-        (match changes with
-        | None -> Changeset.make @@ Distribution.base_changeset distro
-        | Some changes -> changes)
-      (Distribution.dockerfile distro)
-  in
-
-  (* base images: deb and rpm distros *)
-  let job_debian_based_images =
-    let changes =
-      (* we need the [debian] base job if we have jobs of
-         images based on top of it *)
-      Changeset.make
-        (Files.debian_base @ Files.debian_homebrew @ Files.debian_rust_build
-       @ Files.merge_script @ Files.debian_build @ Files.merge_script
-       @ Files.debian_systemd @ Files.debian_jsonnet @ Files.rust_sdk_bindings)
-    in
-    make_job_base_image_distribution ~changes Distribution.Debian
-  in
-  let job_ubuntu_based_images =
-    let changes =
-      Changeset.make
-        (Files.debian_base @ Files.debian_build @ Files.merge_script
-       @ Files.debian_systemd)
-    in
-    make_job_base_image_distribution ~changes Distribution.Ubuntu
-  in
-  let job_fedora_based_images =
-    make_job_base_image_distribution Distribution.Fedora
-  in
-  let job_rockylinux_based_images =
-    make_job_base_image_distribution
-      ~base_name:(Upstream "rockylinux/rockylinux")
-      Distribution.Rockylinux
-  in
-  (* debian-rust: based on [debian:trixie]. *)
-  let job_rust_based_images =
-    make_job_base_images
-      ~__POS__
-      ~image_name:"debian-rust"
-      ~base_name:(Pipeline_dep "debian")
-      ~matrix:[("RELEASE", ["trixie"])]
-      ~dependencies:(Dependent [Job job_debian_based_images])
-      ~compilation:Native
-      ~changes:
-        (Changeset.make
-           (Files.debian_rust_build
-          (* Adding the changeset of debian job as we want to test the
-             build of [debian-rust] if [debian] is rebuild. *)
-          @ Files.debian_base
-           (* If we run [debian-rust] merge job, we need [debian-rust] build job *)
-           @ Files.merge_script))
-      "images/base-images/Dockerfile.rust"
-  in
-  (* dedicated merge job exist because QEMU compilation takes too much
-     time. Build job reached timeout. *)
-  let job_rust_based_images_merge =
-    job_docker_authenticated
-      ~__POS__
-      ~name:"images.debian-rust.merge"
-      ~stage:Stages.build
-      ~dependencies:(Dependent [Job job_rust_based_images])
-      ~rules:
-        (if changeset then
-           [
-             job_rule
-               ~changes:
-                 (Changeset.encode
-                    (Changeset.make
-                       (Files.merge_script
-                      (* Adding changesets of [debian] and
-                        [debian-rust] build jobs as if we rebuild one
-                        of these images, we want to test the
-                        [debian-rust] merge job *)
-                      @ Files.debian_rust_build
-                       @ Files.debian_base)))
-               ~when_:On_success
-               ();
-           ]
-         (* To force the run of the job. Similar to
-            [make_job_base_images] and cf. comment above.
-            Migration to Cacio will clean this hack. *)
-           else [job_rule ~when_:On_success ()])
-      ~variables:
-        [
-          ("RELEASE", "trixie");
-          ("IMAGE_NAME", "${GCP_REGISTRY}/tezos/tezos/debian-rust");
-        ]
-      ["scripts/ci/docker-merge-base-images.sh"]
-  in
-  let job_ci_release_based_images =
-    make_job_base_images
-      ~__POS__
-      ~image_name:"ci-release"
-      ~base_name:(Upstream "debian")
-      ~matrix:[("RELEASE", ["trixie"])]
-      ~compilation:Amd64_only
-      ~changes:(Changeset.make Files.(ci_releases @ debian_base))
-      "images/base-images/Dockerfile.debian-release"
-  in
-
-  (* debian-homebrew: based on [debian:trixie] *)
-  let job_debian_homebrew_base_images =
-    make_job_base_images
-      ~__POS__
-      ~image_name:"debian-homebrew"
-      ~base_name:(Pipeline_dep "debian")
-      ~dependencies:(Dependent [Job job_debian_based_images])
-      ~matrix:[("RELEASE", ["trixie"])]
-      ~compilation:Amd64_only
-        (* Adding the changeset of [debian] job as we want to test the
-         build of [debian-homebrew] if [debian] is rebuild. *)
-      ~changes:(Changeset.make (Files.debian_homebrew @ Files.debian_base))
-      "images/base-images/Dockerfile.debian-homebrew"
-  in
-  (* This base image differs from the others in its build process: it is
-     bootstrapped directly from the upstream Docker Hub [docker:<version>]
-     image (declared in {!Images_external.upstream_docker}) rather than from
-     another internal base image (e.g. [debian:<release>]).
-     The resulting image includes the Docker daemon, gcloud CLI, hadolint
-     and regctl — it is the standard Docker-in-Docker image for CI jobs.
-     The changeset is also different to ensure this image is always up-to-date *)
-  let job_docker_ci_based_images =
-    let docker_version = Images.Base_images.docker_version in
-    let variables =
-      [
-        ("RELEASE", docker_version);
-        ("DISTRIBUTION", "alpine-docker-ci");
-        ("IMAGE_PATH", "");
-        ("GCLOUD_VERSION", "543.0.0");
-        ("HADOLINT_VERSION", "2.10.0");
-        ("DOCKER_VERSION", docker_version);
-        ("REGCTL_VERSION", "v0.4.3");
-        ("PLATFORM", "linux/amd64,linux/arm64");
-        ("CI_DOCKER_HUB", "false");
-      ]
-    in
-    job
-      ~rules:
-        (if changeset then
-           [
-             job_rule
-               ~changes:Changeset.(encode (make Files.alpine_docker_ci))
-               ~when_:On_success
-               ();
-           ]
-         else [job_rule ~when_:On_success ()])
-      ~tag:Gcp_very_high_cpu
-      ~__POS__
-      ~image:Images.upstream_docker
-      ~variables
-      ~services:[{name = Images.Base_images.dind_service}]
-      ~stage:Stages.build
-      ?dependencies:(Option.map (fun j -> Dependent [Job j]) start_job)
-      ~name:"images.alpine-docker-ci"
-      [
-        (* minimal set of tools needed to bootstrap the docker-ci image *)
-        "images/scripts/install-gcloud-apk.sh";
-        "export PATH=$PATH:/google-cloud-sdk/bin";
-        "scripts/ci/docker_initialize.sh";
-        "scripts/ci/build-base-images.sh \
-         images/base-images/Dockerfile.alpine-docker-ci";
-      ]
-  in
-  let job_debian_build_base_images =
-    make_job_base_images
-      ~__POS__
-      ~image_name:"debian-build"
-      ~base_name:(Pipeline_dep "debian")
-      ~dependencies:(Dependent [Job job_debian_based_images])
-      ~matrix:Distribution.(release_matrix Debian)
-      ~compilation:Native
-      ~changes:
-        (Changeset.make
-           (Files.debian_build @ Files.debian_base @ Files.merge_script))
-      "images/base-images/Dockerfile.debian-build"
-  in
-  let job_debian_build_base_images_merge =
-    job_docker_authenticated
-      ~__POS__
-      ~name:"images.debian-build.merge"
-      ~stage:Stages.build
-      ~dependencies:(Dependent [Job job_debian_build_base_images])
-      ~rules:
-        (if changeset then
-           [
-             job_rule
-               ~changes:
-                 (Changeset.encode
-                    (Changeset.make
-                       (Files.merge_script @ Files.debian_build
-                      @ Files.debian_base)))
-               ~when_:On_success
-               ();
-           ]
-         else [job_rule ~when_:On_success ()])
-      ~parallel:(Matrix [Distribution.(release_matrix Debian)])
-      ~variables:[("IMAGE_NAME", "${GCP_REGISTRY}/tezos/tezos/debian-build")]
-      ["scripts/ci/docker-merge-base-images.sh"]
-  in
-  let job_ubuntu_build_base_images =
-    make_job_base_images
-      ~__POS__
-      ~image_name:"ubuntu-build"
-      ~base_name:(Pipeline_dep "ubuntu")
-      ~dependencies:(Dependent [Job job_ubuntu_based_images])
-      ~matrix:Distribution.(release_matrix Ubuntu)
-      ~compilation:Native
-      ~changes:
-        (Changeset.make
-           (Files.debian_build @ Files.debian_base @ Files.merge_script))
-      "images/base-images/Dockerfile.debian-build"
-  in
-  let job_ubuntu_build_base_images_merge =
-    job_docker_authenticated
-      ~__POS__
-      ~name:"images.ubuntu-build.merge"
-      ~stage:Stages.build
-      ~dependencies:(Dependent [Job job_ubuntu_build_base_images])
-      ~rules:
-        (if changeset then
-           [
-             job_rule
-               ~changes:
-                 (Changeset.encode
-                    (Changeset.make
-                       (Files.merge_script @ Files.debian_build
-                      @ Files.debian_base)))
-               ~when_:On_success
-               ();
-           ]
-         else [job_rule ~when_:On_success ()])
-      ~parallel:(Matrix [Distribution.(release_matrix Ubuntu)])
-      ~variables:[("IMAGE_NAME", "${GCP_REGISTRY}/tezos/tezos/ubuntu-build")]
-      ["scripts/ci/docker-merge-base-images.sh"]
-  in
-  let job_debian_systemd_base_images =
-    make_job_base_images
-      ~__POS__
-      ~image_name:"debian-systemd"
-      ~base_name:(Pipeline_dep "debian")
-      ~dependencies:(Dependent [Job job_debian_based_images])
-      ~matrix:Distribution.(release_matrix Debian)
-      ~compilation:Amd64_only
-      ~changes:(Changeset.make (Files.debian_systemd @ Files.debian_base))
-      "images/base-images/Dockerfile.debian-systemd"
-  in
-  let job_ubuntu_systemd_base_images =
-    make_job_base_images
-      ~__POS__
-      ~image_name:"ubuntu-systemd"
-      ~base_name:(Pipeline_dep "ubuntu")
-      ~dependencies:(Dependent [Job job_ubuntu_based_images])
-      ~matrix:Distribution.(release_matrix Ubuntu)
-      ~compilation:Amd64_only
-      ~changes:(Changeset.make (Files.debian_systemd @ Files.debian_base))
-      "images/base-images/Dockerfile.debian-systemd"
-  in
-  (* debian-jsonnet: based on [debian:trixie] *)
-  let job_jsonnet_base_images =
-    make_job_base_images
-      ~__POS__
-      ~image_name:"debian-jsonnet"
-      ~base_name:(Pipeline_dep "debian")
-      ~dependencies:(Dependent [Job job_debian_based_images])
-      ~matrix:[("RELEASE", ["trixie"])]
-      ~compilation:Amd64_only
-      ~changes:(Changeset.make (Files.debian_jsonnet @ Files.debian_base))
-      "images/base-images/Dockerfile.debian-jsonnet"
-  in
-  (* rust-sdk-bindings: based on [debian:trixie] *)
-  let job_rust_sdk_bindings_base_images =
-    make_job_base_images
-      ~__POS__
-      ~image_name:"debian-rust-sdk-bindings"
-      ~base_name:(Pipeline_dep "debian")
-      ~dependencies:(Dependent [Job job_debian_based_images])
-      ~matrix:[("RELEASE", ["trixie"])]
-      ~compilation:Amd64_only
-      ~changes:(Changeset.make (Files.rust_sdk_bindings @ Files.debian_base))
-      "images/base-images/Dockerfile.rust-sdk-bindings"
-  in
   [
-    job_debian_based_images;
-    job_ubuntu_based_images;
-    job_rust_based_images;
-    job_rust_based_images_merge;
-    job_debian_homebrew_base_images;
-    job_docker_ci_based_images;
-    job_debian_build_base_images;
-    job_debian_build_base_images_merge;
-    job_ubuntu_build_base_images;
-    job_ubuntu_build_base_images_merge;
-    job_debian_systemd_base_images;
-    job_ubuntu_systemd_base_images;
-    job_jsonnet_base_images;
-    job_rust_sdk_bindings_base_images;
-    job_ci_release_based_images;
+    make_job_debian_based_images ?start_job ~changeset ();
+    make_job_ubuntu_based_images ?start_job ~changeset ();
+    make_job_rust_based_images ?start_job ~changeset ();
+    make_job_rust_based_images_merge ~changeset ();
+    make_job_debian_homebrew_base_images ?start_job ~changeset ();
+    make_job_docker_ci_based_images ?start_job ~changeset ();
+    make_job_debian_build_base_images ?start_job ~changeset ();
+    make_job_debian_build_base_images_merge ~changeset ();
+    make_job_ubuntu_build_base_images ?start_job ~changeset ();
+    make_job_ubuntu_build_base_images_merge ~changeset ();
+    make_job_debian_systemd_base_images ?start_job ~changeset ();
+    make_job_ubuntu_systemd_base_images ?start_job ~changeset ();
+    make_job_jsonnet_base_images ?start_job ~changeset ();
+    make_job_rust_sdk_bindings_base_images ?start_job ~changeset ();
+    make_job_ci_release_based_images ?start_job ~changeset ();
   ]
   @
   if enable_rpm_images then
-    [job_fedora_based_images; job_rockylinux_based_images]
+    [
+      make_job_fedora_based_images ?start_job ~changeset ();
+      make_job_rockylinux_based_images ?start_job ~changeset ();
+    ]
   else []
 
 let child_pipeline =
