@@ -614,13 +614,6 @@ module Stake : sig
        and type value = Full_staking_balance_repr.t
        and type t := Raw_context.t
 
-  (* TODO: Remove after next protocol *)
-  module Staking_balance_up_to_T :
-    Indexed_data_storage
-      with type key = Signature.Public_key_hash.t
-       and type value = Full_staking_balance_repr.t
-       and type t := Raw_context.t
-
   (** This should be fairly small compared to staking balance *)
   module Active_delegates_with_minimal_stake :
     Data_set_storage
@@ -699,20 +692,6 @@ module Clst : sig
        and type key = Contract_repr.t
        and type value = Clst_delegates_parameters_repr.update
 end
-
-type consensus_pk_in_R = {
-  delegate : Signature.Public_key_hash.t;
-  consensus_pk : Signature.Public_key.t;
-  consensus_pkh : Signature.Public_key_hash.t;
-}
-
-(** State of the sampler used to select delegates up to R.
-    Remove in S. *)
-module Delegate_sampler_state_up_to_R :
-  Indexed_data_storage
-    with type key = Cycle_repr.t
-     and type value = consensus_pk_in_R Sampler.t
-     and type t := Raw_context.t
 
 (** State of the sampler used to select delegates. Managed synchronously
     with [Stake.Selected_distribution_for_cycle]. *)
