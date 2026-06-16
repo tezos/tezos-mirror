@@ -241,14 +241,47 @@ impl<Host: SmartRollupCore> StorageV1 for Host {
     fn store_read_all(&self, path: &impl Path) -> Result<Vec<u8>, RuntimeError> {
         use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 
-        let length = StorageV1::store_value_size(self, path)?;
-        let mut buffer: Vec<u8> = Vec::with_capacity(length);
-
-        // SAFETY: the algorithm goes as follows:
+        // Fast path: read a single chunk directly via `store_read_slice` --
+        // not `StorageV1::store_read`, which performs an extra `store_has`
+        // disambiguation on error. When the value is non-empty and fits within
+        // one chunk (the common case) a strictly-short read returns the whole
+        // value in a single host call and skips the `store_value_size` query.
         //
-        // A vector of capacity [length] has been previously allocated, of the exact
-        // size of the value in the storage. Only `MAX_FILE_CHUNK_SIZE` bytes
-        // can be read at once, as such the values must be read as chunks.
+        // Any other outcome falls through to the size-based path below, which
+        // resolves every remaining case with `store_value_size` alone (no extra
+        // `store_has`):
+        //   - a full chunk means the value spans several chunks: the first
+        //     chunk already read is kept and the remaining chunks appended;
+        //   - a read at offset 0 of an *empty* value is rejected by hosts that
+        //     treat an at-the-end offset as invalid (the size-based path then
+        //     reads a length of 0 and returns an empty vector);
+        //   - a missing path makes `store_value_size` return `PathNotFound`.
+        //
+        // Reading first is therefore never more than one extra host call for
+        // empty/absent values, and saves one for every value up to a chunk.
+        let mut buffer = alloc::vec![0u8; MAX_FILE_CHUNK_SIZE];
+        match self.store_read_slice(path, 0, &mut buffer) {
+            // Whole value read in a single host call.
+            Ok(size) if size < MAX_FILE_CHUNK_SIZE => {
+                buffer.truncate(size);
+                return Ok(buffer);
+            }
+            // First chunk of a multi-chunk value: it fills the buffer, keep it.
+            Ok(size) if size == MAX_FILE_CHUNK_SIZE => {},
+            Ok(_) => unreachable!("cannot read more than MAX_FILE_CHUNK_SIZE, as that is all that was requested"),
+            // Empty or missing value: nothing valid was read.
+            Err(_) => buffer.clear(),
+        }
+
+        let length = StorageV1::store_value_size(self, path)?;
+        // The buffer already holds the first chunk (if any) and its
+        // `MAX_FILE_CHUNK_SIZE` allocation, so only grow it to fit the rest.
+        buffer.reserve_exact(length.saturating_sub(buffer.len()));
+
+        // SAFETY: `buffer` has capacity for [length] bytes (the chunk already
+        // read above plus the reservation). Only `MAX_FILE_CHUNK_SIZE` bytes
+        // can be read at once, as such the remaining bytes are read as chunks
+        // starting at the current length.
         while buffer.len() < length {
             let offset = buffer.len();
             let max_length = usize::min(MAX_FILE_CHUNK_SIZE, length - offset);
