@@ -1,21 +1,22 @@
 parameter (unit %run) ;
 storage unit ;
 # Michelson contract whose %run entrypoint emits two EMIT ops,
-# one with tag %crac and one with tag %crac_end (the same tags used by
-# kernel-generated CRAC frame markers), from a KT1 sender.
+# one with tag %cross_runtime_call and one with tag %cross_runtime_call_end
+# (the same tags used by kernel-generated cross-runtime call frame markers),
+# from a KT1 sender.
 #
-# Used to verify that user-contract EMITs with tags "crac" and "crac_end"
-# do NOT perturb the CRAC bracket walk in check_crac_brackets: the walk
-# filters on source = null implicit account (handler_address), so any
-# event emitted by a KT1 is excluded regardless of its tag.  In
-# particular, a forged %crac_end must not drive the walk's depth
-# negative even if no matching begin was seen from the null sender.
+# Used to verify that user-contract EMITs with tags "cross_runtime_call" and
+# "cross_runtime_call_end" do NOT perturb the cross-runtime call bracket walk
+# in check_crac_brackets: the walk filters on source = null implicit account
+# (handler_address), so any event emitted by a KT1 is excluded regardless of
+# its tag.  In particular, a forged %cross_runtime_call_end must not drive the
+# walk's depth negative even if no matching begin was seen from the null sender.
 code
   { CDR ;
     PUSH string "forged-crac-end-marker" ;
-    EMIT %crac_end string ;
+    EMIT %cross_runtime_call_end string ;
     PUSH string "forged-crac-marker" ;
-    EMIT %crac string ;
+    EMIT %cross_runtime_call string ;
     NIL operation ;
     SWAP ;
     CONS ;

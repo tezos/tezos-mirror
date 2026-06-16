@@ -290,8 +290,8 @@ fn build_response(
 }
 
 sol! {
-    event CracReceived(
-        string cracId,
+    event CrossRuntimeCallReceived(
+        string crossRuntimeCallId,
         string sourceRuntime,
         string senderAddress,
         string sourceAddress,
@@ -375,7 +375,7 @@ fn classify_evm_run_error(context: &str, e: EvmRunError) -> TezosXRuntimeError {
 
 /// Execute a state-mutating cross-runtime entrypoint call (POST).
 ///
-/// Unchanged behavior from pre-L2-1259: emits `CracReceived`, credits the
+/// Unchanged behavior from pre-L2-1259: emits `CrossRuntimeCallReceived`, credits the
 /// sender, and runs the EVM transaction with state changes preserved
 /// (the journal is not committed here — the outer block builder handles
 /// that for the whole CRAC).
@@ -402,7 +402,7 @@ where
     // Record this mutating crossing so a fake EVM transaction is built
     // to mirror the op in the EVM block. Only the invariant originator
     // is kept; this crossing's own sender / target / amount are recorded
-    // in the `CracReceived` log emitted below, not aggregated into the
+    // in the `CrossRuntimeCallReceived` log emitted below, not aggregated into the
     // fake tx (see `CracTransactionInfo` and L2-1408).
     journal
         .evm
@@ -428,8 +428,8 @@ where
     let gas_data = GasData::new(hdrs.gas_limit, 0, hdrs.gas_limit);
     let crac_log = Log {
         address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
-        data: CracReceived {
-            cracId: journal.crac_id().to_string(),
+        data: CrossRuntimeCallReceived {
+            crossRuntimeCallId: journal.crac_id().to_string(),
             // The native runtime of `sourceAddress` (forwarded as
             // `X-Tezos-Source-Runtime`), not the immediate sender's. On a
             // nested `EVM -> Michelson -> EVM` CRAC the source is the
@@ -511,7 +511,7 @@ where
 ///
 /// Differences from [`execute_call`]:
 /// - rejects `X-Tezos-Amount != 0` (catchable `400`);
-/// - no `CracReceived` log emission;
+/// - no `CrossRuntimeCallReceived` log emission;
 /// - runs the EVM transaction under [`TransactionOrigin::CrossRuntimeStatic`],
 ///   so the top-level frame has `is_static = true` and any state
 ///   mutation halts with `StateChangeDuringStaticCall` (surfaced as
@@ -565,7 +565,7 @@ where
     let block_constants = runtime.create_block_constants(host, journal, &context);
     let gas_data = GasData::new(hdrs.gas_limit, 0, hdrs.gas_limit);
 
-    // Intentionally no `CracReceived` log on the static path.
+    // Intentionally no `CrossRuntimeCallReceived` log on the static path.
 
     // Same custom-`ORIGIN` mechanism as the state-mutating path: the
     // inbound originator drives the `ORIGIN` opcode (see
@@ -1778,7 +1778,7 @@ mod tests {
         );
     }
 
-    /// `CracReceived.sourceRuntime` reflects the native runtime of
+    /// `CrossRuntimeCallReceived.sourceRuntime` reflects the native runtime of
     /// `X-Tezos-Source` (forwarded as `X-Tezos-Source-Runtime`), not a
     /// hardcoded `"tezos"`. On a nested `EVM -> Michelson -> EVM` CRAC the
     /// forwarded source is the transitive EVM origin, so the pair
@@ -1831,15 +1831,15 @@ mod tests {
         assert_eq!(resp.status(), http::StatusCode::OK);
 
         // A plain transfer to a code-less account emits no contract logs,
-        // so the only log is the kernel's `CracReceived`.
+        // so the only log is the kernel's `CrossRuntimeCallReceived`.
         let crac_log = journal
             .evm
             .inner
             .logs
             .first()
-            .expect("CracReceived log emitted");
-        let decoded = crate::CracReceived::decode_log_data(&crac_log.data)
-            .expect("log decodes as CracReceived");
+            .expect("CrossRuntimeCallReceived log emitted");
+        let decoded = crate::CrossRuntimeCallReceived::decode_log_data(&crac_log.data)
+            .expect("log decodes as CrossRuntimeCallReceived");
         assert_eq!(
             decoded.sourceRuntime, "ethereum",
             "sourceRuntime must follow X-Tezos-Source-Runtime, not be hardcoded tezos"
@@ -1875,9 +1875,9 @@ mod tests {
             .inner
             .logs
             .first()
-            .expect("CracReceived log emitted");
-        let decoded = crate::CracReceived::decode_log_data(&crac_log.data)
-            .expect("log decodes as CracReceived");
+            .expect("CrossRuntimeCallReceived log emitted");
+        let decoded = crate::CrossRuntimeCallReceived::decode_log_data(&crac_log.data)
+            .expect("log decodes as CrossRuntimeCallReceived");
         assert_eq!(decoded.sourceRuntime, "tezos");
     }
 

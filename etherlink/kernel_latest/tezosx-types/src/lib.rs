@@ -31,8 +31,8 @@ pub const X_TEZOS_GAS_LIMIT: &str = "X-Tezos-Gas-Limit";
 pub const X_TEZOS_GAS_CONSUMED: &str = "X-Tezos-Gas-Consumed";
 pub const X_TEZOS_TIMESTAMP: &str = "X-Tezos-Timestamp";
 pub const X_TEZOS_BLOCK_NUMBER: &str = "X-Tezos-Block-Number";
-pub const X_TEZOS_CRAC_ID: &str = "X-Tezos-CRAC-ID";
-pub const X_TEZOS_CRAC_DEPTH: &str = "X-Tezos-CRAC-Depth";
+pub const X_TEZOS_CRAC_ID: &str = "X-Tezos-Cross-Runtime-Call-ID";
+pub const X_TEZOS_CRAC_DEPTH: &str = "X-Tezos-Cross-Runtime-Call-Depth";
 pub const X_TEZOS_STORAGE_COST: &str = "X-Tezos-Storage-Cost";
 
 /// Maximum permitted value of the `X-Tezos-CRAC-Depth` header, i.e. the

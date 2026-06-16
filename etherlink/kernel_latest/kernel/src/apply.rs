@@ -68,7 +68,7 @@ sol! {
     /// Emitted once at the top of every EVM transaction receipt that
     /// involves cross-runtime calls, whether incoming or outgoing.
     /// Allows indexers to correlate operations across derived blocks.
-    event CracIdEvent(string cracId);
+    event CrossRuntimeCallIdEvent(string crossRuntimeCallId);
 }
 
 pub struct TransactionReceiptInfo {
@@ -287,11 +287,11 @@ pub fn extract_cross_runtime_effects(
     if let Some(tx_info) = journal.evm.take_crac_data() {
         let crac_id = journal.crac_id().to_string();
 
-        // Build a synthetic CracIdEvent log as the first log in the receipt.
+        // Build a synthetic CrossRuntimeCallIdEvent log as the first log in the receipt.
         let crac_id_log = revm::primitives::Log {
             address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
-            data: CracIdEvent {
-                cracId: crac_id.clone(),
+            data: CrossRuntimeCallIdEvent {
+                crossRuntimeCallId: crac_id.clone(),
             }
             .to_log_data(),
         };
@@ -1045,7 +1045,7 @@ pub enum CrossRuntimeEffect {
 /// The fake tx is a neutral envelope: it carries only the invariant
 /// originator (`source`, used as both `from` and `to`), no value, and
 /// the accumulated gas. The per-crossing sender/target/amount facts are
-/// in `logs` (the `CracReceived` events), not in the envelope — see
+/// in `logs` (the `CrossRuntimeCallReceived` events), not in the envelope — see
 /// L2-1408.
 pub struct EvmCracEffect {
     /// CRAC-ID shared by all CRACs in this transaction.
@@ -1408,8 +1408,8 @@ where
                     return Err(err.into());
                 }
                 Err(OperationError::BlockAbort(msg)) => {
-                    log!(Error, "CRAC block abort: {msg}");
-                    return Err(anyhow::anyhow!("CRAC block abort: {msg}"));
+                    log!(Error, "cross-runtime call block abort: {msg}");
+                    return Err(anyhow::anyhow!("cross-runtime call block abort: {msg}"));
                 }
             }?
         }
@@ -2112,8 +2112,8 @@ mod tests {
 
     /// Merging two CRAC receipts appends all ops and preserves nonces.
     ///
-    /// Receipt 1: [Event("crac", nonce=0), Transfer(M_1, nonce=1, amount=100)]
-    /// Receipt 2: [Event("crac", nonce=2), Transfer(M_2, nonce=3, amount=200)]
+    /// Receipt 1: [Event("cross_runtime_call", nonce=0), Transfer(M_1, nonce=1, amount=100)]
+    /// Receipt 2: [Event("cross_runtime_call", nonce=2), Transfer(M_2, nonce=3, amount=200)]
     ///
     /// Each frame keeps its own marker pair; merge just appends.
     /// Nonces are block-global (assigned at creation time) so no renumbering.

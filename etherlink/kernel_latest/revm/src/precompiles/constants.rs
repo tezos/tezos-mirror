@@ -213,7 +213,7 @@ pub(crate) const UPGRADE_SEQUENCER_PRECOMPILE_BASE_COST: u64 = 24_200;
 
 // Gateway base cost: covers ABI decoding, HTTP request construction,
 // header injection (7 X-Tezos-* headers), gas conversion arithmetic,
-// response parsing, and CracSent event emission (LOG4).
+// response parsing, and CrossRuntimeCallSent event emission (LOG4).
 // Derived from Ethereum gas schedule: G_log=375, G_logtopic=375,
 // G_logdata=8/byte, G_copy=3/word, G_memory=3/word.
 // See RFC: Gas model for gateways and aliases.

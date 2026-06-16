@@ -668,7 +668,7 @@ impl BlockInProgress {
         // since the CRAC-ID only contains the transaction index within a
         // block.
         let mut hasher = Keccak256::new();
-        hasher.update(b"CRAC-TX");
+        hasher.update(b"CROSS-RUNTIME-CALL-TX");
         let mut block_number_bytes = [0u8; 32];
         self.number.to_big_endian(&mut block_number_bytes);
         hasher.update(block_number_bytes);
@@ -680,7 +680,7 @@ impl BlockInProgress {
         // top-level-meaningful identity across the op's crossings. The
         // per-crossing sender/target/amount — which vary and are held by
         // the senders, not the originator — are NOT collapsed into these
-        // fields; they live in the `CracReceived` logs. A self-addressed,
+        // fields; they live in the `CrossRuntimeCallReceived` logs. A self-addressed,
         // zero-value tx asserts no spurious transfer edge (L2-1408).
         let from = effect.source;
         let to = Some(effect.source);
@@ -747,7 +747,11 @@ impl BlockInProgress {
                         trace.add_logs(Some(effect.logs.clone()));
                     }
                     if let Err(e) = flush_call_traces(host, &[trace], &trace_hash) {
-                        log!(Debug, "Failed to flush call traces for CRAC tx: {:?}", e);
+                        log!(
+                            Debug,
+                            "Failed to flush call traces for cross-runtime call tx: {:?}",
+                            e
+                        );
                     }
                 }
                 Some(TracerInput::StructLogger(_)) => {
@@ -757,7 +761,12 @@ impl BlockInProgress {
                     macro_rules! log_store_err {
                         ($op:expr, $result:expr) => {
                             if let Err(e) = $result {
-                                log!(Debug, "Failed to {} for CRAC tx: {:?}", $op, e);
+                                log!(
+                                    Debug,
+                                    "Failed to {} for cross-runtime call tx: {:?}",
+                                    $op,
+                                    e
+                                );
                             }
                         };
                     }
@@ -781,7 +790,7 @@ impl BlockInProgress {
             }
             log!(
                 Debug,
-                "Wrote synthetic trace for CRAC fake tx {}",
+                "Wrote synthetic trace for cross-runtime call fake tx {}",
                 hex::encode(hash_bytes)
             );
         }
@@ -820,7 +829,7 @@ impl BlockInProgress {
             to,
             index,
             // Neutral envelope: see `from`/`to` above. Per-crossing
-            // values are in the `CracReceived` logs, not here (L2-1408).
+            // values are in the `CrossRuntimeCallReceived` logs, not here (L2-1408).
             value: U256::zero(),
             signature: None,
         };

@@ -478,13 +478,13 @@ fn extract_callback(
 /// `tezosx-tezos-runtime/src/lib.rs::build_(failed_)crac_receipt`.
 /// Imported by the receipt builder so both producer and consumer
 /// agree on the tag.
-pub const SYNTHETIC_CRAC_EVENT_TAG: &str = "crac";
+pub const SYNTHETIC_CRAC_EVENT_TAG: &str = "cross_runtime_call";
 
 /// Tag used by the synthetic CRAC end event built in
 /// `tezosx-tezos-runtime/src/lib.rs::build_(failed_)crac_receipt`.
 /// Imported by the receipt builder so both producer and consumer
 /// agree on the tag.
-pub const SYNTHETIC_CRAC_END_EVENT_TAG: &str = "crac_end";
+pub const SYNTHETIC_CRAC_END_EVENT_TAG: &str = "cross_runtime_call_end";
 
 /// Returns the tag string of a synthetic CRAC frame marker, or `None` if
 /// `iop` is not one.
@@ -2088,7 +2088,9 @@ pub(crate) mod tests {
 
         InternalOperationSum::Event(InternalContentWithMetadata {
             content: EventContent {
-                tag: Some(mir::ast::Entrypoint::from_string_unchecked("crac".into())),
+                tag: Some(mir::ast::Entrypoint::from_string_unchecked(
+                    "cross_runtime_call".into(),
+                )),
                 payload: Some(payload.into()),
                 ty: ty.into(),
             },
@@ -2565,7 +2567,7 @@ pub(crate) mod tests {
         assert_eq!(headers.get("X-Tezos-Gas-Limit").unwrap(), "1000");
         assert_eq!(headers.get("X-Tezos-Timestamp").unwrap(), "1700000000");
         assert_eq!(headers.get("X-Tezos-Block-Number").unwrap(), "5");
-        assert_eq!(headers.get("X-Tezos-Crac-Id").unwrap(), "0-5");
+        assert_eq!(headers.get("X-Tezos-Cross-Runtime-Call-Id").unwrap(), "0-5");
     }
 
     /// Non-zero `crac_depth` materialises on the outgoing header.
@@ -2590,7 +2592,10 @@ pub(crate) mod tests {
             7,
         )
         .unwrap();
-        assert_eq!(headers.get("X-Tezos-Crac-Depth").unwrap(), "7");
+        assert_eq!(
+            headers.get("X-Tezos-Cross-Runtime-Call-Depth").unwrap(),
+            "7"
+        );
     }
 
     #[test]
@@ -5205,7 +5210,7 @@ pub(crate) mod tests {
         assert_eq!(
             synthetic_crac_marker_tag(&iop),
             Some(SYNTHETIC_CRAC_EVENT_TAG),
-            "null sender + tag 'crac' must return Some(SYNTHETIC_CRAC_EVENT_TAG)"
+            "null sender + tag 'cross_runtime_call' must return Some(SYNTHETIC_CRAC_EVENT_TAG)"
         );
     }
 
@@ -5215,7 +5220,7 @@ pub(crate) mod tests {
         assert_eq!(
             synthetic_crac_marker_tag(&iop),
             Some(SYNTHETIC_CRAC_END_EVENT_TAG),
-            "null sender + tag 'crac_end' must return Some(SYNTHETIC_CRAC_END_EVENT_TAG)"
+            "null sender + tag 'cross_runtime_call_end' must return Some(SYNTHETIC_CRAC_END_EVENT_TAG)"
         );
     }
 
@@ -5233,23 +5238,23 @@ pub(crate) mod tests {
 
     #[test]
     fn synthetic_crac_marker_tag_begin_kt1_sender_returns_none() {
-        // User EMIT with tag "crac" but non-null sender must return None.
+        // User EMIT with tag "cross_runtime_call" but non-null sender must return None.
         let iop = make_marker_event(SYNTHETIC_CRAC_EVENT_TAG, false);
         assert_eq!(
             synthetic_crac_marker_tag(&iop),
             None,
-            "KT1 sender + tag 'crac' must return None (sender must be null)"
+            "KT1 sender + tag 'cross_runtime_call' must return None (sender must be null)"
         );
     }
 
     #[test]
     fn synthetic_crac_marker_tag_end_kt1_sender_returns_none() {
-        // Forged user EMIT with tag "crac_end" from a KT1 must return None.
+        // Forged user EMIT with tag "cross_runtime_call_end" from a KT1 must return None.
         let iop = make_marker_event(SYNTHETIC_CRAC_END_EVENT_TAG, false);
         assert_eq!(
             synthetic_crac_marker_tag(&iop),
             None,
-            "KT1 sender + tag 'crac_end' must return None (sender must be null)"
+            "KT1 sender + tag 'cross_runtime_call_end' must return None (sender must be null)"
         );
     }
 }

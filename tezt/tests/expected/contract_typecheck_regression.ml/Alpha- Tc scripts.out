@@ -5787,11 +5787,11 @@ Well typed (Gas remaining: 1039992.845 units remaining)	michelson_test_scripts/m
          /* [ unit ] */ ;
          PUSH string "forged-crac-end-marker"
          /* [ string : unit ] */ ;
-         EMIT %crac_end string
+         EMIT %cross_runtime_call_end string
          /* [ operation : unit ] */ ;
          PUSH string "forged-crac-marker"
          /* [ string : operation : unit ] */ ;
-         EMIT %crac string
+         EMIT %cross_runtime_call string
          /* [ operation : operation : unit ] */ ;
          NIL operation
          /* [ list operation : operation : operation : unit ] */ ;

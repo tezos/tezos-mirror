@@ -1202,7 +1202,7 @@ where
                     return Err(err.into());
                 }
                 Err(OperationError::BlockAbort(msg)) => {
-                    return Err(anyhow::anyhow!("CRAC block abort: {msg}"));
+                    return Err(anyhow::anyhow!("cross-runtime call block abort: {msg}"));
                 }
             };
 
