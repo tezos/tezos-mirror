@@ -182,7 +182,7 @@ fn handle_blueprint_chunk<Host>(
     blueprint: UnsignedSequencerBlueprint,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     log!(Benchmarking, "Handling a blueprint input");
     log!(
@@ -418,7 +418,7 @@ fn import_dal_attested_slots<Host>(
     slot_indices: &[u8],
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + HostReveal,
+    Host: StorageV1 + HostReveal + KeySpaceLoader,
 {
     // Skip if there are no attested slots
     if slot_indices.is_empty() {

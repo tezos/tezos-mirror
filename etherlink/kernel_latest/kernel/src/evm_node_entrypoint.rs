@@ -181,7 +181,8 @@ pub extern "C" fn tezosx_simulate() {
 #[allow(dead_code)]
 pub fn tezosx_simulate_fn<Host>(host: &mut Host)
 where
-    Host: tezos_smart_rollup_host::runtime::Runtime,
+    Host: tezos_smart_rollup_host::runtime::Runtime
+        + tezos_smart_rollup_host::storage::CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
     let input = match host.store_read_all(&TEZOSX_SIMULATION_INPUT) {
@@ -235,7 +236,7 @@ where
     );
 
     let chain_config = fetch_tezosx_configuration(&mut host);
-    let blueprint_header = match read_current_blueprint_header(&host) {
+    let blueprint_header = match read_current_blueprint_header(&mut host) {
         Ok(h) => h,
         Err(err) => {
             log!(

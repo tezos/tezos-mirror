@@ -51,6 +51,25 @@ pub fn write_u32_le(ks: &mut impl KeySpace, key: &Key, value: u32) -> Result<(),
     ks.set(key, value.to_le_bytes()).map_err(Error::from)
 }
 
+/// Return an unsigned 2 bytes value at the given `key`.
+///
+/// NB: The given bytes are interpreted in little endian order. The value
+/// must hold at least 2 bytes.
+pub fn read_u16_le(ks: &impl KeySpace, key: &Key) -> Result<u16, Error> {
+    let bytes = ks
+        .get_prefix_exact::<{ std::mem::size_of::<u16>() }>(key)
+        .ok_or(Error::Runtime(RuntimeError::PathNotFound))?;
+    Ok(u16::from_le_bytes(bytes))
+}
+
+/// Write an unsigned 2 bytes value at the given `key`.
+///
+/// NB: The value is stored in little endian order, byte-compatible with the
+/// root [`store_read_slice`](crate::store_read_slice)/`store_write` pair.
+pub fn write_u16_le(ks: &mut impl KeySpace, key: &Key, value: u16) -> Result<(), Error> {
+    ks.set(key, value.to_le_bytes()).map_err(Error::from)
+}
+
 /// Write a signed 8 bytes value at the given `key`.
 ///
 /// NB: The value is stored in little endian order.
@@ -196,6 +215,22 @@ mod tests {
         );
         let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
         assert_eq!(read_u32_le(&ks, &key(b"/level")), Ok(7));
+    }
+
+    #[test]
+    fn write_u16_le_lands_at_absolute_path_and_round_trips() {
+        let mut host = MockKernelHost::default();
+        {
+            let mut ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+            write_u16_le(&mut ks, &key(b"/nb_chunks"), 7).unwrap();
+        }
+        assert_eq!(
+            host.store_read_all(&RefPath::assert_from(b"/ks/nb_chunks"))
+                .unwrap(),
+            7u16.to_le_bytes()
+        );
+        let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+        assert_eq!(read_u16_le(&ks, &key(b"/nb_chunks")), Ok(7));
     }
 
     #[test]

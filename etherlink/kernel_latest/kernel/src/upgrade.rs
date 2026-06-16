@@ -291,7 +291,7 @@ pub fn possible_sequencer_key_change<Host>(
     evm_timestamp: Timestamp,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     let upgrade = read_sequencer_key_change(host)?;
     if let Some(upgrade) = upgrade {

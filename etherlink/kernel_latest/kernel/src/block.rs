@@ -262,7 +262,7 @@ where
 
 fn get_next_bip_info<Host>(host: &mut Host) -> (U256, Timestamp, EVMBlockHeader)
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     match read_current_block_header(host) {
         Err(_) => (
@@ -392,7 +392,7 @@ fn revert_block<Host>(
     error: anyhow::Error,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     log!(
         Error,
@@ -770,9 +770,9 @@ mod tests {
     use tezos_tezlink::operation::Parameters;
     use tezos_tezlink::protocol::{Protocol, TARGET_TEZOS_PROTOCOL};
 
-    fn read_current_number<Host>(host: &Host) -> anyhow::Result<U256>
+    fn read_current_number<Host>(host: &mut Host) -> anyhow::Result<U256>
     where
-        Host: StorageV1,
+        Host: StorageV1 + KeySpaceLoader,
     {
         Ok(crate::blueprint_storage::read_current_blueprint_header(host)?.number)
     }
@@ -1146,7 +1146,7 @@ mod tests {
         start_number: U256,
         blueprints: Vec<Blueprint>,
     ) where
-        Host: StorageV1,
+        Host: StorageV1 + KeySpaceLoader,
     {
         for (i, blueprint) in blueprints.into_iter().enumerate() {
             store_inbox_blueprint_by_number(
@@ -1160,7 +1160,7 @@ mod tests {
 
     fn store_blueprints<Host>(host: &mut Host, blueprints: Vec<Blueprint>)
     where
-        Host: StorageV1,
+        Host: StorageV1 + KeySpaceLoader,
     {
         store_blueprints_from_number::<Host>(host, U256::zero(), blueprints)
     }
@@ -1849,7 +1849,7 @@ mod tests {
         let expected_level = 1;
         assert_eq!(
             U256::from(expected_level),
-            read_current_number(&host).unwrap()
+            read_current_number(&mut host).unwrap()
         );
         let expected_timestamp = timestamp_of_call;
         // The chain id observed by the contract is the michelson runtime
@@ -2692,7 +2692,7 @@ mod tests {
 
     fn check_current_block_number<Host>(host: &mut Host, nb: usize)
     where
-        Host: StorageV1,
+        Host: StorageV1 + KeySpaceLoader,
     {
         let current_nb =
             read_current_number(host).expect("Should have manage to check block number");
@@ -2816,7 +2816,7 @@ mod tests {
 
         // sanity check: no current block
         assert!(
-            read_current_number(&host).is_err(),
+            read_current_number(&mut host).is_err(),
             "Should not have found current block number"
         );
 
@@ -2863,7 +2863,7 @@ mod tests {
 
         // test no new block
         assert!(
-            read_current_number(&host).is_err(),
+            read_current_number(&mut host).is_err(),
             "Should not have found current block number"
         );
 
@@ -2911,7 +2911,7 @@ mod tests {
 
         // sanity check: no current block
         assert!(
-            read_current_number(&host).is_err(),
+            read_current_number(&mut host).is_err(),
             "Should not have found current block number"
         );
         //provision sender account
@@ -2964,7 +2964,7 @@ mod tests {
 
         // test no new block
         assert_eq!(
-            read_current_number(&host).expect("should have found a block number"),
+            read_current_number(&mut host).expect("should have found a block number"),
             U256::zero(),
             "There should have been one block registered"
         );

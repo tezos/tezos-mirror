@@ -8,7 +8,6 @@ use crate::chains::{ExperimentalFeatures, TezosXChainConfig, TezosXTransaction};
 use crate::configuration::{Configuration, ConfigurationMode};
 use crate::error::{Error, StorageError};
 use crate::l2block::L2Block;
-use crate::migration::allow_path_not_found;
 use crate::sequencer_blueprint::{
     BlueprintWithDelayedHashes, UnsignedSequencerBlueprint,
 };
@@ -31,24 +30,29 @@ use tezos_smart_rollup_core::MAX_INPUT_MESSAGE_SIZE;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::{Key, KeySpaceLoader};
-use tezos_storage::{keyspace, read_rlp, store_read_slice, store_rlp};
+use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceLoader};
+use tezos_storage::{keyspace, read_rlp, store_rlp};
 use tezos_tezlink::block::TezBlock;
 use tezos_tezlink::protocol::{Protocol, INITIAL_PROTOCOL};
 
+// Absolute form kept for the `migration.rs` blueprint moves (`store_move`,
+// a path-subtree op the flat keyspace API cannot express) and for tests; the
+// steady-state read/write helpers go through the `/base` keyspace at the
+// relative keys built below, resolving to these same paths.
 pub const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/base/blueprints");
 
-const EVM_BLUEPRINT_NB_CHUNKS: RefPath = RefPath::assert_from(b"/nb_chunks");
-
-// This generation number is used to decide if the blueprint containing this sub-key
-// is outdated or not. Instead of deleting all blueprints when we want to
+// Relative key (under the `/base` keyspace) of the current blueprint
+// generation. This generation number is used to decide if a blueprint is
+// outdated or not. Instead of deleting all blueprints when we want to
 // invalidate them, we just increment the current generation number stored
 // so that when reading a blueprint we can check if its generation matches
 // the current one.
-const EVM_BLUEPRINT_GENERATION: RefPath = RefPath::assert_from(b"/generation");
+const BLUEPRINT_CURRENT_GENERATION_KEY: Key = Key::from_static(b"/blueprints/generation");
 
-// Absolute form kept for the raw reader; the steady-state writer goes through
-// the `/base` keyspace at the relative key, resolving to this same path.
+// The current block header is read and written through the `/base` keyspace at
+// this relative key. The absolute form is kept only for tests asserting the key
+// resolves to the historical durable path.
+#[cfg(test)]
 const EVM_CURRENT_BLOCK_HEADER: RefPath =
     RefPath::assert_from(b"/base/current_block_header");
 const EVM_CURRENT_BLOCK_HEADER_KEY: Key = Key::from_static(b"/current_block_header");
@@ -188,6 +192,8 @@ impl From<L2Block> for BlockHeader<ChainHeader> {
     }
 }
 
+// Absolute path of a blueprint, kept for `migration.rs` (`store_move`) and
+// tests. Steady-state access uses the relative `Key` builders below.
 pub fn blueprint_path(number: U256) -> Result<OwnedPath, StorageError> {
     let number_as_path: Vec<u8> = format!("/{number}").into();
     // The key being an integer value, it will always be valid as a path,
@@ -196,58 +202,72 @@ pub fn blueprint_path(number: U256) -> Result<OwnedPath, StorageError> {
     concat(&EVM_BLUEPRINTS, &number_subkey).map_err(StorageError::from)
 }
 
-fn blueprint_chunk_path(
-    blueprint_path: &OwnedPath,
-    chunk_index: u16,
-) -> Result<OwnedPath, StorageError> {
-    let chunk_index_as_path: Vec<u8> = format!("/{chunk_index}").into();
-    let chunk_index_subkey = RefPath::assert_from(&chunk_index_as_path);
-    concat(blueprint_path, &chunk_index_subkey).map_err(StorageError::from)
+// Keyspace-relative keys for the blueprint sub-paths. They emit keys relative
+// to the `/base` prefix (`/blueprints/<n>/...`) that resolve, once
+// concatenated with the prefix, to the exact same durable paths as the
+// absolute `concat`-built ones above.
+fn blueprint_chunk_key(number: U256, chunk_index: u16) -> Result<Key, StorageError> {
+    Key::try_from(format!("/blueprints/{number}/{chunk_index}"))
+        .map_err(StorageError::from)
 }
 
-fn blueprint_nb_chunks_path(
-    blueprint_path: &OwnedPath,
-) -> Result<OwnedPath, StorageError> {
-    concat(blueprint_path, &EVM_BLUEPRINT_NB_CHUNKS).map_err(StorageError::from)
+fn blueprint_nb_chunks_key(number: U256) -> Result<Key, StorageError> {
+    Key::try_from(format!("/blueprints/{number}/nb_chunks")).map_err(StorageError::from)
 }
 
-fn blueprint_current_generation_path() -> Result<OwnedPath, StorageError> {
-    concat(&EVM_BLUEPRINTS, &EVM_BLUEPRINT_GENERATION).map_err(StorageError::from)
+fn blueprint_generation_key(number: U256) -> Result<Key, StorageError> {
+    Key::try_from(format!("/blueprints/{number}/generation")).map_err(StorageError::from)
 }
 
-fn blueprint_generation_path(
-    blueprint_path: &OwnedPath,
-) -> Result<OwnedPath, StorageError> {
-    concat(blueprint_path, &EVM_BLUEPRINT_GENERATION).map_err(StorageError::from)
-}
-
-fn read_current_generation_or_default(
-    host: &impl StorageV1,
-    default: U256,
-) -> Result<U256, Error> {
-    let path = blueprint_current_generation_path()?;
+// 32-byte little-endian `U256` read/write through a keyspace handle, mirroring
+// the byte layout of the absolute-path helpers. Kept local to the kernel crate
+// since the storage crate has no `primitive_types` dependency.
+fn write_u256_le(base: &mut impl KeySpace, key: &Key, value: U256) -> Result<(), Error> {
     let mut buffer = [0u8; 32];
-    match store_read_slice(host, &path, &mut buffer, 32) {
-        Ok(()) => Ok(U256::from_little_endian(&buffer)),
-        Err(tezos_storage::error::Error::Runtime(RuntimeError::PathNotFound))
-        | Err(tezos_storage::error::Error::Runtime(RuntimeError::HostErr(
-            tezos_smart_rollup_host::Error::StoreNotAValue,
-        ))) => Ok(default),
-        Err(err) => Err(err.into()),
+    value.to_little_endian(&mut buffer);
+    base.set(key, buffer).map_err(Error::from)
+}
+
+// Reads a 32-byte little-endian `U256`, falling back to `default` when the key
+// is absent or not a value — matching the `PathNotFound | StoreNotAValue` arms
+// of the previous absolute-path readers.
+fn read_u256_le_or_default(base: &impl KeySpace, key: &Key, default: U256) -> U256 {
+    match base.get_prefix_exact::<32>(key) {
+        Some(buffer) => U256::from_little_endian(&buffer),
+        None => default,
     }
 }
 
-fn store_current_generation(
-    host: &mut impl StorageV1,
-    generation: U256,
-) -> Result<(), Error> {
-    let path = blueprint_current_generation_path()?;
-    let mut buffer = [0u8; 32];
-    generation.to_little_endian(&mut buffer);
-    host.store_write(&path, &buffer, 0).map_err(Error::from)
+// The blueprint accessors below route `/base/blueprints` through the `/base`
+// keyspace, each loading the handle transiently.
+
+fn read_current_generation_or_default<Host>(
+    host: &mut Host,
+    default: U256,
+) -> Result<U256, Error>
+where
+    Host: StorageV1 + KeySpaceLoader,
+{
+    let base = crate::storage::load_base_keyspace(host)?;
+    Ok(read_u256_le_or_default(
+        &base,
+        &BLUEPRINT_CURRENT_GENERATION_KEY,
+        default,
+    ))
 }
 
-fn increment_current_generation(host: &mut impl StorageV1) -> Result<(), Error> {
+fn store_current_generation<Host>(host: &mut Host, generation: U256) -> Result<(), Error>
+where
+    Host: StorageV1 + KeySpaceLoader,
+{
+    let mut base = crate::storage::load_base_keyspace(host)?;
+    write_u256_le(&mut base, &BLUEPRINT_CURRENT_GENERATION_KEY, generation)
+}
+
+fn increment_current_generation<Host>(host: &mut Host) -> Result<(), Error>
+where
+    Host: StorageV1 + KeySpaceLoader,
+{
     let current_generation = read_current_generation_or_default(host, U256::zero())?;
     let new_generation =
         current_generation
@@ -259,55 +279,66 @@ fn increment_current_generation(host: &mut impl StorageV1) -> Result<(), Error> 
     Ok(())
 }
 
-fn read_blueprint_generation_or_default(
-    host: &impl StorageV1,
-    blueprint_path: &OwnedPath,
+fn read_blueprint_generation_or_default<Host>(
+    host: &mut Host,
+    number: U256,
     default: U256,
-) -> Result<U256, Error> {
-    let path = blueprint_generation_path(blueprint_path)?;
-    let mut buffer = [0u8; 32];
-    match store_read_slice(host, &path, &mut buffer, 32) {
-        Ok(()) => Ok(U256::from_little_endian(&buffer)),
-        Err(tezos_storage::error::Error::Runtime(RuntimeError::PathNotFound))
-        | Err(tezos_storage::error::Error::Runtime(RuntimeError::HostErr(
-            tezos_smart_rollup_host::Error::StoreNotAValue,
-        ))) => Ok(default),
-        Err(err) => Err(err.into()),
-    }
+) -> Result<U256, Error>
+where
+    Host: StorageV1 + KeySpaceLoader,
+{
+    let key = blueprint_generation_key(number)?;
+    let base = crate::storage::load_base_keyspace(host)?;
+    Ok(read_u256_le_or_default(&base, &key, default))
 }
 
-fn store_blueprint_generation(
-    host: &mut impl StorageV1,
-    blueprint_path: &OwnedPath,
+fn store_blueprint_generation<Host>(
+    host: &mut Host,
+    number: U256,
     generation: U256,
-) -> Result<(), Error> {
-    let path = blueprint_generation_path(blueprint_path)?;
-    let mut buffer = [0u8; 32];
-    generation.to_little_endian(&mut buffer);
-    host.store_write(&path, &buffer, 0).map_err(Error::from)
+) -> Result<(), Error>
+where
+    Host: StorageV1 + KeySpaceLoader,
+{
+    let key = blueprint_generation_key(number)?;
+    let mut base = crate::storage::load_base_keyspace(host)?;
+    write_u256_le(&mut base, &key, generation)
 }
 
-fn read_blueprint_nb_chunks(
-    host: &impl StorageV1,
-    blueprint_path: &OwnedPath,
-) -> Result<u16, Error> {
-    let path = blueprint_nb_chunks_path(blueprint_path)?;
-    let mut buffer = [0u8; 2];
-    store_read_slice(host, &path, &mut buffer, 2)?;
-    Ok(u16::from_le_bytes(buffer))
+fn read_blueprint_nb_chunks<Host>(host: &mut Host, number: U256) -> Result<u16, Error>
+where
+    Host: StorageV1 + KeySpaceLoader,
+{
+    let key = blueprint_nb_chunks_key(number)?;
+    let base = crate::storage::load_base_keyspace(host)?;
+    keyspace::read_u16_le(&base, &key).map_err(Error::from)
 }
 
 fn store_blueprint_nb_chunks<Host>(
     host: &mut Host,
-    blueprint_path: &OwnedPath,
+    number: U256,
     nb_chunks: u16,
 ) -> Result<(), Error>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
-    let path = blueprint_nb_chunks_path(blueprint_path)?;
-    let bytes = nb_chunks.to_le_bytes();
-    host.store_write(&path, &bytes, 0).map_err(Error::from)
+    let key = blueprint_nb_chunks_key(number)?;
+    let mut base = crate::storage::load_base_keyspace(host)?;
+    keyspace::write_u16_le(&mut base, &key, nb_chunks).map_err(Error::from)
+}
+
+fn store_blueprint_chunk<Host>(
+    host: &mut Host,
+    number: U256,
+    chunk_index: u16,
+    chunk: &StoreBlueprint,
+) -> Result<(), Error>
+where
+    Host: StorageV1 + KeySpaceLoader,
+{
+    let key = blueprint_chunk_key(number, chunk_index)?;
+    let mut base = crate::storage::load_base_keyspace(host)?;
+    keyspace::store_rlp(chunk, &mut base, &key).map_err(Error::from)
 }
 
 pub fn store_sequencer_blueprint<Host>(
@@ -315,16 +346,18 @@ pub fn store_sequencer_blueprint<Host>(
     blueprint: UnsignedSequencerBlueprint,
 ) -> Result<(), Error>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
-    let blueprint_path = blueprint_path(blueprint.number)?;
-    store_blueprint_nb_chunks(host, &blueprint_path, blueprint.nb_chunks)?;
+    store_blueprint_nb_chunks(host, blueprint.number, blueprint.nb_chunks)?;
     let current_generation = read_current_generation_or_default(host, U256::zero())?;
-    store_blueprint_generation(host, &blueprint_path, current_generation)?;
-    let blueprint_chunk_path =
-        blueprint_chunk_path(&blueprint_path, blueprint.chunk_index)?;
+    store_blueprint_generation(host, blueprint.number, current_generation)?;
     let store_blueprint = StoreBlueprint::SequencerChunk(blueprint.chunk);
-    store_rlp(&store_blueprint, host, &blueprint_chunk_path).map_err(Error::from)
+    store_blueprint_chunk(
+        host,
+        blueprint.number,
+        blueprint.chunk_index,
+        &store_blueprint,
+    )
 }
 
 pub fn store_inbox_blueprint_by_number<Host>(
@@ -333,15 +366,13 @@ pub fn store_inbox_blueprint_by_number<Host>(
     number: U256,
 ) -> Result<(), Error>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
-    let blueprint_path = blueprint_path(number)?;
-    store_blueprint_nb_chunks(host, &blueprint_path, 1)?;
+    store_blueprint_nb_chunks(host, number, 1)?;
     let current_generation = read_current_generation_or_default(host, U256::zero())?;
-    store_blueprint_generation(host, &blueprint_path, current_generation)?;
-    let chunk_path = blueprint_chunk_path(&blueprint_path, 0)?;
+    store_blueprint_generation(host, number, current_generation)?;
     let store_blueprint = StoreBlueprint::InboxBlueprint(blueprint);
-    store_rlp(&store_blueprint, host, &chunk_path).map_err(Error::from)
+    store_blueprint_chunk(host, number, 0, &store_blueprint)
 }
 
 pub fn store_inbox_blueprint<Host>(
@@ -349,16 +380,16 @@ pub fn store_inbox_blueprint<Host>(
     blueprint: Blueprint,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     let number = read_next_blueprint_number(host)?;
     Ok(store_inbox_blueprint_by_number(host, blueprint, number)?)
 }
 
 #[inline(always)]
-pub fn read_next_blueprint_number<Host>(host: &Host) -> Result<U256, Error>
+pub fn read_next_blueprint_number<Host>(host: &mut Host) -> Result<U256, Error>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     match read_current_blueprint_header(host) {
         Ok(blueprint_header) => Ok(blueprint_header.number + 1),
@@ -376,15 +407,13 @@ pub fn store_forced_blueprint<Host>(
     number: U256,
 ) -> Result<(), Error>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
-    let blueprint_path = blueprint_path(number)?;
-    store_blueprint_nb_chunks(host, &blueprint_path, 1)?;
+    store_blueprint_nb_chunks(host, number, 1)?;
     let current_generation = read_current_generation_or_default(host, U256::zero())?;
-    store_blueprint_generation(host, &blueprint_path, current_generation)?;
-    let chunk_path = blueprint_chunk_path(&blueprint_path, 0)?;
+    store_blueprint_generation(host, number, current_generation)?;
     let store_blueprint = StoreBlueprint::InboxBlueprint(blueprint);
-    store_rlp(&store_blueprint, host, &chunk_path).map_err(Error::from)
+    store_blueprint_chunk(host, number, 0, &store_blueprint)
 }
 
 impl Encodable for EVMBlockHeader {
@@ -514,17 +543,20 @@ where
 }
 
 pub fn read_current_block_header<Host, H: Decodable>(
-    host: &Host,
+    host: &mut Host,
 ) -> Result<BlockHeader<H>, Error>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
-    Ok(read_rlp(host, &EVM_CURRENT_BLOCK_HEADER)?)
+    let base = crate::storage::load_base_keyspace(host)?;
+    Ok(keyspace::read_rlp(&base, &EVM_CURRENT_BLOCK_HEADER_KEY)?)
 }
 
-pub fn read_current_blueprint_header<Host>(host: &Host) -> Result<BlueprintHeader, Error>
+pub fn read_current_blueprint_header<Host>(
+    host: &mut Host,
+) -> Result<BlueprintHeader, Error>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     let block_header = read_current_block_header::<_, rlp_helpers::IgnoredField>(host)?;
     Ok(block_header.blueprint_header)
@@ -798,25 +830,39 @@ where
 
 fn invalidate_blueprint<Host>(
     host: &mut Host,
-    blueprint_path: &OwnedPath,
+    number: U256,
     error: &BlueprintValidity,
 ) -> Result<(), Error>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     log!(
         Info,
         "Deleting invalid blueprint at path {}, error: {:?}",
-        blueprint_path,
+        blueprint_path(number)?,
         error
     );
     // Remove invalid blueprint from storage
-    delete_blueprint(host, blueprint_path)
+    delete_blueprint(host, number)
+}
+
+// Reads a single blueprint chunk through the `/base` keyspace.
+fn read_blueprint_chunk<Host>(
+    host: &mut Host,
+    number: U256,
+    chunk_index: u16,
+) -> Result<StoreBlueprint, Error>
+where
+    Host: StorageV1 + KeySpaceLoader,
+{
+    let key = blueprint_chunk_key(number, chunk_index)?;
+    let base = crate::storage::load_base_keyspace(host)?;
+    keyspace::read_rlp(&base, &key).map_err(Error::from)
 }
 
 fn read_all_chunks_and_validate<Host>(
     host: &mut Host,
-    blueprint_path: &OwnedPath,
+    number: U256,
     nb_chunks: u16,
     config: &Configuration,
     previous_chain_header: &EVMBlockHeader,
@@ -829,19 +875,14 @@ where
     let mut chunks = vec![];
     let mut size = 0;
     if nb_chunks > MAXIMUM_NUMBER_OF_CHUNKS {
-        invalidate_blueprint(
-            host,
-            blueprint_path,
-            &BlueprintValidity::BlueprintTooLarge,
-        )?;
+        invalidate_blueprint(host, number, &BlueprintValidity::BlueprintTooLarge)?;
         return Ok((None, 0));
     };
     for i in 0..nb_chunks {
-        let path = blueprint_chunk_path(blueprint_path, i)?;
-        let stored_chunk = match read_rlp(host, &path) {
+        let stored_chunk = match read_blueprint_chunk(host, number, i) {
             Ok(chunk) => chunk,
-            Err(tezos_storage::error::Error::Runtime(RuntimeError::PathNotFound)) => {
-                delete_blueprint(host, blueprint_path)?;
+            Err(Error::Storage(StorageError::Runtime(RuntimeError::PathNotFound))) => {
+                delete_blueprint(host, number)?;
                 return Ok((None, 0));
             }
             Err(err) => return Err(err.into()),
@@ -886,7 +927,7 @@ where
                 );
                 Ok((Some(blueprint), size_with_delayed_transactions))
             } else {
-                invalidate_blueprint(host, blueprint_path, &validity.0)?;
+                invalidate_blueprint(host, number, &validity.0)?;
                 Ok((None, size))
             }
         }
@@ -903,27 +944,22 @@ pub fn read_blueprint<Host>(
 where
     Host: StorageV1 + KeySpaceLoader,
 {
-    let blueprint_path = blueprint_path(number)?;
-    let exists = blueprint_exists(host, &blueprint_path)?;
+    let exists = blueprint_exists(host, number)?;
     if exists {
-        let nb_chunks = read_blueprint_nb_chunks(host, &blueprint_path)?;
+        let nb_chunks = read_blueprint_nb_chunks(host, number)?;
         let current_generation = read_current_generation_or_default(host, U256::zero())?;
         let blueprint_generation =
-            read_blueprint_generation_or_default(host, &blueprint_path, U256::zero())?;
+            read_blueprint_generation_or_default(host, number, U256::zero())?;
         // If the generation is not the current one, the blueprint is stale
         if blueprint_generation < current_generation {
-            invalidate_blueprint(
-                host,
-                &blueprint_path,
-                &BlueprintValidity::StaleBlueprint,
-            )?;
+            invalidate_blueprint(host, number, &BlueprintValidity::StaleBlueprint)?;
             return Ok((None, 0));
         }
         log!(Benchmarking, "Number of chunks in blueprint: {}", nb_chunks);
         // All chunks are available
         let (blueprint, size) = read_all_chunks_and_validate(
             host,
-            &blueprint_path,
+            number,
             nb_chunks,
             config,
             previous_chain_header,
@@ -967,48 +1003,45 @@ where
 
 pub fn drop_blueprint<Host>(host: &mut Host, number: U256) -> Result<(), Error>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
-    let path = blueprint_path(number)?;
-    delete_blueprint(host, &path)
+    delete_blueprint(host, number)
 }
 
-pub fn delete_blueprint<Host>(
-    host: &mut Host,
-    blueprint_path: &OwnedPath,
-) -> Result<(), Error>
+pub fn delete_blueprint<Host>(host: &mut Host, number: U256) -> Result<(), Error>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
-    let exists = blueprint_exists(host, blueprint_path)?;
+    let exists = blueprint_exists(host, number)?;
     if !exists {
         return Ok(());
     }
-    let nb_chunks = read_blueprint_nb_chunks(host, blueprint_path)?;
+    let nb_chunks = read_blueprint_nb_chunks(host, number)?;
+    // Delete the whole `/base/blueprints/<n>` subtree through the keyspace.
+    // `KeySpace::delete` is infallible (it returns whether the key existed),
+    // so absent keys need no special handling — unlike the raw
+    // `store_delete` + `allow_path_not_found` it replaces.
+    let mut base = crate::storage::load_base_keyspace(host)?;
     for i in 0..nb_chunks {
-        let chunk_path = blueprint_chunk_path(blueprint_path, i)?;
-        allow_path_not_found(host.store_delete(&chunk_path))?;
+        base.delete(&blueprint_chunk_key(number, i)?);
     }
-    allow_path_not_found(host.store_delete(&blueprint_generation_path(blueprint_path)?))?;
-    allow_path_not_found(host.store_delete(&blueprint_nb_chunks_path(blueprint_path)?))?;
+    base.delete(&blueprint_generation_key(number)?);
+    base.delete(&blueprint_nb_chunks_key(number)?);
     Ok(())
 }
 
-pub fn blueprint_exists<Host>(
-    host: &Host,
-    blueprint_path: &OwnedPath,
-) -> Result<bool, Error>
+pub fn blueprint_exists<Host>(host: &mut Host, number: U256) -> Result<bool, Error>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
-    host.store_has(&blueprint_nb_chunks_path(blueprint_path)?)
-        .map_err(Error::from)
-        .map(|exists| exists.is_some())
+    let key = blueprint_nb_chunks_key(number)?;
+    let base = crate::storage::load_base_keyspace(host)?;
+    Ok(base.contains(&key))
 }
 
 pub fn clear_all_blueprints<Host>(host: &mut Host) -> Result<(), Error>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     increment_current_generation(host)?;
     Ok(())
@@ -1123,8 +1156,7 @@ mod tests {
             .expect("Should be able to store sequencer blueprint");
 
         // Blueprint 0 should be stored
-        let blueprint_path = blueprint_path(U256::zero()).unwrap();
-        let exists = blueprint_exists(&host, &blueprint_path).unwrap();
+        let exists = blueprint_exists(&mut host, U256::zero()).unwrap();
         assert!(exists);
 
         // Reading the next blueprint should be None, as the delayed hash
@@ -1134,12 +1166,12 @@ mod tests {
         assert!(blueprint.0.is_none());
 
         // Next number should be 0, as we didn't read one
-        let number = read_next_blueprint_number(&host)
+        let number = read_next_blueprint_number(&mut host)
             .expect("Should be able to read next blueprint number");
         assert!(number.is_zero());
 
         // The blueprint 0 should have been removed
-        let exists = blueprint_exists(&host, &blueprint_path).unwrap();
+        let exists = blueprint_exists(&mut host, U256::zero()).unwrap();
         assert!(!exists);
 
         // Test with invalid parent hash
@@ -1187,7 +1219,7 @@ mod tests {
         store_sequencer_blueprint(&mut host, seq_blueprint)
             .expect("Should be able to store sequencer blueprint");
         // Blueprint 0 should be stored
-        let exists = blueprint_exists(&host, &blueprint_path).unwrap();
+        let exists = blueprint_exists(&mut host, U256::zero()).unwrap();
         assert!(exists);
 
         // Reading the next blueprint should be None, as the parent hash
@@ -1197,7 +1229,7 @@ mod tests {
         assert!(blueprint.0.is_none());
 
         // The blueprint 0 should have been removed
-        let exists = blueprint_exists(&host, &blueprint_path).unwrap();
+        let exists = blueprint_exists(&mut host, U256::zero()).unwrap();
         assert!(!exists)
     }
 
@@ -1233,10 +1265,67 @@ mod tests {
 
         // The keyspace write must land at the historical absolute path...
         assert!(host.store_read_all(&EVM_CURRENT_BLOCK_HEADER).is_ok());
-        // ...and the raw reader must decode the same blueprint header back.
-        let read = read_current_block_header::<_, EVMBlockHeader>(&host).unwrap();
+        // ...and the keyspace reader must decode the same blueprint header back.
+        let read = read_current_block_header::<_, EVMBlockHeader>(&mut host).unwrap();
         assert_eq!(read.blueprint_header.number, 7.into());
         assert_eq!(read.blueprint_header.timestamp, Timestamp::from(10));
+    }
+
+    // The sequencer-blueprint writer and its readers now go through the `/base`
+    // keyspace at relative keys. Checking the raw absolute paths and reading
+    // back through the migrated readers proves the relative keys resolve to the
+    // historical durable locations.
+    #[test]
+    fn store_sequencer_blueprint_resolves_to_absolute_paths() {
+        let mut host = MockKernelHost::default();
+        let number = U256::from(3);
+        let chunk_index = 2u16;
+        let nb_chunks = 5u16;
+        let chunk = vec![7u8; 16];
+
+        let blueprint = UnsignedSequencerBlueprint {
+            chunk: chunk.clone(),
+            number,
+            nb_chunks,
+            chunk_index,
+            chain_id: None,
+        };
+        store_sequencer_blueprint(&mut host, blueprint).unwrap();
+
+        // The keyspace writes must land at the historical absolute paths,
+        // identical to the `concat`-built ones.
+        let path = blueprint_path(number).unwrap();
+        let nb_chunks_path = concat(&path, &RefPath::assert_from(b"/nb_chunks")).unwrap();
+        let generation_path =
+            concat(&path, &RefPath::assert_from(b"/generation")).unwrap();
+        let chunk_path = concat(&path, &RefPath::assert_from(b"/2")).unwrap();
+        assert_eq!(
+            host.store_read_all(&nb_chunks_path).unwrap(),
+            nb_chunks.to_le_bytes()
+        );
+        // The current generation defaults to zero, so the blueprint inherits it.
+        assert_eq!(host.store_read_all(&generation_path).unwrap(), [0u8; 32]);
+        assert!(host.store_read_all(&chunk_path).is_ok());
+
+        // ...and the migrated readers read the same values back.
+        assert_eq!(
+            read_blueprint_nb_chunks(&mut host, number).unwrap(),
+            nb_chunks
+        );
+        assert_eq!(
+            read_blueprint_generation_or_default(&mut host, number, U256::one()).unwrap(),
+            U256::zero()
+        );
+        assert_eq!(
+            read_blueprint_chunk(&mut host, number, chunk_index).unwrap(),
+            StoreBlueprint::SequencerChunk(chunk)
+        );
+
+        // The blueprint exists and is removed cleanly through the keyspace.
+        assert!(blueprint_exists(&mut host, number).unwrap());
+        delete_blueprint(&mut host, number).unwrap();
+        assert!(!blueprint_exists(&mut host, number).unwrap());
+        assert!(host.store_read_all(&chunk_path).is_err());
     }
 
     #[test]
