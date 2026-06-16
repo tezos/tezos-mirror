@@ -628,6 +628,45 @@ let test_durable_count_subtrees_and_list () =
   let* () = assert_list tree [] "/long/path/to/something/unexisting" in
   Lwt.return_ok ()
 
+(* Test that [fold] visits every value stored in the durable storage exactly
+   once, passing the correct key and content. The traversal order is
+   unspecified, so results are compared as sorted lists. *)
+let test_durable_fold () =
+  let open Lwt_syntax in
+  let entries =
+    [
+      ("/hello/world", "first value");
+      ("/hello/you", "second value");
+      ("/hello/you/too", "third value");
+      ("/long/path/to/something", "fourth value");
+    ]
+  in
+  let* durable = make_durable entries in
+  let durable = Durable.of_storage_exn durable in
+  (* [make_durable] injects a non-value sentinel ("@"/"keep_me") at the durable
+     root to keep the storage non-empty. It is not a chunked byte vector, so we
+     remove it (the root value, key "") to fold over genuine values only. *)
+  let* durable =
+    Durable.delete
+      ~edit_readonly:true
+      ~kind:Value
+      durable
+      (Durable.key_of_string_exn "")
+  in
+  let* collected =
+    Durable.fold durable ~init:[] ~f:(fun key value acc ->
+        let+ value = Chunked_byte_vector.to_string value in
+        ("/" ^ String.concat "/" key, value) :: acc)
+  in
+  let to_strings l = List.map (fun (k, v) -> k ^ " = " ^ v) l in
+  let sorted l = List.sort String.compare (to_strings l) in
+  Assert.equal_list
+    ~loc:__LOC__
+    ~msg:"fold visits every stored value exactly once"
+    (sorted entries)
+    (sorted collected) ;
+  Lwt.return_ok ()
+
 (* Test checking that [store_copy from_key to_key] copies the subtree at
    [from_key] to [to_key] in the durable storage.  This should overwrite
    the tree that existed previously at [to_key] *)
@@ -1340,6 +1379,7 @@ let tests =
         "Durable: count subtrees and list"
         `Quick
         test_durable_count_subtrees_and_list;
+      tztest "Durable: fold" `Quick test_durable_fold;
       tztest "Durable: invalid keys" `Quick test_durable_invalid_keys;
       tztest "Durable: readonly keys" `Quick test_readonly_key;
     ]
