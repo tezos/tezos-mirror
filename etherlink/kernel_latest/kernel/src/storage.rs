@@ -19,7 +19,7 @@ use tezos_crypto_rs::hash::ChainId;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_data_encoding::nom::NomReader;
 use tezos_evm_logging::{log, Level::*};
-use tezos_indexable_storage::IndexableStorage;
+use tezos_indexable_storage::KeyspaceIndexableStorage;
 use tezos_smart_rollup::host::RuntimeError;
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
@@ -169,7 +169,10 @@ pub const MAXIMUM_GAS_PER_TRANSACTION: RefPath =
 pub const EVM_BLOCK_IN_PROGRESS: RefPath =
     RefPath::assert_from(b"/evm/world_state/blocks/in_progress");
 
-const EVENTS: RefPath = RefPath::assert_from(b"/base/rollup_events");
+/// Relative key of the rollup events index inside the `/base` keyspace. It
+/// resolves to the absolute durable path `/base/rollup_events`, where the
+/// push-only counter (`length`) and indexed values are stored.
+const EVENTS_KEY: Key = Key::from_static(b"/rollup_events");
 
 pub const EVM_TRANSACTIONS_RECEIPTS: RefPath =
     RefPath::assert_from(b"/evm/world_state/transactions_receipts");
@@ -1102,21 +1105,26 @@ pub fn store_sequencer(
 
 pub fn clear_events<Host>(host: &mut Host) -> anyhow::Result<()>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     if host.store_has(&KEEP_EVENTS)?.is_some() {
         host.store_delete(&KEEP_EVENTS)?;
         Ok(())
     } else {
-        let index = IndexableStorage::new(&EVENTS)?;
-        index.clear(host).map_err(Into::into)
+        let mut base = load_base_keyspace(host)?;
+        let index = KeyspaceIndexableStorage::new(EVENTS_KEY);
+        index.clear(&mut base).map_err(Into::into)
     }
 }
 
-pub fn store_event(host: &mut impl StorageV1, event: &Event) -> anyhow::Result<()> {
-    let index = IndexableStorage::new(&EVENTS)?;
+pub fn store_event(
+    host: &mut (impl StorageV1 + KeySpaceLoader),
+    event: &Event,
+) -> anyhow::Result<()> {
+    let mut base = load_base_keyspace(host)?;
+    let index = KeyspaceIndexableStorage::new(EVENTS_KEY);
     index
-        .push_value(host, &event.rlp_bytes())
+        .push_value(&mut base, &event.rlp_bytes())
         .map_err(Into::into)
 }
 

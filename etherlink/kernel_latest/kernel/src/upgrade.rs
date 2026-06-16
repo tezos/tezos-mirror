@@ -89,7 +89,7 @@ pub fn store_kernel_upgrade<Host>(
     kernel_upgrade: &KernelUpgrade,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + IsEvmNode,
+    Host: StorageV1 + IsEvmNode + KeySpaceLoader,
 {
     log!(
         Info,
@@ -196,7 +196,7 @@ pub fn store_sequencer_upgrade<Host>(
     sequencer_upgrade: SequencerUpgrade,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + IsEvmNode,
+    Host: StorageV1 + IsEvmNode + KeySpaceLoader,
 {
     log!(
         Info,

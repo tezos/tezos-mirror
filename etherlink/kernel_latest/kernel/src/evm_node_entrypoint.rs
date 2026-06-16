@@ -64,7 +64,8 @@ pub extern "C" fn populate_delayed_inbox() {
 #[allow(dead_code)]
 pub fn populate_delayed_inbox_with_durable_storage<Host>(host: &mut Host)
 where
-    Host: tezos_smart_rollup_host::runtime::Runtime,
+    Host: tezos_smart_rollup_host::runtime::Runtime
+        + tezos_smart_rollup_host::storage::CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
     let payload = host.store_read_all(&DELAYED_INPUT_PATH).unwrap();

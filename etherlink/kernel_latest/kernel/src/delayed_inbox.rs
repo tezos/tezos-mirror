@@ -215,7 +215,7 @@ impl DelayedInbox {
         level: u32,
     ) -> Result<()>
     where
-        Host: StorageV1 + IsEvmNode,
+        Host: StorageV1 + IsEvmNode + KeySpaceLoader,
     {
         match tx {
             TezosXTransaction::Ethereum(tx) => {
