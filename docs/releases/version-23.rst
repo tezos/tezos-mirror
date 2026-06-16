@@ -124,7 +124,7 @@ Fedora or Rocky Linux packages
 
   dnf -y update octez-node  octez-client octez-baker octez-dal-node octez-smart-rollup-node
 
-If you are installing Ubuntu and Debian packages from scratch, follow :ref:`their install instructions <installing_rpm>`
+If you are installing Ubuntu and Debian packages from scratch, follow :ref:`their install instructions <installing_deb>`
 
 From sources
 ~~~~~~~~~~~~
