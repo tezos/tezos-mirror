@@ -152,6 +152,12 @@
   no longer touches durable storage. Reveal now performs one durable write
   instead of two, and cross-runtime classification of an implicit address
   needs no read. (!22170)
+- Re-priced originated-contract storage-accounting gas in the Michelson
+  runtime to charge the aggregated `/info` record actually read and
+  written (each at its encoded size), instead of mirroring L1's
+  per-counter cost model. This lowers the `consumed_milligas` reported on
+  receipts and `eth_estimateGas` for operations that update an originated
+  contract's storage. (!22173)
 - Expose a contract's storage-space watermarks through two read-only
   RPCs, `GET .../contracts/<id>/storage/used_space` and `.../paid_space`,
   mirroring L1's `get_used_storage_space` / `get_paid_storage_space`
