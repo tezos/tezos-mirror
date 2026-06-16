@@ -198,6 +198,21 @@ where
     }
 }
 
+fn fetch_evm_chain_id(host: &mut impl StorageV1) -> U256 {
+    read_evm_chain_id(host).unwrap_or_else(|err| {
+        // Chain id not in storage yet: fall back to the default and persist.
+        log!(
+            Info,
+            "Failed to read the EVM chain id ({err:?}), falling back to the default."
+        );
+        let evm_chain_id = U256::from(EVM_CHAIN_ID);
+        if let Err(err) = store_evm_chain_id(host, evm_chain_id) {
+            log!(Error, "Failed to persist the default EVM chain id: {err:?}");
+        }
+        evm_chain_id
+    })
+}
+
 /// Derive the Michelson runtime chain ID from the EVM chain ID by
 /// hashing the EVM chain ID bytes with Blake2B-256 and taking the
 /// first 4 bytes.  This follows the same pattern as Tezos L1's
@@ -232,11 +247,7 @@ where
     // Read both runtime chain ids from storage. The EVM chain id falls back to
     // the default and is persisted on first use; the Michelson runtime chain id
     // is derived from it and persisted if absent.
-    let evm_chain_id = read_evm_chain_id(host).unwrap_or_else(|_| {
-        let evm_chain_id = U256::from(EVM_CHAIN_ID);
-        let _ = store_evm_chain_id(host, evm_chain_id);
-        evm_chain_id
-    });
+    let evm_chain_id = fetch_evm_chain_id(host);
     let limits = fetch_evm_limits(host);
     let spec_id = read_evm_version(host).into();
     let experimental_features = ExperimentalFeatures::read_from_storage(host);
