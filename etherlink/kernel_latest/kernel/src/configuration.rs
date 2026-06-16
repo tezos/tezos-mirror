@@ -10,11 +10,11 @@ use crate::{
     retrieve_minimum_base_fee_per_gas,
     storage::{
         dal_slots, enable_dal, is_enable_fa_bridge, max_blueprint_lookahead_in_seconds,
-        read_admin, read_chain_id, read_delayed_transaction_bridge,
+        read_admin, read_delayed_transaction_bridge, read_evm_chain_id,
         read_kernel_governance, read_kernel_security_governance,
         read_maximum_allowed_ticks, read_michelson_runtime_chain_id,
         read_or_set_maximum_gas_per_transaction, read_sequencer_governance, sequencer,
-        store_chain_id, store_michelson_runtime_chain_id,
+        store_evm_chain_id, store_michelson_runtime_chain_id,
     },
     tick_model::constants::{MAXIMUM_GAS_LIMIT, MAX_ALLOWED_TICKS},
 };
@@ -31,7 +31,7 @@ use tezos_smart_rollup_host::storage::StorageV1;
 
 /// The chain id will need to be unique when the EVM rollup is deployed in
 /// production.
-pub const CHAIN_ID: u32 = 1337;
+pub const EVM_CHAIN_ID: u32 = 1337;
 
 #[derive(Debug, Clone, Default)]
 pub struct DalConfiguration {
@@ -215,12 +215,12 @@ fn fetch_michelson_runtime_chain_id(
 ) -> ChainId {
     let chain_id_res = read_michelson_runtime_chain_id(host);
     match chain_id_res {
-        Ok(Some(chain_id)) => chain_id,
+        Ok(Some(michelson_chain_id)) => michelson_chain_id,
         Ok(None) | Err(_) => {
             // Chain id not in storage yet: derive from the EVM chain id and persist.
-            let chain_id = derive_michelson_chain_id(evm_chain_id);
-            let _ = store_michelson_runtime_chain_id(host, &chain_id);
-            chain_id
+            let michelson_chain_id = derive_michelson_chain_id(evm_chain_id);
+            let _ = store_michelson_runtime_chain_id(host, &michelson_chain_id);
+            michelson_chain_id
         }
     }
 }
@@ -232,10 +232,10 @@ where
     // Read both runtime chain ids from storage. The EVM chain id falls back to
     // the default and is persisted on first use; the Michelson runtime chain id
     // is derived from it and persisted if absent.
-    let evm_chain_id = read_chain_id(host).unwrap_or_else(|_| {
-        let chain_id = U256::from(CHAIN_ID);
-        let _ = store_chain_id(host, chain_id);
-        chain_id
+    let evm_chain_id = read_evm_chain_id(host).unwrap_or_else(|_| {
+        let evm_chain_id = U256::from(EVM_CHAIN_ID);
+        let _ = store_evm_chain_id(host, evm_chain_id);
+        evm_chain_id
     });
     let limits = fetch_evm_limits(host);
     let spec_id = read_evm_version(host).into();

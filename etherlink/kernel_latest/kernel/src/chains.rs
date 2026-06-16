@@ -18,7 +18,7 @@ use crate::{
     },
     tick_model::constants::MAXIMUM_GAS_LIMIT,
     transaction::TransactionContent,
-    CHAIN_ID,
+    EVM_CHAIN_ID,
 };
 use mir::ast::PublicKeyHash;
 use num_traits::ToPrimitive;
@@ -1247,11 +1247,11 @@ impl Default for EvmLimits {
 impl Default for TezosXChainConfig {
     fn default() -> Self {
         Self::create_config(
-            U256::from(CHAIN_ID),
+            U256::from(EVM_CHAIN_ID),
             EvmLimits::default(),
             SpecId::default(),
             ExperimentalFeatures::default(),
-            ChainId::from(CHAIN_ID.to_le_bytes()),
+            ChainId::from(EVM_CHAIN_ID.to_le_bytes()),
         )
     }
 }
@@ -1259,11 +1259,11 @@ impl Default for TezosXChainConfig {
 #[cfg(test)]
 pub fn test_tezosx_chain_config() -> TezosXChainConfig {
     TezosXChainConfig::create_config(
-        U256::from(CHAIN_ID),
+        U256::from(EVM_CHAIN_ID),
         EvmLimits::default(),
         SpecId::default(),
         ExperimentalFeatures::default(),
-        ChainId::from(CHAIN_ID.to_le_bytes()),
+        ChainId::from(EVM_CHAIN_ID.to_le_bytes()),
     )
 }
 

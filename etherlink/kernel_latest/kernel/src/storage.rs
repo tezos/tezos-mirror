@@ -147,7 +147,7 @@ pub const EVM_TRANSACTIONS_RECEIPTS: RefPath =
 pub const EVM_TRANSACTIONS_OBJECTS: RefPath =
     RefPath::assert_from(b"/evm/world_state/transactions_objects");
 
-const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/evm/world_state/chain_id");
+const EVM_CHAIN_ID_PATH: RefPath = RefPath::assert_from(b"/evm/world_state/chain_id");
 
 const MICHELSON_RUNTIME_CHAIN_ID: RefPath =
     RefPath::assert_from(b"/tez/world_state/chain_id");
@@ -612,12 +612,15 @@ where
     Ok(())
 }
 
-pub fn store_chain_id(host: &mut impl StorageV1, chain_id: U256) -> Result<(), Error> {
-    write_u256_le(host, &EVM_CHAIN_ID, chain_id).map_err(Error::from)
+pub fn store_evm_chain_id(
+    host: &mut impl StorageV1,
+    evm_chain_id: U256,
+) -> Result<(), Error> {
+    write_u256_le(host, &EVM_CHAIN_ID_PATH, evm_chain_id).map_err(Error::from)
 }
 
-pub fn read_chain_id(host: &impl StorageV1) -> Result<U256, Error> {
-    read_u256_le(host, &EVM_CHAIN_ID).map_err(Error::from)
+pub fn read_evm_chain_id(host: &impl StorageV1) -> Result<U256, Error> {
+    read_u256_le(host, &EVM_CHAIN_ID_PATH).map_err(Error::from)
 }
 
 pub fn store_michelson_runtime_chain_id(

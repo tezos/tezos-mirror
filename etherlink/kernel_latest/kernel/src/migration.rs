@@ -20,7 +20,7 @@ use crate::migration::legacy::{
     WITHDRAWAL_ADDRESS,
 };
 use crate::storage::{
-    read_chain_id, read_l1_level, read_last_info_per_level_timestamp,
+    read_evm_chain_id, read_l1_level, read_last_info_per_level_timestamp,
     read_storage_version, store_backlog, store_dal_slots, store_storage_version,
     tweak_dal_activation, StorageVersion, ENABLE_FA_BRIDGE, EVM_TRANSACTIONS_OBJECTS,
     EVM_TRANSACTIONS_RECEIPTS, SEQUENCER_GOVERNANCE,
@@ -59,7 +59,7 @@ fn is_etherlink_network(
     host: &impl StorageV1,
     expected_chain_id: u64,
 ) -> Result<bool, Error> {
-    match read_chain_id(host) {
+    match read_evm_chain_id(host) {
         Ok(chain_id) => Ok(chain_id == expected_chain_id.into()),
         Err(Error::Storage(StorageError::Runtime(RuntimeError::PathNotFound))) => {
             Ok(false)

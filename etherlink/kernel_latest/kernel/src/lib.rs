@@ -6,7 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::configuration::{
-    fetch_configuration, fetch_tezosx_configuration, Configuration, CHAIN_ID,
+    fetch_configuration, fetch_tezosx_configuration, Configuration, EVM_CHAIN_ID,
 };
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
@@ -23,8 +23,8 @@ use primitive_types::U256;
 use reveal_storage::{is_revealed_storage, reveal_storage};
 use revm_etherlink::precompiles::initializer::init_precompile_bytecodes;
 use storage::{
-    read_chain_id, read_da_fee, read_kernel_version, read_minimum_base_fee_per_gas,
-    read_tracer_input, store_chain_id, store_da_fee, store_kernel_version,
+    read_da_fee, read_evm_chain_id, read_kernel_version, read_minimum_base_fee_per_gas,
+    read_tracer_input, store_da_fee, store_evm_chain_id, store_kernel_version,
     store_minimum_base_fee_per_gas, store_storage_version, STORAGE_VERSION,
     STORAGE_VERSION_PATH,
 };
@@ -161,13 +161,13 @@ fn init_storage_versioning(host: &mut impl StorageV1) -> Result<(), Error> {
     }
 }
 
-fn retrieve_chain_id(host: &mut impl StorageV1) -> Result<U256, Error> {
-    match read_chain_id(host) {
-        Ok(chain_id) => Ok(chain_id),
+fn retrieve_evm_chain_id(host: &mut impl StorageV1) -> Result<U256, Error> {
+    match read_evm_chain_id(host) {
+        Ok(evm_chain_id) => Ok(evm_chain_id),
         Err(_) => {
-            let chain_id = U256::from(CHAIN_ID);
-            store_chain_id(host, chain_id)?;
-            Ok(chain_id)
+            let evm_chain_id = U256::from(EVM_CHAIN_ID);
+            store_evm_chain_id(host, evm_chain_id)?;
+            Ok(evm_chain_id)
         }
     }
 }
@@ -462,7 +462,7 @@ mod tests {
     use crate::fees;
     use crate::parsing::RollupType;
     use crate::run;
-    use crate::storage::{store_chain_id, ENABLE_FA_BRIDGE};
+    use crate::storage::{store_evm_chain_id, ENABLE_FA_BRIDGE};
     use alloy_primitives::keccak256;
     use alloy_sol_types::sol;
     use pretty_assertions::assert_eq;
@@ -587,7 +587,7 @@ mod tests {
             b"KT1DWVsu4Jtu2ficZ1qtNheGPunm5YVniegT",
         )
         .unwrap();
-        store_chain_id(&mut host, DUMMY_CHAIN_ID).unwrap();
+        store_evm_chain_id(&mut host, DUMMY_CHAIN_ID).unwrap();
 
         // run level in order to initialize outbox counter (by SOL message)
         let level = host.host.run_level(|_| ());
