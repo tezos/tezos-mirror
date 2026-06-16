@@ -623,7 +623,7 @@ pub fn fetch_hashes_from_delayed_inbox<Host>(
     block_number: U256,
 ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     let mut delayed_txs = vec![];
     let mut total_size = current_blueprint_size;
@@ -692,7 +692,7 @@ pub fn fetch_delayed_txs<Host>(
     block_number: U256,
 ) -> anyhow::Result<(BlueprintValidity, usize)>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     let (mut delayed_txs, total_size) =
         match TezosXChainConfig::fetch_hashes_from_delayed_inbox(

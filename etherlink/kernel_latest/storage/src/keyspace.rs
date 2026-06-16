@@ -120,6 +120,21 @@ pub fn read_rlp<T: Decodable>(ks: &impl KeySpace, key: &Key) -> Result<T, Error>
     FromRlpBytes::from_rlp_bytes(&bytes).map_err(Error::from)
 }
 
+/// Return a decodable value stored as rlp bytes at the given `key`, or
+/// `None` if the key is absent.
+///
+/// Mirrors the root [`read_optional_rlp`](crate::read_optional_rlp): a
+/// missing key yields `None` rather than an error.
+pub fn read_optional_rlp<T: Decodable>(
+    ks: &impl KeySpace,
+    key: &Key,
+) -> Result<Option<T>, Error> {
+    match ks.get(key) {
+        Some(bytes) => Ok(Some(FromRlpBytes::from_rlp_bytes(&bytes)?)),
+        None => Ok(None),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

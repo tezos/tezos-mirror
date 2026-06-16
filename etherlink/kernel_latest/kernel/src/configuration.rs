@@ -311,7 +311,9 @@ where
             let max_blueprint_lookahead_in_seconds =
                 max_blueprint_lookahead_in_seconds(&base)
                     .unwrap_or(DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS);
-            match DelayedInbox::new(host) {
+            // Reuse the live `/base` handle; re-loading would fail with
+            // `AlreadyLoaded`.
+            match DelayedInbox::from_base(&base) {
                 Ok(delayed_inbox) => Configuration {
                     tezos_contracts,
                     mode: ConfigurationMode::Sequencer {

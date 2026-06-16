@@ -389,7 +389,9 @@ mod tests {
         }
     }
 
-    fn delayed_inbox_is_empty<Host: StorageV1>(
+    fn delayed_inbox_is_empty<
+        Host: StorageV1 + tezos_smart_rollup_keyspace::KeySpaceLoader,
+    >(
         conf: &Configuration,
         host: &mut Host,
     ) -> bool {

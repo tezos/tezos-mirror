@@ -489,7 +489,7 @@ fn clean_delayed_transactions<Host>(
     delayed_txs: Vec<TransactionHash>,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     for hash in delayed_txs {
         delayed_inbox.delete(host, hash.into())?;

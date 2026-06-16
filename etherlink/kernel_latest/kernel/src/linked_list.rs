@@ -4,13 +4,10 @@ use anyhow::{Context, Result};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpIterator, RlpStream};
 use std::marker::PhantomData;
 use tezos_ethereum::rlp_helpers::{append_option, decode_field, decode_option, next};
-use tezos_smart_rollup_host::path::{concat, OwnedPath, Path};
-use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_storage::{read_optional_rlp, read_rlp, store_rlp};
+use tezos_smart_rollup_keyspace::{Key, KeySpace};
+use tezos_storage::keyspace::{read_optional_rlp, read_rlp, store_rlp};
 
-use crate::migration::allow_path_not_found;
-
-/// Doubly linked list using the durable storage.
+/// Doubly linked list backed by a [`KeySpace`].
 ///
 /// The list is generic over element and index.
 /// The element has to implement Decodable and Encodable
@@ -18,13 +15,23 @@ use crate::migration::allow_path_not_found;
 ///
 /// The list is lazy. Not all the list is loaded at initialization.
 /// Elements are saved/read at the appropriate moment.
+///
+/// All entries are addressed by keys derived from the element id relative to
+/// the `prefix` key inside the keyspace, mirroring the historical durable
+/// layout: for a list rooted at `prefix` the metadata lives at
+/// `{prefix}/meta`, a pointer at `{prefix}/{hex(id)}/pointer` and its data at
+/// `{prefix}/{hex(id)}/data`. A keyspace loaded under name `/base` with
+/// `prefix = /delayed-inbox` therefore resolves to exactly the durable paths
+/// the previous [`StorageV1`]-based list used.
+///
+/// [`StorageV1`]: tezos_smart_rollup_host::storage::StorageV1
 pub struct LinkedList<Id, Elt>
 where
     Id: AsRef<[u8]> + Encodable + Decodable + Clone,
     Elt: Encodable + Decodable + Clone,
 {
-    /// Absolute path to queue
-    path: OwnedPath,
+    /// Relative key, inside the keyspace, under which the list is stored.
+    prefix: Key,
     /// None indicates an empty list
     pointers: Option<LinkedListPointer<Id, Elt>>,
     _type: PhantomData<(Id, Elt)>,
@@ -48,13 +55,13 @@ struct Pointer<Id, Elt> {
     _type: PhantomData<Elt>,
 }
 
-/// Helper function to decode a path from rlp
-fn decode_path(
+/// Helper function to decode the relative key prefix from rlp.
+fn decode_prefix(
     it: &mut RlpIterator,
     field_name: &'static str,
-) -> Result<OwnedPath, rlp::DecoderError> {
-    let path: Vec<u8> = decode_field(&next(it)?, field_name)?;
-    OwnedPath::try_from(path).map_err(|_| DecoderError::Custom("not a path"))
+) -> Result<Key, rlp::DecoderError> {
+    let prefix: Vec<u8> = decode_field(&next(it)?, field_name)?;
+    Key::from_bytes(&prefix).map_err(|_| DecoderError::Custom("not a key"))
 }
 
 impl<Id: Decodable, Elt> Decodable for LinkedListPointer<Id, Elt> {
@@ -118,7 +125,7 @@ where
 {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
         stream.begin_list(2);
-        stream.append(&self.path.as_bytes());
+        stream.append(&self.prefix.as_bytes());
         append_option(stream, &self.pointers);
     }
 }
@@ -137,11 +144,11 @@ where
         }
 
         let mut it = decoder.iter();
-        let path = decode_path(&mut it, "path")?;
+        let prefix = decode_prefix(&mut it, "prefix")?;
         let pointers = decode_option(&next(&mut it)?, "pointers")?;
 
         Ok(Self {
-            path,
+            prefix,
             pointers,
             _type: PhantomData,
         })
@@ -154,68 +161,50 @@ where
     Id: Decodable + Encodable + AsRef<[u8]>,
     Elt: Encodable + Decodable,
 {
-    fn pointer_path(id: &Id, prefix: &impl Path) -> Result<OwnedPath> {
-        let path = hex::encode(id);
-        let path: Vec<u8> = format!("/{path}/pointer").into();
-        let path = OwnedPath::try_from(path)?;
-        let path = concat(prefix, &path)?;
-        Ok(path)
+    fn pointer_key(id: &Id, prefix: &Key) -> Result<Key> {
+        Key::try_from(format!("{}/{}/pointer", prefix, hex::encode(id)))
+            .context("invalid pointer key")
     }
 
-    /// Path to the pointer
+    /// Key to the pointer.
     ///
-    /// This path is used when you want to read a pointer or to remove it.
-    fn path(&self, prefix: &impl Path) -> Result<OwnedPath> {
-        Self::pointer_path(&self.id, prefix)
+    /// This key is used when you want to read a pointer or to remove it.
+    fn key(&self, prefix: &Key) -> Result<Key> {
+        Self::pointer_key(&self.id, prefix)
     }
 
-    /// Path to the data held by the pointer.
-    fn data_path(&self, prefix: &impl Path) -> Result<OwnedPath> {
-        let path = hex::encode(&self.id);
-        let path: Vec<u8> = format!("/{path}/data").into();
-        let path = OwnedPath::try_from(path)?;
-        let path = concat(prefix, &path)?;
-        Ok(path)
+    /// Key to the data held by the pointer.
+    fn data_key(id: &Id, prefix: &Key) -> Result<Key> {
+        Key::try_from(format!("{}/{}/data", prefix, hex::encode(id)))
+            .context("invalid data key")
     }
 
-    fn save_data(
-        &self,
-        host: &mut impl StorageV1,
-        prefix: &impl Path,
-        data: &Elt,
-    ) -> Result<()> {
-        let path = self.data_path(prefix)?;
-        store_rlp(data, host, &path).context("cannot save the pointer's data")
+    fn save_data(&self, ks: &mut impl KeySpace, prefix: &Key, data: &Elt) -> Result<()> {
+        let key = Self::data_key(&self.id, prefix)?;
+        store_rlp(data, ks, &key).context("cannot save the pointer's data")
     }
 
-    fn get_data(&self, host: &impl StorageV1, prefix: &impl Path) -> Result<Elt> {
-        let path = self.data_path(prefix)?;
-        read_rlp(host, &path).context("cannot read the pointer's data")
+    fn get_data(&self, ks: &impl KeySpace, prefix: &Key) -> Result<Elt> {
+        let key = Self::data_key(&self.id, prefix)?;
+        read_rlp(ks, &key).context("cannot read the pointer's data")
     }
 
-    /// Load the pointer from the durable storage
-    fn read(host: &impl StorageV1, prefix: &impl Path, id: &Id) -> Result<Option<Self>> {
-        read_optional_rlp(host, &Self::pointer_path(id, prefix)?)
+    /// Load the pointer from the keyspace.
+    fn read(ks: &impl KeySpace, prefix: &Key, id: &Id) -> Result<Option<Self>> {
+        read_optional_rlp(ks, &Self::pointer_key(id, prefix)?)
+            .context("cannot read the pointer")
     }
 
-    /// Save the pointer in the durable storage
-    fn save(&self, host: &mut impl StorageV1, prefix: &impl Path) -> Result<()> {
-        store_rlp(self, host, &self.path(prefix)?)
-            .context("cannot save pointer to storage")
+    /// Save the pointer in the keyspace.
+    fn save(&self, ks: &mut impl KeySpace, prefix: &Key) -> Result<()> {
+        store_rlp(self, ks, &self.key(prefix)?).context("cannot save pointer to storage")
     }
 
-    /// Removes the pointer and its data frm the durable storage.
-    fn remove_with_data(
-        &self,
-        host: &mut impl StorageV1,
-        prefix: &impl Path,
-    ) -> Result<()> {
-        let pointer_path = self.path(prefix)?;
-        let data_path = self.data_path(prefix)?;
-        host.store_delete(&pointer_path)
-            .context("cannot remove the pointer")?;
-        host.store_delete(&data_path)
-            .context("cannot remove the pointer's data")
+    /// Removes the pointer and its data from the keyspace.
+    fn remove_with_data(&self, ks: &mut impl KeySpace, prefix: &Key) -> Result<()> {
+        ks.delete(&self.key(prefix)?);
+        ks.delete(&Self::data_key(&self.id, prefix)?);
+        Ok(())
     }
 }
 
@@ -225,42 +214,39 @@ where
     Id: AsRef<[u8]> + Encodable + Decodable + Clone + PartialEq,
     Elt: Encodable + Decodable + Clone,
 {
-    /// Load a list from the storage.
+    /// Load a list from the keyspace.
     /// If the list does not exist, a new empty list is created.
-    /// Otherwise the existing list is read from the storage.
-    pub fn new(path: &impl Path, host: &impl StorageV1) -> Result<Self> {
-        let mut list = Self::read(host, path)?.unwrap_or(Self {
-            path: path.into(),
+    /// Otherwise the existing list is read from the keyspace.
+    pub fn new(prefix: &Key, ks: &impl KeySpace) -> Result<Self> {
+        let mut list = Self::read(ks, prefix)?.unwrap_or(Self {
+            prefix: prefix.clone(),
             pointers: None,
             _type: PhantomData,
         });
-        // Always use the caller-supplied path. The serialised metadata
-        // may contain a stale path when the subtree has been relocated
+        // Always use the caller-supplied prefix. The serialised metadata
+        // may contain a stale prefix when the subtree has been relocated
         // (e.g. /evm/delayed-inbox → /base/delayed-inbox by V53).
-        list.path = path.into();
+        list.prefix = prefix.clone();
         Ok(list)
     }
 
-    /// Path to the metadata that defines the list.
-    fn metadata_path(root: &impl Path) -> Result<OwnedPath> {
-        let meta_path: Vec<u8> = "/meta".into();
-        let meta_path = OwnedPath::try_from(meta_path)?;
-        let path = concat(root, &meta_path)?;
-        Ok(path)
+    /// Key to the metadata that defines the list.
+    fn metadata_key(prefix: &Key) -> Result<Key> {
+        Key::try_from(format!("{prefix}/meta")).context("invalid metadata key")
     }
 
-    /// Saves the LinkedList in the durable storage.
+    /// Saves the LinkedList in the keyspace.
     ///
     /// Only save the back and front pointers.
-    fn save(&self, host: &mut impl StorageV1) -> Result<()> {
-        let path = Self::metadata_path(&self.path)?;
-        store_rlp(self, host, &path).context("cannot save linked list from the storage")
+    fn save(&self, ks: &mut impl KeySpace) -> Result<()> {
+        let key = Self::metadata_key(&self.prefix)?;
+        store_rlp(self, ks, &key).context("cannot save linked list to the storage")
     }
 
-    /// Load the LinkedList from the durable storage.
-    fn read(host: &impl StorageV1, path: &impl Path) -> Result<Option<Self>> {
-        let path = Self::metadata_path(path)?;
-        read_optional_rlp(host, &path)
+    /// Load the LinkedList from the keyspace.
+    fn read(ks: &impl KeySpace, prefix: &Key) -> Result<Option<Self>> {
+        let key = Self::metadata_key(prefix)?;
+        read_optional_rlp(ks, &key).context("cannot read linked list from the storage")
     }
 
     /// Returns true if the list contains no elements.
@@ -274,9 +260,9 @@ where
     /// The Id has to be unique by element.
     /// The Id will be later use to retrieve the element
     /// (example: it can be the hash of the element).
-    pub fn push(&mut self, host: &mut impl StorageV1, id: &Id, elt: &Elt) -> Result<()> {
-        // Check if the path already exist
-        if (Pointer::read(host, &self.path, id)? as Option<Pointer<Id, Elt>>).is_some() {
+    pub fn push(&mut self, ks: &mut impl KeySpace, id: &Id, elt: &Elt) -> Result<()> {
+        // Check if the pointer already exists
+        if (Pointer::read(ks, &self.prefix, id)? as Option<Pointer<Id, Elt>>).is_some() {
             return Ok(());
         }
         match &self.pointers {
@@ -295,10 +281,10 @@ where
                     _type: PhantomData,
                 };
                 // Saves the pointer
-                penultimate.save(host, &self.path)?;
-                back.save(host, &self.path)?;
+                penultimate.save(ks, &self.prefix)?;
+                back.save(ks, &self.prefix)?;
                 // And the save the data
-                back.save_data(host, &self.path, elt)?;
+                back.save_data(ks, &self.prefix, elt)?;
                 // update the back pointer of the list
 
                 // Before the addition, penultimate might be the front
@@ -327,8 +313,8 @@ where
                     _type: PhantomData,
                 };
                 // Saves the pointer and its data
-                back.save(host, &self.path)?;
-                back.save_data(host, &self.path, elt)?;
+                back.save(ks, &self.prefix)?;
+                back.save_data(ks, &self.prefix, elt)?;
                 // update the front and back pointers of the list
                 self.pointers = Some(LinkedListPointer {
                     front: back.clone(),
@@ -336,43 +322,47 @@ where
                 });
             }
         };
-        self.save(host)
+        self.save(ks)
     }
 
     /// Returns an element at a given index.
     ///
     /// Returns None if the element is not present
-    pub fn find(&self, host: &impl StorageV1, id: &Id) -> Result<Option<Elt>> {
-        let Some::<Pointer<Id, Elt>>(pointer) = Pointer::read(host, &self.path, id)?
+    pub fn find(&self, ks: &impl KeySpace, id: &Id) -> Result<Option<Elt>> {
+        let Some::<Pointer<Id, Elt>>(pointer) = Pointer::read(ks, &self.prefix, id)?
         else {
             return Ok(None);
         };
-        read_optional_rlp(host, &pointer.data_path(&self.path)?)
+        read_optional_rlp(
+            ks,
+            &Pointer::<Id, Elt>::data_key(&pointer.id, &self.prefix)?,
+        )
+        .context("cannot read the pointer's data")
     }
 
     /// Removes and returns the element at position index within the vector.
-    pub fn remove(&mut self, host: &mut impl StorageV1, id: &Id) -> Result<Option<Elt>> {
+    pub fn remove(&mut self, ks: &mut impl KeySpace, id: &Id) -> Result<Option<Elt>> {
         // Check if the list is empty
         let Some(LinkedListPointer { front, back }) = &self.pointers else {
             return Ok(None);
         };
         // Get the previous and the next pointer
-        let Some(pointer) = Pointer::read(host, &self.path, id)? else {
+        let Some(pointer) = Pointer::read(ks, &self.prefix, id)? else {
             return Ok(None);
         };
         let previous = match pointer.previous {
-            Some(ref previous) => Pointer::read(host, &self.path, previous)?,
+            Some(ref previous) => Pointer::read(ks, &self.prefix, previous)?,
             None => None,
         };
         let next = match pointer.next {
-            Some(ref next) => Pointer::read(host, &self.path, next)?,
+            Some(ref next) => Pointer::read(ks, &self.prefix, next)?,
             None => None,
         };
 
         // retrieve the data
-        let data = pointer.get_data(host, &self.path)?;
+        let data = pointer.get_data(ks, &self.prefix)?;
         // delete the pointer and the data
-        pointer.remove_with_data(host, &self.path)?;
+        pointer.remove_with_data(ks, &self.prefix)?;
         match (previous, next) {
             // This case represents the list with only one element
             (None, None) => {
@@ -386,7 +376,7 @@ where
                     ..next
                 };
                 // update the pointer
-                new_front.save(host, &self.path)?;
+                new_front.save(ks, &self.prefix)?;
 
                 // If the list has 2 elements and if the front is removed,
                 // then the front and the back are equal.
@@ -408,7 +398,7 @@ where
                     next: None, // because it's the end of the list
                     ..previous
                 };
-                new_back.save(host, &self.path)?;
+                new_back.save(ks, &self.prefix)?;
                 // If the list has 2 elements and if the back is removed,
                 // then the front and the back are equal.
                 if new_back.id == front.id {
@@ -434,8 +424,8 @@ where
                     previous: Some(previous_id),
                     ..next
                 };
-                new_previous.save(host, &self.path)?;
-                new_next.save(host, &self.path)?;
+                new_previous.save(ks, &self.prefix)?;
+                new_next.save(ks, &self.prefix)?;
 
                 // We remove the second item of a list of three. It means back and front
                 // have been updated and are pointing to each other now.
@@ -468,42 +458,41 @@ where
                 }
             }
         };
-        self.save(host)?;
+        self.save(ks)?;
         Ok(Some(data))
     }
 
     /// Returns the first element of the list
     /// or `None` if it is empty.
-    pub fn first(&self, host: &impl StorageV1) -> Result<Option<Elt>> {
+    pub fn first(&self, ks: &impl KeySpace) -> Result<Option<Elt>> {
         let Some(LinkedListPointer { front, .. }) = &self.pointers else {
             return Ok(None);
         };
-        Ok(Some(front.get_data(host, &self.path)?))
+        Ok(Some(front.get_data(ks, &self.prefix)?))
     }
 
     /// Returns the first element of the list alongside its id
     /// or `None` if it is empty.
-    pub fn first_with_id(&self, host: &impl StorageV1) -> Result<Option<(Id, Elt)>> {
+    pub fn first_with_id(&self, ks: &impl KeySpace) -> Result<Option<(Id, Elt)>> {
         let Some(LinkedListPointer { front, .. }) = &self.pointers else {
             return Ok(None);
         };
-        Ok(Some((front.id.clone(), front.get_data(host, &self.path)?)))
+        Ok(Some((front.id.clone(), front.get_data(ks, &self.prefix)?)))
     }
 
     /// Removes the first element of the list and returns it
-    pub fn pop_first(&mut self, host: &mut impl StorageV1) -> Result<Option<Elt>> {
+    pub fn pop_first(&mut self, ks: &mut impl KeySpace) -> Result<Option<Elt>> {
         let Some(LinkedListPointer { front, .. }) = &self.pointers else {
             return Ok(None);
         };
         let to_remove = front.id.clone();
-        self.remove(host, &to_remove)
+        self.remove(ks, &to_remove)
     }
 
     /// Deletes the entire list
-    pub fn delete(&mut self, host: &mut impl StorageV1) -> Result<()> {
-        let metadata_path = Self::metadata_path(&self.path)?;
-        allow_path_not_found(host.store_delete(&metadata_path))?;
-        while self.pop_first(host)?.is_some() {}
+    pub fn delete(&mut self, ks: &mut impl KeySpace) -> Result<()> {
+        ks.delete(&Self::metadata_key(&self.prefix)?);
+        while self.pop_first(ks)?.is_some() {}
         self.pointers = None;
         Ok(())
     }
@@ -517,7 +506,15 @@ mod tests {
     use rlp::{Decodable, DecoderError, Encodable};
     use std::collections::HashMap;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_smart_rollup_host::path::RefPath;
+    use tezos_smart_rollup_keyspace::KeySpaceLoader;
+
+    /// Relative key, inside the test keyspace, under which the list lives.
+    const PREFIX: Key = Key::from_static(b"/list");
+
+    /// Load the test keyspace.
+    fn keyspace(host: &mut MockKernelHost) -> impl KeySpace + '_ {
+        host.load_or_create("/q".parse().unwrap()).unwrap()
+    }
 
     #[derive(Clone, PartialEq, Debug)]
     struct Hash([u8; 8]);
@@ -545,8 +542,8 @@ mod tests {
     }
 
     fn traverse_f(
-        host: &MockKernelHost,
-        list_path: &OwnedPath,
+        ks: &impl KeySpace,
+        prefix: &Key,
         pointer: Pointer<Hash, u8>,
         f: &dyn Fn(&Pointer<Hash, u8>) -> Option<Hash>,
     ) -> (Pointer<Hash, u8>, usize) {
@@ -557,7 +554,7 @@ mod tests {
             match f(&cell) {
                 None => break,
                 Some(next) => {
-                    match Pointer::<Hash, u8>::read(host, list_path, &next).unwrap() {
+                    match Pointer::<Hash, u8>::read(ks, prefix, &next).unwrap() {
                         Some(next) => cell = next,
                         None => {
                             panic!("Pointer should exist in storage");
@@ -569,7 +566,7 @@ mod tests {
         (cell, size)
     }
 
-    fn traverse(host: &MockKernelHost, list: &LinkedList<Hash, u8>) -> usize {
+    fn traverse(ks: &impl KeySpace, list: &LinkedList<Hash, u8>) -> usize {
         let Some(LinkedListPointer {
             ref front,
             ref back,
@@ -579,14 +576,14 @@ mod tests {
         };
 
         let (found_front, size_from_back) =
-            traverse_f(host, &list.path, back.clone(), &|cell: &Pointer<
+            traverse_f(ks, &list.prefix, back.clone(), &|cell: &Pointer<
                 Hash,
                 u8,
             >| {
                 cell.previous.clone()
             });
         let (found_back, size_from_front) =
-            traverse_f(host, &list.path, front.clone(), &|cell: &Pointer<
+            traverse_f(ks, &list.prefix, front.clone(), &|cell: &Pointer<
                 Hash,
                 u8,
             >| {
@@ -600,12 +597,8 @@ mod tests {
         size_from_back
     }
 
-    fn assert_length(
-        host: &MockKernelHost,
-        list: &LinkedList<Hash, u8>,
-        expected_len: u64,
-    ) {
-        let traverse_length = traverse(host, list);
+    fn assert_length(ks: &impl KeySpace, list: &LinkedList<Hash, u8>, expected_len: u64) {
+        let traverse_length = traverse(ks, list);
         assert_eq!(
             expected_len, traverse_length as u64,
             "Traverse size is unexpected"
@@ -614,36 +607,35 @@ mod tests {
 
     #[test]
     fn test_empty() {
-        let host = MockKernelHost::default();
-        let path = RefPath::assert_from(b"/list");
+        let mut host = MockKernelHost::default();
+        let ks = keyspace(&mut host);
         let list =
-            LinkedList::<Hash, u8>::new(&path, &host).expect("list should be created");
+            LinkedList::<Hash, u8>::new(&PREFIX, &ks).expect("list should be created");
         assert!(list.is_empty())
     }
 
     #[test]
     fn test_find_returns_none_when_empty() {
-        let host = MockKernelHost::default();
-        let path = RefPath::assert_from(b"/list");
-        let list = LinkedList::new(&path, &host).expect("list should be created");
+        let mut host = MockKernelHost::default();
+        let ks = keyspace(&mut host);
+        let list = LinkedList::new(&PREFIX, &ks).expect("list should be created");
         let hash = Hash([0; 8]);
-        let read: Option<u8> = list.find(&host, &hash).expect("storage should work");
+        let read: Option<u8> = list.find(&ks, &hash).expect("storage should work");
         assert!(read.is_none())
     }
 
     #[test]
     fn test_insert() {
         let mut host = MockKernelHost::default();
-        let path = RefPath::assert_from(b"/list");
-        let mut list = LinkedList::new(&path, &host).expect("list should be created");
+        let mut ks = keyspace(&mut host);
+        let mut list = LinkedList::new(&PREFIX, &ks).expect("list should be created");
         let id = Hash([0x0; 8]);
         let elt = 0x32_u8;
 
-        list.push(&mut host, &id, &elt)
-            .expect("storage should work");
+        list.push(&mut ks, &id, &elt).expect("storage should work");
 
         let read: u8 = list
-            .find(&host, &id)
+            .find(&ks, &id)
             .expect("storage should work")
             .expect("element should be present");
 
@@ -653,19 +645,18 @@ mod tests {
     #[test]
     fn test_remove() {
         let mut host = MockKernelHost::default();
-        let path = RefPath::assert_from(b"/list");
-        let mut list = LinkedList::new(&path, &host).expect("list should be created");
+        let mut ks = keyspace(&mut host);
+        let mut list = LinkedList::new(&PREFIX, &ks).expect("list should be created");
         let id = Hash([0x0; 8]);
         let elt = 0x32_u8;
 
-        assert_length(&host, &list, 0u64);
-        list.push(&mut host, &id, &elt)
-            .expect("storage should work");
-        assert_length(&host, &list, 1u64);
-        let _: Option<u8> = list.remove(&mut host, &id).expect("storage should work");
-        assert_length(&host, &list, 0u64);
+        assert_length(&ks, &list, 0u64);
+        list.push(&mut ks, &id, &elt).expect("storage should work");
+        assert_length(&ks, &list, 1u64);
+        let _: Option<u8> = list.remove(&mut ks, &id).expect("storage should work");
+        assert_length(&ks, &list, 0u64);
 
-        let read: Option<u8> = list.find(&host, &id).expect("storage should work");
+        let read: Option<u8> = list.find(&ks, &id).expect("storage should work");
 
         assert!(read.is_none())
     }
@@ -673,12 +664,11 @@ mod tests {
     #[test]
     fn test_remove_nothing() {
         let mut host = MockKernelHost::default();
-        let path = RefPath::assert_from(b"/list");
-        let mut list = LinkedList::new(&path, &host).expect("list should be created");
+        let mut ks = keyspace(&mut host);
+        let mut list = LinkedList::new(&PREFIX, &ks).expect("list should be created");
         let id = Hash([0x0; 8]);
 
-        let removed: Option<u8> =
-            list.remove(&mut host, &id).expect("storage should work");
+        let removed: Option<u8> = list.remove(&mut ks, &id).expect("storage should work");
 
         assert!(removed.is_none())
     }
@@ -686,16 +676,15 @@ mod tests {
     #[test]
     fn test_first() {
         let mut host = MockKernelHost::default();
-        let path = RefPath::assert_from(b"/list");
-        let mut list = LinkedList::new(&path, &host).expect("list should be created");
+        let mut ks = keyspace(&mut host);
+        let mut list = LinkedList::new(&PREFIX, &ks).expect("list should be created");
         let id = Hash([0x0; 8]);
         let elt = 0x32_u8;
 
-        list.push(&mut host, &id, &elt)
-            .expect("storage should workd");
+        list.push(&mut ks, &id, &elt).expect("storage should workd");
 
         let read: u8 = list
-            .first(&host)
+            .first(&ks)
             .expect("storage should work")
             .expect("element should be present");
 
@@ -705,18 +694,18 @@ mod tests {
     #[test]
     fn test_first_when_only_two_elements() {
         let mut host = MockKernelHost::default();
-        let path = RefPath::assert_from(b"/list");
-        let mut list = LinkedList::new(&path, &host).expect("list should be created");
+        let mut ks = keyspace(&mut host);
+        let mut list = LinkedList::new(&PREFIX, &ks).expect("list should be created");
         let id_1 = Hash([0x0; 8]);
         let id_2 = Hash([0x1; 8]);
 
-        list.push(&mut host, &id_1, &0x32_u8)
+        list.push(&mut ks, &id_1, &0x32_u8)
             .expect("storage should workd");
-        list.push(&mut host, &id_2, &0x33_u8)
+        list.push(&mut ks, &id_2, &0x33_u8)
             .expect("storage should workd");
 
         let read: u8 = list
-            .first(&host)
+            .first(&ks)
             .expect("storage should work")
             .expect("element should be present");
 
@@ -726,19 +715,19 @@ mod tests {
     #[test]
     fn test_first_after_two_push() {
         let mut host = MockKernelHost::default();
-        let path = RefPath::assert_from(b"/list");
-        let mut list = LinkedList::new(&path, &host).expect("list should be created");
+        let mut ks = keyspace(&mut host);
+        let mut list = LinkedList::new(&PREFIX, &ks).expect("list should be created");
         let id_1 = Hash([0x0; 8]);
         let id_2 = Hash([0x1; 8]);
 
-        list.push(&mut host, &id_1, &0x32_u8)
+        list.push(&mut ks, &id_1, &0x32_u8)
             .expect("storage should workd");
-        list.push(&mut host, &id_2, &0x33_u8)
+        list.push(&mut ks, &id_2, &0x33_u8)
             .expect("storage should workd");
-        let _: Option<u8> = list.remove(&mut host, &id_1).expect("storage should work");
+        let _: Option<u8> = list.remove(&mut ks, &id_1).expect("storage should work");
 
         let read: u8 = list
-            .first(&host)
+            .first(&ks)
             .expect("storage should work")
             .expect("element should be present");
 
@@ -748,43 +737,78 @@ mod tests {
     #[test]
     fn test_delete() {
         let mut host = MockKernelHost::default();
-        let path = RefPath::assert_from(b"/list");
+        let mut ks = keyspace(&mut host);
         let mut list: LinkedList<Hash, u8> =
-            LinkedList::new(&path, &host).expect("list should be created");
+            LinkedList::new(&PREFIX, &ks).expect("list should be created");
         let id_1 = Hash([0x0; 8]);
         let id_2 = Hash([0x1; 8]);
-        list.push(&mut host, &id_1, &0x32_u8)
+        list.push(&mut ks, &id_1, &0x32_u8)
             .expect("push should have worked");
-        list.push(&mut host, &id_2, &0x33_u8)
+        list.push(&mut ks, &id_2, &0x33_u8)
             .expect("push should have worked");
-        list.delete(&mut host).expect("delete should have worked");
+        list.delete(&mut ks).expect("delete should have worked");
         let reloaded_list: LinkedList<Hash, u8> =
-            LinkedList::new(&path, &host).expect("list should be created");
+            LinkedList::new(&PREFIX, &ks).expect("list should be created");
         assert!(reloaded_list.is_empty());
     }
 
-    fn fill_list(
-        elements: &HashMap<[u8; 8], u8>,
-    ) -> (MockKernelHost, LinkedList<Hash, u8>) {
-        let mut host = MockKernelHost::default();
-        let path = RefPath::assert_from(b"/list");
-        let mut list = LinkedList::new(&path, &host).expect("list should be created");
-        for (pos, (id, elt)) in elements.iter().enumerate() {
-            list.push(&mut host, &Hash(*id), elt)
-                .expect("storage should work");
+    /// The keyspace-backed list must lay its entries out at exactly the
+    /// durable paths the previous `StorageV1`-based list used, so an
+    /// existing on-chain delayed inbox keeps being read after the upgrade.
+    /// Here a keyspace named `/base` with prefix `/delayed-inbox` must land
+    /// data, pointer and metadata under `/base/delayed-inbox/...`.
+    #[test]
+    fn keyspace_list_lands_at_historical_absolute_paths() {
+        use tezos_smart_rollup_host::path::RefPath;
+        use tezos_smart_rollup_host::storage::StorageV1;
 
-            assert_length(&host, &list, pos as u64 + 1);
+        let mut host = MockKernelHost::default();
+        let id = Hash([0xab; 8]);
+        let elt = 0x42_u8;
+        {
+            let mut ks = host.load_or_create("/base".parse().unwrap()).unwrap();
+            let mut list = LinkedList::new(&Key::from_static(b"/delayed-inbox"), &ks)
+                .expect("list should be created");
+            list.push(&mut ks, &id, &elt).expect("push should work");
         }
-        (host, list)
+
+        // The element data is readable, as raw rlp, at the historical path.
+        let data_path =
+            RefPath::assert_from(b"/base/delayed-inbox/abababababababab/data");
+        let raw: u8 = tezos_storage::read_rlp(&host, &data_path)
+            .expect("data should be readable at the historical path");
+        assert_eq!(raw, elt);
+
+        // The pointer and metadata nodes exist at their historical paths.
+        assert!(host
+            .store_read_all(&RefPath::assert_from(
+                b"/base/delayed-inbox/abababababababab/pointer"
+            ))
+            .is_ok());
+        assert!(host
+            .store_read_all(&RefPath::assert_from(b"/base/delayed-inbox/meta"))
+            .is_ok());
     }
 
-    fn make_list(n: u8, host: &mut MockKernelHost) -> (LinkedList<Hash, u8>, Vec<Hash>) {
-        let path = RefPath::assert_from(b"/list");
-        let mut list = LinkedList::new(&path, host).expect("list should be created");
+    fn fill_list(
+        ks: &mut impl KeySpace,
+        elements: &HashMap<[u8; 8], u8>,
+    ) -> LinkedList<Hash, u8> {
+        let mut list = LinkedList::new(&PREFIX, ks).expect("list should be created");
+        for (pos, (id, elt)) in elements.iter().enumerate() {
+            list.push(ks, &Hash(*id), elt).expect("storage should work");
+
+            assert_length(ks, &list, pos as u64 + 1);
+        }
+        list
+    }
+
+    fn make_list(n: u8, ks: &mut impl KeySpace) -> (LinkedList<Hash, u8>, Vec<Hash>) {
+        let mut list = LinkedList::new(&PREFIX, ks).expect("list should be created");
         let mut elements = vec![];
         for i in 0..n {
             let id = Hash([i; 8]);
-            list.push(host, &id, &i).unwrap();
+            list.push(ks, &id, &i).unwrap();
             elements.push(id);
         }
 
@@ -794,49 +818,53 @@ mod tests {
     #[test]
     fn test_push_4_remove_pos_0() {
         let mut host = MockKernelHost::default();
-        let (mut list, elements) = make_list(4, &mut host);
+        let mut ks = keyspace(&mut host);
+        let (mut list, elements) = make_list(4, &mut ks);
 
-        assert_length(&host, &list, 4);
+        assert_length(&ks, &list, 4);
         let _: Option<u8> = list
-            .remove(&mut host, &elements[0])
+            .remove(&mut ks, &elements[0])
             .expect("storage should work");
-        assert_length(&host, &list, 3);
+        assert_length(&ks, &list, 3);
     }
 
     #[test]
     fn test_push_4_remove_pos_1() {
         let mut host = MockKernelHost::default();
-        let (mut list, elements) = make_list(4, &mut host);
+        let mut ks = keyspace(&mut host);
+        let (mut list, elements) = make_list(4, &mut ks);
 
-        assert_length(&host, &list, 4);
+        assert_length(&ks, &list, 4);
         let _: Option<u8> = list
-            .remove(&mut host, &elements[1])
+            .remove(&mut ks, &elements[1])
             .expect("storage should work");
-        assert_length(&host, &list, 3);
+        assert_length(&ks, &list, 3);
     }
 
     #[test]
     fn test_push_4_remove_pos_2() {
         let mut host = MockKernelHost::default();
-        let (mut list, elements) = make_list(4, &mut host);
+        let mut ks = keyspace(&mut host);
+        let (mut list, elements) = make_list(4, &mut ks);
 
-        assert_length(&host, &list, 4);
+        assert_length(&ks, &list, 4);
         let _: Option<u8> = list
-            .remove(&mut host, &elements[2])
+            .remove(&mut ks, &elements[2])
             .expect("storage should work");
-        assert_length(&host, &list, 3);
+        assert_length(&ks, &list, 3);
     }
 
     #[test]
     fn test_push_4_remove_pos_3() {
         let mut host = MockKernelHost::default();
-        let (mut list, elements) = make_list(4, &mut host);
+        let mut ks = keyspace(&mut host);
+        let (mut list, elements) = make_list(4, &mut ks);
 
-        assert_length(&host, &list, 4);
+        assert_length(&ks, &list, 4);
         let _: Option<u8> = list
-            .remove(&mut host, &elements[3])
+            .remove(&mut ks, &elements[3])
             .expect("storage should work");
-        assert_length(&host, &list, 3);
+        assert_length(&ks, &list, 3);
     }
 
     fn elements() -> impl Strategy<Value = (HashMap<[u8; 8], u8>, usize)> {
@@ -861,20 +889,24 @@ mod tests {
 
         #[test]
         fn test_push_remove_consistency((elements, idx) in elements()) {
-            let (mut host, mut list) = fill_list(&elements);
+            let mut host = MockKernelHost::default();
+            let mut ks = keyspace(&mut host);
+            let mut list = fill_list(&mut ks, &elements);
 
             let elt = elements.keys().nth(idx).unwrap();
-            list.remove(&mut host, &Hash(*elt)).unwrap();
+            list.remove(&mut ks, &Hash(*elt)).unwrap();
 
-            assert_length(&host, &list, (elements.len() as u64) - 1);
+            assert_length(&ks, &list, (elements.len() as u64) - 1);
 
         }
 
         #[test]
         fn test_pushed_elements_are_present((elements, _) in elements()) {
-            let (host, list) = fill_list(&elements);
+            let mut host = MockKernelHost::default();
+            let mut ks = keyspace(&mut host);
+            let list = fill_list(&mut ks, &elements);
             for (id, elt) in & elements {
-                let read: u8 = list.find(&host, &Hash(*id)).expect("storage should work").expect("element should be present");
+                let read: u8 = list.find(&ks, &Hash(*id)).expect("storage should work").expect("element should be present");
                 assert_eq!(elt, &read)
             }
         }
@@ -882,11 +914,11 @@ mod tests {
         #[test]
         fn test_push_element_create_non_empty_list((elements, _) in elements()) {
             let mut host = MockKernelHost::default();
-            let path = RefPath::assert_from(b"/list");
-            let mut list = LinkedList::new(&path, &host).expect("list should be created");
+            let mut ks = keyspace(&mut host);
+            let mut list = LinkedList::new(&PREFIX, &ks).expect("list should be created");
             assert!(list.is_empty());
             for (id, elt) in elements {
-                list.push(&mut host, &Hash(id), &elt).expect("storage should work");
+                list.push(&mut ks, &Hash(id), &elt).expect("storage should work");
                 assert!(!list.is_empty())
             }
         }
@@ -894,32 +926,36 @@ mod tests {
         #[test]
         fn test_remove_from_empty_creates_empty_list(elements: Vec<[u8; 8]>) {
             let mut host = MockKernelHost::default();
-            let path = RefPath::assert_from(b"/list");
-            let mut list = LinkedList::new(&path, &host).expect("list should be created");
+            let mut ks = keyspace(&mut host);
+            let mut list = LinkedList::new(&PREFIX, &ks).expect("list should be created");
             assert!(list.is_empty());
             for id in elements {
-                let _: Option<u8> = list.remove(&mut host, &Hash(id)).expect("storage to work");
+                let _: Option<u8> = list.remove(&mut ks, &Hash(id)).expect("storage to work");
             }
             assert!(list.is_empty());
         }
 
         #[test]
         fn test_remove_returns_the_appropriate_element((elements, _) in elements()) {
-            let (mut host, mut list) = fill_list(&elements);
+            let mut host = MockKernelHost::default();
+            let mut ks = keyspace(&mut host);
+            let mut list = fill_list(&mut ks, &elements);
             let mut length : u64 = elements.len().try_into().unwrap();
             for (id, elt) in &elements {
-                let removed: u8 = list.remove(&mut host, &Hash(*id)).expect("storage should work").expect("element should be present");
+                let removed: u8 = list.remove(&mut ks, &Hash(*id)).expect("storage should work").expect("element should be present");
                 length -= 1;
-                assert_length(&host, &list, length);
+                assert_length(&ks, &list, length);
                 assert_eq!(elt, &removed)
             }
         }
 
         #[test]
         fn test_remove_everything_creates_the_empty_list((elements, _) in elements()) {
-            let (mut host, mut list) = fill_list(&elements);
+            let mut host = MockKernelHost::default();
+            let mut ks = keyspace(&mut host);
+            let mut list = fill_list(&mut ks, &elements);
             for (id, _) in elements {
-                let _: u8 = list.remove(&mut host, &Hash(id)).expect("storage should work").expect("element should be present");
+                let _: u8 = list.remove(&mut ks, &Hash(id)).expect("storage should work").expect("element should be present");
             }
             assert!(list.is_empty())
         }
@@ -927,17 +963,19 @@ mod tests {
         #[test]
         fn test_list_is_kept_between_reboots((elements, _) in elements()) {
             let mut host = MockKernelHost::default();
-            let path = RefPath::assert_from(b"/list");
+            let mut ks = keyspace(&mut host);
+            // Reconstructing the list from the keyspace re-reads its metadata,
+            // simulating a reboot while the durable storage persists.
             for (id, elt) in &elements {
-                let mut list = LinkedList::new(&path, &host).expect("list should be created");
-                list.push(&mut host, &Hash(*id), elt)
+                let mut list = LinkedList::new(&PREFIX, &ks).expect("list should be created");
+                list.push(&mut ks, &Hash(*id), elt)
                     .expect("storage should work");
                 assert!(!list.is_empty())
             }
             for (id, elt) in &elements {
-                let list = LinkedList::new(&path, &host).expect("list should be created");
+                let list = LinkedList::new(&PREFIX, &ks).expect("list should be created");
                 let read: u8 = list
-                    .find(&host, &Hash(*id))
+                    .find(&ks, &Hash(*id))
                     .expect("storage should work")
                     .expect("element should be present");
                 assert_eq!(elt, &read);
@@ -947,12 +985,12 @@ mod tests {
         #[test]
         fn test_pop_first_after_push((elements, _) in elements()) {
             let mut host = MockKernelHost::default();
-            let path = RefPath::assert_from(b"/list");
-            let mut list = LinkedList::new(&path, &host).expect("list should be created");
+            let mut ks = keyspace(&mut host);
+            let mut list = LinkedList::new(&PREFIX, &ks).expect("list should be created");
 
             for (id, elt) in elements {
-                list.push(&mut host, &Hash(id), &elt).expect("storage should work");
-                let removed = list.pop_first(&mut host).expect("storage should work").expect("element should be present");
+                list.push(&mut ks, &Hash(id), &elt).expect("storage should work");
+                let removed = list.pop_first(&mut ks).expect("storage should work").expect("element should be present");
                 assert_eq!(elt, removed);
             }
         }
@@ -960,19 +998,19 @@ mod tests {
         #[test]
         fn test_pop_first_keep_the_order((elements, _) in elements()) {
             let mut host = MockKernelHost::default();
-            let path = RefPath::assert_from(b"/list");
-            let mut list = LinkedList::new(&path, &host).expect("list should be created");
+            let mut ks = keyspace(&mut host);
+            let mut list = LinkedList::new(&PREFIX, &ks).expect("list should be created");
 
             let mut inserted = vec![];
             let mut removed = vec![];
 
             for (id, elt) in elements {
-                list.push(&mut host, &Hash(id), &elt).expect("storage should work");
+                list.push(&mut ks, &Hash(id), &elt).expect("storage should work");
                 inserted.push(elt);
             }
 
             while !list.is_empty() {
-                let pop = list.pop_first(&mut host).expect("storage should work").expect("element should be present");
+                let pop = list.pop_first(&mut ks).expect("storage should work").expect("element should be present");
                 removed.push(pop);
             }
 

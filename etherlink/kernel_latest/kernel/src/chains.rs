@@ -570,7 +570,7 @@ impl TezosXChainConfig {
         block_number: U256,
     ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
     where
-        Host: StorageV1,
+        Host: StorageV1 + KeySpaceLoader,
     {
         crate::blueprint_storage::fetch_hashes_from_delayed_inbox(
             host,
