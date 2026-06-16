@@ -18,6 +18,13 @@
 
 open Rpc.Syntax
 
+(** Tezlink's per-operation hard gas limit (Michelson gas units). Mirrors
+    [hard_gas_limit_per_operation] in
+    [etherlink/bin_node/lib_dev/tezlink/tezlink_constants.ml]. Octez-client
+    defaults to 3_000_000 gas for [originate]/[transfer], which the node now
+    rejects with [GasLimitSetError]; cap every Tezlink-targeted call here. *)
+let michelson_hard_gas_limit_per_operation = 660_000
+
 module Setup = struct
   let runtime_tags = List.map Tezosx_runtime.tag
 
@@ -53,13 +60,15 @@ module Contract = struct
   module Store_input = struct
     let prg = contract_prg ["opcodes"; "store_input"]
 
-    let originate ~initial_storage =
+    let originate ?(gas_limit = michelson_hard_gas_limit_per_operation)
+        ~initial_storage =
       let init = sf {|"%s"|} initial_storage in
-      Client.originate_contract ~init ~prg
+      Client.originate_contract ~init ~prg ~gas_limit
 
-    let call ~new_storage store_input_address =
+    let call ?(gas_limit = michelson_hard_gas_limit_per_operation) ~new_storage
+        store_input_address =
       let arg = sf {|"%s"|} new_storage in
-      Client.transfer ~arg ~receiver:store_input_address
+      Client.transfer ~arg ~receiver:store_input_address ~gas_limit
 
     let read_storage ~tez_client kt1 =
       let open JSON in
@@ -73,46 +82,60 @@ module Contract = struct
   module Double_send = struct
     let prg = contract_prg ["mini_scenarios"; "double_send"]
 
-    let originate ~initial_storage =
+    let originate ?(gas_limit = michelson_hard_gas_limit_per_operation)
+        ~initial_storage =
       let init = sf {|"%s"|} initial_storage in
-      Client.originate_contract ~init ~prg
+      Client.originate_contract ~init ~prg ~gas_limit
 
-    let call ~dest1 ~dest2 ~new_storage address =
+    let call ?(gas_limit = michelson_hard_gas_limit_per_operation) ~dest1 ~dest2
+        ~new_storage address =
       let arg = sf {|Pair (Pair "%s" "%s") "%s"|} dest1 dest2 new_storage in
-      Client.transfer ~arg ~receiver:address
+      Client.transfer ~arg ~receiver:address ~gas_limit
   end
 
   module Update_big_map = struct
     let prg = contract_prg ["opcodes"; "update_big_map"]
 
-    let originate ~initial_storage =
-      Client.originate_contract ~init:initial_storage ~prg
+    let originate ?(gas_limit = michelson_hard_gas_limit_per_operation)
+        ~initial_storage =
+      Client.originate_contract ~init:initial_storage ~prg ~gas_limit
 
-    let call ~updates address = Client.transfer ~arg:updates ~receiver:address
+    let call ?(gas_limit = michelson_hard_gas_limit_per_operation) ~updates
+        address =
+      Client.transfer ~arg:updates ~receiver:address ~gas_limit
   end
 
   module Big_map_write = struct
     let prg = contract_prg ["mini_scenarios"; "big_map_write"]
 
-    let originate () = Client.originate_contract ~init:"Unit" ~prg
+    let originate ?(gas_limit = michelson_hard_gas_limit_per_operation) () =
+      Client.originate_contract ~init:"Unit" ~prg ~gas_limit
 
-    let call ~param address = Client.transfer ~arg:param ~receiver:address
+    let call ?(gas_limit = michelson_hard_gas_limit_per_operation) ~param
+        address =
+      Client.transfer ~arg:param ~receiver:address ~gas_limit
   end
 
   module Big_map_store = struct
     let prg = contract_prg ["mini_scenarios"; "big_map_store"]
 
-    let originate ?(init = "{}") () = Client.originate_contract ~init ~prg
+    let originate ?(gas_limit = michelson_hard_gas_limit_per_operation)
+        ?(init = "{}") () =
+      Client.originate_contract ~init ~prg ~gas_limit
 
-    let call address = Client.transfer ~arg:"Unit" ~receiver:address
+    let call ?(gas_limit = michelson_hard_gas_limit_per_operation) address =
+      Client.transfer ~arg:"Unit" ~receiver:address ~gas_limit
   end
 
   module Receiver_store = struct
     let prg = contract_prg ["big_maps"; "receiver_store"]
 
-    let originate () = Client.originate_contract ~init:"{}" ~prg
+    let originate ?(gas_limit = michelson_hard_gas_limit_per_operation) () =
+      Client.originate_contract ~init:"{}" ~prg ~gas_limit
 
-    let call ~param address = Client.transfer ~arg:param ~receiver:address
+    let call ?(gas_limit = michelson_hard_gas_limit_per_operation) ~param
+        address =
+      Client.transfer ~arg:param ~receiver:address ~gas_limit
   end
 end
 
@@ -219,7 +242,7 @@ let alias_materialization_cost =
   (origination_size + alias_forwarder_content_size) * cost_per_byte
 
 (** [kernel/src/fees.rs:DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER] *)
-let michelson_to_evm_gas_multiplier = 10
+let michelson_to_evm_gas_multiplier = 45
 
 (** At the default [base_fee_per_gas = 10^9 wei] (kernel default
     [MINIMUM_BASE_FEE_PER_GAS]), 1 mutez translates to 1000 EVM
@@ -477,6 +500,7 @@ let test_transfer_to_fresh_implicit_burns_slot () =
       ~giver:Constant.bootstrap1.alias
       ~receiver:Constant.bootstrap2.alias
       ~burn_cap:Tez.one
+      ~gas_limit:michelson_hard_gas_limit_per_operation
       tez_client
   in
   let*@ _ = Rpc.produce_block evm_node in
@@ -671,13 +695,27 @@ let test_partial_internal_burn_failure_backtracks_all () =
       ~giver:Constant.bootstrap1.alias
       ~receiver:Constant.bootstrap5.alias
       ~burn_cap:Tez.one
+      ~gas_limit:michelson_hard_gas_limit_per_operation
       tez_client
   in
   let*@ _ = Rpc.produce_block evm_node in
-  (* Reveal manually not prevent the `reveal_fee` to shifted the balance delta. *)
-  let*! () =
-    Client.reveal ~fee:reveal_fee ~src:Constant.bootstrap5.alias tez_client
+  (* Reveal manually to prevent the [reveal_fee] from shifting the balance
+     delta of the subsequent call.  Use the low-level [Operation.Manager]
+     API rather than [Client.reveal]: octez-client's [reveal] subcommand
+     does not expose [--gas-limit] and its simulation defaults to 3M gas,
+     which the Tezlink node rejects since the per-op cap dropped to 660k. *)
+  let* reveal_op =
+    Operation.Manager.(
+      operation
+        [
+          make
+            ~source:Constant.bootstrap5
+            ~fee:(Tez.to_mutez reveal_fee)
+            (reveal Constant.bootstrap5 ());
+        ])
+      tez_client
   in
+  let* _hash = Operation.inject ~dont_wait:true reveal_op tez_client in
   let*@ _ = Rpc.produce_block evm_node in
 
   let new_storage = "bigger storage" in
@@ -1981,7 +2019,7 @@ let test_evm_to_michelson_alias_origination_evm_oog () =
     Michelson-packed parameter (e.g. [encode_michelson_string]); the
     callback is [None]. Used by SCENARIO 7. *)
 let tz1_to_michelson_via_gateway ~tez_client ~source ~kt1 ~entrypoint ~body_hex
-    ?fee () =
+    ?(gas_limit = michelson_hard_gas_limit_per_operation) ?fee () =
   let arg =
     sf
       {|Pair "http://tezos/%s/%s" (Pair {} (Pair %s (Pair 1 None)))|}
@@ -1997,6 +2035,7 @@ let tz1_to_michelson_via_gateway ~tez_client ~source ~kt1 ~entrypoint ~body_hex
     ~receiver:michelson_gateway_address
     ~entrypoint:"call"
     ~arg
+    ~gas_limit
     tez_client
 
 (** Sends a CRAC from a top-level tz1 manager-op to a Michelson
@@ -2073,7 +2112,8 @@ let test_michelson_to_michelson_storage_growth_michelson_pays () =
     [source] to the EVM contract [evm_address]
     through the gateway's [call_evm] entrypoint. *)
 let send_crac_to_evm ~tez_client ~source ~evm_address ~fn_sig
-    ?(amount = Tez.zero) ?(calldata = "0x") ?fee () =
+    ?(amount = Tez.zero) ?(calldata = "0x")
+    ?(gas_limit = michelson_hard_gas_limit_per_operation) ?fee () =
   let arg =
     sf {|Pair "%s" (Pair "%s" (Pair %s None))|} evm_address fn_sig calldata
   in
@@ -2085,6 +2125,7 @@ let send_crac_to_evm ~tez_client ~source ~evm_address ~fn_sig
     ~receiver:michelson_gateway_address
     ~entrypoint:"call_evm"
     ~arg
+    ~gas_limit
     tez_client
 
 (** Sends a CRAC from a top-level tz1 manager-op through an EVM
