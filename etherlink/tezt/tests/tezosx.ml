@@ -267,16 +267,14 @@ let send_tezos_op_to_delayed_inbox_and_wait ~sc_rollup_address ~sc_rollup_node
     [michelson_test_scripts], converts code and initial storage to JSON,
     forges and sends the origination operation, then returns the hex key and
     KT1 address of the new contract. *)
-let originate_michelson_contract_via_delayed_inbox ~sc_rollup_address
-    ~sc_rollup_node ~client ~l1_contracts ~sequencer ~source ~counter
-    ~script_name ~init_storage_data ?(init_balance = 0) protocol =
+let originate_michelson_code_via_delayed_inbox ~sc_rollup_address
+    ~sc_rollup_node ~client ~l1_contracts ~sequencer ~source ~counter ~code
+    ~init_storage_data ?(init_balance = 0) () =
   let* contracts_before =
     Delayed_inbox.subkeys
       tezosx_michelson_contracts_index
       (Sc_rollup_node sc_rollup_node)
   in
-  let script_path = Michelson_script.(find script_name protocol |> path) in
-  let* code = Client.convert_script_to_json ~script:script_path client in
   let* init_storage =
     Client.convert_data_to_json ~data:init_storage_data client
   in
@@ -319,6 +317,24 @@ let originate_michelson_contract_via_delayed_inbox ~sc_rollup_address
   let kt1_address = decode_michelson_contract_address contract_hex in
   Log.info "Originated contract: %s" kt1_address ;
   return (contract_hex, kt1_address)
+
+let originate_michelson_contract_via_delayed_inbox ~sc_rollup_address
+    ~sc_rollup_node ~client ~l1_contracts ~sequencer ~source ~counter
+    ~script_name ~init_storage_data ?(init_balance = 0) protocol =
+  let script_path = Michelson_script.(find script_name protocol |> path) in
+  let* code = Client.convert_script_to_json ~script:script_path client in
+  originate_michelson_code_via_delayed_inbox
+    ~sc_rollup_address
+    ~sc_rollup_node
+    ~client
+    ~l1_contracts
+    ~sequencer
+    ~source
+    ~counter
+    ~code
+    ~init_storage_data
+    ~init_balance
+    ()
 
 (** [call_michelson_contract_via_delayed_inbox] calls a Michelson contract
     via the delayed inbox. Converts the argument from Michelson notation to
@@ -1110,6 +1126,152 @@ let test_michelson_origination_wrong_storage_type =
     (List.length contracts_after = List.length contracts_before)
       int
       ~error_msg:"Expected no new contracts but got %L (was %R)") ;
+  unit
+
+(** End-to-end reproduction of the forged-`big_map`-id vulnerability. A
+    contract must not be able to read or overwrite another contract's
+    `big_map` by passing its bare id (a forged lazy-storage reference) as an
+    operation parameter. Mirrors L1's `allow_forged_lazy_storage_id:false`
+    gate on user-supplied parameters.
+
+    Scenario: a victim owns `big_map { 0 -> "genesis-42" }`; a reader stores
+    whatever it reads at key 0; a writer overwrites key 0 with "Hacked-by-mi".
+    Both reader and writer are called with the victim's forged big_map id.
+    With the fix, both calls are rejected — the reader's storage stays [None]
+    and the victim's value remains "genesis-42". Without the fix, the reader
+    leaks "genesis-42" and the writer overwrites the victim with
+    "Hacked-by-mi". *)
+let test_michelson_forged_big_map_id_rejected =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Forged big_map id parameter is rejected on tezos X"
+    ~tags:["michelson"; "big_map"; "forged"; "security"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  let source = Constant.bootstrap5 in
+  (* Victim: owns a `big_map nat string`. On a unit call it materialises
+     big_map[0] into its (option string) field, making the content observable
+     from durable storage without itself using a forged id. *)
+  let victim_code =
+    "parameter unit ; storage (pair (option string) (big_map nat string)) ; \
+     code { CDR ; CDR ; DUP ; PUSH nat 0 ; GET ; PAIR ; NIL operation ; PAIR }"
+  in
+  (* Reader: stores big_map[0] read from its parameter. *)
+  let reader_code =
+    "parameter (big_map nat string) ; storage (option string) ; code { CAR ; \
+     PUSH nat 0 ; GET ; NIL operation ; PAIR }"
+  in
+  (* Writer: overwrites key 0 with the string Hacked-by-mi and stores it. *)
+  let writer_code =
+    "parameter (big_map nat string) ; storage (big_map nat string) ; code { \
+     CAR ; PUSH string \"Hacked-by-mi\" ; SOME ; PUSH nat 0 ; UPDATE ; NIL \
+     operation ; PAIR }"
+  in
+  let originate ~counter ~code:src ~init_storage_data =
+    let* code = Client.convert_script_to_json ~script:src client in
+    originate_michelson_code_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter
+      ~code
+      ~init_storage_data
+      ()
+  in
+  let storage_json contract_hex =
+    let* raw = read_michelson_contract_storage sc_rollup_node contract_hex in
+    match Option.bind raw decode_micheline_storage with
+    | Some j -> return j
+    | None -> Test.fail "Could not read/decode storage of %s" contract_hex
+  in
+  (* 1. Originate the victim with big_map { 0 -> "genesis-42" }. *)
+  let* victim_hex, victim_kt1 =
+    originate
+      ~counter:1
+      ~code:victim_code
+      ~init_storage_data:{|Pair None { Elt 0 "genesis-42" }|}
+  in
+  (* Read the victim's big_map id from its storage `Pair None <id>`. *)
+  let* victim_storage = storage_json victim_hex in
+  let victim_bigmap_id =
+    JSON.(victim_storage |-> "args" |=> 1 |-> "int" |> as_string)
+  in
+  Log.info "Victim big_map id = %s" victim_bigmap_id ;
+  (* 2. Originate the reader and the writer. *)
+  let* reader_hex, reader_kt1 =
+    originate ~counter:2 ~code:reader_code ~init_storage_data:"None"
+  in
+  let* _writer_hex, writer_kt1 =
+    originate ~counter:3 ~code:writer_code ~init_storage_data:"{}"
+  in
+  (* 3. READ attempt: call the reader with the forged victim id. *)
+  let* () =
+    call_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:4
+      ~dest:reader_kt1
+      ~arg_data:victim_bigmap_id
+      ()
+  in
+  (* 4. WRITE attempt: call the writer with the forged victim id. *)
+  let* () =
+    call_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:5
+      ~dest:writer_kt1
+      ~arg_data:victim_bigmap_id
+      ()
+  in
+  (* 5. Materialise the victim's big_map[0] into its readable storage field. *)
+  let* () =
+    call_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:6
+      ~dest:victim_kt1
+      ~arg_data:"Unit"
+      ()
+  in
+  (* The reader must NOT have read the victim's big_map: storage stays None. *)
+  let* reader_storage = storage_json reader_hex in
+  Check.(
+    (JSON.(reader_storage |-> "prim" |> as_string) = "None")
+      string
+      ~error_msg:
+        "reader read the victim's big_map through a forged id (storage prim = \
+         %L, expected None)") ;
+  (* The writer must NOT have overwritten the victim: big_map[0] is unchanged. *)
+  let* victim_storage = storage_json victim_hex in
+  let materialized = JSON.(victim_storage |-> "args" |=> 0) in
+  Check.(
+    (JSON.(materialized |-> "prim" |> as_string) = "Some")
+      string
+      ~error_msg:"victim big_map[0] unexpectedly missing (prim = %L)") ;
+  Check.(
+    (JSON.(materialized |-> "args" |=> 0 |-> "string" |> as_string)
+    = "genesis-42")
+      string
+      ~error_msg:"victim big_map was overwritten through a forged id: got %L") ;
   unit
 
 (** Call a Michelson contract that always fails (FAILWITH) via the delayed
@@ -6132,6 +6294,7 @@ let () =
   test_michelson_call_nonexistent_contract [Alpha] ;
   test_michelson_call_wrong_entrypoint [Alpha] ;
   test_michelson_origination_wrong_storage_type [Alpha] ;
+  test_michelson_forged_big_map_id_rejected [Alpha] ;
   test_michelson_call_failwith [Alpha] ;
   test_michelson_inter_contract_call () ;
   test_michelson_internal_call_revert () ;
