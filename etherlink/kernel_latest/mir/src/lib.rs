@@ -109,7 +109,7 @@
 //! // from `parser` for simplicity, you may also opt to create a new one to
 //! // potentially save a bit of memory (depends on the workload).
 //! let (operations_iter, new_storage) = contract_typechecked
-//!     .interpret(&mut ctx, &parser.arena, parameter, &Entrypoint::default(), &storage)
+//!     .interpret(&mut ctx, &parser.arena, parameter, &Entrypoint::default(), &storage, mir::typechecker::AllowForgedLazyStorageId::No)
 //!     .unwrap();
 //! let TypedValue::Int(new_storage_int) = &new_storage else { unreachable!() };
 //! assert_eq!(new_storage_int, &22698374052006863956975682u128.into());
@@ -476,6 +476,7 @@ mod tests {
                         M::prim2_uncarbonated(&arena, Prim::Elt, "foo".into(), 0.into()),
                     ],
                 ),
+                crate::typechecker::AllowForgedLazyStorageId::No,
             );
         use TypedValue as TV;
         match &interp_res.unwrap() {
@@ -1394,6 +1395,7 @@ mod multisig_tests {
                         anti_replay_counter(),
                         pair(threshold.clone(), seq([PUBLIC_KEY.into()])),
                     ),
+                    crate::typechecker::AllowForgedLazyStorageId::No,
                 );
 
             assert_eq!(
@@ -1470,6 +1472,7 @@ mod multisig_tests {
                         anti_replay_counter(),
                         pair(threshold.clone(), seq([PUBLIC_KEY.into()])),
                     ),
+                    crate::typechecker::AllowForgedLazyStorageId::No,
                 );
 
             assert_eq!(
@@ -1530,6 +1533,7 @@ mod multisig_tests {
                         anti_replay_counter(),
                         pair(threshold, seq([PUBLIC_KEY.into()])),
                     ),
+                    crate::typechecker::AllowForgedLazyStorageId::No,
                 );
 
             assert_eq!(

@@ -48,6 +48,7 @@ fn run_contract(parameter: Micheline, storage: Micheline) {
             parameter,
             &Entrypoint::default(),
             &storage,
+            mir::typechecker::AllowForgedLazyStorageId::No,
         )
         .unwrap();
     let TypedValue::Nat(storage_nat) = &new_storage else {

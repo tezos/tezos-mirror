@@ -148,7 +148,10 @@ fn typecheck_stack<'a>(
     stk.into_iter()
         .map(|(t, v)| {
             let t = parse_ty(ctx.gas(), &t)?;
-            let tc_val = typecheck_value(&v, &mut ctx, &t)?;
+            // TZT stacks may reference big_maps declared in the test's
+            // `big_maps` section by their id.
+            let tc_val =
+                typecheck_value(&v, &mut ctx, &t, AllowForgedLazyStorageId::Yes)?;
             Ok((t, tc_val))
         })
         .collect()
@@ -243,7 +246,12 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         // populate the context for type checking the output stack.
         let self_addr = match m_self {
             Some(s) => {
-                let typed = typecheck_value(&s, &mut Ctx::default(), &Type::Address)?;
+                let typed = typecheck_value(
+                    &s,
+                    &mut Ctx::default(),
+                    &Type::Address,
+                    AllowForgedLazyStorageId::No,
+                )?;
                 let address = match &mut { typed } {
                     TypedValue::Address(addr) => std::mem::take(addr),
                     other => {
@@ -265,7 +273,12 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
 
         let source = match m_source {
             Some(s) => {
-                let typed = typecheck_value(&s, &mut Ctx::default(), &Type::KeyHash)?;
+                let typed = typecheck_value(
+                    &s,
+                    &mut Ctx::default(),
+                    &Type::KeyHash,
+                    AllowForgedLazyStorageId::No,
+                )?;
                 match &mut { typed } {
                     TypedValue::KeyHash(kh) => Some(kh.take_out()),
                     other => {
@@ -281,7 +294,12 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
 
         let sender = match m_sender {
             Some(s) => {
-                let typed = typecheck_value(&s, &mut Ctx::default(), &Type::Address)?;
+                let typed = typecheck_value(
+                    &s,
+                    &mut Ctx::default(),
+                    &Type::Address,
+                    AllowForgedLazyStorageId::No,
+                )?;
                 let address = match &mut { typed } {
                     TypedValue::Address(addr) => std::mem::take(addr),
                     other => {
@@ -300,8 +318,12 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             Some(oc) => {
                 let mut a = HashMap::new();
                 for (ahm, ctm) in oc {
-                    let typed_address =
-                        typecheck_value(&ahm, &mut Ctx::default(), &Type::Address)?;
+                    let typed_address = typecheck_value(
+                        &ahm,
+                        &mut Ctx::default(),
+                        &Type::Address,
+                        AllowForgedLazyStorageId::No,
+                    )?;
                     let address_hash = match &mut { typed_address } {
                         TypedValue::Address(addr) => std::mem::take(addr).hash,
                         other => {
@@ -332,8 +354,12 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             Some(bm) => {
                 let mut a = BTreeMap::new();
                 for (idx, key_ty, val_ty, elts) in bm {
-                    let typed_idx =
-                        typecheck_value(&idx, &mut Ctx::default(), &Type::Int)?;
+                    let typed_idx = typecheck_value(
+                        &idx,
+                        &mut Ctx::default(),
+                        &Type::Int,
+                        AllowForgedLazyStorageId::No,
+                    )?;
                     let idx: BigMapId = match &mut { typed_idx } {
                         TypedValue::Int(i) => std::mem::take(i).into(),
                         other => {
@@ -358,8 +384,8 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                                 // pattern match with a condition to ensure length is 2
                                 Micheline::App(Prim::Elt, kv, _) if kv.len() == 2 => {
                                     let (k_raw, v_raw) = (&kv[0], &kv[1]);
-                                    let k = typecheck_value(k_raw, &mut Ctx::default(), &key_ty)?;
-                                    let v = typecheck_value(v_raw, &mut Ctx::default(), &val_ty)?;
+                                    let k = typecheck_value(k_raw, &mut Ctx::default(), &key_ty, AllowForgedLazyStorageId::No)?;
+                                    let v = typecheck_value(v_raw, &mut Ctx::default(), &val_ty, AllowForgedLazyStorageId::No)?;
                                     Ok((k, v))
                                 }
                                 _ => Err(
@@ -416,6 +442,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                             &address_raw,
                             &mut Ctx::default(),
                             &Type::Address,
+                            AllowForgedLazyStorageId::No,
                         )?;
                         let storage_type =
                             parse_ty(Ctx::default().gas(), &storage_type_raw)?;
@@ -423,6 +450,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                             &storage_raw,
                             &mut Ctx::default(),
                             &storage_type,
+                            AllowForgedLazyStorageId::No,
                         )?;
 
                         let address = match &mut { typed_address } {
@@ -448,6 +476,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                             &address_raw,
                             &mut Ctx::default(),
                             &Type::Address,
+                            AllowForgedLazyStorageId::No,
                         )?;
                         let views: HashMap<String, View> = views
                             .into_iter()
@@ -512,7 +541,12 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             balance: m_balance,
             chain_id: m_chain_id
                 .map(|v| -> Result<crate::ast::ChainId, Box<dyn Error>> {
-                    let typed = typecheck_value(&v, &mut Ctx::default(), &Type::ChainId)?;
+                    let typed = typecheck_value(
+                        &v,
+                        &mut Ctx::default(),
+                        &Type::ChainId,
+                        AllowForgedLazyStorageId::No,
+                    )?;
                     match &mut { typed } {
                         TypedValue::ChainId(id) => Ok(std::mem::take(id)),
                         other => Err(format!(

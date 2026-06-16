@@ -34,8 +34,8 @@ use crate::lexer::Prim;
 use crate::serializer::DecodeError;
 use crate::stack::*;
 use crate::typechecker::{
-    typecheck_contract_address, typecheck_value, typecheck_value_with_views, TcError,
-    TypecheckViews,
+    typecheck_contract_address, typecheck_value, typecheck_value_with_views,
+    AllowForgedLazyStorageId, TcError, TypecheckViews,
 };
 
 /// Errors possible during interpretation.
@@ -258,11 +258,22 @@ impl<'a> ContractScript<'a> {
         parameter: Micheline<'a>,
         entrypoint: &Entrypoint,
         storage_in: &Micheline<'a>,
+        // Policy for the *parameter* only: a forged big_map id is acceptable
+        // there for an internal call but not for an external/cross-runtime one.
+        // The storage is the contract's own committed state, so it is always
+        // typechecked with forged ids allowed.
+        parameter_allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
     ) -> Result<
         (impl Iterator<Item = OperationInfo<'a>>, TypedValue<'a>),
         ContractInterpretError<'a>,
     > {
-        let wrapped_parameter = self.wrap_parameter(arena, parameter, entrypoint, ctx)?;
+        let wrapped_parameter = self.wrap_parameter(
+            arena,
+            parameter,
+            entrypoint,
+            ctx,
+            parameter_allow_forged_lazy_storage_id,
+        )?;
         let mut storage = self.typecheck_storage(ctx, storage_in)?;
         let mut started_with_map_ids = vec![];
         storage.view_big_map_ids(&mut started_with_map_ids);
@@ -369,6 +380,7 @@ impl<'a> ContractScript<'a> {
         parameter: Micheline<'a>,
         entrypoint: &Entrypoint,
         ctx: &mut impl CtxTrait<'a>,
+        allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
     ) -> Result<TypedValue<'a>, TcError> {
         let parsed_annotation = FieldAnnotation::from_string(entrypoint.to_string());
         if let Some((annotation_path, annotation_type)) =
@@ -383,6 +395,7 @@ impl<'a> ContractScript<'a> {
                 ctx,
                 annotation_type,
                 TypecheckViews::Enabled,
+                allow_forged_lazy_storage_id,
             )?;
             let mut result = parameter;
             for direction in annotation_path.iter().rev() {
@@ -395,7 +408,12 @@ impl<'a> ContractScript<'a> {
                     }
                 }
             }
-            Ok(typecheck_value(&result, ctx, &self.parameter)?)
+            Ok(typecheck_value(
+                &result,
+                ctx,
+                &self.parameter,
+                allow_forged_lazy_storage_id,
+            )?)
         } else {
             Err(TcError::NoSuchEntrypoint(entrypoint.clone()))
         }
@@ -427,11 +445,14 @@ impl<'a> ContractScript<'a> {
         storage: &Micheline<'a>,
         typecheck_views: TypecheckViews,
     ) -> Result<TypedValue<'a>, TcError> {
+        // This is the contract's own committed storage, which may legitimately
+        // reference the big_maps it owns by id.
         crate::typechecker::typecheck_value_with_views(
             storage,
             ctx,
             &self.storage,
             typecheck_views,
+            AllowForgedLazyStorageId::Yes,
         )
     }
 }
@@ -1662,10 +1683,15 @@ fn interpret_step<'a, 'b, 'c>(
             };
 
             let storage_ty = view_storage_ty.parse_ty(ctx.gas())?;
-            let storage_ty_mich =
-                storage_ty.into_micheline_optimized_legacy(arena, ctx.gas())?;
-            let storage = Micheline::decode_raw(arena, &view_storage, ctx.gas())??
-                .typecheck_value(ctx, &storage_ty_mich)?;
+            let storage_value = Micheline::decode_raw(arena, &view_storage, ctx.gas())??;
+            // The view's storage is the callee's committed storage and may
+            // legitimately reference big_maps it owns.
+            let storage = typecheck_value(
+                &storage_value,
+                ctx,
+                &storage_ty,
+                AllowForgedLazyStorageId::Yes,
+            )?;
             let input_type = view.input_type.parse_ty(ctx.gas())?;
             let output_type = view.output_type.parse_ty(ctx.gas())?;
 
@@ -3026,7 +3052,15 @@ fn interpret_one<'a>(
                 let mich = Micheline::decode_packed(arena, &bytes, ctx.gas())
                     .ok()?
                     .ok()?;
-                crate::interpreter::typecheck_value(&mich, ctx, ty).ok()
+                // UNPACK must not accept forged lazy-storage ids (mirrors L1's
+                // `allow_forged:false`); big_maps are not packable anyway.
+                crate::interpreter::typecheck_value(
+                    &mich,
+                    ctx,
+                    ty,
+                    AllowForgedLazyStorageId::No,
+                )
+                .ok()
             };
             let result = try_unpack();
             // L1 charges Interp_costs.unpack_failed (minus the 0x05 tag) when a
@@ -9542,7 +9576,13 @@ mod interpreter_tests {
         .unwrap();
         assert_eq!(
             script
-                .wrap_parameter(&arena, bad, &Entrypoint::default(), &mut Ctx::default())
+                .wrap_parameter(
+                    &arena,
+                    bad,
+                    &Entrypoint::default(),
+                    &mut Ctx::default(),
+                    AllowForgedLazyStorageId::No,
+                )
                 .map(|_| ()),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::ViewOutput,
@@ -9552,7 +9592,13 @@ mod interpreter_tests {
         // A well-formed lambda parameter still typechecks.
         let good = parse("{ DROP; UNIT }").unwrap();
         assert!(script
-            .wrap_parameter(&arena, good, &Entrypoint::default(), &mut Ctx::default())
+            .wrap_parameter(
+                &arena,
+                good,
+                &Entrypoint::default(),
+                &mut Ctx::default(),
+                AllowForgedLazyStorageId::No,
+            )
             .is_ok());
     }
 

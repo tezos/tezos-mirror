@@ -197,6 +197,14 @@
   callee carries the dual `(payer −V, storage fees +V)` balance-updates
   pair, where V aggregates every cost the operation delegated through
   CRAC. (!22166)
+- **Security fix:** reject forged lazy-storage ids in operation
+  parameters. A `big_map` parameter passed as a bare id (or id-plus-diff)
+  is no longer accepted in an externally-supplied or cross-runtime
+  operation parameter, mirroring L1's `allow_forged_lazy_storage_id`
+  gate. Previously a contract could read or even overwrite another
+  contract's `big_map` by forging its id; such a parameter now fails to
+  typecheck. Forged ids remain allowed for a contract's own committed
+  storage and for internal-call parameters. (!22207)
 - Removed the legacy `%default` (simple transfer, `string`) entrypoint
   from the gateway contract. Use the generic `%call` entrypoint instead:
   a POST to `http://ethereum/<address>` with an empty body and the

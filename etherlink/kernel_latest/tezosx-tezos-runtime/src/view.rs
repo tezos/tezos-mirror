@@ -25,7 +25,9 @@ use mir::context::{CtxTrait, TypecheckingCtx};
 use mir::gas::OutOfGas;
 use mir::interpreter::{EnshrinedViewDispatchError, InterpretError};
 use mir::parser::Parser;
-use mir::typechecker::{typecheck_value, typecheck_view, TcError};
+use mir::typechecker::{
+    typecheck_value, typecheck_view, AllowForgedLazyStorageId, TcError,
+};
 use tezos_crypto_rs::hash::OperationHash;
 use tezos_data_encoding::types::{Narith, Zarith};
 use tezos_execution::account_storage::{
@@ -347,12 +349,26 @@ where
                 .map_err(|e| {
                     TezosXRuntimeError::Custom(format!("failed to decode storage: {e:?}"))
                 })?;
-        let storage = typecheck_value(&storage_mich, &mut mir_ctx, &storage_ty)
-            .map_err(classify_tc_error)?;
+        // The storage is the target contract's own committed state, so it may
+        // legitimately reference big_maps it owns by id.
+        let storage = typecheck_value(
+            &storage_mich,
+            &mut mir_ctx,
+            &storage_ty,
+            AllowForgedLazyStorageId::Yes,
+        )
+        .map_err(classify_tc_error)?;
 
-        // Typecheck the caller-supplied input against the view's declared input type.
-        let input = typecheck_value(&input_mich, &mut mir_ctx, &input_ty)
-            .map_err(classify_tc_error)?;
+        // Typecheck the caller-supplied input against the view's declared input
+        // type. The input comes from outside the contract's own state, so
+        // forged lazy-storage ids are rejected.
+        let input = typecheck_value(
+            &input_mich,
+            &mut mir_ctx,
+            &input_ty,
+            AllowForgedLazyStorageId::No,
+        )
+        .map_err(classify_tc_error)?;
 
         // Typecheck the view body. `typecheck_view` sets the `in_view` flag
         // that bars side-effectful instructions. Reaching the non-Seq
