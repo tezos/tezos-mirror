@@ -8506,6 +8506,637 @@ let test_nds_host_func_crashes_node ~kind =
   let* () = Client.bake_for_and_wait tezos_client in
   crash
 
+(* ------------------------------------------------------------------------ *)
+(* Manager-operation apply-time assertion failure                            *)
+(* ------------------------------------------------------------------------ *)
+
+(* A well-formed [Smart_rollup_state_hash] distinct from
+   [Constant.sc_rollup_compressed_state]. The exact value is arbitrary -- only
+   being well-formed and distinct from the honest state matters; this one is a
+   base58check [Smart_rollup_state_hash] ([srs1...]) obtained by encoding an
+   arbitrary 32-byte digest. *)
+let sc_rollup_compressed_state_bis =
+  "srs11Zb2dxcFEMWEAqCS6F1BSKkoGqaUyFA2d9s5SrWj9RGzjMn3BL"
+
+(* A serialized Arith-PVM proof step. Its bytes embed the PVM's [boot_sector] and
+   [status] state; the refutation verifier requires a valid [pvm_step] (it checks
+   the proof's state level) before it reaches the DAL page proof.
+
+   It is recorded here as a hex literal because it cannot be produced through the
+   client/RPC: it is the binary [Sc_rollup.Proof] encoding of a proof built with
+   the protocol's [Internal_for_tests] API. To regenerate, construct such a proof
+   in an OCaml protocol test and print its bytes as hex. *)
+let malicious_dal_overflow_pvm_step =
+  "030002db10db4d3b595f59e0b53740f164bf951bcfae9e0873fd23fbce82fac4f404e181f3368597fee1f77358b98fea989fd6a88e8ee63beaaddc09a68e79563dae34820b626f6f745f736563746f72c8baff5f78423676a25d9cd27a412dd932327b9b3e1cc26e754a36410a5efbf7b406737461747573c00100"
+
+(* A refutation [Proof] step combining [malicious_dal_overflow_pvm_step] with a
+   DAL page proof for a page at [published_level = Int32.max_int]. The
+   [dal_proof = "02000000"] is the only shape constructible without an on-chain
+   skip list ([Invalid_page_id], no target cell). The out-of-range
+   [published_level] is the only malicious part: verifying the proof during
+   [apply] computes [Raw_level_repr.add published_level lag], which overflows
+   [int32] and trips an assertion. *)
+let malicious_dal_overflow_step : Ezjsonm.value =
+  `O
+    [
+      ("pvm_step", `String malicious_dal_overflow_pvm_step);
+      ( "input_proof",
+        `O
+          [
+            ("input_proof_kind", `String "reveal_proof");
+            ( "reveal_proof",
+              `O
+                [
+                  ("reveal_proof_kind", `String "dal_page_proof");
+                  ( "dal_page_id",
+                    `O
+                      [
+                        (* Int32.max_int: the value that triggers the overflow *)
+                        ("published_level", `Float 2147483647.);
+                        ("slot_index", `Float 0.);
+                        ("page_index", `Float 0.);
+                      ] );
+                  ("dal_proof", `String "02000000");
+                ] );
+          ] );
+    ]
+
+(* Set up a single-tick refutation game between bootstrap1 (p1) and bootstrap2
+   (p2): publish two conflicting single-tick commitments and have p1 start the
+   dispute, so the next expected move is a {e proof} move. Does NOT inject the
+   malicious move. [?keys] is forwarded to every [bake_for] used to drive the
+   chain: pass all bootstrap delegates to keep round 0 always available, so the
+   setup bakes at round 0 (timestamp +1s/block) instead of bootstrap1's first
+   free -- often high -- round (which jumps the timestamp by the super-linear
+   round duration and, against a near-now genesis, stalls each [bake_for] until
+   wall-clock catches up). *)
+let setup_dal_overflow_game ?keys ~commitment_period ~sc_rollup client =
+  let p1 = Constant.bootstrap1 in
+  let p2 = Constant.bootstrap2 in
+  let* commitment, player_commitment_hash =
+    bake_period_then_publish_commitment
+      ?keys
+      ~number_of_ticks:1
+      ~sc_rollup
+      ~src:p1.public_key_hash
+      client
+  in
+  let* _commitment_bis, opponent_commitment_hash =
+    forge_and_publish_commitment
+      ?keys
+      ~compressed_state:sc_rollup_compressed_state_bis
+      ~number_of_ticks:1
+      ~inbox_level:commitment.inbox_level
+      ~predecessor:commitment.predecessor
+      ~sc_rollup
+      ~src:p2.public_key_hash
+      client
+  in
+  (* A refutation game may not start too early: wait one commitment period. *)
+  let* () =
+    repeat commitment_period (fun () -> Client.bake_for_and_wait ?keys client)
+  in
+  (* [p1] starts the dispute against [p2]. *)
+  start_refute
+    ?keys
+    client
+    ~source:p1
+    ~opponent:p2.public_key_hash
+    ~sc_rollup
+    ~player_commitment_hash
+    ~opponent_commitment_hash
+
+(* Build [p1]'s malicious proof [Move] (DAL page proof with
+   [published_level = Int32.max_int]) WITHOUT injecting. Exposed on its own for
+   the gossip test, which builds the operation on one node and injects it on
+   another. *)
+let build_dal_overflow_refute ~sc_rollup client =
+  let p1 = Constant.bootstrap1 in
+  let p2 = Constant.bootstrap2 in
+  (* A generous gas limit ensures the overflow assertion is reached before any
+     gas exhaustion. *)
+  let malicious_op =
+    Operation.Manager.(
+      make ~source:p1 ~gas_limit:200_000 ~fee:1_000_000
+      @@ sc_rollup_refute
+           ~sc_rollup
+           ~opponent:p2.public_key_hash
+           ~refutation:
+             (Move
+                {
+                  choice_tick = 0;
+                  refutation_step = Proof malicious_dal_overflow_step;
+                })
+           ())
+  in
+  Operation.Manager.operation [malicious_op] client
+
+(* Build and inject the malicious refute [Move] WITHOUT baking, then assert the
+   mempool accepts it: operation validation passes (it does not verify the proof).
+   Returns the forged operation and its hash.
+
+   The exact accepted class depends on the protocol -- they implement different
+   mitigations -- and on whether a baker is producing blocks concurrently:
+   - proto <= 025 (frozen T/U, plugin mitigation): local injection fast-paths
+     around the plugin [pre_filter], so the op is [validated] right after
+     injection. [pre_filter] (which classifies this refute op [branch_delayed])
+     re-runs on every mempool flush, i.e. on every new head, so with a baker
+     running a flush may reclassify it [branch_delayed] before we read. The plugin
+     keeps the op out of blocks, so it never leaves the mempool: we accept
+     [validated] or [branch_delayed].
+   - proto > 025 (Alpha, in-protocol fix): the overflow is a normal [tzresult], so
+     the op applies cleanly and there is no [pre_filter] -- it is [validated], and
+     never [branch_delayed]. With a baker running it may already have been baked
+     into a block by the time we read, after which it has left the mempool
+     entirely: we accept [validated] or absent (but never [branch_delayed]). *)
+let inject_dal_overflow_refute ~protocol ~sc_rollup client =
+  let* op = build_dal_overflow_refute ~sc_rollup client in
+  let* (`OpHash oph) = Operation.inject op client in
+  Log.info "Injected malicious refute operation %s" oph ;
+  let* mempool = Mempool.get_mempool client in
+  let validated = List.mem oph mempool.validated in
+  let branch_delayed = List.mem oph mempool.branch_delayed in
+  let accepted =
+    if Protocol.number protocol <= 025 then validated || branch_delayed
+    else (* Alpha: [validated], or already baked into a block (absent). *)
+      validated || not (List.mem oph mempool.refused || branch_delayed)
+  in
+  if not accepted then
+    Test.fail
+      "The malicious refute operation %s was not accepted by the mempool \
+       (operation validation must pass): expected %s. Mempool: validated=[%s] \
+       branch_delayed=[%s] refused=[%s]"
+      oph
+      (if Protocol.number protocol <= 025 then "'validated' or 'branch_delayed'"
+       else "'validated' (or already included in a block)")
+      (String.concat "," mempool.validated)
+      (String.concat "," mempool.branch_delayed)
+      (String.concat "," mempool.refused) ;
+  Log.info "OK: the operation %s passed mempool validation." oph ;
+  return (op, oph)
+
+(* Combined setup + inject. *)
+let setup_and_inject_dal_overflow_refute ?keys ~protocol ~commitment_period
+    ~sc_rollup client =
+  let* () =
+    setup_dal_overflow_game ?keys ~commitment_period ~sc_rollup client
+  in
+  inject_dal_overflow_refute ~protocol ~sc_rollup client
+
+(* A refute [Move] whose DAL page proof targets [published_level = Int32.max_int]
+   is accepted by the mempool (operation validation does not verify the proof).
+   This test checks that applying such an operation behaves normally: the
+   [preapply/operations] RPC returns it rather than aborting, and an honest baker
+   includes it in a baked block with an "applied" result. *)
+let test_refute_apply_assertion_failure =
+  let commitment_period = 5 in
+  test_l1_scenario
+    ~kind:"arith"
+    ~commitment_period
+      (* Large challenge window so commitments are not cementable during the
+         test (we never cement; this just avoids interference). *)
+    ~challenge_window:100
+    {
+      tags = ["refutation"; "game"; "dal"; "assertion"; "apply"];
+      variant = Some "dal_overflow_applies_cleanly";
+      description = "refute DAL-overflow proof applies cleanly";
+    }
+  @@ fun protocol sc_rollup node client ->
+  let* op, oph =
+    setup_and_inject_dal_overflow_refute
+      ~protocol
+      ~commitment_period
+      ~sc_rollup
+      client
+  in
+  (* Apply the op on top of head with the [preapply/operations] RPC -- the
+     block-construction apply path (it only skips the signature check, which we
+     supply). A clean application returns HTTP 200; an abort surfaces as a 500. *)
+  let* signature = Operation.sign ~protocol op client in
+  let preapply_input =
+    Operation.make_preapply_operation_input ~protocol ~signature op
+  in
+  let* response =
+    Node.RPC.(
+      call_json
+        node
+        (post_chain_block_helpers_preapply_operations
+           ~data:(Data (`A [preapply_input]))
+           ()))
+  in
+  let body = JSON.encode response.body in
+  if not (response.code = 200) then
+    Test.fail
+      "Expected preapply to return HTTP 200 (the operation applies). Got code \
+       %d with body: %s. A 500 'Assertion failed' means applying the op \
+       aborted on an uncaught assertion."
+      response.code
+      body ;
+  Log.info "OK (1): applying the operation does not abort (HTTP 200)" ;
+  (* (2) An honest baker can apply the operation, so it is
+     included in the block with an "applied" status -- not dropped. *)
+  let* level_before = Node.get_level node in
+  let* () = Client.bake_for_and_wait client in
+  let* level_after = Node.get_level node in
+  Check.((level_after = level_before + 1) int)
+    ~error_msg:"Expected a new block at level %R, got %L." ;
+  let* block = Client.RPC.call client @@ RPC.get_chain_block () in
+  let manager_ops = JSON.(block |-> "operations" |=> 3 |> as_list) in
+  let op_json =
+    match
+      List.find_opt
+        (fun o -> JSON.(o |-> "hash" |> as_string) = oph)
+        manager_ops
+    with
+    | Some j -> j
+    | None ->
+        Test.fail
+          "The refute operation %s was NOT included in the baked block."
+          oph
+  in
+  let status =
+    JSON.(
+      op_json |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
+      |-> "status" |> as_string)
+  in
+  if status <> "applied" then
+    Test.fail
+      "The refute operation %s was included but with operation_result status \
+       %S; expected \"applied\"."
+      oph
+      status ;
+  Log.info
+    "OK (2): the baker included the operation %s in a block (level %d)."
+    oph
+    level_after ;
+  unit
+
+(* Regression test for the frozen-protocol (T/U) mempool mitigation, in the
+   realistic gossip threat model.
+
+   [Mempool.pre_filter] runs only on operations received from PEERS, not on
+   locally-injected ones (injection is fast-pathed, see
+   [prevalidator.ml:on_inject]). So the attack and its mitigation are inter-node:
+
+   - An attacker injects the un-appliable refute operation on its own node, where
+     it is [validated] (bypassing that node's filter) and gossiped.
+   - An honest node receives it and, thanks to the plugin's [pre_filter]
+     (proto_*/lib_plugin/mempool.ml), classifies it [branch_delayed] instead of
+     [validated]; it is then neither re-gossiped nor offered to a baker.
+
+   We use two nodes: [attacker] injects the operation and we check that on the
+   honest node it is [branch_delayed] (not [validated]). That an honest baker
+   then keeps producing blocks follows generically -- a baker never selects
+   [branch_delayed] operations -- and is covered by the forging and consensus
+   tests. *)
+let test_refute_apply_assertion_gossiped_op_refused =
+  let commitment_period = 5 in
+  register_test
+    ~__FILE__
+    ~kind:"arith"
+    ~tags:["refutation"; "game"; "dal"; "assertion"; "apply"; "plugin"]
+    ~title:
+      "Sc_rollup, dal_page_level_overflow: gossiped op refused by plugin \
+       pre_filter"
+  @@ fun protocol ->
+  (* Honest node configured with the smart-rollup parameters. *)
+  let* honest_node, honest_client =
+    setup_l1 ~commitment_period ~challenge_window:100 protocol
+  in
+  (* Attacker node, which will inject the malicious operation. *)
+  let* attacker_node =
+    Node.init [Synchronisation_threshold 0; Private_mode; No_bootstrap_peers]
+  in
+  let* attacker_client = Client.init ~endpoint:(Node attacker_node) () in
+  let* () = Client.Admin.trust_address honest_client ~peer:attacker_node
+  and* () = Client.Admin.trust_address attacker_client ~peer:honest_node in
+  let* () = Client.Admin.connect_address honest_client ~peer:attacker_node in
+  let keys =
+    Account.Bootstrap.keys
+    |> Array.map (fun k -> k.Account.alias)
+    |> Array.to_list
+  in
+  let* sc_rollup =
+    originate_sc_rollup
+      ~keys
+      ~kind:"arith"
+      ~src:Constant.bootstrap1.alias
+      honest_client
+  in
+  (* Set up the single-tick refutation game and build the malicious move on the
+     honest node (its operations propagate to the attacker node). We build the
+     operation here but inject it on the attacker node below. *)
+  let* () =
+    setup_dal_overflow_game ~keys ~commitment_period ~sc_rollup honest_client
+  in
+  let* op = build_dal_overflow_refute ~sc_rollup honest_client in
+  (* Make sure the attacker node is synchronised before injecting (so the
+     operation's branch is known there). *)
+  let* head_level = Node.get_level honest_node in
+  let* (_ : int) = Node.wait_for_level attacker_node head_level in
+  (* Inject on the attacker node: it bypasses that node's [pre_filter] and is
+     classified [validated] there. *)
+  let* (`OpHash oph) = Operation.inject op attacker_client in
+  let* attacker_mempool = Mempool.get_mempool attacker_client in
+  if not (List.mem oph attacker_mempool.validated) then
+    Test.fail
+      "Expected the operation %s to be 'validated' on the attacker node (local \
+       injection bypasses the filter), but it was not."
+      oph ;
+  Log.info "Operation %s is 'validated' on the attacker node." oph ;
+  (* Wait for the honest node to receive the gossiped operation, then check its
+     plugin filter [refused] it (rather than 'validated'). *)
+  let is_classified mempool =
+    List.mem oph mempool.Mempool.refused
+    || List.mem oph mempool.validated
+    || List.mem oph mempool.branch_delayed
+    || List.mem oph mempool.branch_delayed
+  in
+  let rec wait_for_honest_classification n =
+    let* mempool = Mempool.get_mempool honest_client in
+    if is_classified mempool then return mempool
+    else if n <= 0 then
+      Test.fail
+        "The honest node never received the gossiped operation %s after \
+         waiting."
+        oph
+    else
+      let* () = Lwt_unix.sleep 1. in
+      wait_for_honest_classification (n - 1)
+  in
+  let* honest_mempool = wait_for_honest_classification 30 in
+  if List.mem oph honest_mempool.validated then
+    Test.fail
+      "The honest node classified the gossiped operation %s as 'validated'; \
+       the plugin filter should have refused it."
+      oph ;
+  if not (List.mem oph honest_mempool.branch_delayed) then
+    Test.fail
+      "Expected the honest node to classify the operation %s as \
+       'branch_delayed' (branch_delayed=[%s] refused=[%s])."
+      oph
+      (String.concat "," honest_mempool.branch_delayed)
+      (String.concat "," honest_mempool.refused) ;
+  Log.info
+    "OK: the honest node 'branch_delayed' the gossiped operation (plugin \
+     pre_filter)." ;
+  unit
+
+(* Forging-side counterpart to [test_refute_apply_assertion_gossiped_op_refused].
+
+   On the frozen protocols (T/U) the plugin's [check_block_operation] is wired
+   into operation selection ([lib_delegate/operation_selection.ml]), where it
+   gates each manager op BEFORE the apply simulation. So even when the
+   un-appliable refute operation is [validated] in the mempool -- here by local
+   injection, which bypasses [pre_filter] -- forging DROPS it via the plugin gate
+   instead of feeding it to the apply simulation (which would trip the
+   frozen-protocol overflow assertion).
+
+   We forge with [Client.bake_for] rather than a baker daemon: it runs the very
+   same [operation_selection] path but synchronously, so there is no daemon
+   scheduling and no concurrent mempool flush to race against. (A running daemon
+   could flush on a new head and let [pre_filter] demote the op to
+   [branch_delayed] before forging, making the drop happen mempool-side rather
+   than at forging -- a race that made the daemon version flaky on slow CI.)
+
+   The decisive observation is that the block is forged cleanly while EXCLUDING
+   our [validated] op. That is only reachable via the plugin gate: without the
+   mitigation the op would instead reach the apply simulation and raise the
+   overflow [assert] -- an uncaught exception, not a tzresult error, so it is not
+   caught as a normal operation error -- aborting the forge and failing this
+   [bake_for]. (An apply-time *drop* cannot happen for this op precisely because
+   the failure is an exception, not an [Error].)
+
+   The operation is [validated] right after injection (the fast-path of local
+   injection bypasses [pre_filter]), but once the mempool is flushed on the new
+   head it is re-validated through the full pipeline -- including [pre_filter] --
+   and reclassified [branch_delayed] by the same plugin predicate. So we end the
+   test by checking it is [branch_delayed] (no longer [validated]).
+
+   Registered only up to protocol 25: alpha's plugin [check_block_operation] is a
+   stub, so the op would not be dropped at forging there. *)
+let test_refute_apply_assertion_baker_excludes_op =
+  let commitment_period = 5 in
+  register_test
+    ~__FILE__
+    ~kind:"arith"
+    ~tags:["refutation"; "game"; "dal"; "assertion"; "apply"; "baker"; "plugin"]
+    ~title:
+      "Sc_rollup, dal_page_level_overflow: baker drops un-appliable refute op \
+       at forging (plugin)"
+  @@ fun protocol ->
+  let* node, client =
+    setup_l1 ~commitment_period ~challenge_window:100 protocol
+  in
+  let keys =
+    Account.Bootstrap.keys
+    |> Array.map (fun k -> k.Account.alias)
+    |> Array.to_list
+  in
+  let* sc_rollup =
+    originate_sc_rollup
+      ~keys
+      ~kind:"arith"
+      ~src:Constant.bootstrap1.alias
+      client
+  in
+  (* Local injection bypasses [pre_filter], so the operation is [validated] in
+     the baker's own mempool: the baker WILL consider it at forging. *)
+  let* _op, oph =
+    setup_and_inject_dal_overflow_refute
+      ~protocol
+      ~keys
+      ~commitment_period
+      ~sc_rollup
+      client
+  in
+  let* level_before = Node.get_level node in
+  (* Forge one block synchronously via the client. This runs the same
+     [operation_selection] path as the baker daemon: our [validated] op is a
+     candidate, the plugin's [check_block_operation] rejects it before the apply
+     simulation, and the block is produced without it. A clean bake here that
+     excludes the op is the proof that the plugin gate dropped it -- without the
+     mitigation the op would reach the apply simulation and the overflow [assert]
+     would abort this bake. *)
+  let* () = Client.bake_for_and_wait ~keys client in
+  let* level_after = Node.get_level node in
+  Check.((level_after = level_before + 1) int)
+    ~error_msg:"Expected the baker to forge a block at level %R, got %L." ;
+  (* The un-appliable op is excluded from the freshly forged block. *)
+  let* block = Client.RPC.call client @@ RPC.get_chain_block () in
+  let manager_ops = JSON.(block |-> "operations" |=> 3 |> as_list) in
+  if List.exists (fun o -> JSON.(o |-> "hash" |> as_string) = oph) manager_ops
+  then
+    Test.fail
+      "The un-appliable operation %s was included in the forged block at level \
+       %d; the plugin's [check_block_operation] should have dropped it at \
+       forging."
+      oph
+      level_after ;
+  Log.info
+    "OK: the operation %s was dropped at forging (plugin \
+     [check_block_operation]) and the block was produced cleanly."
+    oph ;
+  (* On the new head the mempool was flushed and our operation re-validated
+     through the full pipeline -- including [pre_filter], bypassed only by the
+     injection fast-path -- so the same plugin predicate now reclassifies it
+     [branch_delayed]. *)
+  let* mempool = Mempool.get_mempool client in
+  if List.mem oph mempool.validated then
+    Test.fail
+      "Operation %s is unexpectedly still 'validated' after baking; expected \
+       it to be reclassified by [pre_filter] on the mempool flush."
+      oph ;
+  if not (List.mem oph mempool.branch_delayed) then
+    Test.fail
+      "Expected the un-appliable operation %s to be 'branch_delayed' after the \
+       mempool flush (re-validated through pre_filter). validated=[%s] \
+       branch_delayed=[%s] refused=[%s]"
+      oph
+      (String.concat "," mempool.validated)
+      (String.concat "," mempool.branch_delayed)
+      (String.concat "," mempool.refused) ;
+  Log.info
+    "OK: the chain advanced to level %d, the un-appliable operation was \
+     dropped at forging via the plugin filter ([check_block_operation]) and is \
+     now 'branch_delayed' in the mempool."
+    level_after ;
+  unit
+
+(* Two honest bakers (one per node) with the bootstrap delegates split across the
+   two nodes, so reaching a (pre)quorum is a genuine multi-party process. The
+   malicious refute op is injected while the bakers run; the test asserts the
+   chain keeps ADVANCING.
+
+   This guards against a consensus halt: a proposal that includes an un-appliable
+   op can reach a prequorum and the bakers lock on its payload, which can then be
+   neither applied nor abandoned (they are locked) -- a network-wide halt with no
+   malicious baker.
+
+   The head is brought close to wall-clock before the bakers start (a short
+   negative activation delay plus the catch-up below), so they run at small,
+   second-scale rounds; with the default far-past genesis they would sit at
+   hours-per-round and the chain would stall for unrelated reasons. *)
+let test_refute_apply_assertion_halts_baking_2nodes =
+  let commitment_period = 5 in
+  Protocol.register_test
+    ~__FILE__
+    ~title:"refute DAL-overflow op does not halt two honest bakers"
+    ~tags:["refutation"; "game"; "dal"; "assertion"; "apply"; "baker"; "lock"]
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  (* Activate ~25s in the past (not the default ~1 year) so the bakers run at
+     small rounds; the catch-up below brings the head to ~now. *)
+  let* node1, client1 =
+    setup_l1
+      ~timestamp:(Client.Ago (Client.Time.Span.of_seconds_exn 25.))
+      ~commitment_period
+      ~challenge_window:100
+      protocol
+  in
+  (* A second, independent node. *)
+  let* node2 = Node.init [Synchronisation_threshold 0; History_mode Archive] in
+  let* client2 = Client.init ~endpoint:(Node node2) () in
+  let* () = Client.Admin.trust_address client1 ~peer:node2
+  and* () = Client.Admin.trust_address client2 ~peer:node1 in
+  let* () = Client.Admin.connect_address client1 ~peer:node2 in
+  let* level1 = Node.get_level node1 in
+  let* _ = Node.wait_for_level node2 level1 in
+  Log.info "Two nodes connected and synced at level %d." level1 ;
+  let all_keys =
+    Account.Bootstrap.keys
+    |> Array.map (fun k -> k.Account.alias)
+    |> Array.to_list
+  in
+  let* sc_rollup = originate_sc_rollup ~keys:all_keys ~kind:"arith" client1 in
+  Log.info
+    "Originated rollup %s; setting up the single-tick refutation game."
+    sc_rollup ;
+  let* () =
+    setup_dal_overflow_game ~keys:all_keys ~commitment_period ~sc_rollup client1
+  in
+  (* Bring the head up to ~wall-clock so the bakers start at small rounds.
+     [~minimal_timestamp:false] forges each block at the current time, jumping the
+     head to ~now in one block. Done before injecting so the op's branch is fresh
+     when the bakers start. *)
+  let head_lag_s () =
+    let* header = Client.RPC.call client1 @@ RPC.get_chain_block_header () in
+    let ts_notation = JSON.(header |-> "timestamp" |> as_string) in
+    match Client.Time.of_notation_opt ts_notation with
+    | None -> Test.fail "Could not parse head timestamp %s" ts_notation
+    | Some ts ->
+        return (Ptime.diff (Client.Time.now ()) ts |> Ptime.Span.to_float_s)
+  in
+  let rec catch_up n =
+    let* lag = head_lag_s () in
+    if lag > 2. && n < 20 then
+      let* () =
+        Client.bake_for_and_wait ~minimal_timestamp:false ~keys:all_keys client1
+      in
+      catch_up (n + 1)
+    else (
+      Log.info "Head caught up to wall-clock (lag %.1fs) after %d blocks." lag n ;
+      unit)
+  in
+  let* () = catch_up 0 in
+  (* Split the bootstrap delegates across the two nodes so locking is a genuine
+     multi-party commitment (neither baker alone proposes and self-confirms).
+     Bakers run with DEFAULT configuration. *)
+  let delegates1 =
+    [
+      Constant.bootstrap1.public_key_hash;
+      Constant.bootstrap2.public_key_hash;
+      Constant.bootstrap3.public_key_hash;
+    ]
+  in
+  let delegates2 =
+    [Constant.bootstrap4.public_key_hash; Constant.bootstrap5.public_key_hash]
+  in
+  let* _baker1 =
+    Agnostic_baker.init ~event_level:`Info ~delegates:delegates1 node1 client1
+  in
+  let* _baker2 =
+    Agnostic_baker.init ~event_level:`Info ~delegates:delegates2 node2 client1
+  in
+  (* Let the bakers run first so they are actively monitoring the mempool; the op
+     we inject next is then reliably picked up in the next proposal (injecting
+     before they start raced with their initial mempool fetch). *)
+  let* start_level = Node.get_level node1 in
+  let* _ = Node.wait_for_level node1 (start_level + 2) in
+  Log.info
+    "Bakers are advancing the chain (level %d); now injecting the malicious op."
+    (start_level + 2) ;
+  let* _op, oph = inject_dal_overflow_refute ~protocol ~sc_rollup client1 in
+  let* level_before = Node.get_level node1 in
+  Log.info
+    "Malicious op %s injected at level %d; checking the chain keeps advancing."
+    oph
+    level_before ;
+  (* The op applies (does not abort), so baking proceeds; we require the chain to
+     advance by two more levels. A timeout means the bakers locked on a proposal
+     carrying the un-appliable op (a consensus halt). *)
+  let advanced =
+    let* l = Node.wait_for_level node1 (level_before + 2) in
+    return (`Advanced l)
+  in
+  let timeout =
+    let* () = Lwt_unix.sleep 90. in
+    return `Stuck
+  in
+  let* result = Lwt.pick [advanced; timeout] in
+  match result with
+  | `Advanced l ->
+      Log.info
+        "OK: the chain advanced to level %d -- the op applies and baking is \
+         not halted."
+        l ;
+      unit
+  | `Stuck ->
+      Test.fail
+        "The chain did not advance past level %d within 90s; the bakers locked \
+         on a proposal carrying the un-appliable op (a consensus halt)."
+        level_before
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_get_genesis_info ~kind protocols ;
@@ -8617,6 +9248,12 @@ let register ~protocols =
     protocols ;
   test_refutation protocols ~kind:"arith" ;
   test_refutation protocols ~kind:"wasm_2_0_0" ;
+  let from_proto_v = List.filter (fun p -> Protocol.number p > 025) protocols in
+  test_refute_apply_assertion_failure from_proto_v ;
+  let before_v = List.filter (fun p -> Protocol.number p <= 025) protocols in
+  test_refute_apply_assertion_gossiped_op_refused before_v ;
+  test_refute_apply_assertion_baker_excludes_op before_v ;
+  test_refute_apply_assertion_halts_baking_2nodes protocols ;
   test_recover_bond_of_stakers protocols ;
   test_patch_durable_storage_on_commitment protocols ;
   (* Specific Arith PVM tezts *)

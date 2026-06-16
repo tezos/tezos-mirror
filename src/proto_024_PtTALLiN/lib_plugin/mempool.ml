@@ -540,44 +540,67 @@ let prefilter_consensus_operation info config level_and_round =
       We add [config.clock_drift] time as a safety margin.
   *)
 let pre_filter info config
-    ({shell = _; protocol_data = Operation_data {contents; _} as op} :
+    ({shell = _; protocol_data = Operation_data {contents; _} as op} as
+     operation :
       Main.operation) =
-  let prefilter_manager_op manager_op =
-    match pre_filter_manager info config op manager_op with
-    | `Passed_prefilter prio -> `Passed_prefilter (manager_prio prio)
-    | (`Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _) as err
-      ->
-        err
-  in
-  match contents with
-  | Single (Failing_noop _) ->
-      `Refused [Environment.wrap_tzerror Wrong_operation]
-  | Single (Preattestation consensus_content)
-  | Single (Attestation {consensus_content; dal_content = _}) ->
-      let level_and_round : level_and_round =
-        {level = consensus_content.level; round = consensus_content.round}
+  (* Reject a smart-rollup refutation whose DAL page proof targets a
+     [published_level] beyond the level of the block it would be baked into
+     ([head + 1]): such an operation is un-appliable (see
+     [Block_validation.find_future_dal_refute]) and would otherwise be
+     classified [validated], gossiped, and selected by a baker. We classify it
+     [`Branch_delayed] (not [`Refused]): the op is not permanently invalid
+     -- its [published_level] is greater than [head + 1] and may be reached
+     as the head advances, after which the op could become valid -- so it
+     matches the [`Temporary] error kind (whose generic classification is
+     [`Branch_delayed]) and is retained and re-evaluated on each new head.
+     We compare against [head + 1] to agree with block validation (which
+     uses the level of the block being validated). *)
+  let level = Raw_level.succ (Raw_level.of_int32_exn info.head.level) in
+  match Block_validation.find_future_dal_refute ~level operation with
+  | Some published_level ->
+      `Branch_delayed
+        [
+          Environment.wrap_tzerror
+            (Block_validation.Sc_rollup_refute_dal_proof_future_published_level
+               {published_level; level});
+        ]
+  | None -> (
+      let prefilter_manager_op manager_op =
+        match pre_filter_manager info config op manager_op with
+        | `Passed_prefilter prio -> `Passed_prefilter (manager_prio prio)
+        | (`Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _) as
+          err ->
+            err
       in
-      prefilter_consensus_operation info config level_and_round
-  | Single (Preattestations_aggregate _) ->
-      (* Aggregate are built at baking time and shouldn't be broadcasted between
+      match contents with
+      | Single (Failing_noop _) ->
+          `Refused [Environment.wrap_tzerror Wrong_operation]
+      | Single (Preattestation consensus_content)
+      | Single (Attestation {consensus_content; dal_content = _}) ->
+          let level_and_round : level_and_round =
+            {level = consensus_content.level; round = consensus_content.round}
+          in
+          prefilter_consensus_operation info config level_and_round
+      | Single (Preattestations_aggregate _) ->
+          (* Aggregate are built at baking time and shouldn't be broadcasted between
          mempools. *)
-      `Refused [Environment.wrap_tzerror Wrong_operation]
-  | Single (Attestations_aggregate _) ->
-      (* Aggregate are built at baking time and shouldn't be broadcasted between
+          `Refused [Environment.wrap_tzerror Wrong_operation]
+      | Single (Attestations_aggregate _) ->
+          (* Aggregate are built at baking time and shouldn't be broadcasted between
          mempools. *)
-      `Refused [Environment.wrap_tzerror Wrong_operation]
-  | Single (Seed_nonce_revelation _)
-  | Single (Double_consensus_operation_evidence _)
-  | Single (Double_baking_evidence _)
-  | Single (Dal_entrapment_evidence _)
-  | Single (Activate_account _)
-  | Single (Proposals _)
-  | Single (Vdf_revelation _)
-  | Single (Drain_delegate _)
-  | Single (Ballot _) ->
-      `Passed_prefilter other_prio
-  | Single (Manager_operation _) as op -> prefilter_manager_op op
-  | Cons (Manager_operation _, _) as op -> prefilter_manager_op op
+          `Refused [Environment.wrap_tzerror Wrong_operation]
+      | Single (Seed_nonce_revelation _)
+      | Single (Double_consensus_operation_evidence _)
+      | Single (Double_baking_evidence _)
+      | Single (Dal_entrapment_evidence _)
+      | Single (Activate_account _)
+      | Single (Proposals _)
+      | Single (Vdf_revelation _)
+      | Single (Drain_delegate _)
+      | Single (Ballot _) ->
+          `Passed_prefilter other_prio
+      | Single (Manager_operation _) as op -> prefilter_manager_op op
+      | Cons (Manager_operation _, _) as op -> prefilter_manager_op op)
 
 let syntactic_check _ = Lwt.return `Well_formed
 

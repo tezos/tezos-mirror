@@ -335,6 +335,7 @@ val get_staked_on_commitment :
   sc_rollup:string -> staker:string -> Client.t -> string Lwt.t
 
 val forge_and_publish_commitment :
+  ?keys:string list ->
   ?compressed_state:string ->
   ?number_of_ticks:int ->
   inbox_level:int ->
@@ -345,6 +346,7 @@ val forge_and_publish_commitment :
   (RPC.smart_rollup_commitment * string) Lwt.t
 
 val bake_period_then_publish_commitment :
+  ?keys:string list ->
   ?compressed_state:string ->
   ?number_of_ticks:int ->
   sc_rollup:string ->
@@ -362,9 +364,14 @@ val cement_commitment :
   unit Lwt.t
 
 val bake_operation_via_rpc :
-  __LOC__:string -> Client.t -> Operation_core.Manager.t -> unit Lwt.t
+  __LOC__:string ->
+  ?keys:string list ->
+  Client.t ->
+  Operation_core.Manager.t ->
+  unit Lwt.t
 
 val start_refute :
+  ?keys:string list ->
   Client.t ->
   source:Account.key ->
   opponent:string ->
