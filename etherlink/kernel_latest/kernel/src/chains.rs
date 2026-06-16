@@ -7,6 +7,7 @@ use crate::{
     block_in_progress::BlockInProgress,
     blueprint_storage::{DelayedTransactionFetchingResult, EVMBlockHeader},
     bridge::{execute_tezlink_deposit, Deposit, TEZLINK_DEPOSITOR},
+    configuration::EVM_CHAIN_ID,
     delayed_inbox::DelayedInbox,
     error,
     fees::{DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER, MINIMUM_BASE_FEE_PER_GAS},
@@ -18,7 +19,6 @@ use crate::{
     },
     tick_model::constants::MAXIMUM_GAS_LIMIT,
     transaction::TransactionContent,
-    EVM_CHAIN_ID,
 };
 use mir::ast::PublicKeyHash;
 use num_traits::ToPrimitive;

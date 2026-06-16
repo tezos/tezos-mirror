@@ -198,7 +198,7 @@ where
     }
 }
 
-fn fetch_evm_chain_id(host: &mut impl StorageV1) -> U256 {
+pub fn fetch_evm_chain_id(host: &mut impl StorageV1) -> U256 {
     read_evm_chain_id(host).unwrap_or_else(|err| {
         // Chain id not in storage yet: fall back to the default and persist.
         log!(

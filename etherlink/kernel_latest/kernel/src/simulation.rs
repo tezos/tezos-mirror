@@ -11,6 +11,7 @@
 use crate::apply::revm_run_transaction;
 use crate::block_storage;
 use crate::chains::ExperimentalFeatures;
+use crate::configuration::fetch_evm_chain_id;
 use crate::fees::simulation_add_gas_for_fees;
 use crate::storage::{
     read_last_info_per_level_timestamp, read_or_set_maximum_gas_per_transaction,
@@ -19,7 +20,7 @@ use crate::storage::{
 use crate::tick_model::constants::MAXIMUM_GAS_LIMIT;
 use crate::{error::Error, storage};
 
-use crate::{parsable, parsing, retrieve_evm_chain_id};
+use crate::{parsable, parsing};
 
 use primitive_types::{H160, U256};
 use revm::primitives::hardfork::SpecId;
@@ -393,7 +394,7 @@ impl Evaluation {
     where
         Host: StorageV1,
     {
-        let evm_chain_id = retrieve_evm_chain_id(host)?;
+        let evm_chain_id = fetch_evm_chain_id(host);
         let minimum_base_fee_per_gas = crate::retrieve_minimum_base_fee_per_gas(host);
         let da_fee = crate::retrieve_da_fee(host)?;
         let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
@@ -719,7 +720,7 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
 
     use crate::registry_impl::RegistryImpl;
-    use crate::{retrieve_block_fees, retrieve_evm_chain_id};
+    use crate::retrieve_block_fees;
 
     use super::*;
 
@@ -798,14 +799,12 @@ mod tests {
         let timestamp =
             read_last_info_per_level_timestamp(host).unwrap_or(Timestamp::from(0));
         let timestamp = U256::from(timestamp.as_u64());
-        let evm_chain_id = retrieve_evm_chain_id(host);
-        assert!(evm_chain_id.is_ok(), "chain_id should be defined");
+        let evm_chain_id = fetch_evm_chain_id(host);
         let block_fees = retrieve_block_fees(host);
-        assert!(evm_chain_id.is_ok(), "chain_id should be defined");
         assert!(block_fees.is_ok(), "block_fees should be defined");
         let block = BlockConstants::first_block(
             timestamp,
-            evm_chain_id.unwrap(),
+            evm_chain_id,
             block_fees.unwrap(),
             crate::block::GAS_LIMIT,
             H160::zero(),

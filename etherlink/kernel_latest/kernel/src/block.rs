@@ -647,16 +647,17 @@ mod tests {
         TEZ_BLOCKS_PATH, TEZ_SAFE_STORAGE_ROOT_PATH,
         TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
     };
+    use crate::configuration::fetch_evm_chain_id;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
     use crate::fees::{DA_FEE_PER_BYTE, DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER};
     use crate::registry_impl::RegistryImpl;
+    use crate::retrieve_block_fees;
     use crate::storage::read_block_in_progress;
     use crate::storage::read_last_info_per_level_timestamp;
     use crate::transaction::Transaction;
     use crate::transaction::TransactionContent;
     use crate::transaction::TransactionContent::Ethereum;
     use crate::transaction::TransactionContent::EthereumDelayed;
-    use crate::{retrieve_block_fees, retrieve_evm_chain_id};
     use primitive_types::{H160, U256};
     use revm::primitives::hardfork::SpecId;
     use revm_etherlink::helpers::legacy::{alloy_to_u256, h160_to_alloy, u256_to_alloy};
@@ -2036,14 +2037,13 @@ mod tests {
         let timestamp =
             read_last_info_per_level_timestamp(host).unwrap_or(Timestamp::from(0));
         let timestamp = U256::from(timestamp.as_u64());
-        let evm_chain_id = retrieve_evm_chain_id(host);
+        let evm_chain_id = fetch_evm_chain_id(host);
         let block_fees = retrieve_block_fees(host);
-        assert!(evm_chain_id.is_ok(), "chain_id should be defined");
         assert!(block_fees.is_ok(), "block fees should be defined");
         TezosXBlockConstants {
             evm_runtime_block_constants: BlockConstants::first_block(
                 timestamp,
-                evm_chain_id.unwrap(),
+                evm_chain_id,
                 block_fees.unwrap(),
                 crate::block::GAS_LIMIT,
                 H160::zero(),
