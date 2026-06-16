@@ -3294,6 +3294,7 @@ dependencies = [
  "num-traits",
  "pretty_assertions",
  "primitive-types",
+ "rlp",
  "sha3",
  "tezos-evm-logging-latest",
  "tezos-evm-runtime-latest",
