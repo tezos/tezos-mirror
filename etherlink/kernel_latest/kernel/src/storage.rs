@@ -259,10 +259,22 @@ const EVM_BURNED_FEES: RefPath = RefPath::assert_from(b"/evm/world_state/fees/bu
 /// keyspace. Resolves to the durable path `/base/info_per_level/timestamp`.
 const INFO_PER_LEVEL_TIMESTAMP_KEY: Key = Key::from_static(b"/info_per_level/timestamp");
 
+// Canonical durable paths of the simulation outputs. The writers go through
+// the `/base` keyspace via the relative keys below; these absolute forms are
+// kept for documentation and tests asserting the resolved path.
+#[allow(dead_code)]
 pub const SIMULATION_RESULT: RefPath =
     RefPath::assert_from(b"/base/evm_simulation_result");
+#[allow(dead_code)]
 pub const SIMULATION_HTTP_TRACES: RefPath =
     RefPath::assert_from(b"/base/simulation_http_traces");
+
+// Key to the simulation result, inside the `/base` keyspace. Resolves to the
+// durable path `/base/evm_simulation_result`.
+const SIMULATION_RESULT_KEY: Key = Key::from_static(b"/evm_simulation_result");
+// Key to the aggregate simulation HTTP traces, inside the `/base` keyspace.
+// Resolves to the durable path `/base/simulation_http_traces`.
+const SIMULATION_HTTP_TRACES_KEY: Key = Key::from_static(b"/simulation_http_traces");
 
 /// Flag path enabling per-transaction HTTP trace capture during block
 /// replay. The `__` prefix follows the existing convention for node-driven
@@ -345,19 +357,20 @@ const MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS_KEY: Key =
     Key::from_static(b"/max_blueprint_lookahead_in_seconds");
 
 pub fn store_simulation_result<T>(
-    host: &mut impl StorageV1,
+    host: &mut (impl StorageV1 + KeySpaceLoader),
     result: SimulationResult<T, String>,
 ) -> Result<(), anyhow::Error>
 where
     T: Decodable + Encodable,
 {
+    let mut base = load_base_keyspace(host)?;
     let encoded = result.to_bytes();
-    host.store_write(&SIMULATION_RESULT, &encoded, 0)
+    base.set(&SIMULATION_RESULT_KEY, encoded)
         .context("Failed to write the simulation result.")
 }
 
 pub fn store_simulation_http_traces(
-    host: &mut impl StorageV1,
+    host: &mut (impl StorageV1 + KeySpaceLoader),
     traces: &[tezosx_journal::HttpTrace],
 ) -> Result<(), anyhow::Error> {
     let mut stream = rlp::RlpStream::new_list(traces.len());
@@ -365,7 +378,8 @@ pub fn store_simulation_http_traces(
         stream.append(trace);
     }
     let encoded = stream.out();
-    host.store_write(&SIMULATION_HTTP_TRACES, &encoded, 0)
+    let mut base = load_base_keyspace(host)?;
+    base.set(&SIMULATION_HTTP_TRACES_KEY, encoded)
         .context("Failed to write the simulation HTTP traces.")
 }
 
@@ -1568,6 +1582,38 @@ mod tests {
             host.store_read_all(&RefPath::assert_from(b"/base/kernel_version"))
                 .unwrap(),
             b"kernel-test"
+        );
+    }
+
+    // The simulation-output writers now go through the `/base` keyspace.
+    // Each writer must land its bytes at the historical absolute path with
+    // the exact same encoding as before, so the EVM-node-side decoders that
+    // read these values across the kernel↔node ABI are unaffected.
+    #[test]
+    fn base_keyspace_simulation_writers_resolve_to_absolute_paths() {
+        use crate::simulation::SimulationResult;
+        use tezos_ethereum::rlp_helpers::VersionedEncoding;
+
+        let mut host = MockKernelHost::default();
+
+        // The simulation result is RLP-encoded with a leading version byte
+        // (`VersionedEncoding`). The keyspace writer must store exactly those
+        // bytes at `/base/evm_simulation_result`.
+        let result: SimulationResult<u64, String> = SimulationResult::Ok(42);
+        let expected = result.to_bytes();
+        super::store_simulation_result(&mut host, result).unwrap();
+        assert_eq!(
+            host.store_read_all(&super::SIMULATION_RESULT).unwrap(),
+            expected
+        );
+
+        // The HTTP traces are stored as an RLP list. An empty capture is the
+        // common case (no cross-runtime HTTP call); it must resolve to the
+        // empty-list encoding at `/base/simulation_http_traces`.
+        super::store_simulation_http_traces(&mut host, &[]).unwrap();
+        assert_eq!(
+            host.store_read_all(&super::SIMULATION_HTTP_TRACES).unwrap(),
+            rlp::RlpStream::new_list(0).out().to_vec()
         );
     }
 
