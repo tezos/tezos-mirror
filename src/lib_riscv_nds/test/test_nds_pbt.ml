@@ -791,6 +791,7 @@ let () =
   register_pbt
     ~long:true
     ~long_factor:10
+    ~extra_tags:["slow"]
     (module Disk_prove_backend)
     test_bisimulation ;
   register_pbt
