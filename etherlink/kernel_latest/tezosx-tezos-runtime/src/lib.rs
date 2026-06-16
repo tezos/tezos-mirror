@@ -24,8 +24,8 @@ use tezos_execution::{
     cross_runtime_transfer,
     enshrined_contracts::CracError,
     mir_ctx::{clear_temporary_big_maps, InterpretContext, OperationCtx, TcCtx},
-    originate_contract, typecheck_code_and_storage, CracTransferError, OriginationNonce,
-    TezlinkOperationGas,
+    originate_contract, storage_fees, typecheck_code_and_storage, CracTransferError,
+    OriginationNonce, TezlinkOperationGas,
 };
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKeyHash;
@@ -51,6 +51,7 @@ use tezos_tezlink::{
 use tezosx_interfaces::{
     AliasInfo, AliasResolution, Classification, CrossRuntimeContext, Origin, Registry,
     RuntimeInterface, TezosXRuntimeError, ALIAS_LOOKUP_MILLIGAS, X_TEZOS_GAS_CONSUMED,
+    X_TEZOS_STORAGE_COST,
 };
 use tezosx_journal::{DispatchSlotError, TezosXJournal};
 
@@ -115,16 +116,22 @@ pub fn crac_top_level_applied_result() -> ContentResult<TransferContent> {
 // structured variants (and corresponding HTTP status codes) where
 // possible.
 fn build_response(
-    result: Result<(), TezosXRuntimeError>,
+    result: Result<ExecuteRequestOutcome, TezosXRuntimeError>,
     consumed_milligas: u64,
     frame_result: Option<Vec<u8>>,
 ) -> http::Response<Vec<u8>> {
     let gas_header = consumed_milligas.to_string();
     let mut builder = http::Response::builder().header(X_TEZOS_GAS_CONSUMED, &gas_header);
     let (status, body) = match result {
-        Ok(()) => {
+        Ok(outcome) => {
             builder =
                 builder.header(http::header::CONTENT_TYPE, "application/octet-stream");
+            if outcome.delegated_storage_cost > 0 {
+                builder = builder.header(
+                    X_TEZOS_STORAGE_COST,
+                    outcome.delegated_storage_cost.to_string(),
+                );
+            }
             (StatusCode::OK, frame_result.unwrap_or_default())
         }
         Err(TezosXRuntimeError::BadRequest(msg)) => {
@@ -160,12 +167,12 @@ fn build_response(
 /// request error takes precedence and the dispatch payload (if any)
 /// is dropped on the floor, as it would be for any non-2xx.
 fn finalize_response(
-    result: Result<(), TezosXRuntimeError>,
+    result: Result<ExecuteRequestOutcome, TezosXRuntimeError>,
     consumed_milligas: u64,
     dispatch: Result<Option<Vec<u8>>, DispatchSlotError>,
 ) -> http::Response<Vec<u8>> {
     let result = match (result, &dispatch) {
-        (Ok(()), Err(e)) => Err(TezosXRuntimeError::Custom(format!(
+        (Ok(_), Err(e)) => Err(TezosXRuntimeError::Custom(format!(
             "dispatch slot inconsistency: {e}"
         ))),
         (other, _) => other,
@@ -524,6 +531,11 @@ fn build_alias_origination_internal(
     })
 }
 
+#[derive(Default)]
+struct ExecuteRequestOutcome {
+    delegated_storage_cost: u64,
+}
+
 /// Execute a cross-runtime request: dispatches on the HTTP method.
 ///
 /// - `POST` → entrypoint call (existing state-mutating transfer path).
@@ -543,7 +555,7 @@ fn execute_request<Host>(
     journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
     consumed_milligas: &mut u64,
-) -> Result<(), TezosXRuntimeError>
+) -> Result<ExecuteRequestOutcome, TezosXRuntimeError>
 where
     Host: StorageV1,
 {
@@ -557,7 +569,6 @@ where
                 request,
                 consumed_milligas,
             )
-            .map(|_| ())
         }
         http::Method::GET => {
             // The view path doesn't mutate storage or push a CRAC
@@ -576,6 +587,7 @@ where
                 request,
                 consumed_milligas,
             )
+            .map(|()| ExecuteRequestOutcome::default())
         }
         ref other => Err(TezosXRuntimeError::MethodNotAllowed(format!(
             "HTTP method {other} not allowed (use POST for entrypoint calls or GET for views)"
@@ -584,7 +596,10 @@ where
 }
 
 /// Execute an entrypoint call (state-mutating transfer targeting a
-/// Michelson contract or implicit account).
+/// Michelson contract or implicit account). On success, returns the
+/// total mutez storage cost this frame delegates upward — the sum
+/// of the values received from inner outgoing CRACs and the
+/// standalone cost of this frame's own internal operations.
 fn execute_entrypoint_call<Host>(
     chain_id: &ChainId,
     registry: &impl Registry,
@@ -592,7 +607,7 @@ fn execute_entrypoint_call<Host>(
     journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
     consumed_milligas: &mut u64,
-) -> Result<TransferSuccess, TezosXRuntimeError>
+) -> Result<ExecuteRequestOutcome, TezosXRuntimeError>
 where
     Host: StorageV1,
 {
@@ -720,6 +735,7 @@ where
         // (EVM alias) or `Implicit(pkh)` (native Michelson origin). `None`
         // only for a top-level Michelson tx (absent `X-Tezos-Source`).
         crac_origin: hdrs.crac_origin_contract.clone(),
+        delegated_storage_cost: 0,
     };
     let parser = mir::parser::Parser::new();
 
@@ -805,6 +821,7 @@ where
             )
         }
     };
+    let received_delegated_storage_cost = operation_ctx.delegated_storage_cost;
     // Persist the post-execution origination index back to the
     // journal on every path (success, failure, OOG): MIR has had
     // its mutable borrow of `nonce` released by `cross_runtime_transfer`
@@ -904,19 +921,7 @@ where
         );
     }
 
-    // For cross-runtime calls (CRAC), build the two-step receipt
-    // structure per RFC: CRAC Derived Block Contents and store it
-    // in the journal for the block builder.
-    //
-    // source_contract = alias(E_0) from X-Tezos-Source (top-level destination)
-    // hdrs.sender    = alias(E_1) from X-Tezos-Sender (internal sender)
-    //
-    // The builder sponsors its own synthetic-event encoding (against a
-    // dedicated kernel-owned gas counter), so it neither charges the
-    // caller for the kernel bookkeeping nor can it downgrade a
-    // successful CRAC to an OutOfGas error when the caller's leftover
-    // budget is tight (L2-1464).
-    let transfer = if is_crac {
+    if is_crac {
         let source_contract = hdrs.crac_origin_contract.as_ref().ok_or_else(|| {
             TezosXRuntimeError::Custom(
                 "is_crac set but crac_origin_contract is None".into(),
@@ -943,12 +948,21 @@ where
         #[cfg(debug_assertions)]
         assert_receipt_markers_balanced(&receipt);
         journal.michelson.push_pending_crac_receipt(receipt);
-        TransferSuccess::default()
-    } else {
-        result.target.into()
     };
     *consumed_milligas = gas.total_milligas_consumed().into();
-    Ok(transfer)
+
+    let delegated_storage_cost =
+        result.own_storage_cost + received_delegated_storage_cost;
+
+    let delegated_storage_cost = u64::try_from(delegated_storage_cost).map_err(|e| {
+        TezosXRuntimeError::ConversionError(format!(
+            "Delegated storage cost does not fit in u64: {e}"
+        ))
+    })?;
+
+    Ok(ExecuteRequestOutcome {
+        delegated_storage_cost,
+    })
 }
 
 /// Assert that the CRAC frame markers in a receipt are balanced.
@@ -1241,14 +1255,31 @@ impl RuntimeInterface for TezosRuntime {
         // separate AppliedOperation for the alias materialization;
         // it surfaces only as an internal op of the enclosing CRAC.
         let internal_op = build_alias_origination_internal(&null_pkh, script, receipt);
+
+        let alias_storage_cost =
+            storage_fees::compute_internal_op_storage_fees(&internal_op).map_err(|e| {
+                TezosXRuntimeError::Custom(format!(
+                    "Failed to compute storage fees for the alias forwarder origination: {e:?}"
+                ))
+            })?;
+
+        let alias_storage_cost = u64::try_from(alias_storage_cost).map_err(|e| {
+            TezosXRuntimeError::ConversionError(format!(
+                "Alias storage cost does not fit in u64: {e}"
+            ))
+        })?;
+
         journal
             .michelson
             .push_pending_alias_origination_internal(internal_op);
 
-        // TODO(L2-1519): compute the mutez cost of the bytes written
-        // here and set `delegated_storage_cost` to `Some(cost)` so the
-        // caller can absorb it.
-        Ok((kt1_str, AliasResolution::build(remaining)))
+        Ok((
+            kt1_str,
+            AliasResolution::build_with_delegated_storage_cost(
+                remaining,
+                alias_storage_cost,
+            ),
+        ))
     }
 
     fn compute_alias(&self, native_address: &[u8]) -> Result<String, TezosXRuntimeError> {
@@ -1413,7 +1444,11 @@ mod tests {
 
     #[test]
     fn build_response_success_uses_frame_result() {
-        let resp = build_response(Ok(()), 0, Some(b"collected".to_vec()));
+        let resp = build_response(
+            Ok(ExecuteRequestOutcome::default()),
+            0,
+            Some(b"collected".to_vec()),
+        );
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(resp.body(), b"collected");
         assert_eq!(
@@ -1426,7 +1461,7 @@ mod tests {
 
     #[test]
     fn build_response_success_no_frame_result() {
-        let resp = build_response(Ok(()), 0, None);
+        let resp = build_response(Ok(ExecuteRequestOutcome::default()), 0, None);
         assert_eq!(resp.status(), StatusCode::OK);
         assert!(resp.body().is_empty());
         assert_eq!(
@@ -1439,7 +1474,7 @@ mod tests {
 
     #[test]
     fn build_response_success_empty_frame_result() {
-        let resp = build_response(Ok(()), 0, Some(vec![]));
+        let resp = build_response(Ok(ExecuteRequestOutcome::default()), 0, Some(vec![]));
         assert_eq!(resp.status(), StatusCode::OK);
         assert!(resp.body().is_empty());
         assert_eq!(
@@ -1508,7 +1543,7 @@ mod tests {
     #[test]
     fn build_response_success_has_gas_consumed_header() {
         // consumed_milligas = 0 → reported as 0
-        let resp = build_response(Ok(()), 0, None);
+        let resp = build_response(Ok(ExecuteRequestOutcome::default()), 0, None);
         assert_eq!(
             resp.headers()
                 .get(X_TEZOS_GAS_CONSUMED)
@@ -1520,7 +1555,7 @@ mod tests {
     #[test]
     fn build_response_gas_consumed_reports_milligas() {
         // 5000 milligas → reported as 5000
-        let resp = build_response(Ok(()), 5000, None);
+        let resp = build_response(Ok(ExecuteRequestOutcome::default()), 5000, None);
         assert_eq!(
             resp.headers()
                 .get(X_TEZOS_GAS_CONSUMED)
@@ -1541,6 +1576,38 @@ mod tests {
         );
     }
 
+    /// `delegated_storage_cost = 0` on a 2xx response: the header is
+    /// omitted entirely. Absence signals "nothing to delegate".
+    #[test]
+    fn build_response_no_storage_cost_header_when_zero() {
+        let resp = build_response(Ok(ExecuteRequestOutcome::default()), 0, None);
+        assert!(
+            resp.headers().get(X_TEZOS_STORAGE_COST).is_none(),
+            "X-Tezos-Storage-Cost must be absent when delegated cost is 0"
+        );
+    }
+
+    /// `delegated_storage_cost > 0` on a 2xx response: the header is
+    /// present, ASCII-decimal, exact value match (no leading zeros,
+    /// no spaces).
+    #[test]
+    fn build_response_emits_storage_cost_header_on_2xx() {
+        let resp = build_response(
+            Ok(ExecuteRequestOutcome {
+                delegated_storage_cost: 12345,
+            }),
+            0,
+            None,
+        );
+        assert_eq!(
+            resp.headers()
+                .get(X_TEZOS_STORAGE_COST)
+                .and_then(|v| v.to_str().ok()),
+            Some("12345"),
+            "X-Tezos-Storage-Cost must carry the exact mutez value"
+        );
+    }
+
     // --- finalize_response tests ---
     //
     // Four cases of `(execute_request result, dispatch slot take)`:
@@ -1552,7 +1619,11 @@ mod tests {
     // payload — 200 with the payload as body.
     #[test]
     fn finalize_response_success_with_payload() {
-        let resp = finalize_response(Ok(()), 42, Ok(Some(b"collected".to_vec())));
+        let resp = finalize_response(
+            Ok(ExecuteRequestOutcome::default()),
+            42,
+            Ok(Some(b"collected".to_vec())),
+        );
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(resp.body(), b"collected");
         assert_eq!(
@@ -1589,7 +1660,11 @@ mod tests {
     // 2xx response.
     #[test]
     fn finalize_response_success_with_unbalanced_slot_escalates_to_500() {
-        let resp = finalize_response(Ok(()), 7, Err(DispatchSlotError::NoSlot));
+        let resp = finalize_response(
+            Ok(ExecuteRequestOutcome::default()),
+            7,
+            Err(DispatchSlotError::NoSlot),
+        );
         assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
         assert!(
             String::from_utf8_lossy(resp.body()).contains("dispatch slot inconsistency"),

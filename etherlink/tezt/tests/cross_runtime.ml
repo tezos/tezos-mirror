@@ -16,15 +16,11 @@
 
 open Rpc.Syntax
 
-(** Base-fee floor for the CRAC test setups.  The delayed-inbox transport
-    bypassed the fee market entirely; direct tezlink injection enforces
-    minimal fees (base_fee_per_gas * michelson_to_evm_gas_multiplier *
-    gas_limit), which the historical [~fee:1000] of the forged
-    operations does not cover beyond 100k gas.  The operations must
-    stay byte-for-byte identical, so instead lower the base-fee floor
-    to 1 wei — non-zero so BASEFEE-observable assertions stay
-    meaningful. *)
-let crac_minimum_base_fee_per_gas = Wei.of_string "1"
+(** Base-fee floor for the CRAC test setups.  Mirrors the production
+    Etherlink floor (1 GWei) so the mutez<->EVM gas conversion driving
+    alias-mat and other CRAC-borne storage costs uses the same factor
+    as on-chain.  The forge helpers below scale [~fee] accordingly. *)
+let crac_minimum_base_fee_per_gas = Wei.of_string "1000000000"
 
 (** Foreign endpoint of the tezlink RPC served by [evm_node]. *)
 let tezlink_foreign_endpoint_from_evm_node evm_node =
@@ -179,10 +175,10 @@ module TezContract = struct
         operation
           [
             make
-              ~fee:1000
+              ~fee:10_000
               ~counter
-              ~gas_limit:10000
-              ~storage_limit:60000
+              ~gas_limit:10_000
+              ~storage_limit:60_000
               ~source
               (origination ~code ~init_storage ~init_balance ());
           ])
@@ -212,17 +208,17 @@ module TezContract = struct
    *  JSON, forges, injects and seals the call operation. *)
   let call_contract_via_tezlink ~client ~client_tezlink ~sequencer ~source
       ~counter ~dest ~arg_data ?(entrypoint = "default") ?(amount = 0)
-      ?(gas_limit = 100_000) () =
+      ?(gas_limit = 100_000) ?(fee = 100_000) ?(storage_limit = 5_000) () =
     let* arg = Client.convert_data_to_json ~data:arg_data client in
     let* call_op =
       Operation.Manager.(
         operation
           [
             make
-              ~fee:1000
+              ~fee
               ~counter
               ~gas_limit
-              ~storage_limit:1000
+              ~storage_limit
               ~source
               (call ~dest ~arg ~entrypoint ~amount ());
           ])
@@ -747,7 +743,7 @@ module TezRunner = struct
 
   (** Calls [%run] with [Unit] by direct tezlink injection. *)
   let call_run ~client ~client_tezlink ~sequencer ~source ~counter ?amount
-      ?gas_limit runner =
+      ?gas_limit ?fee ?storage_limit runner =
     call_contract_via_tezlink
       ~client
       ~client_tezlink
@@ -756,6 +752,8 @@ module TezRunner = struct
       ~counter
       ?amount
       ?gas_limit
+      ?fee
+      ?storage_limit
       ~dest:runner
       ~arg_data:"Unit"
       ~entrypoint:"run"
@@ -1740,7 +1738,13 @@ module CracRunnerWrapper = struct
     end
 
     module TezRunner : sig
-      val call_run : ?amount:int -> ?gas_limit:int -> tez_runner -> unit Lwt.t
+      val call_run :
+        ?amount:int ->
+        ?gas_limit:int ->
+        ?fee:int ->
+        ?storage_limit:int ->
+        tez_runner ->
+        unit Lwt.t
 
       val get_consumed_milligas : ?block:string -> unit -> int Lwt.t
 
@@ -2247,7 +2251,8 @@ module CracRunnerWrapper = struct
       end
 
       module TezRunner = struct
-        let call_run ?amount ?gas_limit (`Tez_runner (_, runner)) =
+        let call_run ?amount ?gas_limit ?fee ?storage_limit
+            (`Tez_runner (_, runner)) =
           TezRunner.call_run
             ~client
             ~client_tezlink
@@ -2256,6 +2261,8 @@ module CracRunnerWrapper = struct
             ~counter:(tez_counter ())
             ?amount
             ?gas_limit
+            ?fee
+            ?storage_limit
             runner
 
         let get_consumed_milligas ?block () =
@@ -2636,7 +2643,7 @@ module CracRunnerWrapper = struct
             operation
               [
                 make
-                  ~fee:1000
+                  ~fee:100_000
                   ~counter:(tez_counter ())
                   ~gas_limit:100_000
                   ~storage_limit:1000
@@ -2790,7 +2797,8 @@ end
 
 (** Registers a sequencer-only CRAC runner test on the sandbox.  Builds
  *  a {!CracRunnerWrapper.S} and passes it to [body]. *)
-let register_crac_runner_test ~title ?(tags = []) body =
+let register_crac_runner_test ~title ?(tags = [])
+    ?(minimum_base_fee_per_gas = crac_minimum_base_fee_per_gas) body =
   let with_runtimes = Tezosx_runtime.[Tezos] in
   let tags =
     ["tezosx"]
@@ -2804,7 +2812,7 @@ let register_crac_runner_test ~title ?(tags = []) body =
     ~title
     ~tags
     ~with_runtimes
-    ~minimum_base_fee_per_gas:crac_minimum_base_fee_per_gas
+    ~minimum_base_fee_per_gas
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
   @@ fun sequencer ->
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -5072,7 +5080,11 @@ let test_crac_double_nested_tez_revert () =
   Log.debug ~prefix "Originate TEZ main" ;
   let* tez_main = TezMultiRunCaller.originate ~callees:[tez_bridge_outer] () in
   Log.debug ~prefix "Call TEZ main" ;
-  let* () = TezRunner.call_run tez_main in
+  (* Two TEZ→EVM hops with alias materialization on the outbound legs
+     overshoot the default 100k Michelson gas budget once the alias
+     forwarder body is folded into the gateway consumption.  Bumping
+     here is local — the surrounding tests don't share the budget. *)
+  let* () = TezRunner.call_run ~gas_limit:300_000 tez_main in
   Log.debug ~prefix "Verify counters" ;
   let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_main in
   let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_runner in
@@ -5966,7 +5978,12 @@ let test_crac_nested_catches_with_multiple_reverts () =
       ()
   in
   Log.debug ~prefix "Call EVM main" ;
-  let* _ = EvmRunner.call_run evm_main in
+  (* Two CRAC->Michelson reverts plus three accepted Michelson hops
+     consume ~5x the 304k EVM gas alias-mat budget on top of the
+     contract logic — the default 3M EVM gas is right on the cliff,
+     so the tx ends [status:false] without any catch firing. Give
+     it 5M to absorb the alias-mat overhead at base_fee=1 GWei. *)
+  let* _ = EvmRunner.call_run ~gas:5_000_000 evm_main in
   Log.debug ~prefix "Verify counters" ;
   let* () =
     EvmMultiRunCaller.check_storage
@@ -7705,7 +7722,10 @@ let test_crac_receipt_separate_tx_two_cracs () =
     Rpc.Tezosx.tez_getEthereumTezosAddress bridge_2_addr sequencer
   in
   (* Send both run() transactions to the mempool without producing a
-     block, then produce one block so both land with different tx_index. *)
+     block, then produce one block so both land with different tx_index.
+     Each tx materializes one or two aliases (~304k EVM gas at base_fee
+     = 1 GWei), so the 300k budget would land at the cliff; 1M leaves
+     room for the alias-mat plus the CRAC body. *)
   let* raw_tx_1 =
     Cast.craft_tx
       ~source_private_key:sender.private_key
@@ -8927,7 +8947,10 @@ let test_crac_receipt_interleaved_failed_pending () =
   let*@ bridge_fail_alias =
     Rpc.Tezosx.tez_getEthereumTezosAddress bridge_fail_addr sequencer
   in
-  let* _ = EvmRunner.call_run evm_main in
+  (* 8 CRAC sub-calls (4 SF pairs) each pulling alias mat into the
+     EVM gas budget; the default 3M is on the cliff at base_fee=1 GWei
+     with the new EVM<->Michelson conversion. *)
+  let* _ = EvmRunner.call_run ~gas:5_000_000 evm_main in
   (* 4 catches absorbed the failing CRACs; the 4 successful CRACs went
      through.  The EVM counter increments once per callee + once after
      the loop = 2*n_pairs + 1 = 9. *)
@@ -9210,7 +9233,7 @@ let test_crac_receipt_tez_not_first_tx () =
       operation
         [
           make
-            ~fee:1000
+            ~fee:100_000
             ~counter:(tez_counter ())
             ~gas_limit:100_000
             ~storage_limit:1000
@@ -9228,7 +9251,7 @@ let test_crac_receipt_tez_not_first_tx () =
       operation
         [
           make
-            ~fee:1000
+            ~fee:100_000
             ~counter:(tez_counter ())
             ~gas_limit:100_000
             ~storage_limit:1000
@@ -9301,7 +9324,7 @@ let test_crac_receipt_evm_then_tez_same_block () =
       operation
         [
           make
-            ~fee:1000
+            ~fee:100_000
             ~counter:(tez_counter ())
             ~gas_limit:100_000
             ~storage_limit:1000
@@ -10989,15 +11012,18 @@ let test_crac_gas_header_michelson_burner () =
   let* () = TezRunner.call_run ~gas_limit:200_000 tez_burner in
   let* mg_direct = TezRunner.get_consumed_milligas () in
 
-  (* Warmup calls (alias generation) *)
+  (* Warmup calls (alias generation).  The burner intentionally
+     consumes substantial Michelson gas inside the CRAC, which on top
+     of alias mat overflows the default 3M EVM budget at base_fee=1
+     GWei with the new EVM<->Michelson conversion. *)
   Log.debug ~prefix "Warmup calls" ;
   let* _ = EvmRunner.call_run runner_baseline in
-  let* _ = EvmRunner.call_run runner_burner in
+  let* _ = EvmRunner.call_run ~gas:5_000_000 runner_burner in
 
   (* Measurement calls (aliases cached) *)
   Log.debug ~prefix "Measurement calls" ;
   let* g_baseline = EvmRunner.call_run runner_baseline in
-  let* g_burner = EvmRunner.call_run runner_burner in
+  let* g_burner = EvmRunner.call_run ~gas:5_000_000 runner_burner in
 
   let g_expected = Int64.of_int (mg_direct / 22) in
   let delta = Int64.sub g_burner g_baseline in
@@ -12276,7 +12302,9 @@ let crac_register ~title ~tags body =
    (we need direct access to [client] / [client_tezlink] to originate
    Michelson contracts via direct tezlink injection, which the CRAC
    runner wrapper hides). *)
-let crac_orig_register ~title ~tags body =
+let crac_orig_register
+    ?(minimum_base_fee_per_gas = crac_minimum_base_fee_per_gas) ~title ~tags
+    body =
   let with_runtimes = Tezosx_runtime.[Tezos] in
   let tags =
     ["tezosx"]
@@ -12291,7 +12319,7 @@ let crac_orig_register ~title ~tags body =
     ~title
     ~tags
     ~with_runtimes
-    ~minimum_base_fee_per_gas:crac_minimum_base_fee_per_gas
+    ~minimum_base_fee_per_gas
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
   @@ fun sequencer ->
   let* client =
@@ -12355,14 +12383,17 @@ let crac_orig_deploy_bridge ~evm_version ~sequencer ~sender ~nonce ~kt1 =
   return addr
 
 (* Craft + send a raw EVM run() tx to the mempool without producing a
-   block.  Used to land two distinct top-level CRACs in the same block. *)
+   block.  Used to land two distinct top-level CRACs in the same block.
+   Two-CRAC scenarios materialize one alias per leg (~304k EVM gas
+   each at base_fee=1 GWei); 5M gives both legs comfortable headroom
+   on top of contract execution. *)
 let crac_orig_send_run_no_block ~sequencer ~sender ~nonce ~address =
   let* raw_tx =
     Cast.craft_tx
       ~source_private_key:sender.Eth_account.private_key
       ~chain_id:EvmContract.tezosx_evm_chain_id
       ~nonce
-      ~gas:2_000_000
+      ~gas:5_000_000
       ~gas_price:1_000_000_000
       ~value:Wei.zero
       ~address
@@ -13471,7 +13502,11 @@ let test_crac_origin_repair_none_to_alias () =
     ~prefix
     "Step 1: fire tez_bridge (origin=None for evm_alias(source.pkh)) → \
      evm_relay → tez_bridge_2 → evm_recorder" ;
-  let* () = TezRunner.call_run tez_bridge in
+  (* TEZ→EVM→TEZ→EVM chain: three CRAC boundaries each pull alias-mat
+     consumption back into the Michelson frame.  Default 100k Michelson
+     gas runs out on the recorder hop; 300k covers the full chain with
+     the [base_fee=1 GWei] conversion factor. *)
+  let* () = TezRunner.call_run ~gas_limit:300_000 tez_bridge in
   (* PRIMARY step 1: tx.origin at recorder = evm_alias(source.pkh).
      The first CRAC records the classification; the round-trip already
      resolves correctly on the return hop. *)
@@ -13505,7 +13540,7 @@ let test_crac_origin_repair_none_to_alias () =
     ~prefix
     "Step 2: fire tez_bridge again (Recorded branch — alias now in durable \
      storage)" ;
-  let* () = TezRunner.call_run tez_bridge in
+  let* () = TezRunner.call_run ~gas_limit:300_000 tez_bridge in
   Log.debug
     ~prefix
     "Step 2 PRIMARY: verify tx.origin at evm_recorder still = evm_alias(tz1)" ;
@@ -13777,7 +13812,11 @@ let test_crac_receipt_frames_nested_and_sibling () =
   let*@ evm_inner_alias =
     Rpc.Tezosx.tez_getEthereumTezosAddress evm_inner_addr sequencer
   in
-  let* _ = EvmRunner.call_run evm_main in
+  (* Two-callee chain with nested inner CRAC: each top-level callee
+     materializes its alias; the inner frame materializes another two.
+     ~1.5M EVM gas of pure alias mat on top of contract execution puts
+     the default 3M EVM budget on the cliff at base_fee=1 GWei. *)
+  let* _ = EvmRunner.call_run ~gas:5_000_000 evm_main in
   let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_2 in
   let* () =
     TezMultiRunCaller.check_storage ~expected_counter:1 tez_inner_of_inner

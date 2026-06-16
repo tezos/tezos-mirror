@@ -250,6 +250,7 @@ where
         source_public_key: &[],
         crac_chain_depth: hdrs.crac_depth,
         crac_origin: hdrs.crac_origin_contract.clone(),
+        delegated_storage_cost: 0,
     };
 
     // Arena holding all Micheline allocations for typechecking and

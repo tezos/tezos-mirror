@@ -158,7 +158,7 @@ pub mod context;
 pub mod enshrined_contracts;
 mod gas;
 pub mod mir_ctx;
-mod storage_fees;
+pub mod storage_fees;
 mod validate;
 
 /// Where an internal operation entered the current frame's tree.
@@ -260,7 +260,7 @@ fn burn_pass<Host, M, A>(
 ) -> (Vec<InternalOperationSum>, Result<(), ApplyOperationError>)
 where
     Host: StorageV1,
-    M: storage_fees::StorageFeesBurn,
+    M: storage_fees::OperationStorageFees,
     A: TezlinkAccount,
 {
     let parent_outcome = storage_fees::burn_content_storage_fees::<_, M>(
@@ -308,12 +308,13 @@ fn finalize_and_burn<Host, M, A>(
     payer: &A,
     storage_limit: &Narith,
     balance_updates: Vec<BalanceUpdate>,
+    delegated_storage_cost: u64,
     result: Result<M::Success, ApplyOperationError>,
     mut internal_operation_results: Vec<TaggedInternalOp>,
 ) -> OperationResult<M>
 where
     Host: StorageV1,
-    M: storage_fees::StorageFeesBurn,
+    M: storage_fees::OperationStorageFees,
     A: TezlinkAccount,
 {
     let mut content = finalize_statuses::<M>(result, &mut internal_operation_results);
@@ -325,6 +326,15 @@ where
         &mut content,
         internal_operation_results,
     );
+    // TODO(L2-1520): render the dedicated balance-updates for the delegated cost.
+    let burn_outcome = burn_outcome.and_then(|()| {
+        storage_fees::burn_storage_cost(
+            host,
+            payer,
+            &mut storage_limit_remaining,
+            delegated_storage_cost,
+        )
+    });
     if let Err(errors) = burn_outcome {
         log!(Debug, "Storage burn failed: {errors:?}");
         content.backtrack_if_applied_with_errors(errors.into());
@@ -1283,6 +1293,13 @@ fn gw<E: ToString>(e: E) -> TransferError {
 pub struct CrossRuntimeTransferResult {
     pub target: TransferTarget,
     pub internal_receipts: Vec<InternalOperationSum>,
+    /// Standalone storage cost — in mutez — of the internal
+    /// operations the sub-execution emitted directly. Excludes
+    /// operations surfaced from inner CRAC sub-executions (their
+    /// cost is reported upward by those sub-executions through
+    /// their own `X-Tezos-Storage-Cost` header, accumulated on the
+    /// caller frame's [`OperationCtx::delegated_storage_cost`]).
+    pub own_storage_cost: BigUint,
 }
 
 /// Error from [`cross_runtime_transfer`], carrying both the transfer
@@ -1373,9 +1390,22 @@ where
                     .michelson
                     .checkpoint_commit(tc_ctx.host, checkpoint_index)
                     .map_err(|e| CracTransferError::from(gw(e)))?;
+
+                let target: TransferTarget = success.into();
+                let own_storage_cost =
+                    storage_fees::compute_storage_fees::<TransferContent>(&target)?;
+                let own_storage_cost: BigUint = internal_receipts
+                    .iter()
+                    .filter(|t| matches!(t.origin, InternalOpOrigin::Own))
+                    .try_fold(own_storage_cost, |acc, t| {
+                        let fee = storage_fees::compute_internal_op_storage_fees(&t.op)?;
+                        Ok::<BigUint, TransferError>(acc + fee)
+                    })?;
+
                 Ok(CrossRuntimeTransferResult {
-                    target: success.into(),
+                    target,
                     internal_receipts: untag_internals(internal_receipts),
+                    own_storage_cost,
                 })
             } else {
                 // revert: restore the snapshot
@@ -2022,6 +2052,7 @@ where
                 source_account,
                 storage_limit,
                 balance_updates,
+                0,
                 reveal_result.map_err(Into::into),
                 internal_operations_receipts,
             ))
@@ -2041,6 +2072,7 @@ where
                 source_public_key,
                 crac_chain_depth: 0,
                 crac_origin: None,
+                delegated_storage_cost: 0,
             };
             // Watermarks for `drain_reentrant_crac_ops`: a top-level
             // manager op whose destination is the gateway enters EVM
@@ -2098,6 +2130,7 @@ where
                 source_account,
                 storage_limit,
                 balance_updates,
+                operation_ctx.delegated_storage_cost,
                 transfer_result.map_err(Into::into),
                 internal_operations_receipts,
             ))
@@ -2129,6 +2162,7 @@ where
                     source_account,
                     storage_limit,
                     balance_updates,
+                    0,
                     origination_result.map_err(|e| e.into()),
                     internal_operations_receipts,
                 ),

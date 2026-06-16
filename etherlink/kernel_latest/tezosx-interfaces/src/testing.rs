@@ -161,6 +161,11 @@ pub struct MockRegistry {
     pub generated_alias: String,
     pub serve_override: Option<(u16, Vec<u8>)>,
     pub injective_aliases: bool,
+    /// When `Some`, `ensure_alias` returns
+    /// `AliasResolution::build_with_delegated_storage_cost(remaining, v)`
+    /// so tests can exercise the caller-side accumulation of
+    /// `delegated_storage_cost`. Default `None` (no delegation).
+    pub alias_delegated_storage_cost: Option<u64>,
     pub ensure_alias_calls: RefCell<Vec<(AliasInfo, RuntimeId)>>,
     pub serve_calls: RefCell<Vec<http::Request<Vec<u8>>>>,
 }
@@ -171,6 +176,7 @@ impl MockRegistry {
             generated_alias: generated_alias.into(),
             serve_override: None,
             injective_aliases: false,
+            alias_delegated_storage_cost: None,
             ensure_alias_calls: RefCell::new(Vec::new()),
             serve_calls: RefCell::new(Vec::new()),
         }
@@ -195,6 +201,15 @@ impl MockRegistry {
         self.injective_aliases = true;
         self
     }
+
+    /// Have `ensure_alias` report `delegated_storage_cost: Some(v)`
+    /// on every materialization, so tests can drive the caller-side
+    /// accumulation path that activates only when the target runtime
+    /// delegates a non-zero cost.
+    pub fn with_alias_delegated_storage_cost(mut self, v: u64) -> Self {
+        self.alias_delegated_storage_cost = Some(v);
+        self
+    }
 }
 
 impl Registry for MockRegistry {
@@ -214,10 +229,14 @@ impl Registry for MockRegistry {
         self.ensure_alias_calls
             .borrow_mut()
             .push((alias_info, target_runtime));
-        Ok((
-            self.generated_alias.clone(),
-            crate::AliasResolution::build(gas_remaining),
-        ))
+        let resolution = match self.alias_delegated_storage_cost {
+            Some(v) => crate::AliasResolution::build_with_delegated_storage_cost(
+                gas_remaining,
+                v,
+            ),
+            None => crate::AliasResolution::build(gas_remaining),
+        };
+        Ok((self.generated_alias.clone(), resolution))
     }
 
     fn compute_alias(&self, alias_info: AliasInfo) -> Result<String, TezosXRuntimeError> {
