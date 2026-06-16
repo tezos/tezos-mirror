@@ -8,10 +8,10 @@
 //! and a new kind that will be integrated into both the WASM and RISC-V pvms.
 //!
 //! We therefore specify irmin-flavoured durable storage as [`StorageV1`], and the new durable storage
-//! as `StorageV2`.
-// TODO (TZX-38): define `StorageV2` trait.
+//! as NDS, exposed in the WASM pvm through [`v2::WasmNds`].
 
 mod v1;
+pub mod v2;
 
 pub use v1::CoreStorage;
 pub use v1::StorageV1;

@@ -16,6 +16,10 @@ categories = ["no-std", "no-std::no-alloc", "api-bindings", "wasm"]
 [lib]
 path = "src/lib.rs"
 
+[dependencies.tezos-smart-rollup-constants]
+path = "../constants"
+version = "0.2.2"
+
 [dependencies.tezos-smart-rollup-core]
 path = "../core"
 version = "0.2.2"
