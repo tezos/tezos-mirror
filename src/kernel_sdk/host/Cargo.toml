@@ -35,6 +35,9 @@ optional = true
 [build-dependencies.tezos-smart-rollup-build-utils]
 path = "../build-utils"
 
+[dependencies]
+cfg-if = "1.0.0"
+
 [features]
 default = ["std", "alloc", "crypto"]
 crypto = ["tezos_crypto_rs"]

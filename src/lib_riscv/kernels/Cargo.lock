@@ -942,7 +942,7 @@ dependencies = [
  "tezos-smart-rollup-host",
  "tezos_crypto_rs",
  "tezos_data_encoding",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "time",
 ]
 
@@ -963,7 +963,9 @@ dependencies = [
 name = "tezos-smart-rollup-host"
 version = "0.2.2"
 dependencies = [
+ "cfg-if",
  "tezos-smart-rollup-build-utils",
+ "tezos-smart-rollup-constants",
  "tezos-smart-rollup-core",
  "tezos_crypto_rs",
  "tezos_data_encoding",

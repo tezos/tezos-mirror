@@ -5,10 +5,15 @@
 //! NDS-backend durable storage functionality, integrated in the
 //! WASM PVM.
 
+mod wasm_target;
+
 use core::mem::MaybeUninit;
 
 use tezos_smart_rollup_constants::core::NDS_MAX_KEY_SIZE;
 use tezos_smart_rollup_constants::core::STORE_HASH_SIZE;
+
+#[cfg(pvm_kind = "wasm")]
+pub use wasm_target::WasmNdsHandle;
 
 /// Errors returned by the NDS host functions exposed through [`WasmNds`].
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
