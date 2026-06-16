@@ -37,6 +37,11 @@ General
   executable issuing RPC calls through an endpoint answering redirects
   (e.g. behind a reverse proxy).
 
+- RPC servers now enable TCP keepalive on accepted connections, so that
+  connections whose peer has disappeared without closing (e.g. behind a
+  NAT or load balancer that drops idle flows) are eventually closed and
+  their resources released, instead of being retained until restart.
+
 Node
 ----
 
