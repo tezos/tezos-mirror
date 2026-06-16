@@ -250,6 +250,30 @@ let job_npm_audit =
            | `all -> ["./scripts/ci/npm_audit.sh --all"]);
          ])
 
+(* TODO: Remove [~allow_failure] once existing known
+   vulnerabilities have been fixed in all Cargo.lock files.
+   Tracked in https://gitlab.com/tezos/tezos/-/issues/8331.
+
+   In MR pipelines, the script audits only the directories whose
+   Cargo.lock changed in the merge request.  In scheduled pipelines,
+   [--all] makes the script discover and audit every Cargo.lock found
+   in the repository (i.e. all workspaces, not just changed ones). *)
+let job_cargo_audit =
+  Cacio.parameterize @@ fun mode ->
+  CI.job
+    "cargo_audit"
+    ~__POS__
+    ~description:
+      "Run cargo audit on Cargo.lock files to detect known vulnerabilities."
+    ~image:Tezos_ci.Images.Base_images.debian_rust_trixie
+    ~stage:Test
+    ~allow_failure:Yes
+    ~only_if_changed:["**/Cargo.lock"; "**/Cargo.toml"]
+    ~script:
+      (match mode with
+      | `mr -> ["./scripts/ci/cargo_audit.sh"]
+      | `all -> ["./scripts/ci/cargo_audit.sh --all"])
+
 let register () =
   Cacio.register_merge_request_jobs
     [
@@ -262,6 +286,7 @@ let register () =
       (Immediate, job_check_rust_fmt);
       (Immediate, job_nix);
       (Immediate, job_npm_audit `mr);
+      (Immediate, job_cargo_audit `mr);
     ] ;
   Cacio.register_jobs Before_merging [(Immediate, job_commit_titles `lenient)] ;
   Cacio.register_jobs Merge_train [(Immediate, job_commit_titles `strict)] ;
@@ -277,5 +302,6 @@ let register () =
       (Immediate, job_check_rust_fmt);
       (Immediate, job_nix);
       (Immediate, job_npm_audit `all);
+      (Immediate, job_cargo_audit `all);
     ] ;
   ()

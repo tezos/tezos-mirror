@@ -1663,6 +1663,26 @@ release_page.tezt:
       junit: $JUNIT
     when: always
 
+cargo_audit:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
+  stage: sanity
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  allow_failure: true
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/cargo_audit.sh --all
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
 npm_audit:
   image: node:22-alpine
   stage: sanity
