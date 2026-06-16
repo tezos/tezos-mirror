@@ -12,22 +12,33 @@ open Gitlab_ci.Util
 module Images = Tezos_ci.Images
 module CI = Cacio.Shared
 
-let build_images =
+type docker_image = {
+  name : string; (* the name of the image like tezos/tezos *)
+  tag : string; (* the tag like master *)
+  dockerfile : string;
+      (* the docker file associated to this image like build.dockerfile *)
+  job_name : string;
+      (* the unique friendly job name associate to the scanning job *)
+}
+
+let image_ref image = image.name ^ ":" ^ image.tag
+
+let build_images : docker_image list =
   List.map
     (fun tag ->
       {
-        Container_scanning.name = "tezos/tezos";
+        name = "tezos/tezos";
         tag;
         dockerfile = "build.Dockerfile";
         job_name = "tezos-tezos-" ^ tag;
       })
     ["latest"; "octez-evm-node-latest"; "master"]
 
-let base_images =
+let base_images : docker_image list =
   List.map
     (fun release ->
       {
-        Container_scanning.name = "${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian";
+        name = "${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian";
         tag =
           Images.Base_images.(Format.asprintf "%s-%s" release debian_version);
         dockerfile = "images/base-images/Dockerfile.debian";
@@ -39,8 +50,7 @@ let base_images =
   @ List.map
       (fun release ->
         {
-          Container_scanning.name =
-            "${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu";
+          name = "${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu";
           tag =
             Images.Base_images.(Format.asprintf "%s-%s" release debian_version);
           dockerfile = "images/base-images/Dockerfile.debian";
@@ -54,8 +64,7 @@ let base_images =
     List.map
       (fun release ->
         {
-          Container_scanning.name =
-            "${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora";
+          name = "${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora";
           tag = Images.Base_images.(Format.asprintf "%s-%s" release rpm_version);
           dockerfile = "images/base-images/Dockerfile.rpm";
           job_name =
@@ -66,8 +75,7 @@ let base_images =
     @ List.map
         (fun release ->
           {
-            Container_scanning.name =
-              "${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux";
+            name = "${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux";
             tag =
               Images.Base_images.(Format.asprintf "%s-%s" release rpm_version);
             dockerfile = "images/base-images/Dockerfile.rpm";
@@ -91,7 +99,7 @@ let base_images =
    [job_container_scanning_merge_reports]). *)
 let job_container_scanning =
   Cacio.parameterize @@ fun image ->
-  let full_image_name = Container_scanning.(image_ref image) in
+  let full_image_name = image_ref image in
   let report = "gl-container-scanning-report-" ^ image.job_name ^ ".json" in
   CI.job
     ("container_scanning_" ^ image.job_name)
@@ -116,7 +124,7 @@ let job_container_scanning =
    automatically depends on the correct scanning job for the given image. *)
 let job_container_scanning_slack_notification =
   Cacio.parameterize @@ fun image ->
-  let full_image_name = Container_scanning.(image_ref image) in
+  let full_image_name = image_ref image in
   let report = "gl-container-scanning-report-" ^ image.job_name ^ ".json" in
   CI.job
     ("container_scanning_slack_notification_" ^ image.job_name)
