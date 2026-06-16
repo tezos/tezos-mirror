@@ -1221,7 +1221,7 @@ mod tests {
     }
 
     fn dummy_tezosx_config_with_tezos_runtime(
-        host: &mut impl StorageV1,
+        host: &mut (impl StorageV1 + KeySpaceLoader),
     ) -> TezosXChainConfig {
         host.store_write(&crate::storage::ENABLE_TEZOS_RUNTIME, &[], 0)
             .expect("Should have written feature flag");

@@ -260,7 +260,7 @@ fn fetch_michelson_runtime_chain_id(
 
 pub fn fetch_tezosx_configuration<Host>(host: &mut Host) -> TezosXChainConfig
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     // Read both runtime chain ids from storage. The EVM chain id falls back to
     // the default and is persisted on first use; the Michelson runtime chain id

@@ -191,8 +191,13 @@ const MICHELSON_RUNTIME_CHAIN_ID: RefPath =
 pub const ENABLE_MULTICHAIN: RefPath =
     RefPath::assert_from(b"/base/feature_flags/enable_multichain");
 
+// The absolute form remains for its writers (migrations and tests write the
+// flag through the raw host); the reader goes through the `/base` keyspace.
+#[allow(dead_code)]
 pub const ENABLE_TEZOS_RUNTIME: RefPath =
     RefPath::assert_from(b"/base/feature_flags/enable_tezos_runtime");
+const ENABLE_TEZOS_RUNTIME_KEY: Key =
+    Key::from_static(b"/feature_flags/enable_tezos_runtime");
 
 // Target EVM block number for the Michelson runtime sunrise. Written by the
 // installer when scheduling a future activation.
@@ -204,8 +209,11 @@ const MICHELSON_RUNTIME_TARGET_SUNRISE_LEVEL: RefPath =
 const MICHELSON_RUNTIME_SUNRISE_LEVEL: RefPath =
     RefPath::assert_from(b"/tez/world_state/michelson_runtime/sunrise_level");
 
-pub const ENABLE_MICHELSON_GAS_REFUND: RefPath =
-    RefPath::assert_from(b"/base/feature_flags/enable_michelson_gas_refund");
+// Key to the Michelson gas-refund feature flag, inside the `/base` keyspace.
+// Written by the installer/node; the reader goes through the `/base` keyspace.
+// Resolves to `/base/feature_flags/enable_michelson_gas_refund`.
+const ENABLE_MICHELSON_GAS_REFUND_KEY: Key =
+    Key::from_static(b"/feature_flags/enable_michelson_gas_refund");
 
 // Debug Features
 pub const ENABLE_DEBUG_PRECOMPILES: RefPath =
@@ -270,20 +278,23 @@ pub const HTTP_TRACE_ENABLED: RefPath =
 /// [`HTTP_TRACE_ENABLED`].
 const HTTP_TRACES_ROOT: RefPath = RefPath::assert_from(b"/base/__http_trace/traces");
 
-// Path to the number of seconds until delayed txs are timed out.
-const EVM_DELAYED_INBOX_TIMEOUT: RefPath =
-    RefPath::assert_from(b"/base/delayed_inbox_timeout");
+// Key to the number of seconds until delayed txs are timed out, inside the
+// `/base` keyspace. Resolves to the durable path `/base/delayed_inbox_timeout`.
+const DELAYED_INBOX_TIMEOUT_KEY: Key = Key::from_static(b"/delayed_inbox_timeout");
 
-// Path to the number of l1 levels that need to pass for a
-// delayed tx to be timed out.
-const EVM_DELAYED_INBOX_MIN_LEVELS: RefPath =
-    RefPath::assert_from(b"/base/delayed_inbox_min_levels");
+// Key to the number of l1 levels that need to pass for a delayed tx to be
+// timed out, inside the `/base` keyspace. Resolves to the durable path
+// `/base/delayed_inbox_min_levels`.
+const DELAYED_INBOX_MIN_LEVELS_KEY: Key = Key::from_static(b"/delayed_inbox_min_levels");
 
 // Path to the tz1 administrating the sequencer. If there is nothing
 // at this path, the kernel is in proxy mode.
 use revm_etherlink::storage::world_state_handler::SEQUENCER_KEY_PATH;
 
-pub const KEEP_EVENTS: RefPath = RefPath::assert_from(b"/base/keep_rollup_events");
+// Key to the one-shot "keep rollup events" flag, inside the `/base` keyspace.
+// Written by the installer/node; the reader goes through the `/base` keyspace.
+// Resolves to the durable path `/base/keep_rollup_events`.
+const KEEP_EVENTS_KEY: Key = Key::from_static(b"/keep_rollup_events");
 
 // Key to the DAL feature flag, inside the `/base` keyspace. If there is
 // nothing at this key, DAL is not used. Both reader (`enable_dal`) and writer
@@ -994,8 +1005,8 @@ pub fn enable_dal(base: &impl KeySpace, is_evm_node: bool) -> bool {
     base.contains(&ENABLE_DAL_KEY) && !is_evm_node
 }
 
-pub fn enable_tezos_runtime(host: &impl StorageV1) -> bool {
-    Some(ValueType::Value) == host.store_has(&ENABLE_TEZOS_RUNTIME).unwrap_or(None)
+pub fn enable_tezos_runtime(base: &impl KeySpace) -> bool {
+    base.contains(&ENABLE_TEZOS_RUNTIME_KEY)
 }
 
 pub fn read_michelson_runtime_target_sunrise_level(
@@ -1019,8 +1030,8 @@ pub fn enable_debug_precompiles(host: &impl StorageV1) -> bool {
     Ok(Some(ValueType::Value)) == host.store_has(&ENABLE_DEBUG_PRECOMPILES)
 }
 
-pub fn enable_michelson_gas_refund(host: &impl StorageV1) -> bool {
-    Ok(Some(ValueType::Value)) == host.store_has(&ENABLE_MICHELSON_GAS_REFUND)
+pub fn enable_michelson_gas_refund(base: &impl KeySpace) -> bool {
+    base.contains(&ENABLE_MICHELSON_GAS_REFUND_KEY)
 }
 
 pub fn tweak_dal_activation(
@@ -1107,11 +1118,15 @@ pub fn clear_events<Host>(host: &mut Host) -> anyhow::Result<()>
 where
     Host: StorageV1 + KeySpaceLoader,
 {
-    if host.store_has(&KEEP_EVENTS)?.is_some() {
-        host.store_delete(&KEEP_EVENTS)?;
+    // Load `/base` once: the `keep_rollup_events` flag and the events index
+    // both live under it, so a single handle covers the whole operation.
+    let mut base = load_base_keyspace(host)?;
+    if base.contains(&KEEP_EVENTS_KEY) {
+        // One-shot flag: keep this run's events and consume the flag so they
+        // are cleared on the next call.
+        base.delete(&KEEP_EVENTS_KEY);
         Ok(())
     } else {
-        let mut base = load_base_keyspace(host)?;
         let index = KeyspaceIndexableStorage::new(EVENTS_KEY);
         index.clear(&mut base).map_err(Into::into)
     }
@@ -1128,53 +1143,57 @@ pub fn store_event(
         .map_err(Into::into)
 }
 
-pub fn delayed_inbox_timeout<Host>(host: &Host) -> anyhow::Result<u64>
+pub fn delayed_inbox_timeout<Host>(host: &mut Host) -> anyhow::Result<u64>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     // The default timeout is 12 hours
     let default_timeout = 43200;
-    if host.store_has(&EVM_DELAYED_INBOX_TIMEOUT)?.is_some() {
-        let mut buffer = [0u8; 8];
-        store_read_slice(host, &EVM_DELAYED_INBOX_TIMEOUT, &mut buffer, 8)?;
-        let timeout = u64::from_le_bytes(buffer);
-        log!(
-            Debug,
-            "Using delayed inbox timeout of {} seconds ({} hours)",
-            timeout,
-            timeout / 3600
-        );
-        Ok(timeout)
-    } else {
+    let base = load_base_keyspace(host)?;
+    let timeout = keyspace::read_u64_le_default(
+        &base,
+        &DELAYED_INBOX_TIMEOUT_KEY,
+        default_timeout,
+    )?;
+    if timeout == default_timeout {
         log!(
             Debug,
             "Using default delayed inbox timeout of {} seconds ({} hours)",
             default_timeout,
             default_timeout / 3600
         );
-        Ok(default_timeout)
+    } else {
+        log!(
+            Debug,
+            "Using delayed inbox timeout of {} seconds ({} hours)",
+            timeout,
+            timeout / 3600
+        );
     }
+    Ok(timeout)
 }
 
-pub fn delayed_inbox_min_levels<Host>(host: &Host) -> anyhow::Result<u32>
+pub fn delayed_inbox_min_levels<Host>(host: &mut Host) -> anyhow::Result<u32>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     let default_min_levels = 720;
-    if host.store_has(&EVM_DELAYED_INBOX_MIN_LEVELS)?.is_some() {
-        let mut buffer = [0u8; 4];
-        store_read_slice(host, &EVM_DELAYED_INBOX_MIN_LEVELS, &mut buffer, 4)?;
-        let min_levels = u32::from_le_bytes(buffer);
-        log!(Debug, "Using delayed inbox minimum levels: {}", min_levels);
-        Ok(min_levels)
-    } else {
+    let base = load_base_keyspace(host)?;
+    let min_levels = keyspace::read_u32_le_default(
+        &base,
+        &DELAYED_INBOX_MIN_LEVELS_KEY,
+        default_min_levels,
+    )?;
+    if min_levels == default_min_levels {
         log!(
             Debug,
             "Using default delayed inbox minimum levels: {}",
             default_min_levels
         );
-        Ok(default_min_levels)
+    } else {
+        log!(Debug, "Using delayed inbox minimum levels: {}", min_levels);
     }
+    Ok(min_levels)
 }
 
 pub fn read_tracer_input<Host>(host: &mut Host) -> anyhow::Result<Option<TracerInput>>
@@ -1412,6 +1431,76 @@ mod tests {
         assert_eq!(host.store_read_all(&dal_slots_path).unwrap(), vec![0, 1, 2]);
         let base = super::load_base_keyspace(&mut host).unwrap();
         assert_eq!(super::dal_slots(&base), Some(vec![0, 1, 2]));
+    }
+
+    // The read-only config readers (set by the installer/node, read by the
+    // kernel) now go through the `/base` keyspace. Each value seeded at its
+    // historical absolute path must read back through the migrated reader,
+    // proving the resolved durable paths never moved.
+    #[test]
+    fn base_keyspace_config_readers_resolve_to_absolute_paths() {
+        let mut host = MockKernelHost::default();
+
+        host.store_write_all(
+            &RefPath::assert_from(b"/base/delayed_inbox_timeout"),
+            &3600u64.to_le_bytes(),
+        )
+        .unwrap();
+        host.store_write_all(
+            &RefPath::assert_from(b"/base/delayed_inbox_min_levels"),
+            &120u32.to_le_bytes(),
+        )
+        .unwrap();
+        host.store_write_all(
+            &RefPath::assert_from(b"/base/feature_flags/enable_tezos_runtime"),
+            &[1u8],
+        )
+        .unwrap();
+        host.store_write_all(
+            &RefPath::assert_from(b"/base/feature_flags/enable_michelson_gas_refund"),
+            &[1u8],
+        )
+        .unwrap();
+
+        assert_eq!(super::delayed_inbox_timeout(&mut host).unwrap(), 3600);
+        assert_eq!(super::delayed_inbox_min_levels(&mut host).unwrap(), 120);
+        {
+            let base = super::load_base_keyspace(&mut host).unwrap();
+            assert!(super::enable_tezos_runtime(&base));
+            assert!(super::enable_michelson_gas_refund(&base));
+        }
+    }
+
+    // On a fresh `/base`, the delayed-inbox scalars fall back to their
+    // historical defaults and the flags read `false` — a reader resolving to a
+    // wrong key, or defaulting to a "present" value, would be caught here.
+    #[test]
+    fn base_keyspace_config_readers_on_empty_base_use_defaults() {
+        let mut host = MockKernelHost::default();
+
+        assert_eq!(super::delayed_inbox_timeout(&mut host).unwrap(), 43200);
+        assert_eq!(super::delayed_inbox_min_levels(&mut host).unwrap(), 720);
+        let base = super::load_base_keyspace(&mut host).unwrap();
+        assert!(!super::enable_tezos_runtime(&base));
+        assert!(!super::enable_michelson_gas_refund(&base));
+    }
+
+    // `clear_events` reads the one-shot `keep_rollup_events` flag through the
+    // `/base` keyspace and, when set, consumes it (keeping this run's events).
+    #[test]
+    fn clear_events_consumes_keep_flag_through_keyspace() {
+        let mut host = MockKernelHost::default();
+        let keep_path = RefPath::assert_from(b"/base/keep_rollup_events");
+
+        // Flag set at its historical absolute path: clear_events keeps the
+        // events and consumes the flag.
+        host.store_write_all(&keep_path, &[]).unwrap();
+        super::clear_events(&mut host).unwrap();
+        assert!(host.store_read_all(&keep_path).is_err());
+
+        // Flag absent: clear_events takes the index-clearing branch and
+        // succeeds (no events to clear on a fresh base).
+        super::clear_events(&mut host).unwrap();
     }
 
     #[test]

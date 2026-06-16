@@ -160,22 +160,28 @@ pub struct ExperimentalFeatures {
 }
 
 impl ExperimentalFeatures {
-    pub fn read_from_storage(host: &mut impl StorageV1) -> Self {
-        let enable_michelson_gas_refund =
-            crate::storage::enable_michelson_gas_refund(host);
+    pub fn read_from_storage(host: &mut (impl StorageV1 + KeySpaceLoader)) -> Self {
+        let (enable_michelson_gas_refund, tezos_runtime_enabled) = {
+            let base = crate::storage::load_base_keyspace(host).expect(
+                "no other `/base` keyspace handle may be live when reading experimental features",
+            );
+            (
+                crate::storage::enable_michelson_gas_refund(&base),
+                crate::storage::enable_tezos_runtime(&base),
+            )
+        };
 
-        let enabled_michelson_target_sunrise_level =
-            if crate::storage::enable_tezos_runtime(host) {
-                // The target sunrise level defaults to 0 if not set. This allows
-                // current deployment where only enable_tezos_runtime is set to still
-                // activate the Michelson runtime.
-                Some(
-                    crate::storage::read_michelson_runtime_target_sunrise_level(host)
-                        .unwrap_or(U256::zero()),
-                )
-            } else {
-                None
-            };
+        let enabled_michelson_target_sunrise_level = if tezos_runtime_enabled {
+            // The target sunrise level defaults to 0 if not set. This allows
+            // current deployment where only enable_tezos_runtime is set to still
+            // activate the Michelson runtime.
+            Some(
+                crate::storage::read_michelson_runtime_target_sunrise_level(host)
+                    .unwrap_or(U256::zero()),
+            )
+        } else {
+            None
+        };
 
         ExperimentalFeatures {
             enable_michelson_gas_refund,

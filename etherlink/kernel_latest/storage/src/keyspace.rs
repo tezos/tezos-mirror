@@ -32,6 +32,23 @@ pub fn read_u64_le(ks: &impl KeySpace, key: &Key) -> Result<u64, Error> {
     Ok(u64::from_le_bytes(bytes))
 }
 
+/// Return an unsigned 8 bytes value at the given `key`, or `default` when
+/// the key is absent.
+///
+/// Mirrors the root [`read_u64_le_default`](crate::read_u64_le_default): a
+/// missing key (or a value shorter than 8 bytes) yields `default` rather
+/// than an error.
+pub fn read_u64_le_default(
+    ks: &impl KeySpace,
+    key: &Key,
+    default: u64,
+) -> Result<u64, Error> {
+    match ks.get_prefix_exact::<{ std::mem::size_of::<u64>() }>(key) {
+        Some(bytes) => Ok(u64::from_le_bytes(bytes)),
+        None => Ok(default),
+    }
+}
+
 /// Return an unsigned 4 bytes value at the given `key`.
 ///
 /// NB: The given bytes are interpreted in little endian order. The value
@@ -41,6 +58,22 @@ pub fn read_u32_le(ks: &impl KeySpace, key: &Key) -> Result<u32, Error> {
         .get_prefix_exact::<{ std::mem::size_of::<u32>() }>(key)
         .ok_or(Error::Runtime(RuntimeError::PathNotFound))?;
     Ok(u32::from_le_bytes(bytes))
+}
+
+/// Return an unsigned 4 bytes value at the given `key`, or `default` when
+/// the key is absent.
+///
+/// The 4-bytes counterpart of [`read_u64_le_default`]: a missing key (or a
+/// value shorter than 4 bytes) yields `default` rather than an error.
+pub fn read_u32_le_default(
+    ks: &impl KeySpace,
+    key: &Key,
+    default: u32,
+) -> Result<u32, Error> {
+    match ks.get_prefix_exact::<{ std::mem::size_of::<u32>() }>(key) {
+        Some(bytes) => Ok(u32::from_le_bytes(bytes)),
+        None => Ok(default),
+    }
 }
 
 /// Write an unsigned 4 bytes value at the given `key`.
@@ -60,6 +93,23 @@ pub fn read_u16_le(ks: &impl KeySpace, key: &Key) -> Result<u16, Error> {
         .get_prefix_exact::<{ std::mem::size_of::<u16>() }>(key)
         .ok_or(Error::Runtime(RuntimeError::PathNotFound))?;
     Ok(u16::from_le_bytes(bytes))
+}
+
+/// Return an unsigned 2 bytes value at the given `key`, or `default` when
+/// the key is absent.
+///
+/// Mirrors the root [`read_u16_le_default`](crate::read_u16_le_default): a
+/// missing key (or a value shorter than 2 bytes) yields `default` rather
+/// than an error.
+pub fn read_u16_le_default(
+    ks: &impl KeySpace,
+    key: &Key,
+    default: u16,
+) -> Result<u16, Error> {
+    match ks.get_prefix_exact::<{ std::mem::size_of::<u16>() }>(key) {
+        Some(bytes) => Ok(u16::from_le_bytes(bytes)),
+        None => Ok(default),
+    }
 }
 
 /// Write an unsigned 2 bytes value at the given `key`.
@@ -171,6 +221,28 @@ mod tests {
             read_u64_le(&ks, &key(b"/missing")),
             Err(Error::Runtime(RuntimeError::PathNotFound))
         );
+    }
+
+    #[test]
+    fn le_default_helpers_return_default_when_absent_and_value_when_present() {
+        let mut host = MockKernelHost::default();
+        {
+            let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+            // Absent keys fall back to the supplied default.
+            assert_eq!(read_u64_le_default(&ks, &key(b"/u64"), 7), Ok(7));
+            assert_eq!(read_u32_le_default(&ks, &key(b"/u32"), 7), Ok(7));
+            assert_eq!(read_u16_le_default(&ks, &key(b"/u16"), 7), Ok(7));
+        }
+        host.store_write_all(&RefPath::assert_from(b"/ks/u64"), &9u64.to_le_bytes())
+            .unwrap();
+        host.store_write_all(&RefPath::assert_from(b"/ks/u32"), &9u32.to_le_bytes())
+            .unwrap();
+        host.store_write_all(&RefPath::assert_from(b"/ks/u16"), &9u16.to_le_bytes())
+            .unwrap();
+        let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+        assert_eq!(read_u64_le_default(&ks, &key(b"/u64"), 7), Ok(9));
+        assert_eq!(read_u32_le_default(&ks, &key(b"/u32"), 7), Ok(9));
+        assert_eq!(read_u16_le_default(&ks, &key(b"/u16"), 7), Ok(9));
     }
 
     #[test]

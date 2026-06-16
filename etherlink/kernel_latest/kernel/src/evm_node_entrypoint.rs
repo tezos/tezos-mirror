@@ -107,7 +107,8 @@ pub extern "C" fn single_tx_execution() {
 #[allow(dead_code)]
 pub fn single_tx_execution_fn<Host>(host: &mut Host)
 where
-    Host: tezos_smart_rollup_host::runtime::Runtime,
+    Host: tezos_smart_rollup_host::runtime::Runtime
+        + tezos_smart_rollup_host::storage::CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
     let tx_input = match sub_block::read_single_tx_execution_input(&mut host) {

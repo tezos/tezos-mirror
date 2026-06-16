@@ -193,7 +193,7 @@ pub fn handle_run_transaction<Host>(
     input_data: SingleTxExecutionInput,
 ) -> Result<(), anyhow::Error>
 where
-    Host: StorageV1 + WithGas,
+    Host: StorageV1 + WithGas + KeySpaceLoader,
 {
     let __attrs = [
         (

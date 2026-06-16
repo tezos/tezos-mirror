@@ -21,10 +21,9 @@ use tezos_ethereum::{
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
-use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceLoader};
-use tezos_storage::read_u16_le_default;
+use tezos_storage::keyspace;
 
 use crate::storage::load_base_keyspace;
 use tezos_tezlink::operation::Operation;
@@ -40,9 +39,10 @@ pub const DELAYED_INBOX_KEY: Key = Key::from_static(b"/delayed-inbox");
 // forcing timed-out transactions from the delayed inbox.
 pub const DEFAULT_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH: u16 = 1000;
 
-// Path to override the default value.
-pub const MAX_DELAYED_INBOX_BLUEPRINT_LENGTH_PATH: RefPath =
-    RefPath::assert_from(b"/base/max_delayed_inbox_blueprint_length");
+// Key to override the default value, inside the `/base` keyspace. Resolves to
+// the durable path `/base/max_delayed_inbox_blueprint_length`.
+const MAX_DELAYED_INBOX_BLUEPRINT_LENGTH_KEY: Key =
+    Key::from_static(b"/max_delayed_inbox_blueprint_length");
 
 // Tag that indicates the delayed transaction is a eth transaction.
 pub const DELAYED_TRANSACTION_TAG: u8 = 0x01;
@@ -404,13 +404,14 @@ impl DelayedInbox {
         &mut self,
         host: &mut (impl StorageV1 + KeySpaceLoader),
     ) -> Result<Option<Vec<Transaction>>> {
-        let max_delayed_inbox_blueprint_length = read_u16_le_default(
-            host,
-            &MAX_DELAYED_INBOX_BLUEPRINT_LENGTH_PATH,
+        // Load `/base` once and read the override plus pop the whole batch
+        // against the same handle.
+        let mut base = load_base_keyspace(host)?;
+        let max_delayed_inbox_blueprint_length = keyspace::read_u16_le_default(
+            &base,
+            &MAX_DELAYED_INBOX_BLUEPRINT_LENGTH_KEY,
             DEFAULT_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH,
         )?;
-        // Load `/base` once and pop the whole batch against the same handle.
-        let mut base = load_base_keyspace(host)?;
         let mut popped: Vec<Transaction> = vec![];
         while let Some(tx) = self.pop_first(&mut base)? {
             popped.push(tx);
@@ -618,5 +619,49 @@ mod tests {
         let res = delayed_inbox.save_transaction(&mut host, tx.into(), timestamp, 0);
 
         assert!(res.is_err());
+    }
+
+    // The max-blueprint-length override is now read through the `/base`
+    // keyspace inside `next_delayed_inbox_blueprint`. A value seeded at its
+    // historical absolute path must read back through the keyspace key,
+    // proving the resolved durable path never moved; an absent key falls back
+    // to the default.
+    #[test]
+    fn max_delayed_inbox_blueprint_length_resolves_to_absolute_path() {
+        use crate::storage::load_base_keyspace;
+        use tezos_smart_rollup_host::path::RefPath;
+        use tezos_smart_rollup_host::storage::StorageV1;
+        use tezos_storage::keyspace;
+
+        let mut host = MockKernelHost::default();
+
+        {
+            let base = load_base_keyspace(&mut host).unwrap();
+            assert_eq!(
+                keyspace::read_u16_le_default(
+                    &base,
+                    &super::MAX_DELAYED_INBOX_BLUEPRINT_LENGTH_KEY,
+                    super::DEFAULT_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH,
+                )
+                .unwrap(),
+                super::DEFAULT_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH
+            );
+        }
+
+        host.store_write_all(
+            &RefPath::assert_from(b"/base/max_delayed_inbox_blueprint_length"),
+            &42u16.to_le_bytes(),
+        )
+        .unwrap();
+        let base = load_base_keyspace(&mut host).unwrap();
+        assert_eq!(
+            keyspace::read_u16_le_default(
+                &base,
+                &super::MAX_DELAYED_INBOX_BLUEPRINT_LENGTH_KEY,
+                super::DEFAULT_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH,
+            )
+            .unwrap(),
+            42
+        );
     }
 }
