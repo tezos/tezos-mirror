@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez RPC",
     "description": "The RPC API served by the Octez node.",
-    "version": "Octez 24.4 (56bd3e33)"
+    "version": "Octez 25.0 (187a915b)"
   },
   "paths": {
     "/bls/aggregate_proofs": {
@@ -1955,6 +1955,41 @@
                       "type": "array",
                       "items": {
                         "$ref": "#/components/schemas/unistring"
+                      }
+                    },
+                    "profiling": {
+                      "description": "Configuration of profiling output",
+                      "type": "object",
+                      "properties": {
+                        "days-kept": {
+                          "description": "Number of days of profiling results to keep. Older profiling files are automatically deleted during daily rotation.",
+                          "type": "integer",
+                          "minimum": -1073741824,
+                          "maximum": 1073741823
+                        },
+                        "verbosity": {
+                          "description": "Per-profiler verbosity rules. Same format as the PROFILING environment variable, e.g. \"chain_validator->debug;rpc_server->notice\". When set, overrides the PROFILING environment variable.",
+                          "oneOf": [
+                            {
+                              "$ref": "#/components/schemas/unistring"
+                            }
+                          ]
+                        },
+                        "backends": {
+                          "description": "List of profiling backends to enable, e.g. [\"txt\", \"json\"]. When set, overrides the PROFILING_BACKENDS environment variable.",
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/unistring"
+                          }
+                        },
+                        "output-dir": {
+                          "description": "Override the profiling output directory. When set, overrides the PROFILING_OUTPUT_DIR environment variable.",
+                          "oneOf": [
+                            {
+                              "$ref": "#/components/schemas/unistring"
+                            }
+                          ]
+                        }
                       }
                     }
                   }

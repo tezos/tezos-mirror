@@ -1,5 +1,5 @@
-Version 25.0~rc1
-================
+Version 25.0
+============
 
 Changes
 -------
@@ -8,8 +8,9 @@ Summary
 ~~~~~~~
 
 Version 25 introduces the following changes or new features:
-  (1) Support of the **Ushuaia Protocol proposal** (See :ref:`the protocol support section <protocol_support_v25>`)
+  (1) Support for the **Ushuaia Protocol proposal** (See :ref:`the protocol support section <protocol_support_v25>`)
   (2) Deprecation of Octez packages (See :ref:`the Octez packages section <octez_packages_v25>`)
+  (3) Removal of the adaptive issuance vote runtime argument from the baker (See :ref:`the baker section <baker_v25>`)
 
 An overview of breaking changes and deprecations introduced in Octez
 v25 can be found :ref:`here <v25_breaking_changes>`.
@@ -28,11 +29,30 @@ Deprecation of Octez packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Octez v25 deprecates Octez binary packages. They will be removed in Octez v26.
-Instead, the new ``octez-manager`` tool (see https://octez-manager.tezos.com) will handle installation, configuration,
+Instead, the experimental ``octez-manager`` tool (see https://octez-manager.tezos.com) will handle installation, configuration,
 and running of static binaries in a more user-friendly way than source or binary packages.
+This tool is in early development and should be used for testnets only for now.
+
+.. _baker_v25:
+
+Baker: removal of the adaptive issuance vote
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Octez v25 removes the ``--adaptive-issuance-vote`` CLI option of the baker,
+as well as the ``adaptive_issuance_vote`` field from the per-block vote
+configuration file (``per_block_votes.json``). Both were deprecated in Octez
+v24. This vote had no effect since the Paris protocol activated Adaptive
+Issuance.
+
+.. warning::
+
+   If your ``per_block_votes.json`` still contains an
+   ``adaptive_issuance_vote`` field, the baker will reject it at startup.
+   Remove that field before upgrading to v25. Only ``liquidity_baking_vote``
+   is accepted.
 
 Minimal hardware specifications
--------------------------------
+--------------------------------
 
 Our benchmarks suggest the following *minimal* specs for Octez node and baker operators:
 
@@ -60,17 +80,18 @@ From sources
 .. code-block:: shell
 
   git fetch
-  git checkout octez-v25.0-rc1
+  git checkout octez-v25.0
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``octez-v25.0-rc1`` Docker images of Octez.
+If you are using Docker instead, use the ``octez-v25.0`` Docker images of Octez.
 
 Changelog
 ---------
 
+- `Version 25.0 <../CHANGES.html#version-25-0>`_
 - `Version 25.0~rc1 <../CHANGES.html#version-25-0-rc1>`_
 - `Version 25.0~beta1 <../CHANGES.html#version-25-0-beta1>`_

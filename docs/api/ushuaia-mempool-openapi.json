@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez Mempool RPC",
     "description": "The RPC API for the mempool served by the Octez node.",
-    "version": "Octez 24.0~rc1+dev (build: 0) (991d8266)"
+    "version": "Octez 25.0 (187a915b)"
   },
   "paths": {
     "/ban_operation": {
@@ -42,8 +42,7 @@
               }
             }
           }
-        },
-        "summary": "/ban_operation"
+        }
       }
     },
     "/filter": {
@@ -79,8 +78,7 @@
               }
             }
           }
-        },
-        "summary": "/filter"
+        }
       },
       "post": {
         "description": "Set the configuration of the mempool's filter and bounds. **If any of the fields is absent from the input JSON, then it is set to the default value for this field (i.e. its value in the default configuration), even if it previously had a different value.** If the input JSON does not describe a valid configuration, then the configuration is left unchanged. This RPC also returns the new configuration of the mempool (which may differ from the input if the latter omits fields or is invalid). You may call [octez-client rpc get '/chains/main/mempool/filter?include_default=true'] to see an example of JSON describing a valid configuration. See the description of that RPC for details on each configurable value.",
@@ -110,8 +108,7 @@
               }
             }
           }
-        },
-        "summary": "/filter"
+        }
       }
     },
     "/monitor_operations": {
@@ -208,7 +205,7 @@
                       "protocol": {
                         "type": "string",
                         "enum": [
-                          "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
+                          "PsUshuai9QapM5TGj1JpuVGkdxz5GykdnEvS6Rh8SUVrARvZLCY"
                         ]
                       },
                       "branch": {
@@ -217,7 +214,7 @@
                       "contents": {
                         "type": "array",
                         "items": {
-                          "$ref": "#/components/schemas/alpha.operation.alpha.contents"
+                          "$ref": "#/components/schemas/025-PsUshuai.operation.alpha.contents"
                         }
                       },
                       "signature": {
@@ -248,8 +245,7 @@
               }
             }
           }
-        },
-        "summary": "/monitor_operations"
+        }
       }
     },
     "/pending_operations": {
@@ -361,7 +357,7 @@
                           "contents": {
                             "type": "array",
                             "items": {
-                              "$ref": "#/components/schemas/alpha.operation.alpha.contents"
+                              "$ref": "#/components/schemas/025-PsUshuai.operation.alpha.contents"
                             }
                           },
                           "signature": {
@@ -387,7 +383,7 @@
                           "protocol": {
                             "type": "string",
                             "enum": [
-                              "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
+                              "PsUshuai9QapM5TGj1JpuVGkdxz5GykdnEvS6Rh8SUVrARvZLCY"
                             ]
                           },
                           "branch": {
@@ -396,7 +392,7 @@
                           "contents": {
                             "type": "array",
                             "items": {
-                              "$ref": "#/components/schemas/alpha.operation.alpha.contents"
+                              "$ref": "#/components/schemas/025-PsUshuai.operation.alpha.contents"
                             }
                           },
                           "signature": {
@@ -427,7 +423,7 @@
                           "protocol": {
                             "type": "string",
                             "enum": [
-                              "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
+                              "PsUshuai9QapM5TGj1JpuVGkdxz5GykdnEvS6Rh8SUVrARvZLCY"
                             ]
                           },
                           "branch": {
@@ -436,7 +432,7 @@
                           "contents": {
                             "type": "array",
                             "items": {
-                              "$ref": "#/components/schemas/alpha.operation.alpha.contents"
+                              "$ref": "#/components/schemas/025-PsUshuai.operation.alpha.contents"
                             }
                           },
                           "signature": {
@@ -467,7 +463,7 @@
                           "protocol": {
                             "type": "string",
                             "enum": [
-                              "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
+                              "PsUshuai9QapM5TGj1JpuVGkdxz5GykdnEvS6Rh8SUVrARvZLCY"
                             ]
                           },
                           "branch": {
@@ -476,7 +472,7 @@
                           "contents": {
                             "type": "array",
                             "items": {
-                              "$ref": "#/components/schemas/alpha.operation.alpha.contents"
+                              "$ref": "#/components/schemas/025-PsUshuai.operation.alpha.contents"
                             }
                           },
                           "signature": {
@@ -507,7 +503,7 @@
                           "protocol": {
                             "type": "string",
                             "enum": [
-                              "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
+                              "PsUshuai9QapM5TGj1JpuVGkdxz5GykdnEvS6Rh8SUVrARvZLCY"
                             ]
                           },
                           "branch": {
@@ -516,7 +512,7 @@
                           "contents": {
                             "type": "array",
                             "items": {
-                              "$ref": "#/components/schemas/alpha.operation.alpha.contents"
+                              "$ref": "#/components/schemas/025-PsUshuai.operation.alpha.contents"
                             }
                           },
                           "signature": {
@@ -547,7 +543,7 @@
                           "protocol": {
                             "type": "string",
                             "enum": [
-                              "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
+                              "PsUshuai9QapM5TGj1JpuVGkdxz5GykdnEvS6Rh8SUVrARvZLCY"
                             ]
                           },
                           "branch": {
@@ -556,7 +552,7 @@
                           "contents": {
                             "type": "array",
                             "items": {
-                              "$ref": "#/components/schemas/alpha.operation.alpha.contents"
+                              "$ref": "#/components/schemas/025-PsUshuai.operation.alpha.contents"
                             }
                           },
                           "signature": {
@@ -594,8 +590,7 @@
               }
             }
           }
-        },
-        "summary": "/pending_operations"
+        }
       }
     },
     "/request_operations": {
@@ -644,8 +639,7 @@
               }
             }
           }
-        },
-        "summary": "/request_operations"
+        }
       }
     },
     "/unban_all_operations": {
@@ -680,8 +674,7 @@
               }
             }
           }
-        },
-        "summary": "/unban_all_operations"
+        }
       }
     },
     "/unban_operation": {
@@ -720,102 +713,13 @@
               }
             }
           }
-        },
-        "summary": "/unban_operation"
+        }
       }
     }
   },
   "components": {
     "schemas": {
-      "Bls12_381_signature": {
-        "title": "A Bls12_381 signature (Base58Check-encoded)",
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/unistring"
-          }
-        ]
-      },
-      "Context_hash": {
-        "title": "A hash of context (Base58Check-encoded)",
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/unistring"
-          }
-        ]
-      },
-      "DAL_commitment": {
-        "title": "Commitment representation for the DAL (Base58Check-encoded)",
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/unistring"
-          }
-        ]
-      },
-      "Ed25519.Public_key_hash": {
-        "title": "An Ed25519 public key hash (Base58Check-encoded)",
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/unistring"
-          }
-        ]
-      },
-      "Operation_hash": {
-        "title": "A Tezos operation ID (Base58Check-encoded)",
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/unistring"
-          }
-        ]
-      },
-      "Operation_list_list_hash": {
-        "title": "A list of list of operations (Base58Check-encoded)",
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/unistring"
-          }
-        ]
-      },
-      "Protocol_hash": {
-        "title": "A Tezos protocol ID (Base58Check-encoded)",
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/unistring"
-          }
-        ]
-      },
-      "Signature.Public_key": {
-        "title": "A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key (Base58Check-encoded)",
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/unistring"
-          }
-        ]
-      },
-      "Signature.Public_key_hash": {
-        "title": "A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash (Base58Check-encoded)",
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/unistring"
-          }
-        ]
-      },
-      "Signature.V3": {
-        "title": "A Ed25519, Secp256k1, P256, BLS or Mldsa44 signature (Base58Check-encoded)",
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/unistring"
-          }
-        ]
-      },
-      "Zk_rollup_hash": {
-        "title": "A zk rollup address (Base58Check-encoded)",
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/unistring"
-          }
-        ]
-      },
-      "alpha.block_header.alpha.full_header": {
+      "025-PsUshuai.block_header.alpha.full_header": {
         "title": "Shell header",
         "description": "Block header's shell-related content. It contains information such as the block level, its predecessor and timestamp.",
         "type": "object",
@@ -866,7 +770,7 @@
             "$ref": "#/components/schemas/cycle_nonce"
           },
           "liquidity_baking_toggle_vote": {
-            "$ref": "#/components/schemas/alpha.liquidity_baking_vote"
+            "$ref": "#/components/schemas/025-PsUshuai.liquidity_baking_vote"
           },
           "signature": {
             "$ref": "#/components/schemas/Signature.V3"
@@ -888,7 +792,7 @@
           "signature"
         ]
       },
-      "alpha.contract_id": {
+      "025-PsUshuai.contract_id": {
         "title": "A contract handle",
         "description": "A contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash or a base58 originated contract hash.",
         "oneOf": [
@@ -897,7 +801,7 @@
           }
         ]
       },
-      "alpha.contract_id.originated": {
+      "025-PsUshuai.contract_id.originated": {
         "title": "A contract handle -- originated account",
         "description": "A contract notation as given to an RPC or inside scripts. Can be a base58 originated contract hash.",
         "oneOf": [
@@ -906,7 +810,7 @@
           }
         ]
       },
-      "alpha.entrypoint": {
+      "025-PsUshuai.entrypoint": {
         "title": "entrypoint",
         "description": "Named entrypoint to a Michelson smart contract",
         "oneOf": [
@@ -990,7 +894,7 @@
           }
         ]
       },
-      "alpha.inlined.consensus_operation": {
+      "025-PsUshuai.inlined.consensus_operation": {
         "description": "An operation's shell header.",
         "type": "object",
         "properties": {
@@ -998,7 +902,7 @@
             "$ref": "#/components/schemas/block_hash"
           },
           "operations": {
-            "$ref": "#/components/schemas/alpha.inlined.consensus_operation.contents"
+            "$ref": "#/components/schemas/025-PsUshuai.inlined.consensus_operation.contents"
           },
           "signature": {
             "$ref": "#/components/schemas/Signature.V3"
@@ -1009,7 +913,7 @@
           "operations"
         ]
       },
-      "alpha.inlined.consensus_operation.contents": {
+      "025-PsUshuai.inlined.consensus_operation.contents": {
         "oneOf": [
           {
             "title": "Preattestation",
@@ -1235,7 +1139,7 @@
           }
         ]
       },
-      "alpha.liquidity_baking_vote": {
+      "025-PsUshuai.liquidity_baking_vote": {
         "oneOf": [
           {
             "title": "per_block_vote_on",
@@ -1260,7 +1164,7 @@
           }
         ]
       },
-      "alpha.michelson.v1.primitives": {
+      "025-PsUshuai.michelson.v1.primitives": {
         "type": "string",
         "enum": [
           "SHA256",
@@ -1426,10 +1330,10 @@
           "code"
         ]
       },
-      "alpha.mutez": {
+      "025-PsUshuai.mutez": {
         "$ref": "#/components/schemas/positive_bignum"
       },
-      "alpha.operation.alpha.contents": {
+      "025-PsUshuai.operation.alpha.contents": {
         "oneOf": [
           {
             "title": "Attestation",
@@ -1669,10 +1573,10 @@
                 "maximum": 65535
               },
               "op1": {
-                "$ref": "#/components/schemas/alpha.inlined.consensus_operation"
+                "$ref": "#/components/schemas/025-PsUshuai.inlined.consensus_operation"
               },
               "op2": {
-                "$ref": "#/components/schemas/alpha.inlined.consensus_operation"
+                "$ref": "#/components/schemas/025-PsUshuai.inlined.consensus_operation"
               }
             },
             "required": [
@@ -1750,10 +1654,10 @@
                 ]
               },
               "bh1": {
-                "$ref": "#/components/schemas/alpha.block_header.alpha.full_header"
+                "$ref": "#/components/schemas/025-PsUshuai.block_header.alpha.full_header"
               },
               "bh2": {
-                "$ref": "#/components/schemas/alpha.block_header.alpha.full_header"
+                "$ref": "#/components/schemas/025-PsUshuai.block_header.alpha.full_header"
               }
             },
             "required": [
@@ -1773,7 +1677,7 @@
                 ]
               },
               "attestation": {
-                "$ref": "#/components/schemas/alpha.inlined.consensus_operation"
+                "$ref": "#/components/schemas/025-PsUshuai.inlined.consensus_operation"
               },
               "consensus_slot": {
                 "type": "integer",
@@ -1938,7 +1842,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -1980,7 +1884,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -1992,16 +1896,16 @@
                 "$ref": "#/components/schemas/positive_bignum"
               },
               "amount": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               },
               "destination": {
-                "$ref": "#/components/schemas/alpha.contract_id"
+                "$ref": "#/components/schemas/025-PsUshuai.contract_id"
               },
               "parameters": {
                 "type": "object",
                 "properties": {
                   "entrypoint": {
-                    "$ref": "#/components/schemas/alpha.entrypoint"
+                    "$ref": "#/components/schemas/025-PsUshuai.entrypoint"
                   },
                   "value": {}
                 },
@@ -2036,7 +1940,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2048,13 +1952,13 @@
                 "$ref": "#/components/schemas/positive_bignum"
               },
               "balance": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               },
               "delegate": {
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "script": {
-                "$ref": "#/components/schemas/alpha.scripted.contracts"
+                "$ref": "#/components/schemas/025-PsUshuai.scripted.contracts"
               }
             },
             "required": [
@@ -2082,7 +1986,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2120,7 +2024,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2132,7 +2036,7 @@
                 "$ref": "#/components/schemas/positive_bignum"
               },
               "limit": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               }
             },
             "required": [
@@ -2158,7 +2062,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2173,7 +2077,7 @@
                 "$ref": "#/components/schemas/bignum"
               },
               "destination": {
-                "$ref": "#/components/schemas/alpha.contract_id.originated"
+                "$ref": "#/components/schemas/025-PsUshuai.contract_id.originated"
               }
             },
             "required": [
@@ -2201,7 +2105,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2243,7 +2147,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2332,7 +2236,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2369,7 +2273,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2383,13 +2287,13 @@
               "ticket_contents": {},
               "ticket_ty": {},
               "ticket_ticketer": {
-                "$ref": "#/components/schemas/alpha.contract_id"
+                "$ref": "#/components/schemas/025-PsUshuai.contract_id"
               },
               "ticket_amount": {
                 "$ref": "#/components/schemas/positive_bignum"
               },
               "destination": {
-                "$ref": "#/components/schemas/alpha.contract_id"
+                "$ref": "#/components/schemas/025-PsUshuai.contract_id"
               },
               "entrypoint": {
                 "$ref": "#/components/schemas/unistring"
@@ -2424,7 +2328,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2482,7 +2386,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2539,7 +2443,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2582,7 +2486,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2621,7 +2525,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2686,7 +2590,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2977,7 +2881,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -3032,7 +2936,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -3080,7 +2984,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -3123,7 +3027,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -3225,7 +3129,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -3298,13 +3202,13 @@
                             "type": "object",
                             "properties": {
                               "contents": {
-                                "$ref": "#/components/schemas/micheline.alpha.michelson_v1.expression"
+                                "$ref": "#/components/schemas/micheline.025-PsUshuai.michelson_v1.expression"
                               },
                               "ty": {
-                                "$ref": "#/components/schemas/micheline.alpha.michelson_v1.expression"
+                                "$ref": "#/components/schemas/micheline.025-PsUshuai.michelson_v1.expression"
                               },
                               "ticketer": {
-                                "$ref": "#/components/schemas/alpha.contract_id"
+                                "$ref": "#/components/schemas/025-PsUshuai.contract_id"
                               }
                             },
                             "required": [
@@ -3345,7 +3249,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/alpha.mutez"
+                "$ref": "#/components/schemas/025-PsUshuai.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -3473,7 +3377,7 @@
           }
         ]
       },
-      "alpha.scripted.contracts": {
+      "025-PsUshuai.scripted.contracts": {
         "type": "object",
         "properties": {
           "code": {},
@@ -3482,6 +3386,94 @@
         "required": [
           "code",
           "storage"
+        ]
+      },
+      "Bls12_381_signature": {
+        "title": "A Bls12_381 signature (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Context_hash": {
+        "title": "A hash of context (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "DAL_commitment": {
+        "title": "Commitment representation for the DAL (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Ed25519.Public_key_hash": {
+        "title": "An Ed25519 public key hash (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Operation_hash": {
+        "title": "A Tezos operation ID (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Operation_list_list_hash": {
+        "title": "A list of list of operations (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Protocol_hash": {
+        "title": "A Tezos protocol ID (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Signature.Public_key": {
+        "title": "A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Signature.Public_key_hash": {
+        "title": "A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Signature.V3": {
+        "title": "A Ed25519, Secp256k1, P256, BLS or Mldsa44 signature (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Zk_rollup_hash": {
+        "title": "A zk rollup address (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
         ]
       },
       "bignum": {
@@ -3525,7 +3517,7 @@
         "description": "Decimal representation of 64 bit integers",
         "type": "string"
       },
-      "micheline.alpha.michelson_v1.expression": {
+      "micheline.025-PsUshuai.michelson_v1.expression": {
         "oneOf": [
           {
             "title": "Int",
@@ -3568,7 +3560,7 @@
             "title": "Sequence",
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/micheline.alpha.michelson_v1.expression"
+              "$ref": "#/components/schemas/micheline.025-PsUshuai.michelson_v1.expression"
             }
           },
           {
@@ -3577,12 +3569,12 @@
             "type": "object",
             "properties": {
               "prim": {
-                "$ref": "#/components/schemas/alpha.michelson.v1.primitives"
+                "$ref": "#/components/schemas/025-PsUshuai.michelson.v1.primitives"
               },
               "args": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/micheline.alpha.michelson_v1.expression"
+                  "$ref": "#/components/schemas/micheline.025-PsUshuai.michelson_v1.expression"
                 }
               },
               "annots": {
